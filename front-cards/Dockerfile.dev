@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files only (for layer caching)
+COPY package.json ./
+
+# Install dependencies
+RUN npm install
+
+# Note: Source code is mounted as volume for hot-reload
+# No COPY of source code in dev mode
+
+EXPOSE 3000
+
+# Development with hot-reload
+CMD ["npm", "run", "dev"]

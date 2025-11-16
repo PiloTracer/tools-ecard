@@ -1,0 +1,229 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - Normalized relational database
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecards-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecards_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecards_dev_password}
+    ports:
+      - "${POSTGRES_HOST_PORT:-7432}:${POSTGRES_PORT:-5432}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init-postgres:/docker-entrypoint-initdb.d
+    networks:
+      - ecards-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecards_user -d ecards_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Cassandra - Canonical database for high-scale event/log data
+  cassandra:
+    image: cassandra:5.0
+    container_name: ecards-cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: ${CASSANDRA_CLUSTER_NAME:-ecards_cluster}
+      CASSANDRA_DC: ${CASSANDRA_DC:-dc1}
+      CASSANDRA_RACK: ${CASSANDRA_RACK:-rack1}
+      CASSANDRA_ENDPOINT_SNITCH: ${CASSANDRA_ENDPOINT_SNITCH:-GossipingPropertyFileSnitch}
+      CASSANDRA_NUM_TOKENS: ${CASSANDRA_NUM_TOKENS:-256}
+    ports:
+      - "${CASSANDRA_NATIVE_PORT_HOST:-7042}:${CASSANDRA_PORT:-9042}"
+      - "${CASSANDRA_THRIFT_PORT_HOST:-7160}:9160"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+      - ./db/init-cassandra:/docker-entrypoint-initdb.d
+    networks:
+      - ecards-network
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Redis - Job queue and cache
+  redis:
+    image: redis:7-alpine
+    container_name: ecards-redis
+    ports:
+      - "${REDIS_HOST_PORT:-7379}:${REDIS_PORT:-6379}"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecards-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Frontend - Next.js 16 application (Public-facing)
+  front-cards:
+    build:
+      context: ./front-cards
+      dockerfile: Dockerfile.dev
+    container_name: ecards-frontend
+    ports:
+      - "${FRONTEND_HOST_PORT:-7300}:${FRONTEND_PORT:-3000}"
+    volumes:
+      - ./front-cards:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7400}
+    networks:
+      - ecards-network
+    depends_on:
+      - api-server
+    command: npm run dev
+
+  # API Server - Internal backend service (NOT the external auth API)
+  # This is the E-Cards application's own API server for internal operations
+  api-server:
+    build:
+      context: ./api-server
+      dockerfile: Dockerfile.dev
+    container_name: ecards-api
+    ports:
+      - "${API_PORT:-7400}:${API_INTERNAL_PORT:-4000}"
+    volumes:
+      - ./api-server:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_PORT: ${API_PORT:-7400}
+      API_INTERNAL_PORT: ${API_INTERNAL_PORT:-4000}
+      PORT: ${API_INTERNAL_PORT:-4000}
+      API_URL: ${API_URL:-http://localhost:7400}
+      # PostgreSQL
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-ecards_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecards_dev_password}
+      # Cassandra
+      CASSANDRA_HOSTS: ${CASSANDRA_HOSTS:-cassandra}
+      CASSANDRA_PORT: ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-ecards_canonical}
+      CASSANDRA_DC: ${CASSANDRA_DC:-dc1}
+      # Redis
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # JWT (for internal token generation)
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
+      JWT_EXPIRY: ${JWT_EXPIRY:-7d}
+      # Rate limiting
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      # LLM Configuration
+      LLM_ENABLED: ${LLM_ENABLED:-true}
+      LLM_PRIMARY_PROVIDER: ${LLM_PRIMARY_PROVIDER:-openai}
+      LLM_FALLBACK_PROVIDER: ${LLM_FALLBACK_PROVIDER:-deepseek}
+      LLM_CREDIT_COST: ${LLM_CREDIT_COST:-1}
+      LLM_RETRY_ATTEMPTS: ${LLM_RETRY_ATTEMPTS:-2}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-10000}
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-proj-your-openai-api-key-here}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-500}
+      OPENAI_TEMPERATURE: ${OPENAI_TEMPERATURE:-0.3}
+      # Anthropic
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-sk-ant-your-anthropic-api-key-here}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-500}
+      ANTHROPIC_TEMPERATURE: ${ANTHROPIC_TEMPERATURE:-0.3}
+      # DeepSeek
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-your-deepseek-api-key-here}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_MAX_TOKENS: ${DEEPSEEK_MAX_TOKENS:-500}
+      DEEPSEEK_TEMPERATURE: ${DEEPSEEK_TEMPERATURE:-0.3}
+      # External LLM (Backward Compatibility)
+      EXTERNAL_LLM_API: ${EXTERNAL_LLM_API:-http://remote-llm-server:5000/api/llm}
+      # SeaweedFS (Remote - Client Configuration)
+      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://remote-seaweedfs-host:8888}
+      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-your_seaweedfs_access_key}
+      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-your_seaweedfs_secret_key}
+      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-ecards}
+      # External services (Remote Auth & User Management API)
+      EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://remote-auth-server:5000}
+      EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://remote-auth-server:5000/ws}
+      EXTERNAL_USER_API: ${EXTERNAL_USER_API:-http://remote-auth-server:5000/api/users}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      DEBUG: ${DEBUG:-*}
+    networks:
+      - ecards-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+  # Render Worker - Background job processor
+  render-worker:
+    build:
+      context: ./render-worker
+      dockerfile: Dockerfile.dev
+    container_name: ecards-render-worker
+    volumes:
+      - ./render-worker:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # PostgreSQL
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-ecards_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecards_dev_password}
+      # Cassandra
+      CASSANDRA_HOSTS: ${CASSANDRA_HOSTS:-cassandra}
+      CASSANDRA_PORT: ${CASSANDRA_PORT:-9042}
+      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-ecards_canonical}
+      CASSANDRA_DC: ${CASSANDRA_DC:-dc1}
+      # Redis
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # SeaweedFS (Remote - Client Configuration)
+      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://remote-seaweedfs-host:8888}
+      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-your_seaweedfs_access_key}
+      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-your_seaweedfs_secret_key}
+      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-ecards}
+      # Worker config
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+      WORKER_TIMEOUT: ${WORKER_TIMEOUT:-60000}
+      RENDER_ENGINE: ${RENDER_ENGINE:-canvas}
+    networks:
+      - ecards-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
+
+networks:
+  ecards-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  cassandra_data:
+  redis_data:

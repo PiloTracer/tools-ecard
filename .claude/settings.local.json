@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(CONTEXT.tmp)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
