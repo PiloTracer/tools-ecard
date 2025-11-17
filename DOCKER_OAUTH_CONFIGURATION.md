@@ -120,7 +120,7 @@ NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
 
 # Backend (server-side)
 OAUTH_CLIENT_ID=ecards_app_dev  # Must match NEXT_PUBLIC_OAUTH_CLIENT_ID
-OAUTH_CLIENT_SECRET=YaLYMeDOEojswc6lrrqKXT0RHbVlNN5K  # REQUIRED - Get from Tools Dashboard
+OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w  # REQUIRED - Get from Tools Dashboard
 OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
 
 # Application Identity (if using Admin API)
@@ -168,7 +168,7 @@ NEXT_PUBLIC_USER_SUBSCRIPTION_URL=http://epicdev.com/app/features/user-subscript
 **Expected output (backend):**
 ```
 OAUTH_CLIENT_ID=ecards_app_dev
-OAUTH_CLIENT_SECRET=YaLYMeDOEojswc6lrrqKXT0RHbVlNN5K
+OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me

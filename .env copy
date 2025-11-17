@@ -61,7 +61,7 @@ NEXT_PUBLIC_USER_SUBSCRIPTION_URL=http://epicdev.com/app/features/user-subscript
 
 # Backend OAuth Configuration (server-side only)
 OAUTH_CLIENT_ID=ecards_app_dev
-OAUTH_CLIENT_SECRET=YaLYMeDOEojswc6lrrqKXT0RHbVlNN5K
+OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://host.docker.internal/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://host.docker.internal/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://host.docker.internal/api/users/me

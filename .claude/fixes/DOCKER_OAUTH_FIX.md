@@ -110,7 +110,7 @@ Changed backend OAuth endpoints to use `epicdev.com` (now that containers can re
 # Backend OAuth Configuration (server-side only)
 # NOTE: With extra_hosts in docker-compose.yml, epicdev.com resolves to host machine inside containers
 OAUTH_CLIENT_ID=ecards_app_dev
-OAUTH_CLIENT_SECRET=YaLYMeDOEojswc6lrrqKXT0RHbVlNN5K
+OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
@@ -183,7 +183,7 @@ Ensure your `.env` file matches `.env.dev.example`:
 ```bash
 # Backend OAuth Configuration (server-side only)
 OAUTH_CLIENT_ID=ecards_app_dev
-OAUTH_CLIENT_SECRET=YaLYMeDOEojswc6lrrqKXT0RHbVlNN5K
+OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me

@@ -64,15 +64,32 @@ export default function LoginPage() {
       setIsLoading(true);
       setError(null);
 
-      console.log('Initiating OAuth flow...');
+      console.log('Initiating OAuth flow (server-side)...');
 
-      // Generate OAuth authorization URL with PKCE and state
-      const authUrl = await generateAuthorizationUrl();
+      // Call server-side API to generate authorization URL and store PKCE in cookies
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      console.log('Redirecting to OAuth authorization endpoint:', authUrl);
+      if (!response.ok) {
+        throw new Error('Failed to initiate login');
+      }
+
+      const data = await response.json();
+
+      if (!data.success || !data.authorizationUrl) {
+        throw new Error(data.error || 'Failed to get authorization URL');
+      }
+
+      console.log('Authorization URL received from server');
+      console.log('PKCE data stored in HTTP-only cookies');
+      console.log('Redirecting to OAuth authorization endpoint...');
 
       // Redirect to Tools Dashboard for authentication
-      window.location.href = authUrl;
+      window.location.href = data.authorizationUrl;
     } catch (err) {
       console.error('Error initiating login:', err);
       setError(`Failed to initiate login: ${err instanceof Error ? err.message : 'Unknown error'}`);
