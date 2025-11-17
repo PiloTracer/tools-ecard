@@ -666,9 +666,9 @@ export default async function handler(
 
 ### Overview
 
-When users click **"Launch app"** in the Tools Dashboard App Library, the Tools Dashboard **pre-initiates the OAuth flow** by redirecting to your application with OAuth parameters already in the URL.
+When users click **"Launch App"** in the Tools Dashboard App Library, the Tools Dashboard **pre-initiates the OAuth flow** by redirecting the user **DIRECTLY to the OAuth authorization endpoint**, not to your application first.
 
-**This is different from the standard flow** where your app initiates OAuth. Instead of generating new OAuth parameters, your app must **use the parameters that Tools Dashboard already sent**.
+**This is the most streamlined flow** - users go from App Library → OAuth consent screen → Your app (authenticated), without visiting your login page.
 
 ### How It Works
 
@@ -678,368 +678,493 @@ When users click **"Launch app"** in the Tools Dashboard App Library, the Tools 
 │   Browser   │                                  │  App Library     │
 └──────┬──────┘                                  └────────┬─────────┘
        │                                                  │
-       │  1. Click "Launch app" button                   │
+       │  1. Click "Launch App" button                   │
        ├────────────────────────────────────────────────►│
        │                                                  │
-       │  2. Redirect with OAuth parameters              │
-       │     http://yourapp.com/?client_id=xxx&state=yyy │
-       │     &code_challenge=zzz&redirect_uri=...        │
+       │  2. Redirect DIRECTLY to OAuth endpoint         │
+       │     http://epicdev.com/oauth/authorize?         │
+       │     client_id=xxx&state=yyy&redirect_uri=...    │
        │◄─────────────────────────────────────────────────┤
        │                                                  │
        │                                         ┌────────┴─────────┐
-       │                                         │  Your App        │
-       │  3. Detect OAuth params in URL          │  (Landing Page)  │
+       │                                         │  OAuth Server    │
+       │  3. Show consent screen                 │  (Tools Dashboard)│
        ├────────────────────────────────────────►│                  │
        │                                         └────────┬─────────┘
        │                                                  │
-       │  4. Pass params to /login?client_id=xxx&...     │
+       │  4. User approves                               │
+       │◄─────────────────────────────────────────────────┤
+       │                                                  │
+       │  5. Redirect to your callback with code         │
+       │     http://yourapp.com/auth/callback?           │
+       │     code=xxx&state=yyy                          │
        │◄─────────────────────────────────────────────────┤
        │                                                  │
        │                                         ┌────────┴─────────┐
        │                                         │  Your App        │
-       │  5. Use SAME params - redirect to       │  (Login Page)    │
-       │     authorize endpoint with SAME state  │                  │
-       │     and code_challenge                  └────────┬─────────┘
+       │  6. Exchange code for token             │  (Callback)      │
+       ├────────────────────────────────────────►│                  │
+       │                                         └────────┬─────────┘
        │                                                  │
-       │  6. Redirect to Tools Dashboard OAuth            │
-       │     http://epicdev.com/oauth/authorize?          │
-       │     client_id=xxx&state=yyy&code_challenge=zzz  │
+       │  7. Redirect to your authenticated app          │
        │◄─────────────────────────────────────────────────┤
        │                                                  │
-       │  (Continue with standard OAuth flow...)          │
 ```
 
-### URL Parameters Sent by Tools Dashboard
+### OAuth Parameters in Authorization URL
 
-When Tools Dashboard redirects to your app, it includes:
+When Tools Dashboard redirects to the authorization endpoint, it includes:
 
 | Parameter | Example | Description |
 |-----------|---------|-------------|
 | `client_id` | `ecards_app_dev` | Your OAuth client ID |
-| `redirect_uri` | `http://localhost:7300/auth/callback` | Where to send user after auth |
+| `redirect_uri` | `http://localhost:7300/auth/callback` | Your callback URL |
 | `scope` | `profile email subscription` | Requested permissions |
-| `state` | `40ed89e34402fb...` | CSRF protection token (generated by Tools Dashboard) |
-| `response_type` | `code` | OAuth response type |
+| `state` | `40ed89e34402fb...` | CSRF protection token (64 chars) |
+| `response_type` | `code` | OAuth response type (always "code") |
 
 **IMPORTANT:** For pre-initiated flows, Tools Dashboard does **NOT** include PKCE parameters (`code_challenge` and `code_challenge_method`). This is because:
-- The remote app would need access to the `code_verifier` during token exchange
-- PKCE requires the same client to generate both challenge and verifier
-- For pre-initiated flows, `client_secret` provides sufficient security
+- Your app doesn't generate the state or PKCE - Tools Dashboard does
+- You wouldn't have access to the `code_verifier` during token exchange
+- For pre-initiated flows, `client_secret` provides sufficient security (standard OAuth 2.0)
 
-**Example URL:**
+**Example Authorization URL:**
 ```
-http://localhost:7300/?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4&response_type=code
+http://epicdev.com/oauth/authorize?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4&response_type=code
 ```
 
-### ⚠️ Critical: Don't Generate New Parameters!
+### ⚠️ Critical: Handle State Validation Correctly!
 
-**WRONG ❌** - Your app generates new state:
+Since Tools Dashboard redirects **directly to the authorization endpoint**, your app will receive the callback with a state parameter that **you didn't generate**. Your callback handler must detect this and handle it appropriately.
+
+**Key Point:** For pre-initiated flows:
+- Tools Dashboard generates the `state` parameter
+- Your app will NOT have this state stored in sessionStorage
+- You should SKIP state validation for pre-initiated flows
+- The authorization server already validated the state
+
+**WRONG ❌** - Always validate state (fails for pre-initiated flows):
 ```javascript
-// DON'T DO THIS when OAuth is pre-initiated!
-function handleLogin() {
-  const state = generateRandomState(); // ❌ Creates NEW state
+// DON'T DO THIS - will fail for pre-initiated flows!
+async function handleCallback() {
+  const state = searchParams.get('state');
+  const storedState = sessionStorage.getItem('oauth_state');
 
-  const authUrl = `http://epicdev.com/oauth/authorize?` +
-    `client_id=xxx&` +
-    `state=${state}&` + // ❌ Different from Tools Dashboard's state
-    `...other params`;
+  if (state !== storedState) {
+    throw new Error('State mismatch!'); // ❌ Will ALWAYS fail for pre-initiated flows
+  }
 
-  window.location.href = authUrl;
+  // Exchange code for token...
 }
-// Result: Tools Dashboard won't recognize the state - auth fails!
+// Result: Pre-initiated OAuth fails every time!
 ```
 
-**CORRECT ✅** - Use the parameters Tools Dashboard sent:
+**CORRECT ✅** - Conditionally validate state:
 ```javascript
-// DO THIS - Use the parameters from the URL
-function handlePreInitiatedOAuth(searchParams) {
-  // Just pass through the parameters Tools Dashboard sent
-  const authUrl = `http://epicdev.com/oauth/authorize?${searchParams.toString()}`;
+// DO THIS - detect pre-initiated vs self-initiated flows
+async function handleCallback() {
+  const code = searchParams.get('code');
+  const state = searchParams.get('state');
+  const clientId = searchParams.get('client_id'); // Might be in callback URL
 
-  window.location.href = authUrl;
+  // Check if we have a stored state (self-initiated flow)
+  const storedState = sessionStorage.getItem('oauth_state');
+
+  if (storedState) {
+    // Self-initiated flow - validate state
+    if (state !== storedState) {
+      console.error('State mismatch - possible CSRF attack');
+      throw new Error('Invalid state parameter');
+    }
+    console.log('Self-initiated OAuth flow - state validated ✓');
+  } else {
+    // Pre-initiated flow from Tools Dashboard - skip state validation
+    // The authorization server already validated the state
+    console.log('Pre-initiated OAuth flow detected - skipping state validation');
+  }
+
+  // Exchange code for token (same for both flows)
+  await exchangeCodeForToken(code);
 }
-// Result: Tools Dashboard recognizes its own state - auth succeeds!
+// Result: Both pre-initiated and self-initiated flows work! ✅
 ```
 
 ### Implementation
 
-#### Step 1: Detect OAuth Parameters in Landing Page
+Since Tools Dashboard redirects **directly to the authorization endpoint**, your app only needs to handle the **OAuth callback**. You don't need special logic in your landing page or login page to detect OAuth parameters.
 
-```javascript
-// app/page.tsx (Landing Page)
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-
-export default function LandingPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    // Check if OAuth parameters are present (sent from Tools Dashboard)
-    const hasOAuthParams = searchParams.has('client_id') &&
-                          searchParams.has('state') &&
-                          searchParams.has('response_type');
-
-    if (hasOAuthParams) {
-      console.log('OAuth parameters detected from Tools Dashboard');
-      console.log('Parameters:', {
-        client_id: searchParams.get('client_id'),
-        state: searchParams.get('state'),
-        redirect_uri: searchParams.get('redirect_uri'),
-        scope: searchParams.get('scope'),
-      });
-
-      // IMPORTANT: Pass parameters to login page
-      // Don't lose them!
-      router.push(`/login?${searchParams.toString()}`);
-      return;
-    }
-
-    // No OAuth params - show normal landing page
-  }, [searchParams, router]);
-
-  return <div>Landing Page</div>;
-}
-```
-
-#### Step 2: Handle Parameters in Login Page
-
-```javascript
-// app/login/page.tsx (Login Page)
-'use client';
-
-import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-
-export default function LoginPage() {
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    // Check if OAuth parameters are present (from Tools Dashboard)
-    const hasOAuthParams = searchParams.has('client_id') &&
-                          searchParams.has('state') &&
-                          searchParams.has('response_type');
-
-    if (hasOAuthParams) {
-      console.log('Pre-initiated OAuth detected - using provided parameters');
-
-      // Use the OAuth parameters that Tools Dashboard already sent
-      // DON'T generate new ones!
-      const authUrl = `${OAUTH_CONFIG.authorizationEndpoint}?${searchParams.toString()}`;
-
-      console.log('Redirecting to:', authUrl);
-      window.location.href = authUrl;
-      return;
-    }
-  }, [searchParams]);
-
-  // Manual login button (when user comes directly, not from App Library)
-  const handleManualLogin = async () => {
-    // Only generate new parameters when user manually clicks login
-    const authUrl = await generateAuthorizationUrl();
-    window.location.href = authUrl;
-  };
-
-  return (
-    <div>
-      <button onClick={handleManualLogin}>
-        Login with Tools Dashboard
-      </button>
-    </div>
-  );
-}
-```
-
-#### Step 3: OAuth Callback Handles Both Flows
+#### OAuth Callback Implementation (Handles Both Pre-Initiated and Self-Initiated Flows)
 
 ```javascript
 // app/auth/callback/page.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function OAuthCallback() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [status, setStatus] = useState('processing');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     async function handleCallback() {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
+      const error = searchParams.get('error');
+      const errorDescription = searchParams.get('error_description');
 
-      if (!code || !state) {
-        console.error('Missing code or state');
-        router.push('/login?error=invalid_callback');
+      // Handle OAuth errors
+      if (error) {
+        console.error('OAuth error:', error, errorDescription);
+        setStatus('error');
+        setErrorMessage(errorDescription || error);
+        setTimeout(() => router.push(`/login?error=${error}`), 3000);
         return;
       }
 
-      // For pre-initiated OAuth:
-      // - Tools Dashboard generated the state and code_challenge
-      // - We don't have code_verifier stored in sessionStorage
-      // - We need to handle this differently
+      // Validate required parameters
+      if (!code || !state) {
+        console.error('Missing code or state parameter');
+        setStatus('error');
+        setErrorMessage('Invalid callback - missing required parameters');
+        setTimeout(() => router.push('/login?error=invalid_callback'), 3000);
+        return;
+      }
 
-      // Check if we have a stored state (manual login)
-      const storedState = sessionStorage.getItem('oauth_state');
+      try {
+        // ⚠️ CRITICAL: Detect if this is pre-initiated or self-initiated flow
+        const storedState = sessionStorage.getItem('oauth_state');
 
-      if (storedState) {
-        // Manual login flow - verify state
-        if (state !== storedState) {
-          console.error('State mismatch');
-          router.push('/login?error=invalid_state');
-          return;
-        }
+        if (storedState) {
+          // ✅ Self-initiated flow (user clicked "Login with Tools Dashboard")
+          console.log('Self-initiated OAuth flow detected');
 
-        // Get code verifier for PKCE
-        const codeVerifier = sessionStorage.getItem('code_verifier');
+          // Validate state for CSRF protection
+          if (state !== storedState) {
+            console.error('State mismatch - possible CSRF attack');
+            console.error('Expected:', storedState);
+            console.error('Received:', state);
+            setStatus('error');
+            setErrorMessage('Security validation failed');
+            setTimeout(() => router.push('/login?error=state_mismatch'), 3000);
+            return;
+          }
 
-        // Exchange code for token
-        const response = await fetch('/api/auth/exchange-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, codeVerifier }),
-        });
+          console.log('State validated successfully ✓');
 
-        const result = await response.json();
+          // Get code verifier for PKCE (if your self-initiated flow uses PKCE)
+          const codeVerifier = sessionStorage.getItem('code_verifier');
 
-        if (result.success) {
-          sessionStorage.removeItem('oauth_state');
-          sessionStorage.removeItem('code_verifier');
-          router.push('/dashboard');
+          // Exchange code for token
+          const response = await fetch('/api/auth/exchange-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              code_verifier: codeVerifier || undefined,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            // Clean up sessionStorage
+            sessionStorage.removeItem('oauth_state');
+            sessionStorage.removeItem('code_verifier');
+
+            console.log('Authentication successful ✓');
+            setStatus('success');
+            router.push('/dashboard');
+          } else {
+            console.error('Token exchange failed:', result.error);
+            setStatus('error');
+            setErrorMessage(result.error || 'Authentication failed');
+            setTimeout(() => router.push('/login?error=token_exchange_failed'), 3000);
+          }
+
         } else {
-          router.push('/login?error=token_exchange_failed');
+          // ✅ Pre-initiated flow (launched from Tools Dashboard App Library)
+          console.log('Pre-initiated OAuth flow detected (from App Library)');
+          console.log('Skipping state validation - authorization server already validated');
+
+          // NO state validation needed - the authorization server validated it
+          // NO code_verifier needed - pre-initiated flows don't use PKCE
+
+          // Exchange code for token
+          const response = await fetch('/api/auth/exchange-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              // No code_verifier - pre-initiated flows don't use PKCE
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            console.log('Authentication successful ✓');
+            setStatus('success');
+            router.push('/dashboard');
+          } else {
+            console.error('Token exchange failed:', result.error);
+            setStatus('error');
+            setErrorMessage(result.error || 'Authentication failed');
+            setTimeout(() => router.push('/login?error=token_exchange_failed'), 3000);
+          }
         }
-      } else {
-        // Pre-initiated OAuth flow from Tools Dashboard
-        // We don't have code_verifier because Tools Dashboard generated it
-        // Just exchange the code (Tools Dashboard validates on their end)
 
-        console.log('Pre-initiated OAuth callback - exchanging code');
-
-        const response = await fetch('/api/auth/exchange-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code,
-            // No codeVerifier - Tools Dashboard handles PKCE validation
-          }),
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          router.push('/dashboard');
-        } else {
-          router.push('/login?error=token_exchange_failed');
-        }
+      } catch (error) {
+        console.error('Callback handling error:', error);
+        setStatus('error');
+        setErrorMessage('An unexpected error occurred');
+        setTimeout(() => router.push('/login?error=unknown_error'), 3000);
       }
     }
 
     handleCallback();
   }, [router, searchParams]);
 
-  return <div>Processing login...</div>;
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        {status === 'processing' && (
+          <>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Completing authentication...</p>
+          </>
+        )}
+        {status === 'success' && (
+          <>
+            <div className="text-green-500 text-5xl mb-4">✓</div>
+            <p className="text-gray-600">Authentication successful! Redirecting...</p>
+          </>
+        )}
+        {status === 'error' && (
+          <>
+            <div className="text-red-500 text-5xl mb-4">✗</div>
+            <p className="text-gray-600">Authentication failed</p>
+            <p className="text-sm text-gray-500 mt-2">{errorMessage}</p>
+            <p className="text-xs text-gray-400 mt-4">Redirecting to login...</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 ```
 
-### Key Differences: Pre-Initiated vs Manual Login
+### Key Differences: Pre-Initiated vs Self-Initiated Login
 
-| Aspect | Pre-Initiated (App Library) | Manual Login |
-|--------|----------------------------|--------------|
+| Aspect | Pre-Initiated (App Library) | Self-Initiated (Manual Login) |
+|--------|----------------------------|-------------------------------|
+| **Who initiates** | Tools Dashboard App Library | Your app |
+| **Where user starts** | App Library page | Your login page |
+| **First redirect** | Directly to OAuth authorization endpoint | To OAuth authorization endpoint |
 | **Who generates state** | Tools Dashboard | Your app |
-| **Who generates code_challenge** | Tools Dashboard | Your app |
-| **Code verifier stored?** | No (Tools Dashboard has it) | Yes (sessionStorage) |
-| **State validation** | Tools Dashboard validates | Your app validates |
-| **Parameters in URL** | Already present when user arrives | Generated when user clicks login |
-| **User flow** | Click "Launch app" → Your app → OAuth | Visit app → Click login → OAuth |
+| **PKCE used?** | ❌ No - uses client_secret | ✅ Optional (recommended for SPAs) |
+| **Code verifier stored?** | ❌ No | ✅ Yes (in sessionStorage) |
+| **State stored in sessionStorage?** | ❌ No | ✅ Yes |
+| **State validation in your app** | ❌ Skip (server already validated) | ✅ Required (CSRF protection) |
+| **User flow** | Click "Launch App" → Consent → Your app (authenticated) | Your app → Click login → Consent → Your app (authenticated) |
+| **Security** | `client_secret` + state (validated by server) | `client_secret` + state (validated by you) + optional PKCE |
 
 ### Testing Pre-Initiated OAuth
 
 **Test from Tools Dashboard:**
 
 1. Go to `http://epicdev.com/app/features/app-library`
-2. Click "Launch app" for your E-Cards application
-3. You should be redirected to your app with OAuth parameters:
+2. Make sure you're logged in to Tools Dashboard
+3. Click "Launch App" for your registered application
+4. You should be redirected to the OAuth consent screen:
    ```
-   http://localhost:7300/?client_id=ecards_app_dev&state=...&code_challenge=...
+   http://epicdev.com/oauth/authorize?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=...&response_type=code
    ```
-4. Your app should detect these parameters
-5. Redirect to login page with same parameters
-6. Redirect to OAuth authorization endpoint with same parameters
-7. Complete authentication successfully
+5. Click "Allow" to approve the authorization
+6. You should be redirected to your app's callback URL:
+   ```
+   http://localhost:7300/auth/callback?code=...&state=...
+   ```
+7. Your app exchanges the code for tokens
+8. You should land in your authenticated app (e.g., `/dashboard`)
 
-**Verify in browser console:**
+**Verify in browser console (in your app's callback page):**
 
 ```
-OAuth parameters detected from Tools Dashboard
-Parameters: {
-  client_id: 'ecards_app_dev',
-  state: '40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4',
-  redirect_uri: 'http://localhost:7300/auth/callback',
-  scope: 'profile email subscription'
-}
-Pre-initiated OAuth detected - using provided parameters
-Redirecting to: http://epicdev.com/oauth/authorize?client_id=ecards_app_dev&state=...
+Pre-initiated OAuth flow detected (from App Library)
+Skipping state validation - authorization server already validated
+Authentication successful ✓
 ```
+
+**Expected flow timing:**
+- Click "Launch App" → OAuth consent (2 seconds) → Click "Allow" → Your app dashboard (1 second)
+- Total: ~3-4 seconds for complete authentication!
 
 ### Common Mistakes
 
-❌ **Mistake 1: Generating new state**
+❌ **Mistake 1: Always validating state (breaks pre-initiated flows)**
 ```javascript
-// WRONG - state will be different!
-const newState = generateRandomState(); // Don't do this!
+// WRONG - will fail for pre-initiated flows!
+const storedState = sessionStorage.getItem('oauth_state');
+if (state !== storedState) {
+  throw new Error('State mismatch'); // ❌ Always fails for pre-initiated flows
+}
 ```
 
-❌ **Mistake 2: Not passing parameters through routing**
+✅ **Correct - Conditional state validation:**
 ```javascript
-// WRONG - loses OAuth parameters!
-router.push('/login'); // Missing: ?client_id=...&state=...
+const storedState = sessionStorage.getItem('oauth_state');
+if (storedState) {
+  // Self-initiated flow - validate state
+  if (state !== storedState) {
+    throw new Error('State mismatch');
+  }
+} else {
+  // Pre-initiated flow - skip state validation
+  console.log('Pre-initiated flow - state already validated by server');
+}
 ```
 
-❌ **Mistake 3: Trying to validate state from Tools Dashboard**
+❌ **Mistake 2: Requiring code_verifier for all flows**
 ```javascript
-// WRONG - you don't have Tools Dashboard's state stored!
-const storedState = sessionStorage.getItem('oauth_state'); // Will be null
-if (state !== storedState) { // Will fail!
+// WRONG - pre-initiated flows don't have code_verifier!
+const codeVerifier = sessionStorage.getItem('code_verifier');
+if (!codeVerifier) {
+  throw new Error('Missing code verifier'); // ❌ Breaks pre-initiated flows
+}
 ```
 
-❌ **Mistake 4: Generating PKCE for pre-initiated flows**
+✅ **Correct - Make code_verifier optional:**
 ```javascript
-// WRONG - Tools Dashboard doesn't send PKCE, so don't generate it!
-const { codeChallenge } = generatePKCE(); // Don't do this!
+const codeVerifier = sessionStorage.getItem('code_verifier');
+// Send codeVerifier only if it exists (self-initiated flow)
+body: JSON.stringify({
+  code,
+  code_verifier: codeVerifier || undefined, // ✅ Optional
+})
 ```
 
-✅ **Correct approach:**
-- Detect OAuth parameters in URL
-- Pass them through your routing unchanged
-- Redirect to authorization endpoint with the same parameters
-- Let Tools Dashboard validate its own state
-- Do NOT generate PKCE for pre-initiated flows
+❌ **Mistake 3: Not handling OAuth errors in callback**
+```javascript
+// WRONG - ignores error parameters!
+const code = searchParams.get('code');
+// Missing error handling!
+```
+
+✅ **Correct - Check for error first:**
+```javascript
+const error = searchParams.get('error');
+if (error) {
+  const errorDescription = searchParams.get('error_description');
+  console.error('OAuth error:', error, errorDescription);
+  // Handle error appropriately
+  return;
+}
+```
+
+❌ **Mistake 4: Using client_secret in frontend code**
+```javascript
+// WRONG - NEVER expose client_secret in frontend!
+const response = await fetch('/oauth/token', {
+  body: JSON.stringify({
+    client_secret: 'o940zNXww4xYvklk8HcmQEZEIeL1Yd-j', // ❌ SECURITY RISK!
+  })
+});
+```
+
+✅ **Correct - Keep client_secret on backend:**
+```javascript
+// Frontend - send code to YOUR backend
+const response = await fetch('/api/auth/exchange-token', {
+  body: JSON.stringify({ code })
+});
+
+// YOUR Backend - uses client_secret
+const tokenResponse = await fetch('http://epicdev.com/oauth/token', {
+  body: JSON.stringify({
+    code,
+    client_secret: process.env.OAUTH_CLIENT_SECRET, // ✅ Server-side only
+  })
+});
+```
 
 ### Why This Matters
 
 **Without proper handling:**
-- State mismatch → OAuth fails
-- User clicks "Launch app" → Nothing happens or shows error
-- Poor user experience
+- State validation fails for pre-initiated flows
+- User clicks "Launch App" → OAuth error → Poor user experience
+- Support tickets increase
+- User abandonment
 
 **With proper handling:**
-- Seamless launch from App Library
-- OAuth completes successfully using `client_secret` for authentication
-- User lands in your authenticated app
-- Great user experience ✅
+- Seamless "Launch App" experience from Tools Dashboard
+- Works for both pre-initiated AND self-initiated flows
+- OAuth completes successfully in ~3-4 seconds
+- Users land directly in your authenticated app
+- Professional, polished user experience ✅
 
-### Security Note
+### Summary: Remote App Implementation Checklist
+
+To properly support **both** pre-initiated (App Library) and self-initiated (manual login) OAuth flows:
+
+#### ✅ OAuth Callback Handler Must:
+
+1. **Handle OAuth errors first**
+   ```javascript
+   const error = searchParams.get('error');
+   if (error) { /* handle error */ }
+   ```
+
+2. **Detect flow type using sessionStorage**
+   ```javascript
+   const storedState = sessionStorage.getItem('oauth_state');
+   const isPreInitiated = !storedState;
+   ```
+
+3. **Conditionally validate state**
+   ```javascript
+   if (storedState) {
+     // Self-initiated: validate state
+     if (state !== storedState) throw new Error('State mismatch');
+   } else {
+     // Pre-initiated: skip validation (server already validated)
+   }
+   ```
+
+4. **Make code_verifier optional**
+   ```javascript
+   const codeVerifier = sessionStorage.getItem('code_verifier');
+   // Send only if exists (self-initiated flow uses PKCE, pre-initiated doesn't)
+   ```
+
+5. **Exchange code for token on YOUR backend**
+   ```javascript
+   // Never expose client_secret in frontend!
+   fetch('/api/auth/exchange-token', {
+     body: JSON.stringify({ code, code_verifier })
+   });
+   ```
+
+#### ❌ Common Pitfalls to Avoid:
+
+- ❌ Always requiring state validation
+- ❌ Always requiring code_verifier
+- ❌ Exposing client_secret in frontend
+- ❌ Not handling OAuth error parameters
+- ❌ Not checking if sessionStorage has oauth_state before validating
+
+#### 🔒 Security Note
 
 For pre-initiated OAuth flows, PKCE is not used. Instead, security is provided by:
-1. **State parameter** - Prevents CSRF attacks
+1. **State parameter** - Prevents CSRF attacks (validated by authorization server)
 2. **Client secret** - Authenticates the application during token exchange
 3. **Redirect URI validation** - Ensures tokens are sent only to registered URIs
 4. **Short-lived authorization codes** - Expire in 10 minutes
+5. **HTTPS in production** - Protects tokens in transit
 
-This is a standard and secure OAuth 2.0 flow suitable for server-side applications with confidential clients.
+This is a standard and secure OAuth 2.0 Authorization Code flow suitable for server-side applications with confidential clients (RFC 6749).
 
 ---
 

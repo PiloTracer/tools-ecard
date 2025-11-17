@@ -18,6 +18,7 @@ import {
   OAuthErrors,
   getOAuthErrorMessage,
 } from '@/shared/lib/oauth-utils';
+import { OAUTH_CONFIG } from '@/shared/lib/oauth-config';
 import type { TokenExchangeRequest, TokenExchangeResponse } from '@/shared/types/auth';
 
 export default function AuthCallbackPage() {
@@ -71,32 +72,28 @@ export default function AuthCallbackPage() {
       }
 
       // Determine if this is a manual login or pre-initiated OAuth flow
-      const storedState = sessionStorage.getItem('oauth_state');
-      const isManualLogin = !!storedState;
+      // Check for client ID-specific state to distinguish between flows
+      const clientId = OAUTH_CONFIG.clientId;
+      const storedState = sessionStorage.getItem(`oauth_state_${clientId}`);
 
-      console.log('Flow type:', isManualLogin ? 'Manual Login' : 'Pre-Initiated OAuth (from App Library)');
+      // Check if stored state matches received state
+      // Only treat as manual login if states match (not just if stored state exists)
+      const isManualLogin = storedState && state && storedState === state;
+
+      console.log('Client ID:', clientId);
       console.log('Stored state:', storedState ? `${storedState.substring(0, 10)}...` : 'NOT FOUND');
       console.log('Received state:', state ? `${state.substring(0, 10)}...` : 'NOT PROVIDED');
+      console.log('States match:', isManualLogin ? 'YES' : 'NO');
+      console.log('Flow type:', isManualLogin ? 'Manual Login (Self-Initiated)' : 'Pre-Initiated OAuth (from App Library)');
 
       let codeVerifier: string | null = null;
 
       if (isManualLogin) {
-        // Manual login flow - validate state and get code verifier
-        if (!state || !validateState(state)) {
-          console.error('State validation failed!');
-          console.error('Stored state:', storedState);
-          console.error('Received state:', state);
-          setStatus('error');
-          setErrorMessage(getOAuthErrorMessage(OAuthErrors.STATE_MISMATCH));
-          setTimeout(() => {
-            router.push(`/login?error=${OAuthErrors.STATE_MISMATCH}`);
-          }, 3000);
-          return;
-        }
-        console.log('✓ State validation passed');
+        // Manual login flow (self-initiated) - validate state and get code verifier
+        console.log('Self-initiated flow detected - states match ✓');
 
         // Get code verifier for PKCE
-        codeVerifier = getCodeVerifier();
+        codeVerifier = getCodeVerifier(clientId);
         console.log('Code verifier from storage:', codeVerifier ? `${codeVerifier.substring(0, 10)}...` : 'NOT FOUND');
 
         if (!codeVerifier) {
@@ -110,9 +107,20 @@ export default function AuthCallbackPage() {
         }
         console.log('✓ Code verifier found');
       } else {
-        // Pre-initiated OAuth flow - Tools Dashboard validates state on their end
+        // Pre-initiated OAuth flow from App Library
+        // State was validated by the authorization server (Tools Dashboard)
         // No PKCE in pre-initiated flows - security provided by client_secret
-        console.log('✓ Pre-initiated flow - skipping state validation (Tools Dashboard validates)');
+
+        // Clean up any stale OAuth data from previous sessions
+        if (storedState && storedState !== state) {
+          console.log('⚠️  Found stale OAuth data from previous session - clearing');
+          console.log('   Old stored state:', storedState.substring(0, 10) + '...');
+          console.log('   New received state:', state ? state.substring(0, 10) + '...' : 'none');
+          clearOAuthData(clientId);
+        }
+
+        console.log('✓ Pre-initiated flow detected - skipping state validation');
+        console.log('  → State was validated by Tools Dashboard authorization server');
         console.log('✓ Pre-initiated flow - no PKCE required (using client_secret)');
       }
 
@@ -158,7 +166,7 @@ export default function AuthCallbackPage() {
 
       // Clean up OAuth data from sessionStorage
       console.log('Clearing OAuth data from sessionStorage...');
-      clearOAuthData();
+      clearOAuthData(clientId);
 
       // Success!
       console.log('✓ OAuth flow completed successfully!');

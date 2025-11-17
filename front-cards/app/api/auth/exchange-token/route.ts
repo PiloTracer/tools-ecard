@@ -23,14 +23,14 @@ const COOKIE_CONFIG = {
     name: process.env.SESSION_COOKIE_NAME || 'ecards_auth',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
+    sameSite: 'lax' as const,  // Changed from 'strict' to 'lax' to allow OAuth redirects
     path: '/',
   },
   refreshToken: {
     name: process.env.REFRESH_COOKIE_NAME || 'ecards_refresh',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
+    sameSite: 'lax' as const,  // Changed from 'strict' to 'lax' to allow OAuth redirects
     path: '/',
   },
 };
@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
     const tokenResponse = await fetch(OAUTH_CONFIG.tokenEndpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify(tokenRequestBody),
+      body: new URLSearchParams(tokenRequestBody as Record<string, string>),
     });
 
     console.log('Token exchange response status:', tokenResponse.status);
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
       name: 'user_id',
       value: user.id,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',  // Changed from 'strict' to 'lax' to allow OAuth redirects
       path: '/',
       maxAge: 30 * 24 * 60 * 60, // 30 days
     });

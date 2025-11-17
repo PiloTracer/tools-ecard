@@ -60,12 +60,11 @@ NEXT_PUBLIC_EXTERNAL_AUTH_URL=http://epicdev.com/app
 NEXT_PUBLIC_USER_SUBSCRIPTION_URL=http://epicdev.com/app/features/user-subscription
 
 # Backend OAuth Configuration (server-side only)
-# NOTE: With extra_hosts in docker-compose.yml, epicdev.com resolves to host machine inside containers
 OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=YaLYMeDOEojswc6lrrqKXT0RHbVlNN5K
-OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
-OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
-OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
+OAUTH_AUTHORIZATION_ENDPOINT=http://host.docker.internal/oauth/authorize
+OAUTH_TOKEN_ENDPOINT=http://host.docker.internal/oauth/token
+OAUTH_USER_INFO_ENDPOINT=http://host.docker.internal/api/users/me
 OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
 OAUTH_SCOPES=profile email subscription
 
