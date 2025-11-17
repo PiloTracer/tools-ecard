@@ -34,7 +34,7 @@ NEXT_PUBLIC_OAUTH_CLIENT_ID=ecards_app_dev  # ✅ Fixed - matches backend
 
 # Backend (.env.dev.example)
 OAUTH_CLIENT_ID=ecards_app_dev              # ✅ Correct
-OAUTH_CLIENT_SECRET=pQUQtR4fJLYH_9sfrPssE1Loz8HSeZ0D  # ✅ Correct
+OAUTH_CLIENT_SECRET=d9kCj6XEcyzZwRVve6WeUeN_BuAaA6MC  # ✅ Correct
 ```
 
 ---

@@ -267,7 +267,7 @@ console.log('Code verifier:', sessionStorage.getItem('code_verifier'));
 Check environment variables:
 ```bash
 OAUTH_CLIENT_ID=ecards_app_dev
-OAUTH_CLIENT_SECRET=pQUQtR4fJLYH_9sfrPssE1Loz8HSeZ0D
+OAUTH_CLIENT_SECRET=d9kCj6XEcyzZwRVve6WeUeN_BuAaA6MC
 OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback,...
 ```
 

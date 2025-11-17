@@ -91,7 +91,7 @@ These are only accessible on the server:
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `OAUTH_CLIENT_ID` | `ecards_app_dev` | OAuth client ID (must match frontend) |
-| `OAUTH_CLIENT_SECRET` | `pQUQtR4fJLYH_9sfrPssE1Loz8HSeZ0D` | OAuth client secret (**KEEP SECRET!**) |
+| `OAUTH_CLIENT_SECRET` | `d9kCj6XEcyzZwRVve6WeUeN_BuAaA6MC` | OAuth client secret (**KEEP SECRET!**) |
 | `OAUTH_AUTHORIZATION_ENDPOINT` | `http://epicdev.com/oauth/authorize` | Authorization endpoint (backend reference) |
 | `OAUTH_TOKEN_ENDPOINT` | `http://epicdev.com/oauth/token` | Token endpoint (backend calls) |
 | `OAUTH_USER_INFO_ENDPOINT` | `http://epicdev.com/api/users/me` | User info endpoint (backend calls) |
