@@ -12,8 +12,9 @@ This guide explains how to integrate your application with the Tools Dashboard O
 2. [Redirect URIs](#redirect-uris)
 3. [Allowed Scopes](#allowed-scopes)
 4. [OAuth Flow Implementation](#oauth-flow-implementation)
-5. [Code Examples](#code-examples)
-6. [Security Best Practices](#security-best-practices)
+5. [Pre-Initiated OAuth Flow (Launch from App Library)](#pre-initiated-oauth-flow-launch-from-app-library)
+6. [Code Examples](#code-examples)
+7. [Security Best Practices](#security-best-practices)
 
 ---
 
@@ -91,7 +92,7 @@ Redirect URIs are URLs in **your application** where users will be sent back aft
 const OAUTH_CONFIG = {
   clientId: 'ecards_app_dev',
   redirectUri: 'http://localhost:7300/oauth/callback', // Must match exactly!
-  authorizationEndpoint: 'https://epicdev.com/oauth/authorize',
+  authorizationEndpoint: 'http://epicdev.com/oauth/authorize',
 };
 
 // When user clicks login button:
@@ -196,7 +197,7 @@ export default async function handler(
 
   try {
     // Exchange code for access token
-    const tokenResponse = await fetch('https://epicdev.com/oauth/token', {
+    const tokenResponse = await fetch('http://epicdev.com/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -272,7 +273,7 @@ Scopes define **what data and actions** your application can access on behalf of
 ```javascript
 const scopes = ['profile', 'email', 'subscription'];
 
-const authUrl = `https://epicdev.com/oauth/authorize?` +
+const authUrl = `http://epicdev.com/oauth/authorize?` +
   `response_type=code&` +
   `client_id=${CLIENT_ID}&` +
   `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
@@ -289,7 +290,7 @@ Once you have an access token, you can access data based on the granted scopes:
 ```javascript
 // Example: Fetch user profile
 async function getUserProfile(accessToken) {
-  const response = await fetch('https://epicdev.com/api/users/me', {
+  const response = await fetch('http://epicdev.com/api/users/me', {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },
@@ -373,9 +374,9 @@ export const OAUTH_CONFIG = {
   clientId: process.env.OAUTH_CLIENT_ID, // From App Library
   clientSecret: process.env.OAUTH_CLIENT_SECRET, // KEEP SECRET!
   redirectUri: process.env.OAUTH_REDIRECT_URI,
-  authorizationEndpoint: 'https://epicdev.com/oauth/authorize',
-  tokenEndpoint: 'https://epicdev.com/oauth/token',
-  userInfoEndpoint: 'https://epicdev.com/api/users/me',
+  authorizationEndpoint: 'http://epicdev.com/oauth/authorize',
+  tokenEndpoint: 'http://epicdev.com/oauth/token',
+  userInfoEndpoint: 'http://epicdev.com/api/users/me',
   scopes: ['profile', 'email', 'subscription'],
 };
 ```
@@ -502,7 +503,7 @@ export default async function handler(
 
   try {
     // Exchange authorization code for access token
-    const tokenResponse = await fetch('https://epicdev.com/oauth/token', {
+    const tokenResponse = await fetch('http://epicdev.com/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -538,7 +539,7 @@ export default async function handler(
     */
 
     // Fetch user info
-    const userResponse = await fetch('https://epicdev.com/api/users/me', {
+    const userResponse = await fetch('http://epicdev.com/api/users/me', {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
       },
@@ -586,7 +587,7 @@ export async function apiRequest(url, options = {}) {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`https://epicdev.com${url}`, {
+  const response = await fetch(`http://epicdev.com${url}`, {
     ...options,
     headers: {
       ...options.headers,
@@ -629,7 +630,7 @@ export default async function handler(
   }
 
   try {
-    const tokenResponse = await fetch('https://epicdev.com/oauth/token', {
+    const tokenResponse = await fetch('http://epicdev.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -661,6 +662,387 @@ export default async function handler(
 
 ---
 
+## Pre-Initiated OAuth Flow (Launch from App Library)
+
+### Overview
+
+When users click **"Launch app"** in the Tools Dashboard App Library, the Tools Dashboard **pre-initiates the OAuth flow** by redirecting to your application with OAuth parameters already in the URL.
+
+**This is different from the standard flow** where your app initiates OAuth. Instead of generating new OAuth parameters, your app must **use the parameters that Tools Dashboard already sent**.
+
+### How It Works
+
+```
+┌─────────────┐                                  ┌──────────────────┐
+│   User      │                                  │  Tools Dashboard │
+│   Browser   │                                  │  App Library     │
+└──────┬──────┘                                  └────────┬─────────┘
+       │                                                  │
+       │  1. Click "Launch app" button                   │
+       ├────────────────────────────────────────────────►│
+       │                                                  │
+       │  2. Redirect with OAuth parameters              │
+       │     http://yourapp.com/?client_id=xxx&state=yyy │
+       │     &code_challenge=zzz&redirect_uri=...        │
+       │◄─────────────────────────────────────────────────┤
+       │                                                  │
+       │                                         ┌────────┴─────────┐
+       │                                         │  Your App        │
+       │  3. Detect OAuth params in URL          │  (Landing Page)  │
+       ├────────────────────────────────────────►│                  │
+       │                                         └────────┬─────────┘
+       │                                                  │
+       │  4. Pass params to /login?client_id=xxx&...     │
+       │◄─────────────────────────────────────────────────┤
+       │                                                  │
+       │                                         ┌────────┴─────────┐
+       │                                         │  Your App        │
+       │  5. Use SAME params - redirect to       │  (Login Page)    │
+       │     authorize endpoint with SAME state  │                  │
+       │     and code_challenge                  └────────┬─────────┘
+       │                                                  │
+       │  6. Redirect to Tools Dashboard OAuth            │
+       │     http://epicdev.com/oauth/authorize?          │
+       │     client_id=xxx&state=yyy&code_challenge=zzz  │
+       │◄─────────────────────────────────────────────────┤
+       │                                                  │
+       │  (Continue with standard OAuth flow...)          │
+```
+
+### URL Parameters Sent by Tools Dashboard
+
+When Tools Dashboard redirects to your app, it includes:
+
+| Parameter | Example | Description |
+|-----------|---------|-------------|
+| `client_id` | `ecards_app_dev` | Your OAuth client ID |
+| `redirect_uri` | `http://localhost:7300/auth/callback` | Where to send user after auth |
+| `scope` | `profile email subscription` | Requested permissions |
+| `state` | `40ed89e34402fb...` | CSRF protection token (generated by Tools Dashboard) |
+| `response_type` | `code` | OAuth response type |
+
+**IMPORTANT:** For pre-initiated flows, Tools Dashboard does **NOT** include PKCE parameters (`code_challenge` and `code_challenge_method`). This is because:
+- The remote app would need access to the `code_verifier` during token exchange
+- PKCE requires the same client to generate both challenge and verifier
+- For pre-initiated flows, `client_secret` provides sufficient security
+
+**Example URL:**
+```
+http://localhost:7300/?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4&response_type=code
+```
+
+### ⚠️ Critical: Don't Generate New Parameters!
+
+**WRONG ❌** - Your app generates new state:
+```javascript
+// DON'T DO THIS when OAuth is pre-initiated!
+function handleLogin() {
+  const state = generateRandomState(); // ❌ Creates NEW state
+
+  const authUrl = `http://epicdev.com/oauth/authorize?` +
+    `client_id=xxx&` +
+    `state=${state}&` + // ❌ Different from Tools Dashboard's state
+    `...other params`;
+
+  window.location.href = authUrl;
+}
+// Result: Tools Dashboard won't recognize the state - auth fails!
+```
+
+**CORRECT ✅** - Use the parameters Tools Dashboard sent:
+```javascript
+// DO THIS - Use the parameters from the URL
+function handlePreInitiatedOAuth(searchParams) {
+  // Just pass through the parameters Tools Dashboard sent
+  const authUrl = `http://epicdev.com/oauth/authorize?${searchParams.toString()}`;
+
+  window.location.href = authUrl;
+}
+// Result: Tools Dashboard recognizes its own state - auth succeeds!
+```
+
+### Implementation
+
+#### Step 1: Detect OAuth Parameters in Landing Page
+
+```javascript
+// app/page.tsx (Landing Page)
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+export default function LandingPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Check if OAuth parameters are present (sent from Tools Dashboard)
+    const hasOAuthParams = searchParams.has('client_id') &&
+                          searchParams.has('state') &&
+                          searchParams.has('response_type');
+
+    if (hasOAuthParams) {
+      console.log('OAuth parameters detected from Tools Dashboard');
+      console.log('Parameters:', {
+        client_id: searchParams.get('client_id'),
+        state: searchParams.get('state'),
+        redirect_uri: searchParams.get('redirect_uri'),
+        scope: searchParams.get('scope'),
+      });
+
+      // IMPORTANT: Pass parameters to login page
+      // Don't lose them!
+      router.push(`/login?${searchParams.toString()}`);
+      return;
+    }
+
+    // No OAuth params - show normal landing page
+  }, [searchParams, router]);
+
+  return <div>Landing Page</div>;
+}
+```
+
+#### Step 2: Handle Parameters in Login Page
+
+```javascript
+// app/login/page.tsx (Login Page)
+'use client';
+
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+export default function LoginPage() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Check if OAuth parameters are present (from Tools Dashboard)
+    const hasOAuthParams = searchParams.has('client_id') &&
+                          searchParams.has('state') &&
+                          searchParams.has('response_type');
+
+    if (hasOAuthParams) {
+      console.log('Pre-initiated OAuth detected - using provided parameters');
+
+      // Use the OAuth parameters that Tools Dashboard already sent
+      // DON'T generate new ones!
+      const authUrl = `${OAUTH_CONFIG.authorizationEndpoint}?${searchParams.toString()}`;
+
+      console.log('Redirecting to:', authUrl);
+      window.location.href = authUrl;
+      return;
+    }
+  }, [searchParams]);
+
+  // Manual login button (when user comes directly, not from App Library)
+  const handleManualLogin = async () => {
+    // Only generate new parameters when user manually clicks login
+    const authUrl = await generateAuthorizationUrl();
+    window.location.href = authUrl;
+  };
+
+  return (
+    <div>
+      <button onClick={handleManualLogin}>
+        Login with Tools Dashboard
+      </button>
+    </div>
+  );
+}
+```
+
+#### Step 3: OAuth Callback Handles Both Flows
+
+```javascript
+// app/auth/callback/page.tsx
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+export default function OAuthCallback() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    async function handleCallback() {
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+
+      if (!code || !state) {
+        console.error('Missing code or state');
+        router.push('/login?error=invalid_callback');
+        return;
+      }
+
+      // For pre-initiated OAuth:
+      // - Tools Dashboard generated the state and code_challenge
+      // - We don't have code_verifier stored in sessionStorage
+      // - We need to handle this differently
+
+      // Check if we have a stored state (manual login)
+      const storedState = sessionStorage.getItem('oauth_state');
+
+      if (storedState) {
+        // Manual login flow - verify state
+        if (state !== storedState) {
+          console.error('State mismatch');
+          router.push('/login?error=invalid_state');
+          return;
+        }
+
+        // Get code verifier for PKCE
+        const codeVerifier = sessionStorage.getItem('code_verifier');
+
+        // Exchange code for token
+        const response = await fetch('/api/auth/exchange-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, codeVerifier }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          sessionStorage.removeItem('oauth_state');
+          sessionStorage.removeItem('code_verifier');
+          router.push('/dashboard');
+        } else {
+          router.push('/login?error=token_exchange_failed');
+        }
+      } else {
+        // Pre-initiated OAuth flow from Tools Dashboard
+        // We don't have code_verifier because Tools Dashboard generated it
+        // Just exchange the code (Tools Dashboard validates on their end)
+
+        console.log('Pre-initiated OAuth callback - exchanging code');
+
+        const response = await fetch('/api/auth/exchange-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            // No codeVerifier - Tools Dashboard handles PKCE validation
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          router.push('/dashboard');
+        } else {
+          router.push('/login?error=token_exchange_failed');
+        }
+      }
+    }
+
+    handleCallback();
+  }, [router, searchParams]);
+
+  return <div>Processing login...</div>;
+}
+```
+
+### Key Differences: Pre-Initiated vs Manual Login
+
+| Aspect | Pre-Initiated (App Library) | Manual Login |
+|--------|----------------------------|--------------|
+| **Who generates state** | Tools Dashboard | Your app |
+| **Who generates code_challenge** | Tools Dashboard | Your app |
+| **Code verifier stored?** | No (Tools Dashboard has it) | Yes (sessionStorage) |
+| **State validation** | Tools Dashboard validates | Your app validates |
+| **Parameters in URL** | Already present when user arrives | Generated when user clicks login |
+| **User flow** | Click "Launch app" → Your app → OAuth | Visit app → Click login → OAuth |
+
+### Testing Pre-Initiated OAuth
+
+**Test from Tools Dashboard:**
+
+1. Go to `http://epicdev.com/app/features/app-library`
+2. Click "Launch app" for your E-Cards application
+3. You should be redirected to your app with OAuth parameters:
+   ```
+   http://localhost:7300/?client_id=ecards_app_dev&state=...&code_challenge=...
+   ```
+4. Your app should detect these parameters
+5. Redirect to login page with same parameters
+6. Redirect to OAuth authorization endpoint with same parameters
+7. Complete authentication successfully
+
+**Verify in browser console:**
+
+```
+OAuth parameters detected from Tools Dashboard
+Parameters: {
+  client_id: 'ecards_app_dev',
+  state: '40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4',
+  redirect_uri: 'http://localhost:7300/auth/callback',
+  scope: 'profile email subscription'
+}
+Pre-initiated OAuth detected - using provided parameters
+Redirecting to: http://epicdev.com/oauth/authorize?client_id=ecards_app_dev&state=...
+```
+
+### Common Mistakes
+
+❌ **Mistake 1: Generating new state**
+```javascript
+// WRONG - state will be different!
+const newState = generateRandomState(); // Don't do this!
+```
+
+❌ **Mistake 2: Not passing parameters through routing**
+```javascript
+// WRONG - loses OAuth parameters!
+router.push('/login'); // Missing: ?client_id=...&state=...
+```
+
+❌ **Mistake 3: Trying to validate state from Tools Dashboard**
+```javascript
+// WRONG - you don't have Tools Dashboard's state stored!
+const storedState = sessionStorage.getItem('oauth_state'); // Will be null
+if (state !== storedState) { // Will fail!
+```
+
+❌ **Mistake 4: Generating PKCE for pre-initiated flows**
+```javascript
+// WRONG - Tools Dashboard doesn't send PKCE, so don't generate it!
+const { codeChallenge } = generatePKCE(); // Don't do this!
+```
+
+✅ **Correct approach:**
+- Detect OAuth parameters in URL
+- Pass them through your routing unchanged
+- Redirect to authorization endpoint with the same parameters
+- Let Tools Dashboard validate its own state
+- Do NOT generate PKCE for pre-initiated flows
+
+### Why This Matters
+
+**Without proper handling:**
+- State mismatch → OAuth fails
+- User clicks "Launch app" → Nothing happens or shows error
+- Poor user experience
+
+**With proper handling:**
+- Seamless launch from App Library
+- OAuth completes successfully using `client_secret` for authentication
+- User lands in your authenticated app
+- Great user experience ✅
+
+### Security Note
+
+For pre-initiated OAuth flows, PKCE is not used. Instead, security is provided by:
+1. **State parameter** - Prevents CSRF attacks
+2. **Client secret** - Authenticates the application during token exchange
+3. **Redirect URI validation** - Ensures tokens are sent only to registered URIs
+4. **Short-lived authorization codes** - Expire in 10 minutes
+
+This is a standard and secure OAuth 2.0 flow suitable for server-side applications with confidential clients.
+
+---
+
 ## Code Examples
 
 ### Express.js (Node.js) Backend Example
@@ -678,8 +1060,8 @@ const OAUTH_CONFIG = {
   clientId: process.env.OAUTH_CLIENT_ID,
   clientSecret: process.env.OAUTH_CLIENT_SECRET,
   redirectUri: 'http://localhost:3000/oauth/callback',
-  authorizationEndpoint: 'https://epicdev.com/oauth/authorize',
-  tokenEndpoint: 'https://epicdev.com/oauth/token',
+  authorizationEndpoint: 'http://epicdev.com/oauth/authorize',
+  tokenEndpoint: 'http://epicdev.com/oauth/token',
   scopes: ['profile', 'email'],
 };
 
@@ -743,7 +1125,7 @@ app.get('/api/user', async (req, res) => {
   }
 
   try {
-    const userResponse = await axios.get('https://epicdev.com/api/users/me', {
+    const userResponse = await axios.get('http://epicdev.com/api/users/me', {
       headers: {
         'Authorization': `Bearer ${req.session.accessToken}`,
       },
@@ -781,8 +1163,8 @@ OAUTH_CONFIG = {
     'client_id': os.environ['OAUTH_CLIENT_ID'],
     'client_secret': os.environ['OAUTH_CLIENT_SECRET'],
     'redirect_uri': 'http://localhost:5000/oauth/callback',
-    'authorization_endpoint': 'https://epicdev.com/oauth/authorize',
-    'token_endpoint': 'https://epicdev.com/oauth/token',
+    'authorization_endpoint': 'http://epicdev.com/oauth/authorize',
+    'token_endpoint': 'http://epicdev.com/oauth/token',
     'scopes': ['profile', 'email'],
 }
 
@@ -837,7 +1219,7 @@ def get_user():
         return jsonify({'error': 'Not authenticated'}), 401
 
     user_response = requests.get(
-        'https://epicdev.com/api/users/me',
+        'http://epicdev.com/api/users/me',
         headers={'Authorization': f'Bearer {access_token}'}
     )
 
@@ -976,12 +1358,12 @@ const tokenRequest = {
 
 **1. Test authorization (copy URL to browser):**
 ```bash
-echo "https://epicdev.com/oauth/authorize?response_type=code&client_id=ecards_app_dev&redirect_uri=http://localhost:7300/oauth/callback&scope=profile%20email&state=random123"
+echo "http://epicdev.com/oauth/authorize?response_type=code&client_id=ecards_app_dev&redirect_uri=http://localhost:7300/oauth/callback&scope=profile%20email&state=random123"
 ```
 
 **2. Exchange code for token:**
 ```bash
-curl -X POST https://epicdev.com/oauth/token \
+curl -X POST http://epicdev.com/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "grant_type": "authorization_code",
@@ -994,13 +1376,13 @@ curl -X POST https://epicdev.com/oauth/token \
 
 **3. Use access token:**
 ```bash
-curl https://epicdev.com/api/users/me \
+curl http://epicdev.com/api/users/me \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
 **4. Refresh token:**
 ```bash
-curl -X POST https://epicdev.com/oauth/token \
+curl -X POST http://epicdev.com/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "grant_type": "refresh_token",

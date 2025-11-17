@@ -183,7 +183,7 @@
 
 2. **Redirect to remote auth** with parameters:
    ```
-   https://epicdev.com/oauth/authorize?
+   http://epicdev.com/oauth/authorize?
      client_id=ecards_app
      &redirect_uri=http://localhost:7300/auth/callback
      &response_type=code
@@ -208,7 +208,7 @@
 
 6. **Exchange code for tokens** (backend-to-backend):
    ```http
-   POST https://epicdev.com/oauth/token
+   POST http://epicdev.com/oauth/token
    Content-Type: application/x-www-form-urlencoded
 
    grant_type=authorization_code
@@ -300,7 +300,7 @@
 8. Frontend generates random state token
 9. Frontend stores code_verifier and state in sessionStorage
 10. Frontend redirects to:
-    https://epicdev.com/oauth/authorize?client_id=ecards&...
+    http://epicdev.com/oauth/authorize?client_id=ecards&...
 11. Remote App detects user already authenticated (via cookie)
 12. Remote App shows consent screen (optional, first time only):
     "E-Cards wants to access your profile and subscription info"
@@ -367,7 +367,7 @@
 4. Frontend redirects to Remote OAuth
 5. Remote App detects NO valid session (cookie expired/deleted)
 6. Remote App redirects to Login Page:
-   https://epicdev.com/login?returnUrl=/oauth/authorize?...
+   http://epicdev.com/login?returnUrl=/oauth/authorize?...
 7. User enters username + password
 8. Remote App authenticates user
 9. Remote App redirects to OAuth authorize page
@@ -390,7 +390,7 @@
     [Upgrade Now] [Contact Support]
 25. User clicks [Upgrade Now]
 26. Frontend redirects to Remote App subscription page:
-    https://epicdev.com/account/subscription?upgrade=ecards
+    http://epicdev.com/account/subscription?upgrade=ecards
 ```
 
 ### Scenario 6: Rate Limit Exceeded
@@ -477,7 +477,7 @@ export function LandingPage() {
         <button onClick={initiateLogin} className="btn-primary">
           Sign In
         </button>
-        <button onClick={() => window.open('https://epicdev.com/subscribe')}
+        <button onClick={() => window.open('http://epicdev.com/subscribe')}
                 className="btn-secondary">
           Subscribe
         </button>
@@ -1620,7 +1620,7 @@ AUTH_RATE_LIMIT_REFRESH_MAX=20
 NEXT_PUBLIC_API_URL=http://localhost:7400
 NEXT_PUBLIC_WS_URL=ws://localhost:7400
 NEXT_PUBLIC_OAUTH_CLIENT_ID=ecards_app
-NEXT_PUBLIC_EXTERNAL_AUTH_URL=https://epicdev.com
+NEXT_PUBLIC_EXTERNAL_AUTH_URL=http://epicdev.com
 ```
 
 ---

@@ -78,8 +78,24 @@ services:
       - /app/.next
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      # API & WebSocket
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7400}
+      # OAuth Configuration (Frontend - browser-accessible, requires NEXT_PUBLIC_ prefix)
+      # NOTE: Must use same OAUTH_CLIENT_ID value as backend (ecards_app_dev)
+      NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:-ecards_app_dev}
+      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
+      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
+      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
+      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-http://epicdev.com/app}
+      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-http://epicdev.com/app/features/user-subscription}
+      # OAuth Configuration (Backend - for API routes in front-cards/app/api/auth/*)
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
+      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
+      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
+      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
+      OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS:-http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback}
     networks:
       - ecards-network
     depends_on:
@@ -155,9 +171,43 @@ services:
       SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-your_seaweedfs_secret_key}
       SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-ecards}
       # External services (Remote Auth & User Management API)
-      EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://remote-auth-server:5000}
-      EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://remote-auth-server:5000/ws}
-      EXTERNAL_USER_API: ${EXTERNAL_USER_API:-http://remote-auth-server:5000/api/users}
+      EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://epicdev.com/app}
+      EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://epicdev.com/admin/ws}
+      EXTERNAL_USER_API: ${EXTERNAL_USER_API:-http://epicdev.com/admin/api}
+      # OAuth 2.0 Configuration (Backend - for token exchange)
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
+      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
+      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
+      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
+      OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS:-http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback}
+      OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
+      # Application Identity
+      APPLICATION_ID: ${APPLICATION_ID}
+      EXTERNAL_API_KEY: ${EXTERNAL_API_KEY}
+      USER_SUBSCRIPTION_URL: ${USER_SUBSCRIPTION_URL:-http://epicdev.com/app/features/user-subscription}
+      # Token Security
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      # Session Cookie Configuration
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-ecards_auth}
+      REFRESH_COOKIE_NAME: ${REFRESH_COOKIE_NAME:-ecards_refresh}
+      SESSION_COOKIE_MAX_AGE: ${SESSION_COOKIE_MAX_AGE:-3600}
+      REFRESH_COOKIE_MAX_AGE: ${REFRESH_COOKIE_MAX_AGE:-2592000}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_COOKIE_HTTP_ONLY: ${SESSION_COOKIE_HTTP_ONLY:-true}
+      SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-strict}
+      # PKCE Configuration
+      PKCE_ENABLED: ${PKCE_ENABLED:-true}
+      PKCE_CODE_CHALLENGE_METHOD: ${PKCE_CODE_CHALLENGE_METHOD:-S256}
+      # OAuth State Parameter
+      OAUTH_STATE_ENABLED: ${OAUTH_STATE_ENABLED:-true}
+      # Rate Limiting for Auth Endpoints
+      AUTH_RATE_LIMIT_LOGIN_WINDOW: ${AUTH_RATE_LIMIT_LOGIN_WINDOW:-900000}
+      AUTH_RATE_LIMIT_LOGIN_MAX: ${AUTH_RATE_LIMIT_LOGIN_MAX:-5}
+      AUTH_RATE_LIMIT_CALLBACK_WINDOW: ${AUTH_RATE_LIMIT_CALLBACK_WINDOW:-900000}
+      AUTH_RATE_LIMIT_CALLBACK_MAX: ${AUTH_RATE_LIMIT_CALLBACK_MAX:-10}
+      AUTH_RATE_LIMIT_REFRESH_WINDOW: ${AUTH_RATE_LIMIT_REFRESH_WINDOW:-3600000}
+      AUTH_RATE_LIMIT_REFRESH_MAX: ${AUTH_RATE_LIMIT_REFRESH_MAX:-20}
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       DEBUG: ${DEBUG:-*}

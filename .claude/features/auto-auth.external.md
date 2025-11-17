@@ -98,7 +98,7 @@ The E-Cards auto-auth feature requires integration with **two remote application
 
 **URL Structure:**
 ```
-Base URL: http://epicdev.com/app (or https://epicdev.com/app in production)
+Base URL: http://epicdev.com/app (or http://epicdev.com/app in production)
 
 User-facing:
   /                          # User dashboard
@@ -124,7 +124,7 @@ API endpoints:
 
 **URL Structure:**
 ```
-Base URL: http://epicdev.com/admin (or https://epicdev.com/admin in production)
+Base URL: http://epicdev.com/admin (or http://epicdev.com/admin in production)
 
 API endpoints:
   /api/users/:userId                    # User profile

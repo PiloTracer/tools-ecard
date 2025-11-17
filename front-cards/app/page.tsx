@@ -1,4 +1,98 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/features/auth';
+import { USER_SUBSCRIPTION_URL, OAUTH_CONFIG } from '@/shared/lib/oauth-config';
+import { generateAuthorizationUrl } from '@/shared/lib/oauth-utils';
+
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    // Check if OAuth parameters are present in URL (sent from Tools Dashboard)
+    // Note: Pre-initiated flows do NOT include PKCE parameters
+    const hasOAuthParams = searchParams.has('client_id') &&
+                          searchParams.has('state') &&
+                          searchParams.has('response_type');
+
+    if (hasOAuthParams && !isAuthenticated && !isLoading) {
+      // Tools Dashboard has pre-initiated OAuth flow
+      // Auto-redirect to login/OAuth flow
+      console.log('OAuth parameters detected in URL - passing to login page...');
+      setIsRedirecting(true);
+
+      // Extract the state parameter if provided by Tools Dashboard
+      const externalState = searchParams.get('state');
+      if (externalState) {
+        console.log('Using external state parameter:', externalState);
+      }
+
+      // Redirect to login page WITH the OAuth parameters
+      // This is crucial - login page needs these parameters to redirect to authorization endpoint
+      router.push(`/login?${searchParams.toString()}`);
+      return;
+    }
+
+    if (!isLoading && isAuthenticated) {
+      // Redirect authenticated users to dashboard
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, searchParams, router]);
+
+  const handleLogin = async () => {
+    try {
+      setIsRedirecting(true);
+
+      // Generate OAuth authorization URL and redirect immediately
+      const authUrl = await generateAuthorizationUrl();
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error initiating OAuth:', error);
+      setIsRedirecting(false);
+      // Fallback to login page
+      router.push('/login');
+    }
+  };
+
+  // Show loading/redirecting state
+  if (isLoading || isRedirecting) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block p-4 bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 rounded-full shadow-2xl mb-4">
+            <svg
+              className="animate-spin h-12 w-12 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+          <p className="text-gray-400 font-medium">
+            {isRedirecting ? 'Redirecting to Tools Dashboard...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-black overflow-hidden">
       {/* Animated gradient background */}
@@ -64,15 +158,52 @@ export default function Home() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-          <button className="group relative flex-1 h-14 px-8 rounded-xl overflow-hidden transition-all hover:scale-105">
+          <button
+            onClick={handleLogin}
+            disabled={isRedirecting}
+            className="group relative flex-1 h-14 px-8 rounded-xl overflow-hidden transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-blue-600 to-teal-600" />
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-blue-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <span className="relative z-10 text-white font-semibold text-lg">Login with Tools Dashboard</span>
+            <span className="relative z-10 text-white font-semibold text-lg flex items-center justify-center">
+              {isRedirecting ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Redirecting...
+                </>
+              ) : (
+                'Login with Tools Dashboard'
+              )}
+            </span>
           </button>
 
-          <button className="group relative flex-1 h-14 px-8 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm border-2 border-white/20 hover:border-white/40 transition-all hover:scale-105">
-            <span className="relative z-10 text-white font-semibold text-lg">Subscribe</span>
-          </button>
+          <a
+            href={USER_SUBSCRIPTION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative flex-1 h-14 px-8 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm border-2 border-white/20 hover:border-white/40 transition-all hover:scale-105 flex items-center justify-center"
+          >
+            <span className="relative z-10 text-white font-semibold text-lg">Subscribe at Tools Dashboard</span>
+          </a>
         </div>
 
         {/* Footer tagline */}
