@@ -20,6 +20,7 @@
   "dependencies": {
     "fastify": "^4.25.2",
     "@fastify/cors": "^8.5.0",
+    "@fastify/cookie": "^9.2.0",
     "@fastify/websocket": "^10.0.0",
     "@prisma/client": "^5.8.1",
     "cassandra-driver": "^4.7.2",

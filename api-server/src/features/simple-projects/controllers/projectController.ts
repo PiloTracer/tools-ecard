@@ -18,9 +18,10 @@ export const projectController = {
    */
   async getProjects(request: AuthenticatedRequest, reply: FastifyReply) {
     try {
-      // For now, use a mock user ID until auth is implemented
-      // TODO: Get user ID from authenticated request
-      const userId = request.user?.id || 'mock-user-id';
+      // Use authenticated user's email as userId
+      const userId = request.user?.email || 'guest@example.com';
+
+      console.log('[getProjects] userId:', userId, 'user:', request.user);
 
       const result = await projectService.getUserProjects(userId);
 
@@ -45,8 +46,8 @@ export const projectController = {
    */
   async createProject(request: FastifyRequest<{ Body: CreateProjectDto }>, reply: FastifyReply) {
     try {
-      // For now, use a mock user ID until auth is implemented
-      const userId = (request as AuthenticatedRequest).user?.id || 'mock-user-id';
+      // Use authenticated user's email as userId
+      const userId = (request as AuthenticatedRequest).user?.email || 'guest@example.com';
 
       const data = request.body;
       const project = await projectService.createProject(userId, data);
@@ -72,7 +73,7 @@ export const projectController = {
    */
   async getSelectedProject(request: AuthenticatedRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id || 'mock-user-id';
+      const userId = request.user?.email || 'guest@example.com';
 
       const result = await projectService.getSelectedProject(userId);
 
@@ -95,7 +96,7 @@ export const projectController = {
    */
   async updateSelectedProject(request: FastifyRequest<{ Body: UpdateSelectedProjectDto }>, reply: FastifyReply) {
     try {
-      const userId = (request as AuthenticatedRequest).user?.id || 'mock-user-id';
+      const userId = (request as AuthenticatedRequest).user?.email || 'guest@example.com';
 
       const data = request.body;
       const result = await projectService.updateSelectedProject(userId, data);
@@ -115,9 +116,9 @@ export const projectController = {
    */
   async ensureDefaultProject(request: AuthenticatedRequest, reply: FastifyReply) {
     try {
-      const userId = request.user?.id || 'mock-user-id';
+      const userId = request.user?.email || 'guest@example.com';
 
-      console.log('[ensureDefaultProject] Starting for userId:', userId);
+      console.log('[ensureDefaultProject] Starting for userId:', userId, 'user:', request.user);
 
       const project = await projectService.ensureUserDefaultProject(userId);
 

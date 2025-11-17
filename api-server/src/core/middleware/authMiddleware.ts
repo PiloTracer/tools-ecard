@@ -1,0 +1,77 @@
+/**
+ * Authentication Middleware
+ *
+ * Extracts user information from access token cookie and populates request.user
+ */
+
+import type { FastifyRequest, FastifyReply } from 'fastify';
+
+const OAUTH_CONFIG = {
+  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'http://epicdev.com/api/users/me',
+};
+
+const COOKIE_CONFIG = {
+  accessToken: {
+    name: process.env.SESSION_COOKIE_NAME || 'ecards_auth',
+  },
+};
+
+export interface AuthenticatedUser {
+  id: string; // User ID from external auth system
+  email: string;
+  username: string;
+  displayName: string;
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: AuthenticatedUser;
+  }
+}
+
+/**
+ * Auth middleware - extracts user from cookie and fetches user info
+ */
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    // Get access token from cookie
+    const accessToken = request.cookies[COOKIE_CONFIG.accessToken.name];
+
+    if (!accessToken) {
+      // No token - request will proceed without user (controllers can decide if auth is required)
+      return;
+    }
+
+    // Fetch user information from external auth service
+    const userResponse = await fetch(OAUTH_CONFIG.userInfoEndpoint, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (userResponse.ok) {
+      const userData = await userResponse.json();
+
+      // Populate request.user with authenticated user info
+      // Use email as the primary ID for database operations
+      request.user = {
+        id: userData.id?.toString() || userData.email, // Fallback to email if no ID
+        email: userData.email,
+        username: userData.username || userData.email,
+        displayName: userData.displayName || userData.name || userData.username || userData.email,
+      };
+
+      console.log('[Auth] User authenticated:', {
+        id: request.user.id,
+        email: request.user.email,
+        username: request.user.username,
+      });
+    } else {
+      console.warn('[Auth] Failed to fetch user info:', userResponse.status);
+      // Token might be expired or invalid - proceed without user
+    }
+  } catch (error) {
+    console.error('[Auth] Middleware error:', error);
+    // Don't fail the request if auth check fails - let it proceed
+  }
+}

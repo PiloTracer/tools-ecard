@@ -17,6 +17,14 @@ export function ProjectSelector() {
   const [newProjectName, setNewProjectName] = useState('');
   const [createError, setCreateError] = useState('');
 
+  // Ensure we always have a valid selected value
+  // If selectedProjectId is null or doesn't exist in projects, use the first project's id
+  const currentValue = selectedProjectId && projects.some(p => p.id === selectedProjectId)
+    ? selectedProjectId
+    : projects.length > 0
+    ? projects[0].id
+    : '';
+
   const handleSelectProject = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const projectId = e.target.value;
     if (projectId === 'create-new') {
@@ -55,44 +63,65 @@ export function ProjectSelector() {
 
   if (loading) {
     return (
-      <div className="flex items-center space-x-2 mb-4">
-        <span className="text-sm text-gray-600">Loading projects...</span>
+      <div className="flex items-center space-x-3 mb-6">
+        <label className="text-sm font-medium text-gray-700 min-w-fit">
+          Project:
+        </label>
+        <div className="flex items-center space-x-2 flex-1">
+          <div className="h-10 w-48 bg-gray-100 animate-pulse rounded-lg"></div>
+          <span className="text-sm text-gray-500">Loading projects...</span>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center space-x-2 mb-4">
-        <span className="text-sm text-red-600">Error: {error}</span>
+      <div className="flex items-center space-x-3 mb-6">
+        <label className="text-sm font-medium text-gray-700 min-w-fit">
+          Project:
+        </label>
+        <div className="flex items-center space-x-2 flex-1">
+          <div className="px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+            Error: {error}
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mb-4">
+    <div className="mb-6">
       <div className="flex items-center space-x-3">
-        <label htmlFor="project-selector" className="text-sm font-medium text-gray-700">
+        <label htmlFor="project-selector" className="text-sm font-medium text-gray-700 min-w-fit">
           Project:
         </label>
 
         {!isCreating ? (
           <select
             id="project-selector"
-            value={selectedProjectId || ''}
+            value={currentValue}
             onChange={handleSelectProject}
-            className="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={projects.length === 0}
+            className="flex-1 max-w-xs px-4 py-2.5 text-sm bg-white border border-gray-300 rounded-lg shadow-sm
+                     hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                     disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed
+                     transition-colors duration-150"
           >
+            {projects.length === 0 && (
+              <option value="">No projects available</option>
+            )}
             {projects.map(project => (
               <option key={project.id} value={project.id}>
-                {project.name}
-                {project.isDefault && ' (default)'}
+                {project.name}{project.isDefault ? ' (default)' : ''}
               </option>
             ))}
-            <option value="create-new">+ Create New Project</option>
+            <option value="create-new" className="font-medium">
+              + Create New Project
+            </option>
           </select>
         ) : (
-          <div className="flex items-center space-x-2 flex-1 max-w-md">
+          <div className="flex items-center space-x-2 flex-1 max-w-lg">
             <input
               type="text"
               value={newProjectName}
@@ -102,18 +131,24 @@ export function ProjectSelector() {
                 if (e.key === 'Escape') handleCancelCreate();
               }}
               placeholder="Enter project name"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                       transition-colors duration-150"
               autoFocus
             />
             <button
               onClick={handleCreateProject}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
+                       hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                       transition-colors duration-150"
             >
               Create
             </button>
             <button
               onClick={handleCancelCreate}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg
+                       hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2
+                       transition-colors duration-150"
             >
               Cancel
             </button>
@@ -122,7 +157,9 @@ export function ProjectSelector() {
       </div>
 
       {createError && (
-        <p className="mt-2 text-sm text-red-600">{createError}</p>
+        <div className="mt-2 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+          {createError}
+        </div>
       )}
     </div>
   );

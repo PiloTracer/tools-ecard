@@ -4,9 +4,11 @@
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
 import { appConfig } from './core/config';
 import { errorHandler } from './core/middleware/errorHandler';
+import { authMiddleware } from './core/middleware/authMiddleware';
 
 // Feature routes
 import { projectRoutes } from './features/simple-projects/routes';
@@ -49,7 +51,11 @@ export async function buildApp() {
     exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
   });
 
+  await app.register(cookie);
   await app.register(websocket);
+
+  // Register auth middleware globally
+  app.addHook('preHandler', authMiddleware);
 
   // Health check endpoint
   app.get('/health', async () => {
