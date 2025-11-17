@@ -25,9 +25,9 @@ A complete, secure, production-ready OAuth 2.0 integration with PKCE (Proof Key 
 ✅ Rate limiting for auth endpoints
 
 **Redirect URIs Configured:**
-- `http://localhost:7300/auth/callback`
+- `http://localhost:7300/oauth/complete`
 - `http://localhost:7300/oauth/callback`
-- `http://127.0.0.1:7300/auth/callback`
+- `http://127.0.0.1:7300/oauth/complete`
 
 **Scopes Requested:**
 - `profile` - Basic user information
@@ -71,7 +71,7 @@ A complete, secure, production-ready OAuth 2.0 integration with PKCE (Proof Key 
 - Links to terms and privacy policy
 
 ### 4. OAuth Callback Handler
-**File:** `front-cards/app/auth/callback/page.tsx`
+**File:** `front-cards/app/oauth/complete/page.tsx`
 
 ✅ Authorization code validation
 ✅ State parameter verification (CSRF protection)
@@ -302,7 +302,7 @@ A complete, secure, production-ready OAuth 2.0 integration with PKCE (Proof Key 
        ├────────────────────────────────────────►│                  │
        │                                         └────────┬─────────┘
        │                                                  │
-       │  6. Redirect to /auth/callback                  │
+       │  6. Redirect to /oauth/complete                  │
        │     ?code=xxx&state=yyy                         │
        │◄─────────────────────────────────────────────────┤
        │                                                  │
@@ -356,7 +356,7 @@ OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=your_actual_client_secret_here
 
 # Redirect URIs (MUST match what's registered in App Library)
-OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback
+OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete,http://localhost:7300/oauth/callback
 
 # OAuth Scopes
 OAUTH_SCOPES=profile email subscription
@@ -378,7 +378,7 @@ The app will be available at `http://localhost:7300`
 2. Click "Login with Tools Dashboard"
 3. You'll be redirected to Tools Dashboard OAuth page
 4. Log in and approve the requested scopes
-5. You'll be redirected back to `/auth/callback`
+5. You'll be redirected back to `/oauth/complete`
 6. After successful authentication, you'll land on `/dashboard`
 
 ### 4. Protected Routes
@@ -427,7 +427,7 @@ function MyComponent() {
 - [ ] **Login Flow**
   - [ ] Visit `/` redirects to `/login` if not authenticated
   - [ ] Click "Login with Tools Dashboard" redirects to OAuth page
-  - [ ] Approve scopes redirects back to `/auth/callback`
+  - [ ] Approve scopes redirects back to `/oauth/complete`
   - [ ] Successful authentication redirects to `/dashboard`
 
 - [ ] **State Parameter (CSRF Protection)**

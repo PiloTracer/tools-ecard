@@ -185,7 +185,7 @@ function openECards() {
 ```
 GET http://epicdev.com/app/oauth/authorize?
   client_id=ecards_app
-  &redirect_uri=http://localhost:7300/auth/callback
+  &redirect_uri=http://localhost:7300/oauth/complete
   &response_type=code
   &scope=profile+email+subscription
   &state=RANDOM_CSRF_TOKEN
@@ -271,7 +271,7 @@ Content-Type: application/x-www-form-urlencoded
 
 grant_type=authorization_code
 &code=AUTH_CODE_FROM_REDIRECT
-&redirect_uri=http://localhost:7300/auth/callback
+&redirect_uri=http://localhost:7300/oauth/complete
 &client_id=ecards_app
 &client_secret=ECARDS_CLIENT_SECRET
 &code_verifier=ORIGINAL_PKCE_CODE_VERIFIER
@@ -341,19 +341,19 @@ Content-Type: application/json
 **Response (Success):**
 ```
 HTTP/1.1 302 Found
-Location: http://localhost:7300/auth/callback?code=AUTH_CODE&state=CSRF_TOKEN
+Location: http://localhost:7300/oauth/complete?code=AUTH_CODE&state=CSRF_TOKEN
 ```
 
 **Response (User Denied):**
 ```
 HTTP/1.1 302 Found
-Location: http://localhost:7300/auth/callback?error=access_denied&state=CSRF_TOKEN
+Location: http://localhost:7300/oauth/complete?error=access_denied&state=CSRF_TOKEN
 ```
 
 **Response (Error):**
 ```
 HTTP/1.1 302 Found
-Location: http://localhost:7300/auth/callback?error=invalid_request&error_description=Missing+client_id&state=CSRF_TOKEN
+Location: http://localhost:7300/oauth/complete?error=invalid_request&error_description=Missing+client_id&state=CSRF_TOKEN
 ```
 
 ---
@@ -371,7 +371,7 @@ Content-Type: application/x-www-form-urlencoded
 ```
 grant_type=authorization_code
 &code=AUTH_CODE
-&redirect_uri=http://localhost:7300/auth/callback
+&redirect_uri=http://localhost:7300/oauth/complete
 &client_id=ecards_app
 &client_secret=CLIENT_SECRET
 &code_verifier=PKCE_CODE_VERIFIER
@@ -843,7 +843,7 @@ interface RateLimits {
   "client_secret": "SECURE_RANDOM_SECRET_256_BITS",
   "client_name": "E-Cards System",
   "redirect_uri": [
-    "http://localhost:7300/auth/callback"
+    "http://localhost:7300/oauth/complete"
   ],
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
@@ -1246,7 +1246,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
           "urlencoded": [
             { "key": "grant_type", "value": "authorization_code" },
             { "key": "code", "value": "{{auth_code}}" },
-            { "key": "redirect_uri", "value": "http://localhost:7300/auth/callback" },
+            { "key": "redirect_uri", "value": "http://localhost:7300/oauth/complete" },
             { "key": "client_id", "value": "ecards_app" },
             { "key": "client_secret", "value": "{{CLIENT_SECRET}}" },
             { "key": "code_verifier", "value": "{{code_verifier}}" }

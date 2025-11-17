@@ -65,7 +65,7 @@ OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://host.docker.internal/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://host.docker.internal/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://host.docker.internal/api/users/me
-OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
+OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 
 # JWT (Development - change in production!)

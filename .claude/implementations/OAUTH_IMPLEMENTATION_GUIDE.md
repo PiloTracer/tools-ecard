@@ -67,7 +67,7 @@ This guide explains how to integrate your application with the Tools Dashboard O
 
 **Example:**
 ```
-http://localhost:7300/auth/callback
+http://localhost:7300/oauth/complete
 http://localhost:7300/oauth/callback
 ```
 
@@ -696,7 +696,7 @@ When users click **"Launch App"** in the Tools Dashboard App Library, the Tools 
        │◄─────────────────────────────────────────────────┤
        │                                                  │
        │  5. Redirect to your callback with code         │
-       │     http://yourapp.com/auth/callback?           │
+       │     http://yourapp.com/oauth/complete?           │
        │     code=xxx&state=yyy                          │
        │◄─────────────────────────────────────────────────┤
        │                                                  │
@@ -718,7 +718,7 @@ When Tools Dashboard redirects to the authorization endpoint, it includes:
 | Parameter | Example | Description |
 |-----------|---------|-------------|
 | `client_id` | `ecards_app_dev` | Your OAuth client ID |
-| `redirect_uri` | `http://localhost:7300/auth/callback` | Your callback URL |
+| `redirect_uri` | `http://localhost:7300/oauth/complete` | Your callback URL |
 | `scope` | `profile email subscription` | Requested permissions |
 | `state` | `40ed89e34402fb...` | CSRF protection token (64 chars) |
 | `response_type` | `code` | OAuth response type (always "code") |
@@ -796,7 +796,7 @@ Since Tools Dashboard redirects **directly to the authorization endpoint**, your
 #### OAuth Callback Implementation (Handles Both Pre-Initiated and Self-Initiated Flows)
 
 ```javascript
-// app/auth/callback/page.tsx
+// app/oauth/complete/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -985,7 +985,7 @@ export default function OAuthCallback() {
 5. Click "Allow" to approve the authorization
 6. You should be redirected to your app's callback URL:
    ```
-   http://localhost:7300/auth/callback?code=...&state=...
+   http://localhost:7300/oauth/complete?code=...&state=...
    ```
 7. Your app exchanges the code for tokens
 8. You should land in your authenticated app (e.g., `/dashboard`)

@@ -64,7 +64,7 @@ Content-Type: application/json
   "code": "abc123...",
   "client_id": "ecards_app_dev",
   "client_secret": "secret123",
-  "redirect_uri": "http://localhost:7300/auth/callback"
+  "redirect_uri": "http://localhost:7300/oauth/complete"
 }
 ```
 

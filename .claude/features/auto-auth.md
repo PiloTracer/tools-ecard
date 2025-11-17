@@ -112,7 +112,7 @@
 │                          │ User clicks "Sign In"           │
 │                          ▼                                  │
 │  ┌────────────────────────────────────────────────────┐     │
-│  │  Auto-Auth Handler (/auth/callback)               │     │
+│  │  Auto-Auth Handler (/oauth/complete)               │     │
 │  │  - Verify state parameter (CSRF)                  │     │
 │  │  - Exchange auth code for tokens (PKCE)           │     │
 │  │  - Store tokens securely                          │     │
@@ -185,7 +185,7 @@
    ```
    http://epicdev.com/oauth/authorize?
      client_id=ecards_app
-     &redirect_uri=http://localhost:7300/auth/callback
+     &redirect_uri=http://localhost:7300/oauth/complete
      &response_type=code
      &scope=profile email subscription
      &state=RANDOM_STATE_TOKEN
@@ -197,7 +197,7 @@
 
 4. **Remote app redirects back** to E-Cards with:
    ```
-   http://localhost:7300/auth/callback?
+   http://localhost:7300/oauth/complete?
      code=AUTH_CODE_HERE
      &state=RANDOM_STATE_TOKEN
    ```
@@ -213,7 +213,7 @@
 
    grant_type=authorization_code
    &code=AUTH_CODE_HERE
-   &redirect_uri=http://localhost:7300/auth/callback
+   &redirect_uri=http://localhost:7300/oauth/complete
    &client_id=ecards_app
    &client_secret=ECARDS_CLIENT_SECRET
    &code_verifier=ORIGINAL_CODE_VERIFIER
@@ -275,7 +275,7 @@
 
 **Auth Endpoints:**
 - `/auth/login`: 5 attempts per 15 minutes per IP
-- `/auth/callback`: 10 attempts per 15 minutes per IP
+- `/oauth/complete`: 10 attempts per 15 minutes per IP
 - `/auth/refresh`: 20 attempts per hour per user
 
 **API Endpoints:**
@@ -307,8 +307,8 @@
     [Allow] [Deny]
 13. User clicks [Allow]
 14. Remote App redirects to:
-    http://localhost:7300/auth/callback?code=ABC123&state=XYZ789
-15. E-Cards /auth/callback page loads
+    http://localhost:7300/oauth/complete?code=ABC123&state=XYZ789
+15. E-Cards /oauth/complete page loads
 16. Frontend validates state matches sessionStorage
 17. Frontend sends code + code_verifier to backend:
     POST /api/auth/verify-code
@@ -423,7 +423,7 @@
     /auto-auth
       /components
         LandingPage.tsx          # Home page with Sign In button
-        AuthCallback.tsx         # /auth/callback handler
+        AuthCallback.tsx         # /oauth/complete handler
         AuthGuard.tsx            # Protected route wrapper
         SubscriptionError.tsx    # Subscription error display
         RateLimitBanner.tsx      # Rate limit warning
@@ -505,7 +505,7 @@ export function useOAuthFlow() {
     // Build OAuth URL
     const params = new URLSearchParams({
       client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID!,
-      redirect_uri: `${window.location.origin}/auth/callback`,
+      redirect_uri: `${window.location.origin}/oauth/complete`,
       response_type: 'code',
       scope: 'profile email subscription',
       state,
@@ -570,7 +570,7 @@ export function AuthCallback() {
         const result = await authService.exchangeCode({
           code,
           codeVerifier,
-          redirectUri: `${window.location.origin}/auth/callback`,
+          redirectUri: `${window.location.origin}/oauth/complete`,
         });
 
         // Clear session storage
@@ -1342,7 +1342,7 @@ export async function optionalAuthMiddleware(req: FastifyRequest, reply: Fastify
 {
   "code": "AUTHORIZATION_CODE_FROM_OAUTH",
   "codeVerifier": "RANDOM_CODE_VERIFIER",
-  "redirectUri": "http://localhost:7300/auth/callback"
+  "redirectUri": "http://localhost:7300/oauth/complete"
 }
 ```
 
@@ -1507,7 +1507,7 @@ CREATE TABLE IF NOT EXISTS auth_audit_log (
 
 ```
 /                           # Landing page (public)
-/auth/callback              # OAuth callback handler (public)
+/oauth/complete              # OAuth callback handler (public)
 /dashboard                  # User dashboard (protected)
 /templates                  # Template list (protected)
 /batches                    # Batch list (protected)
@@ -1668,7 +1668,7 @@ test('User can sign in via auto-auth', async ({ page }) => {
   await page.waitForURL(/epicdev.com\/oauth\/authorize/);
 
   // 4. Mock OAuth approval
-  await page.goto('http://localhost:7300/auth/callback?code=TEST_CODE&state=TEST_STATE');
+  await page.goto('http://localhost:7300/oauth/complete?code=TEST_CODE&state=TEST_STATE');
 
   // 5. Should redirect to dashboard
   await page.waitForURL('http://localhost:7300/dashboard');

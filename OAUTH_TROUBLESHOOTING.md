@@ -29,7 +29,7 @@ For OAuth authorization to work, ALL of these must be true:
 - [ ] **Client ID matches**: `ecards_app_dev`
 - [ ] **Client secret is set** in E-Cards `.env` file
 - [ ] **Redirect URIs are registered**:
-  - `http://localhost:7300/auth/callback`
+  - `http://localhost:7300/oauth/complete`
   - `http://localhost:7300/oauth/callback`
 
 **How to check:**
@@ -39,7 +39,7 @@ For OAuth authorization to work, ALL of these must be true:
 3. Click "Settings" or "Edit"
 4. Verify:
    - Client ID: ecards_app_dev
-   - Redirect URIs include: http://localhost:7300/auth/callback
+   - Redirect URIs include: http://localhost:7300/oauth/complete
    - App status: Active/Approved
 ```
 
@@ -105,7 +105,7 @@ Verify in App Library:
 ```
 Client ID: ecards_app_dev
 Redirect URIs:
-  - http://localhost:7300/auth/callback
+  - http://localhost:7300/oauth/complete
   - http://localhost:7300/oauth/callback
 Scopes: profile, email, subscription
 Status: Active
@@ -180,7 +180,7 @@ Look for these specific log lines:
 
 **Solution:**
 1. Go to App Library → E-Cards → Settings
-2. Add redirect URI: `http://localhost:7300/auth/callback`
+2. Add redirect URI: `http://localhost:7300/oauth/complete`
 3. Save and try again
 
 ### Issue 4: OAuth loops back to login
@@ -216,7 +216,7 @@ OAuth parameters detected from Tools Dashboard
 Parameters: {
   client_id: 'ecards_app_dev',
   state: '...',
-  redirect_uri: 'http://localhost:7300/auth/callback',
+  redirect_uri: 'http://localhost:7300/oauth/complete',
   scope: 'profile email subscription',
   response_type: 'code'
 }
@@ -260,7 +260,7 @@ Look for:
    → "E-Cards wants to access your profile, email, subscription"
 
 6. User clicks "Approve"
-   → http://localhost:7300/auth/callback?code=...&state=...
+   → http://localhost:7300/oauth/complete?code=...&state=...
 
 7. E-Cards exchanges code for token
    → User logged in and redirected to dashboard

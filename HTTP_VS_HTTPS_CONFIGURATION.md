@@ -95,7 +95,7 @@ These are only accessible on the server:
 | `OAUTH_AUTHORIZATION_ENDPOINT` | `http://epicdev.com/oauth/authorize` | Authorization endpoint (backend reference) |
 | `OAUTH_TOKEN_ENDPOINT` | `http://epicdev.com/oauth/token` | Token endpoint (backend calls) |
 | `OAUTH_USER_INFO_ENDPOINT` | `http://epicdev.com/api/users/me` | User info endpoint (backend calls) |
-| `OAUTH_REDIRECT_URI` | `http://localhost:7300/auth/callback,...` | Comma-separated redirect URIs |
+| `OAUTH_REDIRECT_URI` | `http://localhost:7300/oauth/complete,...` | Comma-separated redirect URIs |
 
 ---
 

@@ -7,7 +7,7 @@ This implementation solves the AdGuard blocking issue by using **pure server-sid
 ## Problem Solved
 
 **Original Issue:**
-- OAuth callback at `/auth/callback` was blocked by AdGuard
+- OAuth callback at `/oauth/complete` was blocked by AdGuard
 - AdGuard flagged "callback" URLs as advertising/tracking
 - JavaScript chunk loading failures prevented callback handler from executing
 
@@ -21,7 +21,7 @@ This implementation solves the AdGuard blocking issue by using **pure server-sid
 
 ### Before (Client-Side Callback)
 ```
-OAuth Server → /auth/callback (client page)
+OAuth Server → /oauth/complete (client page)
               → JavaScript executes
               → Fetch /api/auth/exchange-token (POST)
               → Redirect to /dashboard
@@ -75,7 +75,7 @@ OAuth Server → /oauth/complete (server route, GET)
 - `user_id` (readable by client, 30 days)
 
 ### 4. Updated Redirect URI
-**Old:** `http://localhost:7300/auth/callback`
+**Old:** `http://localhost:7300/oauth/complete`
 **New:** `http://localhost:7300/oauth/complete`
 
 ## Flow Comparison
@@ -86,7 +86,7 @@ OAuth Server → /oauth/complete (server route, GET)
 1. Client generates state/code_verifier (JavaScript)
 2. Client stores in sessionStorage
 3. Client redirects to OAuth server
-4. OAuth server redirects to /auth/callback
+4. OAuth server redirects to /oauth/complete
 5. Client JS reads sessionStorage
 6. Client fetches /api/auth/exchange-token
 7. Server exchanges code for token
@@ -106,7 +106,7 @@ OAuth Server → /oauth/complete (server route, GET)
 ### Pre-Initiated OAuth Flow (From App Library)
 
 **Before:**
-1. App Library redirects to /auth/callback with code
+1. App Library redirects to /oauth/complete with code
 2. Client JS handles callback (no PKCE)
 3. Client fetches /api/auth/exchange-token
 4. Client redirects to /dashboard
@@ -136,7 +136,7 @@ OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
 
 **Old Redirect URI:**
 ```
-http://localhost:7300/auth/callback
+http://localhost:7300/oauth/complete
 ```
 
 **New Redirect URI:**
@@ -210,7 +210,7 @@ http://localhost:7300/oauth/complete
 
 If any issues arise, you can rollback by:
 
-1. Revert redirect URI to `http://localhost:7300/auth/callback`
+1. Revert redirect URI to `http://localhost:7300/oauth/complete`
 2. Remove/disable new routes:
    - `/oauth/complete/route.ts`
    - `/api/auth/login/route.ts`
@@ -235,7 +235,7 @@ If any issues arise, you can rollback by:
 - `docker-compose.dev.yml` - Updated OAUTH_REDIRECT_URI (both services)
 
 ### Unchanged Files (Can Be Kept for Reference)
-- `front-cards/app/auth/callback/page.tsx` - Old client-side callback (can be removed)
+- `front-cards/app/oauth/complete/page.tsx` - Old client-side callback (can be removed)
 - `front-cards/app/api/auth/exchange-token/route.ts` - Old token exchange (can be removed)
 
 ## Performance Impact

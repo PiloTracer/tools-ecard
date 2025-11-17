@@ -75,7 +75,7 @@ const hasOAuthParams = searchParams.has('client_id') &&
 
 ### 2. Updated Callback Handler
 
-**File:** `front-cards/app/auth/callback/page.tsx`
+**File:** `front-cards/app/oauth/complete/page.tsx`
 
 **Changes:**
 - Detects flow type: checks if `oauth_state` exists in sessionStorage
@@ -146,7 +146,7 @@ OAuth parameters detected from Tools Dashboard
 Parameters: {
   client_id: 'ecards_app_dev',
   state: '40ed89e34402fb...',
-  redirect_uri: 'http://localhost:7300/auth/callback',
+  redirect_uri: 'http://localhost:7300/oauth/complete',
   scope: 'profile email subscription',
   response_type: 'code'
 }

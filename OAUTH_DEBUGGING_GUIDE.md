@@ -24,7 +24,7 @@ When the Tools Dashboard redirected users to the E-Cards app with OAuth paramete
 ✅ Enhanced error display with detailed messages
 ✅ Console logging for debugging
 
-#### 3. **OAuth Callback (app/auth/callback/page.tsx)**
+#### 3. **OAuth Callback (app/oauth/complete/page.tsx)**
 ✅ Comprehensive logging at each step
 ✅ Better error messages with context
 ✅ State validation logging
@@ -82,14 +82,14 @@ When the Tools Dashboard redirected users to the E-Cards app with OAuth paramete
 
 After you approve the OAuth request on Tools Dashboard, you'll be redirected to:
 ```
-http://localhost:7300/auth/callback?code=...&state=...
+http://localhost:7300/oauth/complete?code=...&state=...
 ```
 
 Watch the console for the complete flow:
 
 ```
 === OAuth Callback Handler Started ===
-Current URL: http://localhost:7300/auth/callback?code=...&state=...
+Current URL: http://localhost:7300/oauth/complete?code=...&state=...
 URL Parameters: { code: '...' state: '...' }
 Stored state: ...
 Received state: ...
@@ -268,7 +268,7 @@ Check environment variables:
 ```bash
 OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
-OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback,...
+OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete,...
 ```
 
 ---
@@ -336,7 +336,7 @@ Using external state parameter: 1cc5a3a1e66f1aaa...
 === Login Page ===
 Initiating OAuth flow...
 Generating OAuth authorization URL...
-Redirect URI: http://localhost:7300/auth/callback
+Redirect URI: http://localhost:7300/oauth/complete
 Client ID: ecards_app_dev
 Scopes: ["profile", "email", "subscription"]
 Generated state: a1b2c3d4e5f6...
@@ -350,7 +350,7 @@ Redirecting to OAuth authorization endpoint: http://epicdev.com/oauth/authorize?
 
 === Callback Page ===
 === OAuth Callback Handler Started ===
-Current URL: http://localhost:7300/auth/callback?code=AUTH_CODE_HERE&state=a1b2c3d4e5f6...
+Current URL: http://localhost:7300/oauth/complete?code=AUTH_CODE_HERE&state=a1b2c3d4e5f6...
 URL Parameters: {
   code: "SplxlOBeZQ...",
   state: "a1b2c3d4e5...",
@@ -374,7 +374,7 @@ Received token exchange request: {
 Exchanging code for token with OAuth server...
 Token endpoint: http://epicdev.com/oauth/token
 Client ID: ecards_app_dev
-Redirect URI: http://localhost:7300/auth/callback
+Redirect URI: http://localhost:7300/oauth/complete
 Token exchange response status: 200
 ✓ Token exchange successful!
 Received tokens: {
@@ -424,7 +424,7 @@ Clearing OAuth data from sessionStorage...
 3. Click "Login with Tools Dashboard"
 4. Verify redirect to `http://epicdev.com/oauth/authorize`
 5. Approve scopes
-6. Verify redirect to `http://localhost:7300/auth/callback?code=...&state=...`
+6. Verify redirect to `http://localhost:7300/oauth/complete?code=...&state=...`
 7. Verify automatic redirect to `/dashboard`
 8. Verify user info displayed correctly
 
@@ -447,7 +447,7 @@ Clearing OAuth data from sessionStorage...
    - Verify error shown: "Invalid state parameter"
 
 2. **Test missing code:**
-   - Visit `/auth/callback` without code parameter
+   - Visit `/oauth/complete` without code parameter
    - Verify error shown: "No authorization code received"
 
 3. **Test OAuth denial:**

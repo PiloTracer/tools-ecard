@@ -16,7 +16,7 @@ When the App Library redirected directly to the authorization endpoint:
 1. User clicks "Launch App" in App Library
 2. App Library redirects to `http://epicdev.com/oauth/authorize?...` (E-Cards app never sees this request)
 3. User approves on consent screen
-4. OAuth server redirects to `http://localhost:7300/auth/callback?code=...&state=...`
+4. OAuth server redirects to `http://localhost:7300/oauth/complete?code=...&state=...`
 5. E-Cards receives callback but has NO state in sessionStorage (because it never initiated the flow)
 6. E-Cards incorrectly tried to validate the state, causing the error
 
@@ -47,7 +47,7 @@ sessionStorage.getItem(`oauth_state_${clientId}`);
 - `clearOAuthData()` - Now accepts `clientId` parameter and clears client ID-specific keys
 - `generateAuthorizationUrl()` - Now passes `OAUTH_CONFIG.clientId` when storing OAuth data
 
-#### 2. Updated Callback Handler (`auth/callback/page.tsx`)
+#### 2. Updated Callback Handler (`oauth/complete/page.tsx`)
 
 **Flow Detection Logic:**
 ```typescript
@@ -76,7 +76,7 @@ if (isManualLogin) {
 2. App Library generates state and redirects to `http://epicdev.com/oauth/authorize?...`
 3. OAuth server shows consent screen
 4. User approves
-5. OAuth server validates state and redirects to `http://localhost:7300/auth/callback?code=...&state=...`
+5. OAuth server validates state and redirects to `http://localhost:7300/oauth/complete?code=...&state=...`
 6. E-Cards callback handler:
    - ✅ Detects NO stored state in `sessionStorage.getItem('oauth_state_ecards_app_dev')` → Pre-initiated flow
    - ✅ Skips state validation (already validated by OAuth server)
@@ -93,7 +93,7 @@ if (isManualLogin) {
 4. E-Cards redirects to `http://epicdev.com/oauth/authorize?...`
 5. OAuth server shows consent screen
 6. User approves
-7. OAuth server redirects to `http://localhost:7300/auth/callback?code=...&state=...`
+7. OAuth server redirects to `http://localhost:7300/oauth/complete?code=...&state=...`
 8. E-Cards callback handler:
    - ✅ Detects stored state in `sessionStorage.getItem('oauth_state_ecards_app_dev')` → Manual login
    - ✅ Validates state matches stored state (CSRF protection)

@@ -21,7 +21,7 @@ code: 'UND_ERR_CONNECT_TIMEOUT'
 ### Error Flow
 
 1. User completes OAuth authorization on Tools Dashboard
-2. User is redirected to `http://localhost:7300/auth/callback?code=xxx&state=yyy`
+2. User is redirected to `http://localhost:7300/oauth/complete?code=xxx&state=yyy`
 3. Frontend calls `/api/auth/exchange-token` API route
 4. Backend API route (running inside Docker container) tries to exchange code with OAuth server
 5. **Backend makes request to `http://epicdev.com/oauth/token`**
@@ -114,7 +114,7 @@ OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
-OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
+OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 ```
 
@@ -187,7 +187,7 @@ OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
 OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
-OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
+OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 ```
 
