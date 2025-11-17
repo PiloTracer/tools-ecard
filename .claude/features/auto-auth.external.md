@@ -842,9 +842,8 @@ interface RateLimits {
   "client_id": "ecards_app",
   "client_secret": "SECURE_RANDOM_SECRET_256_BITS",
   "client_name": "E-Cards System",
-  "redirect_uris": [
-    "http://localhost:7300/auth/callback",
-    "https://ecards.codedg.com/auth/callback"
+  "redirect_uri": [
+    "http://localhost:7300/auth/callback"
   ],
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
