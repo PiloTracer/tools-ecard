@@ -8,7 +8,8 @@ import websocket from '@fastify/websocket';
 import { appConfig } from './core/config';
 import { errorHandler } from './core/middleware/errorHandler';
 
-// MOCK: Feature routes (will be implemented)
+// Feature routes
+import { projectRoutes } from './features/simple-projects/routes';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
@@ -21,7 +22,31 @@ export async function buildApp() {
 
   // Register plugins
   await app.register(cors, {
-    origin: true, // TODO [backend]: Configure CORS properly for production
+    origin: (origin, cb) => {
+      // Allow requests from the frontend development server
+      const allowedOrigins = [
+        'http://localhost:7300',
+        'http://localhost:3000',
+        'http://127.0.0.1:7300',
+        'http://127.0.0.1:3000',
+      ];
+
+      // In development, allow the origin if it's in our allowed list
+      if (!origin || allowedOrigins.includes(origin)) {
+        cb(null, true);
+      } else if (appConfig.env === 'development') {
+        // In development, be more permissive but log unexpected origins
+        console.warn(`CORS: Unexpected origin ${origin}`);
+        cb(null, true);
+      } else {
+        // In production, be strict
+        cb(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true, // Allow cookies and credentials
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
   });
 
   await app.register(websocket);
@@ -43,7 +68,8 @@ export async function buildApp() {
     };
   });
 
-  // TODO [backend]: Register feature routes
+  // Register feature routes
+  app.register(projectRoutes, { prefix: '/api/v1/projects' });
   // app.register(templateRoutes, { prefix: '/api/v1/templates' });
   // app.register(batchRoutes, { prefix: '/api/v1/batches' });
 

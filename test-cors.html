@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test for E-Cards API</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 3px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>CORS Test for E-Cards API</h1>
+    <p>Testing CORS configuration for API endpoints at <code>http://localhost:7400</code> from origin <code>http://localhost:7300</code></p>
+
+    <div id="test-results"></div>
+
+    <div>
+        <button onclick="runTests()">Run All Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:7400';
+        const resultsDiv = document.getElementById('test-results');
+
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+
+        function addResult(testName, status, details) {
+            const section = document.createElement('div');
+            section.className = `test-section ${status}`;
+            section.innerHTML = `
+                <h3>${testName}</h3>
+                <pre>${JSON.stringify(details, null, 2)}</pre>
+            `;
+            resultsDiv.appendChild(section);
+        }
+
+        async function testEndpoint(name, url, options = {}) {
+            addResult(name, 'pending', { status: 'Testing...', url });
+
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+
+                const data = await response.json().catch(() => ({ text: 'Non-JSON response' }));
+
+                const result = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: {
+                        'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+                        'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
+                    },
+                    data
+                };
+
+                // Check if CORS headers are correct
+                const corsOk = result.headers['access-control-allow-credentials'] === 'true' &&
+                             result.headers['access-control-allow-origin'] !== null;
+
+                // Update the result with proper status
+                const statusDiv = resultsDiv.lastElementChild;
+                statusDiv.className = `test-section ${corsOk ? 'success' : 'error'}`;
+                statusDiv.querySelector('pre').textContent = JSON.stringify({
+                    ...result,
+                    corsStatus: corsOk ? 'CORS headers OK' : 'CORS headers missing or incorrect'
+                }, null, 2);
+
+            } catch (error) {
+                const statusDiv = resultsDiv.lastElementChild;
+                statusDiv.className = 'test-section error';
+                statusDiv.querySelector('pre').textContent = JSON.stringify({
+                    error: error.message,
+                    type: 'Network or CORS error',
+                    details: 'Check browser console for more details'
+                }, null, 2);
+                console.error(`Test ${name} failed:`, error);
+            }
+        }
+
+        async function runTests() {
+            clearResults();
+
+            // Test 1: Health check
+            await testEndpoint('Health Check', `${API_BASE}/health`);
+
+            // Test 2: GET projects
+            await testEndpoint('GET /api/v1/projects', `${API_BASE}/api/v1/projects`);
+
+            // Test 3: POST ensure-default
+            await testEndpoint('POST /api/v1/projects/ensure-default', `${API_BASE}/api/v1/projects/ensure-default`, {
+                method: 'POST',
+                body: JSON.stringify({})
+            });
+
+            // Test 4: OPTIONS preflight
+            await testEndpoint('OPTIONS /api/v1/projects (Preflight)', `${API_BASE}/api/v1/projects`, {
+                method: 'OPTIONS'
+            });
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', runTests);
+    </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 // Prisma schema for E-Cards PostgreSQL database
-// TODO [backend]: Implement full schema based on domain models
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -10,15 +10,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// MOCK: Example model
-// Uncomment and expand when ready to implement
+// User model - represents authenticated users
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  oauthId   String?  @unique @map("oauth_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-// model User {
-//   id        String   @id @default(uuid())
-//   email     String   @unique
-//   name      String
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-//
-//   @@map("users")
-// }
+  // Relations
+  projects          Project[]
+  projectSelection  UserProjectSelection?
+
+  @@map("users")
+}
+
+// Project model - containers for organizing templates and batches
+model Project {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  selectedBy        UserProjectSelection[]
+
+  // Ensure unique project names per user
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([isDefault])
+  @@map("projects")
+}
+
+// UserProjectSelection - tracks which project is currently selected by a user
+model UserProjectSelection {
+  userId     String   @id @map("user_id")
+  projectId  String   @map("project_id")
+  selectedAt DateTime @default(now()) @map("selected_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("user_project_selections")
+}

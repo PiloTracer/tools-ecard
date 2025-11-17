@@ -10,9 +10,19 @@
 import { useAuth } from '@/features/auth';
 import { ProtectedRoute } from '@/features/auth';
 import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
+import { ProjectSelector, useProjects } from '@/features/simple-projects';
+import { useEffect } from 'react';
 
 function DashboardContent() {
   const { user, logout } = useAuth();
+  const { ensureDefaultProject } = useProjects();
+
+  // Ensure user has a default project on first login
+  useEffect(() => {
+    if (user) {
+      ensureDefaultProject();
+    }
+  }, [user, ensureDefaultProject]);
 
   if (!user) {
     return null;
@@ -222,6 +232,11 @@ function DashboardContent() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Project Selector - Positioned right above Quick Actions */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <ProjectSelector />
         </div>
 
         {/* Quick Actions */}

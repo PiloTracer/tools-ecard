@@ -16,9 +16,9 @@ async function start() {
     // Connect to databases
     console.log('🔌 Connecting to databases...');
 
-    // TODO [backend]: Uncomment when Prisma schema is ready
-    // await prisma.$connect();
-    // console.log('✅ Connected to PostgreSQL');
+    // Connect to PostgreSQL via Prisma
+    await prisma.$connect();
+    console.log('✅ Connected to PostgreSQL');
 
     await connectCassandra();
 
@@ -40,7 +40,7 @@ async function start() {
       await app.close();
 
       // Close database connections
-      // await prisma.$disconnect();
+      await prisma.$disconnect();
       await disconnectCassandra();
       await disconnectRedis();
 
