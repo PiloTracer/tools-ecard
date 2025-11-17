@@ -91,11 +91,11 @@ These are only accessible on the server:
 | Variable | Example | Description |
 |----------|---------|-------------|
 | `OAUTH_CLIENT_ID` | `ecards_app_dev` | OAuth client ID (must match frontend) |
-| `OAUTH_CLIENT_SECRET` | `HYPdiXel_rtIP--huB4j1GYNQ9OYIqxS` | OAuth client secret (**KEEP SECRET!**) |
+| `OAUTH_CLIENT_SECRET` | `pQUQtR4fJLYH_9sfrPssE1Loz8HSeZ0D` | OAuth client secret (**KEEP SECRET!**) |
 | `OAUTH_AUTHORIZATION_ENDPOINT` | `http://epicdev.com/oauth/authorize` | Authorization endpoint (backend reference) |
 | `OAUTH_TOKEN_ENDPOINT` | `http://epicdev.com/oauth/token` | Token endpoint (backend calls) |
 | `OAUTH_USER_INFO_ENDPOINT` | `http://epicdev.com/api/users/me` | User info endpoint (backend calls) |
-| `OAUTH_REDIRECT_URIS` | `http://localhost:7300/auth/callback,...` | Comma-separated redirect URIs |
+| `OAUTH_REDIRECT_URI` | `http://localhost:7300/auth/callback,...` | Comma-separated redirect URIs |
 
 ---
 

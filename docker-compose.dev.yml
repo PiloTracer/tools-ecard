@@ -95,7 +95,8 @@ services:
       OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
       OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
       OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
-      OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS:-http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback}
+      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/auth/callback}
+      OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
     networks:
       - ecards-network
     depends_on:
@@ -180,7 +181,7 @@ services:
       OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
       OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
       OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
-      OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS:-http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback}
+      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/auth/callback}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
       # Application Identity
       APPLICATION_ID: ${APPLICATION_ID}

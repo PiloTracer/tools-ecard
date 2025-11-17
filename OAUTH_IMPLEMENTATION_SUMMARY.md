@@ -356,7 +356,7 @@ OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=your_actual_client_secret_here
 
 # Redirect URIs (MUST match what's registered in App Library)
-OAUTH_REDIRECT_URIS=http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback
+OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback
 
 # OAuth Scopes
 OAUTH_SCOPES=profile email subscription

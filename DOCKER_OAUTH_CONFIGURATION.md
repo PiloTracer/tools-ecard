@@ -45,7 +45,7 @@ OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}  # No default - REQUIRED
 OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
 OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
 OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
-OAUTH_REDIRECT_URIS: ${OAUTH_REDIRECT_URIS:-http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback}
+OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/auth/callback}
 OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
 ```
 
@@ -120,11 +120,11 @@ NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
 
 # Backend (server-side)
 OAUTH_CLIENT_ID=ecards_app_dev  # Must match NEXT_PUBLIC_OAUTH_CLIENT_ID
-OAUTH_CLIENT_SECRET=HYPdiXel_rtIP--huB4j1GYNQ9OYIqxS  # REQUIRED - Get from Tools Dashboard
-OAUTH_REDIRECT_URIS=http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback
+OAUTH_CLIENT_SECRET=pQUQtR4fJLYH_9sfrPssE1Loz8HSeZ0D  # REQUIRED - Get from Tools Dashboard
+OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
 
 # Application Identity (if using Admin API)
-APPLICATION_ID=c54c3e5c-b9f3-448e-99f8-46c20222d02f  # Your app UUID
+APPLICATION_ID=dc03bc0c-1eb5-431a-bf2e-638c45b419b1  # Your app UUID
 EXTERNAL_API_KEY=your_api_key_here  # If needed for backend-to-backend
 ```
 
@@ -168,11 +168,11 @@ NEXT_PUBLIC_USER_SUBSCRIPTION_URL=http://epicdev.com/app/features/user-subscript
 **Expected output (backend):**
 ```
 OAUTH_CLIENT_ID=ecards_app_dev
-OAUTH_CLIENT_SECRET=HYPdiXel_rtIP--huB4j1GYNQ9OYIqxS
+OAUTH_CLIENT_SECRET=pQUQtR4fJLYH_9sfrPssE1Loz8HSeZ0D
 OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
 OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
 OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
-OAUTH_REDIRECT_URIS=http://localhost:7300/auth/callback,http://localhost:7300/oauth/callback
+OAUTH_REDIRECT_URI=http://localhost:7300/auth/callback
 ...
 ```
 

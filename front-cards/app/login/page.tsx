@@ -45,7 +45,15 @@ export default function LoginPage() {
       // Don't generate new ones - just redirect with the same parameters
       const authUrl = `${OAUTH_CONFIG.authorizationEndpoint}?${searchParams.toString()}`;
 
-      console.log('Redirecting to:', authUrl);
+      console.log('=== OAuth Redirect Debug ===');
+      console.log('Authorization endpoint:', OAUTH_CONFIG.authorizationEndpoint);
+      console.log('Search params string:', searchParams.toString());
+      console.log('Full authorization URL:', authUrl);
+      console.log('URL length:', authUrl.length);
+      console.log('Contains "oauth":', authUrl.includes('oauth'));
+      console.log('Contains "/oauth/authorize":', authUrl.includes('/oauth/authorize'));
+      console.log('===========================');
+
       setIsLoading(true);
       window.location.href = authUrl;
     }

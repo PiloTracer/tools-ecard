@@ -33,7 +33,14 @@ export default function Home() {
 
       // Redirect to login page WITH the OAuth parameters
       // This is crucial - login page needs these parameters to redirect to authorization endpoint
-      router.push(`/login?${searchParams.toString()}`);
+      const loginUrl = `/login?${searchParams.toString()}`;
+      console.log('=== Landing Page Redirect Debug ===');
+      console.log('Original search params:', searchParams.toString());
+      console.log('Login URL:', loginUrl);
+      console.log('URL length:', loginUrl.length);
+      console.log('===================================');
+
+      router.push(loginUrl);
       return;
     }
 
