@@ -22,7 +22,7 @@ export type User = {
   email: string;
   display_name: string;
   avatar_url?: string;
-  subscription: {
+  subscription?: {
     tier: 'free' | 'basic' | 'professional' | 'enterprise';
     status: 'active' | 'suspended' | 'cancelled';
     cardsPerMonth: number;
@@ -30,8 +30,8 @@ export type User = {
     llmCredits: number;
     resetDate: string; // ISO date string
   };
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt?: string; // ISO date string
+  updatedAt?: string; // ISO date string
 };
 
 /**

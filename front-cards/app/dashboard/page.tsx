@@ -85,7 +85,7 @@ function DashboardContent() {
             </div>
             <div>
               <p className="text-sm text-gray-500">Display Name</p>
-              <p className="font-medium text-gray-900">{user.display_name}</p>
+              <p className="font-medium text-gray-900">{user.display_name || user.username}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">User ID</p>
@@ -108,85 +108,120 @@ function DashboardContent() {
             </a>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Tier */}
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Current Plan</p>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 capitalize">
-                {user.subscription.tier}
-              </span>
-            </div>
-
-            {/* Status */}
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Status</p>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${
-                  user.subscription.status === 'active'
-                    ? 'bg-green-100 text-green-800'
-                    : user.subscription.status === 'suspended'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {user.subscription.status}
-              </span>
-            </div>
-
-            {/* Reset Date */}
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Billing Cycle Resets</p>
-              <p className="font-medium text-gray-900">
-                {new Date(user.subscription.resetDate).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Usage & Limits</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Cards Usage */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Cards Generated</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {user.subscription.currentUsage} / {user.subscription.cardsPerMonth}
+          {user.subscription ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Tier */}
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Current Plan</p>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 capitalize">
+                    {user.subscription.tier}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (user.subscription.currentUsage / user.subscription.cardsPerMonth) * 100
-                      )}%`,
-                    }}
-                  ></div>
-                </div>
-              </div>
 
-              {/* LLM Credits */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">LLM Credits</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {user.subscription.llmCredits} remaining
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${
-                      user.subscription.llmCredits > 10 ? 'bg-green-600' : 'bg-orange-600'
+                {/* Status */}
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Status</p>
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${
+                      user.subscription.status === 'active'
+                        ? 'bg-green-100 text-green-800'
+                        : user.subscription.status === 'suspended'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
                     }`}
-                    style={{
-                      width: `${Math.min(100, user.subscription.llmCredits)}%`,
-                    }}
-                  ></div>
+                  >
+                    {user.subscription.status}
+                  </span>
+                </div>
+
+                {/* Reset Date */}
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Billing Cycle Resets</p>
+                  <p className="font-medium text-gray-900">
+                    {new Date(user.subscription.resetDate).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Usage & Limits</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Cards Usage */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-600">Cards Generated</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {user.subscription.currentUsage} / {user.subscription.cardsPerMonth}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (user.subscription.currentUsage / user.subscription.cardsPerMonth) * 100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* LLM Credits */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-600">LLM Credits</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {user.subscription.llmCredits} remaining
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${
+                          user.subscription.llmCredits > 10 ? 'bg-green-600' : 'bg-orange-600'
+                        }`}
+                        style={{
+                          width: `${Math.min(100, user.subscription.llmCredits)}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start">
+                <svg
+                  className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <div>
+                  <p className="font-medium text-yellow-900">Subscription data not available</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Your subscription information could not be loaded. Please visit the{' '}
+                    <a
+                      href={USER_SUBSCRIPTION_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-yellow-800"
+                    >
+                      Tools Dashboard
+                    </a>{' '}
+                    to view your subscription details.
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Quick Actions */}
