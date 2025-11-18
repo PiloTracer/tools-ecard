@@ -1,0 +1,182 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.ENV/
+.venv.bak/
+ENV.bak/
+
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# FastAPI specific
+*.db
+*.db-journal
+*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.coverage
+.pytest_cache/
+.covers/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.nyc_output/
+coverage/
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+iTunesDB
+Thumbs.db
+VolumeIcon.icns
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage.*
+
+# Build outputs
+*.min.js
+*.min.css
+public/dist/
+build/
+
+# Git related
+.git/
+.gitignore
+.gitmodules
+.gitattributes
+
+# Development and test files
+test/
+tests/
+spec/
+specs/
+*.test.js
+*.spec.js
+*.test.py
+*.spec.py
+
+# Documentation
+docs/
+doc/
+
+# Backup files
+*~
+*.bak
+*.backup
+*.old
+
+# README files that start with README_
+README_*
+
+# Docker specific (to avoid circular issues)
+.dockerignore
+Dockerfile
+Dockerfile.*
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local configuration
+local/
+local.*
+
+# IDE specific
+.vs/
+*.sublime-workspace
+nbproject/
+
+# Development specific
+*.tmp
+*.temp
+.DS_Store
+**/tmp/
+
+# Other
+SUBAGENTS/
+.dev-notes/
+.documentation/
+**/bin/
