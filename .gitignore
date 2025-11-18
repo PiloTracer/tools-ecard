@@ -156,3 +156,6 @@ README_*
 # Other
 SUBAGENTS/
 .dev-notes/
+
+# NEXT:
+.next/

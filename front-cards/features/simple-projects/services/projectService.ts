@@ -14,8 +14,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
 
 class ProjectService {
   private async fetchWithAuth(url: string, options?: RequestInit) {
-    const headers: HeadersInit = {
-      ...options?.headers,
+    const headers: Record<string, string> = {
+      ...(options?.headers as Record<string, string> || {}),
     };
 
     // Only set Content-Type if there's a body

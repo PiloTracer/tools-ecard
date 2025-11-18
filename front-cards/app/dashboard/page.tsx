@@ -11,6 +11,7 @@ import { useAuth } from '@/features/auth';
 import { ProtectedRoute } from '@/features/auth';
 import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
 import { ProjectSelector, useProjects } from '@/features/simple-projects';
+import { QuickActions } from '@/features/simple-quick-actions';
 import { useEffect } from 'react';
 
 function DashboardContent() {
@@ -240,70 +241,11 @@ function DashboardContent() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-              <svg
-                className="w-6 h-6 text-gray-400 mr-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <div className="text-left">
-                <p className="font-medium text-gray-900">Create Template</p>
-                <p className="text-sm text-gray-500">Design a new card template</p>
-              </div>
-            </button>
-
-            <button className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-              <svg
-                className="w-6 h-6 text-gray-400 mr-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <div className="text-left">
-                <p className="font-medium text-gray-900">Import Batch</p>
-                <p className="text-sm text-gray-500">Upload Excel or text data</p>
-              </div>
-            </button>
-
-            <button className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-              <svg
-                className="w-6 h-6 text-gray-400 mr-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                />
-              </svg>
-              <div className="text-left">
-                <p className="font-medium text-gray-900">View Batches</p>
-                <p className="text-sm text-gray-500">Manage generated cards</p>
-              </div>
-            </button>
-          </div>
-        </div>
+        <QuickActions
+          onCreateTemplate={() => console.log('Create Template clicked')}
+          onImportBatch={() => console.log('Import Batch clicked')}
+          onViewBatches={() => console.log('View Batches clicked')}
+        />
 
         {/* Success Message */}
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">

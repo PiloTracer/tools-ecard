@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(CONTEXT.tmp)"
+      "Bash(CONTEXT.tmp)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []
