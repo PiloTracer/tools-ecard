@@ -242,7 +242,7 @@ function DashboardContent() {
 
         {/* Quick Actions */}
         <QuickActions
-          onCreateTemplate={() => console.log('Create Template clicked')}
+          onCreateTemplate={() => console.log('Template Designer clicked')}
           onImportBatch={() => console.log('Import Batch clicked')}
           onViewBatches={() => console.log('View Batches clicked')}
         />

@@ -2,7 +2,7 @@
  * QuickActions Component - Quick action buttons for dashboard
  *
  * Features:
- * - Three main actions: Create Template, Import Batch, View Batches
+ * - Three main actions: Template Designer, Import Batch, View Batches
  * - Project-based enabling: disabled when no project selected
  * - Visual feedback for disabled state
  */
@@ -86,12 +86,12 @@ export function QuickActions({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Create Template Button */}
+        {/* Template Designer Button */}
         <button
           className={getButtonClasses()}
           onClick={handleCreateTemplate}
           disabled={isDisabled}
-          aria-label="Create Template"
+          aria-label="Template Designer"
           title={isDisabled ? "Select a project to create templates" : "Create a new card template"}
         >
           <svg
@@ -109,7 +109,7 @@ export function QuickActions({
             />
           </svg>
           <div className="text-left">
-            <p className={getTitleClasses()}>Create Template</p>
+            <p className={getTitleClasses()}>Template Designer</p>
             <p className={getDescriptionClasses()}>Design a new card template</p>
           </div>
         </button>

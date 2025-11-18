@@ -42,7 +42,7 @@ describe('QuickActions Component', () => {
         />
       );
 
-      const createButton = screen.getByRole('button', { name: /create template/i });
+      const createButton = screen.getByRole('button', { name: /Template Designer/i });
       const importButton = screen.getByRole('button', { name: /import batch/i });
       const viewButton = screen.getByRole('button', { name: /view batches/i });
 
@@ -60,7 +60,7 @@ describe('QuickActions Component', () => {
         />
       );
 
-      fireEvent.click(screen.getByRole('button', { name: /create template/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Template Designer/i }));
       expect(mockOnCreateTemplate).toHaveBeenCalledTimes(1);
 
       fireEvent.click(screen.getByRole('button', { name: /import batch/i }));
@@ -93,7 +93,7 @@ describe('QuickActions Component', () => {
         />
       );
 
-      const createButton = screen.getByRole('button', { name: /create template/i });
+      const createButton = screen.getByRole('button', { name: /Template Designer/i });
       const importButton = screen.getByRole('button', { name: /import batch/i });
       const viewButton = screen.getByRole('button', { name: /view batches/i });
 
@@ -111,7 +111,7 @@ describe('QuickActions Component', () => {
         />
       );
 
-      fireEvent.click(screen.getByRole('button', { name: /create template/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Template Designer/i }));
       fireEvent.click(screen.getByRole('button', { name: /import batch/i }));
       fireEvent.click(screen.getByRole('button', { name: /view batches/i }));
 
@@ -143,7 +143,7 @@ describe('QuickActions Component', () => {
         />
       );
 
-      const createButton = screen.getByRole('button', { name: /create template/i });
+      const createButton = screen.getByRole('button', { name: /Template Designer/i });
       const importButton = screen.getByRole('button', { name: /import batch/i });
       const viewButton = screen.getByRole('button', { name: /view batches/i });
 
@@ -184,8 +184,8 @@ describe('QuickActions Component', () => {
         />
       );
 
-      const createButton = screen.getByRole('button', { name: /create template/i });
-      expect(createButton).toHaveAttribute('aria-label', 'Create Template');
+      const createButton = screen.getByRole('button', { name: /Template Designer/i });
+      expect(createButton).toHaveAttribute('aria-label', 'Template Designer');
       expect(createButton).toHaveAttribute('title', 'Create a new card template');
     });
   });

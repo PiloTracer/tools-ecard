@@ -9,7 +9,7 @@ The Simple Quick Actions feature provides a dashboard component with quick actio
 ### QuickActions
 
 Main component that displays three primary actions:
-- **Create Template**: Opens template designer for new card templates
+- **Template Designer**: Opens template designer for new card templates
 - **Import Batch**: Initiates batch import workflow for Excel/text data
 - **View Batches**: Navigate to batch management interface
 
@@ -63,7 +63,7 @@ function Dashboard() {
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
-| `onCreateTemplate` | `() => void` | No | Callback when Create Template is clicked |
+| `onCreateTemplate` | `() => void` | No | Callback when Template Designer is clicked |
 | `onImportBatch` | `() => void` | No | Callback when Import Batch is clicked |
 | `onViewBatches` | `() => void` | No | Callback when View Batches is clicked |
 | `className` | `string` | No | Additional CSS classes for the container |

@@ -40,7 +40,7 @@ Enable users to design professional e-card templates through a visual interface 
 - **Template Persistence**: Save/load templates with full configuration
 
 ### User Journey
-1. User clicks "Template Designer" (renamed from "Create Template") in Quick Actions
+1. User clicks "Template Designer" (renamed from "Template Designer") in Quick Actions
 2. System loads template designer interface with canvas
 3. User uploads background image or selects from library
 4. User adds/configures text, image, and QR elements
@@ -606,7 +606,7 @@ describe('TemplateValidator', () => {
 ```typescript
 // API endpoints
 describe('Template API', () => {
-  it('POST /templates should create template');
+  it('POST /templates should Template Designer');
   it('PUT /templates/:id should update elements');
   it('GET /templates/:id/preview should generate preview');
 });
@@ -623,7 +623,7 @@ describe('Resource Upload', () => {
 ```typescript
 // Full workflow
 describe('Template Designer E2E', () => {
-  it('should create template from scratch');
+  it('should Template Designer from scratch');
   it('should load and edit existing template');
   it('should export template in multiple formats');
 });

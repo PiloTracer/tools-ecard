@@ -857,7 +857,7 @@ export const storageService = {
 
 ## Phase 5: Data Persistence
 
-### Step 5.1: Create Template Repository
+### Step 5.1: Template Designer Repository
 
 Create `api-server/src/features/template-designer/repositories/templateRepository.ts`:
 ```typescript
@@ -1008,7 +1008,7 @@ export const templateRepository = {
 };
 ```
 
-### Step 5.2: Create Template Service
+### Step 5.2: Template Designer Service
 
 Create `api-server/src/features/template-designer/services/templateService.ts`:
 ```typescript
@@ -1018,7 +1018,7 @@ import type { Template, TemplateConfig, CreateTemplateDto, UpdateTemplateDto } f
 
 export const templateService = {
   async createTemplate(dto: CreateTemplateDto): Promise<Template> {
-    // Create template in PostgreSQL
+    // Template Designer in PostgreSQL
     const template = await templateRepository.createTemplate({
       userId: dto.userId,
       projectId: dto.projectId,
@@ -1368,7 +1368,7 @@ Update `front-cards/features/simple-quick-actions/components/QuickActions.tsx`:
 <p className={getDescriptionClasses()}>Design custom card templates</p>
 ```
 
-### Step 7.2: Create Template Designer Page
+### Step 7.2: Template Designer Designer Page
 
 Create `front-cards/app/template-designer/page.tsx`:
 ```typescript

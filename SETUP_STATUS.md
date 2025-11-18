@@ -226,7 +226,7 @@ Once Docker is fully running, implement features in this order:
 4. Set up WebSocket for real-time updates
 
 ### Phase 2: Template Designer (Week 3-4)
-1. Create template feature scaffold
+1. Template Designer feature scaffold
 2. Implement canvas editor component
 3. Add element manipulation (text, images, QR)
 4. Background image upload to SeaweedFS
