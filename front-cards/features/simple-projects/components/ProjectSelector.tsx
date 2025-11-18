@@ -95,20 +95,21 @@ export function ProjectSelector() {
             value={selectedProjectId || ''}
             onChange={handleSelectProject}
             disabled={projects.length === 0}
-            className="flex-1 max-w-xs px-4 py-2.5 text-sm bg-white border border-gray-300 rounded-lg shadow-sm
+            className="flex-1 max-w-xs px-4 py-2.5 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm
                      hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
                      disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed
-                     transition-colors duration-150"
+                     transition-colors duration-150
+                     [&>option]:text-gray-900 [&>option]:bg-white"
           >
             {projects.length === 0 && (
-              <option value="">No projects available</option>
+              <option value="" className="text-gray-900 bg-white">No projects available</option>
             )}
             {projects.map(project => (
-              <option key={project.id} value={project.id}>
+              <option key={project.id} value={project.id} className="text-gray-900 bg-white">
                 {project.name}{project.isDefault ? ' (default)' : ''}
               </option>
             ))}
-            <option value="create-new" className="font-medium">
+            <option value="create-new" className="font-medium text-gray-900 bg-white">
               + Create New Project
             </option>
           </select>
@@ -123,7 +124,7 @@ export function ProjectSelector() {
                 if (e.key === 'Escape') handleCancelCreate();
               }}
               placeholder="Enter project name"
-              className="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm
+              className="flex-1 px-4 py-2.5 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
                        transition-colors duration-150"
               autoFocus
