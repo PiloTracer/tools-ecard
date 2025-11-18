@@ -156,6 +156,7 @@ README_*
 # Other
 SUBAGENTS/
 .dev-notes/
+**/bin/
 
 # NEXT:
 .next/
