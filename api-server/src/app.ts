@@ -6,12 +6,14 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
+import multipart from '@fastify/multipart';
 import { appConfig } from './core/config';
 import { errorHandler } from './core/middleware/errorHandler';
 import { authMiddleware } from './core/middleware/authMiddleware';
 
 // Feature routes
 import { projectRoutes } from './features/simple-projects/routes';
+import { s3Routes, initializeS3Feature } from './features/s3-bucket';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
@@ -54,6 +56,18 @@ export async function buildApp() {
   await app.register(cookie);
   await app.register(websocket);
 
+  // Register multipart support for file uploads
+  await app.register(multipart, {
+    limits: {
+      fieldNameSize: 100, // Max field name size in bytes
+      fieldSize: 100,     // Max field value size in bytes
+      fields: 10,         // Max number of non-file fields
+      fileSize: 104857600, // Max file size (100MB)
+      files: 1,           // Max number of file fields
+      headerPairs: 2000   // Max number of header key-value pairs
+    }
+  });
+
   // Register auth middleware globally
   app.addHook('preHandler', authMiddleware);
 
@@ -76,6 +90,13 @@ export async function buildApp() {
 
   // Register feature routes
   app.register(projectRoutes, { prefix: '/api/v1/projects' });
+
+  // Register S3 routes (already prefixed in route definitions)
+  await app.register(s3Routes);
+
+  // Initialize S3 buckets on startup
+  await initializeS3Feature();
+
   // app.register(templateRoutes, { prefix: '/api/v1/templates' });
   // app.register(batchRoutes, { prefix: '/api/v1/batches' });
 

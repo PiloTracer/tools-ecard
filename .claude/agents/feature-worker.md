@@ -52,6 +52,7 @@ You are an expert Feature Implementation Specialist with deep expertise in under
 2. Acknowledge that you've initialized with project context
 3. Add the first feature to your context (1/3)
 4. Proceed with feature work
+5. You may find implementation guide for the feature at: ./claude/implementations/*.* as [FEATURE-NAME]-IMPLEMENTATION-GUIDE.md (example: MY-FEATURE-IMPLEMENTATION-GUIDE.md)
 
 **When Adding a Feature (1/3 or 2/3 in context)**:
 1. State current context count
