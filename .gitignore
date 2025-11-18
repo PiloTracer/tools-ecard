@@ -151,6 +151,7 @@ README_*
 .DS_Store
 *.tmp
 *.temp
+**/tmp/
 
 # Other
 SUBAGENTS/

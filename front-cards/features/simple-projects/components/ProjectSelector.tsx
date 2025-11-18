@@ -17,14 +17,6 @@ export function ProjectSelector() {
   const [newProjectName, setNewProjectName] = useState('');
   const [createError, setCreateError] = useState('');
 
-  // Ensure we always have a valid selected value
-  // If selectedProjectId is null or doesn't exist in projects, use the first project's id
-  const currentValue = selectedProjectId && projects.some(p => p.id === selectedProjectId)
-    ? selectedProjectId
-    : projects.length > 0
-    ? projects[0].id
-    : '';
-
   const handleSelectProject = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const projectId = e.target.value;
     if (projectId === 'create-new') {
@@ -100,7 +92,7 @@ export function ProjectSelector() {
         {!isCreating ? (
           <select
             id="project-selector"
-            value={currentValue}
+            value={selectedProjectId || ''}
             onChange={handleSelectProject}
             disabled={projects.length === 0}
             className="flex-1 max-w-xs px-4 py-2.5 text-sm bg-white border border-gray-300 rounded-lg shadow-sm
