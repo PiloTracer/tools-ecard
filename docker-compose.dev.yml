@@ -21,6 +21,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: "1g"
 
   # Cassandra - Canonical database for high-scale event/log data
   cassandra:
@@ -63,6 +67,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: "256m"
 
   # Frontend - Next.js 16 application (Public-facing)
   front-cards:
@@ -105,6 +113,10 @@ services:
     depends_on:
       - api-server
     command: npm run dev
+    deploy:
+      resources:
+        limits:
+          memory: "1g"
 
   # API Server - Internal backend service (NOT the external auth API)
   # This is the E-Cards application's own API server for internal operations
@@ -230,6 +242,10 @@ services:
       db-init:
         condition: service_completed_successfully
     command: npm run dev
+    deploy:
+      resources:
+        limits:
+          memory: "1g"
 
   # Render Worker - Background job processor
   render-worker:
@@ -279,6 +295,10 @@ services:
       db-init:
         condition: service_completed_successfully
     command: npm run dev
+    deploy:
+      resources:
+        limits:
+          memory: "256m"
 
   # Database Initialization - Runs once on startup to create Cassandra keyspace
   db-init:
@@ -298,6 +318,10 @@ services:
       echo '✅ Cassandra keyspace initialized!';
       "
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: "256m"
 
 networks:
   ecards-network:

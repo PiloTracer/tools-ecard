@@ -6,128 +6,185 @@
 
 import { FastifyInstance } from 'fastify';
 import { s3Controller } from '../controllers/s3Controller';
-import { z } from 'zod';
 
 // ============================================================================
-// Request Schemas
+// JSON Schema Definitions for Fastify Validation
 // ============================================================================
 
 const uploadFileSchema = {
-  body: z.object({
-    file: z.object({
-      data: z.any(), // Buffer
-      filename: z.string(),
-      mimetype: z.string(),
-      size: z.number()
-    }),
-    bucket: z.string().optional(),
-    prefix: z.string().optional(),
-    metadata: z.record(z.string()).optional()
-  })
+  type: 'object',
+  required: ['file'],
+  properties: {
+    file: {
+      type: 'object',
+      required: ['data', 'filename', 'mimetype', 'size'],
+      properties: {
+        data: { type: 'object' }, // Buffer
+        filename: { type: 'string' },
+        mimetype: { type: 'string' },
+        size: { type: 'number' }
+      }
+    },
+    bucket: { type: 'string' },
+    prefix: { type: 'string' },
+    metadata: {
+      type: 'object',
+      additionalProperties: { type: 'string' }
+    }
+  }
 };
 
-const downloadFileSchema = {
-  params: z.object({
-    bucket: z.string(),
-    key: z.string()
-  }),
-  querystring: z.object({
-    inline: z.boolean().optional()
-  })
+const downloadFileParamsSchema = {
+  type: 'object',
+  required: ['bucket', 'key'],
+  properties: {
+    bucket: { type: 'string' },
+    key: { type: 'string' }
+  }
 };
 
-const deleteFileSchema = {
-  params: z.object({
-    bucket: z.string(),
-    key: z.string()
-  })
+const downloadFileQuerySchema = {
+  type: 'object',
+  properties: {
+    inline: { type: 'boolean' }
+  }
+};
+
+const deleteFileParamsSchema = {
+  type: 'object',
+  required: ['bucket', 'key'],
+  properties: {
+    bucket: { type: 'string' },
+    key: { type: 'string' }
+  }
 };
 
 const deleteFilesSchema = {
-  body: z.object({
-    bucket: z.string(),
-    keys: z.array(z.string()).min(1)
-  })
+  type: 'object',
+  required: ['bucket', 'keys'],
+  properties: {
+    bucket: { type: 'string' },
+    keys: {
+      type: 'array',
+      minItems: 1,
+      items: { type: 'string' }
+    }
+  }
 };
 
 const listObjectsSchema = {
-  querystring: z.object({
-    bucket: z.string(),
-    prefix: z.string().optional(),
-    delimiter: z.string().optional(),
-    maxKeys: z.number().optional(),
-    continuationToken: z.string().optional()
-  })
+  type: 'object',
+  required: ['bucket'],
+  properties: {
+    bucket: { type: 'string' },
+    prefix: { type: 'string' },
+    delimiter: { type: 'string' },
+    maxKeys: { type: 'number' },
+    continuationToken: { type: 'string' }
+  }
 };
 
 const createBucketSchema = {
-  body: z.object({
-    name: z.string()
-  })
+  type: 'object',
+  required: ['name'],
+  properties: {
+    name: { type: 'string' }
+  }
 };
 
-const deleteBucketSchema = {
-  params: z.object({
-    name: z.string()
-  })
+const deleteBucketParamsSchema = {
+  type: 'object',
+  required: ['name'],
+  properties: {
+    name: { type: 'string' }
+  }
 };
 
 const presignedUrlSchema = {
-  body: z.object({
-    operation: z.enum(['get', 'put']),
-    bucket: z.string(),
-    key: z.string(),
-    expiresIn: z.number().optional(),
-    contentType: z.string().optional()
-  })
+  type: 'object',
+  required: ['operation', 'bucket', 'key'],
+  properties: {
+    operation: {
+      type: 'string',
+      enum: ['get', 'put']
+    },
+    bucket: { type: 'string' },
+    key: { type: 'string' },
+    expiresIn: { type: 'number' },
+    contentType: { type: 'string' }
+  }
 };
 
 const startMultipartSchema = {
-  body: z.object({
-    bucket: z.string(),
-    key: z.string(),
-    contentType: z.string().optional(),
-    metadata: z.record(z.string()).optional()
-  })
+  type: 'object',
+  required: ['bucket', 'key'],
+  properties: {
+    bucket: { type: 'string' },
+    key: { type: 'string' },
+    contentType: { type: 'string' },
+    metadata: {
+      type: 'object',
+      additionalProperties: { type: 'string' }
+    }
+  }
 };
 
 const uploadPartSchema = {
-  body: z.object({
-    bucket: z.string(),
-    key: z.string(),
-    uploadId: z.string(),
-    partNumber: z.number().min(1),
-    data: z.any() // Buffer
-  })
+  type: 'object',
+  required: ['bucket', 'key', 'uploadId', 'partNumber', 'data'],
+  properties: {
+    bucket: { type: 'string' },
+    key: { type: 'string' },
+    uploadId: { type: 'string' },
+    partNumber: {
+      type: 'number',
+      minimum: 1
+    },
+    data: { type: 'object' } // Buffer
+  }
 };
 
 const completeMultipartSchema = {
-  body: z.object({
-    bucket: z.string(),
-    key: z.string(),
-    uploadId: z.string(),
-    parts: z.array(z.object({
-      etag: z.string(),
-      partNumber: z.number()
-    })).min(1)
-  })
+  type: 'object',
+  required: ['bucket', 'key', 'uploadId', 'parts'],
+  properties: {
+    bucket: { type: 'string' },
+    key: { type: 'string' },
+    uploadId: { type: 'string' },
+    parts: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        required: ['etag', 'partNumber'],
+        properties: {
+          etag: { type: 'string' },
+          partNumber: { type: 'number' }
+        }
+      }
+    }
+  }
 };
 
 const abortMultipartSchema = {
-  body: z.object({
-    bucket: z.string(),
-    key: z.string(),
-    uploadId: z.string()
-  })
+  type: 'object',
+  required: ['bucket', 'key', 'uploadId'],
+  properties: {
+    bucket: { type: 'string' },
+    key: { type: 'string' },
+    uploadId: { type: 'string' }
+  }
 };
 
 const copyObjectSchema = {
-  body: z.object({
-    sourceBucket: z.string(),
-    sourceKey: z.string(),
-    destBucket: z.string(),
-    destKey: z.string()
-  })
+  type: 'object',
+  required: ['sourceBucket', 'sourceKey', 'destBucket', 'destKey'],
+  properties: {
+    sourceBucket: { type: 'string' },
+    sourceKey: { type: 'string' },
+    destBucket: { type: 'string' },
+    destKey: { type: 'string' }
+  }
 };
 
 // ============================================================================
@@ -147,38 +204,38 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Upload a file to S3',
       tags: ['S3', 'Storage'],
-      body: uploadFileSchema.body
+      body: uploadFileSchema
     },
     handler: s3Controller.uploadFile.bind(s3Controller)
   });
 
   // Download file
-  fastify.get('/api/v1/s3/objects/:bucket/:key(*)', {
+  fastify.get('/api/v1/s3/objects/:bucket/:key(.*)', {
     schema: {
       description: 'Download a file from S3',
       tags: ['S3', 'Storage'],
-      params: downloadFileSchema.params,
-      querystring: downloadFileSchema.querystring
+      params: downloadFileParamsSchema,
+      querystring: downloadFileQuerySchema
     },
     handler: s3Controller.downloadFile.bind(s3Controller)
   });
 
   // Check file exists (HEAD)
-  fastify.head('/api/v1/s3/objects/:bucket/:key(*)', {
+  fastify.head('/api/v1/s3/objects/:bucket/:key(.*)', {
     schema: {
       description: 'Check if a file exists in S3',
       tags: ['S3', 'Storage'],
-      params: deleteFileSchema.params
+      params: deleteFileParamsSchema
     },
     handler: s3Controller.headFile.bind(s3Controller)
   });
 
   // Delete file
-  fastify.delete('/api/v1/s3/objects/:bucket/:key(*)', {
+  fastify.delete('/api/v1/s3/objects/:bucket/:key(.*)', {
     schema: {
       description: 'Delete a file from S3',
       tags: ['S3', 'Storage'],
-      params: deleteFileSchema.params
+      params: deleteFileParamsSchema
     },
     handler: s3Controller.deleteFile.bind(s3Controller)
   });
@@ -188,7 +245,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Delete multiple files from S3',
       tags: ['S3', 'Storage'],
-      body: deleteFilesSchema.body
+      body: deleteFilesSchema
     },
     handler: s3Controller.deleteFiles.bind(s3Controller)
   });
@@ -198,7 +255,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'List objects in an S3 bucket',
       tags: ['S3', 'Storage'],
-      querystring: listObjectsSchema.querystring
+      querystring: listObjectsSchema
     },
     handler: s3Controller.listObjects.bind(s3Controller)
   });
@@ -208,7 +265,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Copy an object from one location to another',
       tags: ['S3', 'Storage'],
-      body: copyObjectSchema.body
+      body: copyObjectSchema
     },
     handler: s3Controller.copyObject.bind(s3Controller)
   });
@@ -222,7 +279,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Create a new S3 bucket',
       tags: ['S3', 'Storage'],
-      body: createBucketSchema.body
+      body: createBucketSchema
     },
     handler: s3Controller.createBucket.bind(s3Controller)
   });
@@ -241,7 +298,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Delete an S3 bucket',
       tags: ['S3', 'Storage'],
-      params: deleteBucketSchema.params
+      params: deleteBucketParamsSchema
     },
     handler: s3Controller.deleteBucket.bind(s3Controller)
   });
@@ -255,7 +312,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Generate a presigned URL for temporary access',
       tags: ['S3', 'Storage'],
-      body: presignedUrlSchema.body
+      body: presignedUrlSchema
     },
     handler: s3Controller.generatePresignedUrl.bind(s3Controller)
   });
@@ -269,7 +326,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Initialize a multipart upload',
       tags: ['S3', 'Storage', 'Multipart'],
-      body: startMultipartSchema.body
+      body: startMultipartSchema
     },
     handler: s3Controller.startMultipartUpload.bind(s3Controller)
   });
@@ -279,7 +336,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Upload a part in multipart upload',
       tags: ['S3', 'Storage', 'Multipart'],
-      body: uploadPartSchema.body
+      body: uploadPartSchema
     },
     handler: s3Controller.uploadPart.bind(s3Controller)
   });
@@ -289,7 +346,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Complete a multipart upload',
       tags: ['S3', 'Storage', 'Multipart'],
-      body: completeMultipartSchema.body
+      body: completeMultipartSchema
     },
     handler: s3Controller.completeMultipartUpload.bind(s3Controller)
   });
@@ -299,7 +356,7 @@ export async function s3Routes(fastify: FastifyInstance) {
     schema: {
       description: 'Abort a multipart upload',
       tags: ['S3', 'Storage', 'Multipart'],
-      body: abortMultipartSchema.body
+      body: abortMultipartSchema
     },
     handler: s3Controller.abortMultipartUpload.bind(s3Controller)
   });
