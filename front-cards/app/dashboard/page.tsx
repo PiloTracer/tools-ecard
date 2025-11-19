@@ -13,10 +13,12 @@ import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
 import { ProjectSelector, useProjects } from '@/features/simple-projects';
 import { QuickActions } from '@/features/simple-quick-actions';
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 function DashboardContent() {
   const { user, logout } = useAuth();
   const { ensureDefaultProject } = useProjects();
+  const router = useRouter();
 
   // Ensure user has a default project on first login
   useEffect(() => {
@@ -242,7 +244,7 @@ function DashboardContent() {
 
         {/* Quick Actions */}
         <QuickActions
-          onCreateTemplate={() => console.log('Template Designer clicked')}
+          onCreateTemplate={() => router.push('/template-designer')}
           onImportBatch={() => console.log('Import Batch clicked')}
           onViewBatches={() => console.log('View Batches clicked')}
         />

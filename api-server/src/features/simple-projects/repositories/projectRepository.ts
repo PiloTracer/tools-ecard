@@ -100,15 +100,30 @@ export const projectRepository = {
    */
   async ensureDefaultProject(userId: string): Promise<Project> {
     // First, ensure the user exists in the database
-    await prisma.user.upsert({
-      where: { id: userId },
-      update: {},
-      create: {
-        id: userId,
-        email: `${userId}@example.com`, // Mock email for now
-        name: 'User'
-      }
+    // Use findUnique and create separately to avoid upsert constraint issues
+    let user = await prisma.user.findUnique({
+      where: { id: userId }
     });
+
+    if (!user) {
+      try {
+        user = await prisma.user.create({
+          data: {
+            id: userId,
+            email: `${userId}@example.com`, // Mock email for now
+            name: 'User'
+          }
+        });
+      } catch (error) {
+        // If user was created by another request in the meantime, fetch it
+        user = await prisma.user.findUnique({
+          where: { id: userId }
+        });
+        if (!user) {
+          throw error; // Re-throw if still not found
+        }
+      }
+    }
 
     // Check for existing default project
     let defaultProject = await prisma.project.findFirst({
