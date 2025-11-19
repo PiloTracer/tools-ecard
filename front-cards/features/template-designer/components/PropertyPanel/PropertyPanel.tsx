@@ -28,6 +28,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   selectedElement,
   onUpdateElement
 }) => {
+  console.log('PropertyPanel render - selectedElement:', selectedElement);
+
   if (!selectedElement) {
     return (
       <div className="w-80 h-full bg-white border-l border-gray-200 overflow-y-auto">

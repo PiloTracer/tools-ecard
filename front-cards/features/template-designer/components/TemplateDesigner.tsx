@@ -135,14 +135,21 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({ projectId })
   }, [updateElement]);
 
   const handleElementSelect = useCallback((fabricObject: any) => {
+    console.log('handleElementSelect called', { fabricObject, hasElementId: !!(fabricObject as any)?.elementId });
     if (fabricObject) {
       const elementId = (fabricObject as any).elementId;
-      const element = elements.find(el => el.id === elementId);
+      console.log('Looking for element with ID:', elementId);
+      // Get elements directly from store to avoid stale closure
+      const currentElements = useTemplateStore.getState().elements;
+      console.log('Current elements in store:', currentElements.map(e => e.id));
+      const element = currentElements.find(el => el.id === elementId);
+      console.log('Found element:', element);
       setSelectedElement(element || null);
     } else {
+      console.log('Clearing selection');
       setSelectedElement(null);
     }
-  }, [elements]);
+  }, []);
 
   const handleSave = async () => {
     if (!template) return;
