@@ -37,12 +37,6 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Debug: log fabric exports
-    console.log('Fabric exports:', Object.keys(fabric));
-    console.log('fabric.IText:', fabric.IText);
-    console.log('fabric.Textbox:', (fabric as any).Textbox);
-    console.log('fabric.Text:', (fabric as any).Text);
-
     // Initialize Fabric canvas
     const fabricCanvas = new fabric.Canvas(canvasRef.current, {
       width,
@@ -145,7 +139,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
     } else {
       removeGrid(canvas);
     }
-    canvas.renderAll();
+    // Don't clear objects, just update grid
+    canvas.requestRenderAll();
   }, [showGrid, gridSize, isReady]);
 
   // Update zoom
@@ -154,24 +149,39 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
     if (!canvas || !isReady) return;
 
     canvas.setZoom(zoom);
-    canvas.renderAll();
+    canvas.requestRenderAll();
   }, [zoom, isReady]);
 
-  // Render elements
+  // Render elements - sync store with canvas
   useEffect(() => {
     const canvas = useCanvasStore.getState().canvasInstance;
     if (!canvas || !isReady) return;
 
-    // Clear existing elements (except grid)
-    const objects = canvas.getObjects().filter((obj: any) => !obj.isGrid);
-    objects.forEach((obj) => canvas.remove(obj));
+    // Get all non-grid objects
+    const canvasObjects = canvas.getObjects().filter((obj: any) => !obj.isGrid);
+    const canvasElementIds = new Set(canvasObjects.map((obj: any) => obj.elementId).filter(Boolean));
+    const storeElementIds = new Set(elements.map(el => el.id));
 
-    // Add elements from store
-    elements.forEach((element) => {
-      addElementToCanvas(canvas, element);
+    // Remove objects that are no longer in the store
+    canvasObjects.forEach((obj: any) => {
+      if (obj.elementId && !storeElementIds.has(obj.elementId)) {
+        canvas.remove(obj);
+      }
     });
 
-    canvas.renderAll();
+    // Add or update elements
+    elements.forEach((element) => {
+      const existingObject = canvasObjects.find((obj: any) => obj.elementId === element.id);
+
+      if (!existingObject) {
+        // Add new element
+        addElementToCanvas(canvas, element);
+      }
+      // Note: We don't update existing objects here to preserve user interactions
+      // The object:modified event handles syncing changes back to the store
+    });
+
+    canvas.requestRenderAll();
   }, [elements, isReady]);
 
   // Helper function to draw grid
@@ -223,8 +233,6 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
         const textElement = element as TextElement;
         // Try different text class names depending on what's available
         const TextClass = (fabric as any).IText || (fabric as any).Textbox || (fabric as any).Text;
-        console.log('Using TextClass:', TextClass?.name);
-        console.log('textElement:', textElement);
 
         if (!TextClass) {
           console.error('No text class found in fabric!', Object.keys(fabric));
