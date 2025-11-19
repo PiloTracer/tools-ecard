@@ -135,13 +135,42 @@ export const projectRepository = {
 
     // Create if not exists
     if (!defaultProject) {
-      defaultProject = await prisma.project.create({
-        data: {
-          userId,
-          name: 'default',
-          isDefault: true
+      try {
+        defaultProject = await prisma.project.create({
+          data: {
+            userId,
+            name: 'default',
+            isDefault: true
+          }
+        });
+      } catch (error: any) {
+        // If creation failed due to unique constraint (race condition), fetch it
+        if (error.code === 'P2002') {
+          defaultProject = await prisma.project.findFirst({
+            where: {
+              userId,
+              OR: [
+                { isDefault: true },
+                { name: 'default' }
+              ]
+            }
+          });
+
+          // If found but not marked as default, update it
+          if (defaultProject && !defaultProject.isDefault) {
+            defaultProject = await prisma.project.update({
+              where: { id: defaultProject.id },
+              data: { isDefault: true }
+            });
+          }
+
+          if (!defaultProject) {
+            throw error; // Re-throw if still not found
+          }
+        } else {
+          throw error;
         }
-      });
+      }
     }
 
     return defaultProject;

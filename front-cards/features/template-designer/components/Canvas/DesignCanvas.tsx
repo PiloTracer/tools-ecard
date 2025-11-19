@@ -22,6 +22,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isReady, setIsReady] = useState(false);
+  const updatingFromCanvas = useRef(false); // Prevent sync loop
 
   const { elements, addElement, updateElement, selectElement } = useTemplateStore();
   const {
@@ -46,7 +47,10 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
       selection: true,
       selectionBorderColor: '#0066CC',
       selectionLineWidth: 2,
-      renderOnAddRemove: false
+      renderOnAddRemove: false,
+      interactive: true,
+      defaultCursor: 'default',
+      hoverCursor: 'move'
     });
 
     // Set up event handlers
@@ -80,26 +84,68 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
     });
 
     fabricCanvas.on('object:modified', (e) => {
-      if (e.target) {
-        const elementId = (e.target as any).elementId;
-        if (elementId) {
-          // Update element position/size in store
-          const element = elements.find(el => el.id === elementId);
-          if (element) {
-            const updatedElement = {
-              ...element,
-              x: e.target.left || element.x,
-              y: e.target.top || element.y,
-              width: e.target.width ? e.target.width * (e.target.scaleX || 1) : element.width,
-              height: e.target.height ? e.target.height * (e.target.scaleY || 1) : element.height,
-              rotation: e.target.angle || element.rotation
-            };
-            updateElement(updatedElement);
+      if (!e.target) return;
+
+      const elementId = (e.target as any).elementId;
+      if (!elementId) return;
+
+      // Block sync temporarily
+      updatingFromCanvas.current = true;
+
+      // Update element in store
+      const element = elements.find(el => el.id === elementId);
+      if (element) {
+        const updatedElement: any = {
+          ...element,
+          x: Math.round(e.target.left || element.x),
+          y: Math.round(e.target.top || element.y),
+          rotation: e.target.angle || element.rotation
+        };
+
+        // Text elements: calculate fontSize from current rendered size
+        if (element.type === 'text') {
+          const textObj = e.target as any;
+          if (textObj.fontSize && textObj.scaleY) {
+            const newFontSize = Math.round(textObj.fontSize * textObj.scaleY);
+            if (newFontSize !== element.fontSize) {
+              updatedElement.fontSize = newFontSize;
+            }
+          }
+        } else {
+          // Other elements: calculate width/height from current rendered size
+          const newWidth = e.target.width ? Math.round(e.target.width * (e.target.scaleX || 1)) : element.width;
+          const newHeight = e.target.height ? Math.round(e.target.height * (e.target.scaleY || 1)) : element.height;
+
+          if (newWidth !== element.width || newHeight !== element.height) {
+            updatedElement.width = newWidth;
+            updatedElement.height = newHeight;
           }
         }
-        if (onElementUpdate) {
-          onElementUpdate(e.target);
+
+        updateElement(updatedElement);
+      }
+
+      // Unblock sync after a delay
+      setTimeout(() => {
+        updatingFromCanvas.current = false;
+
+        // Normalize text objects: convert scale to fontSize
+        if (element && element.type === 'text') {
+          const textObj = e.target as any;
+          if (textObj.scaleY && textObj.scaleY !== 1) {
+            const newFontSize = Math.round(textObj.fontSize * textObj.scaleY);
+            textObj.set({
+              fontSize: newFontSize,
+              scaleX: 1,
+              scaleY: 1
+            });
+            fabricCanvas.requestRenderAll();
+          }
         }
+      }, 100);
+
+      if (onElementUpdate) {
+        onElementUpdate(e.target);
       }
     });
 
@@ -184,6 +230,11 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   useEffect(() => {
     const canvas = useCanvasStore.getState().canvasInstance;
     if (!canvas || !isReady) return;
+
+    // Skip if we're updating from a canvas modification to prevent interference
+    if (updatingFromCanvas.current) {
+      return;
+    }
 
     // Get all non-grid objects
     const canvasObjects = canvas.getObjects().filter((obj: any) => !obj.isGrid);
@@ -275,7 +326,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           fill: textElement.color || '#000000',
           textAlign: textElement.textAlign || 'left',
           angle: textElement.rotation || 0,
-          opacity: textElement.opacity !== undefined ? textElement.opacity : 1
+          opacity: textElement.opacity !== undefined ? textElement.opacity : 1,
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+          lockScalingFlip: true
         });
         break;
 
@@ -291,7 +347,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           stroke: '#ccc',
           strokeWidth: 1,
           angle: imageElement.rotation,
-          opacity: imageElement.opacity
+          opacity: imageElement.opacity,
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+          lockScalingFlip: true
         });
 
         // Load actual image asynchronously
@@ -303,7 +364,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
               scaleX: (imageElement.width || 100) / (img.width || 1),
               scaleY: (imageElement.height || 100) / (img.height || 1),
               angle: imageElement.rotation,
-              opacity: imageElement.opacity
+              opacity: imageElement.opacity,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              lockScalingFlip: true
             });
             (img as any).elementId = imageElement.id;
             canvas.remove(fabricObject!);
@@ -325,7 +391,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           stroke: '#333',
           strokeWidth: 1,
           angle: qrElement.rotation,
-          opacity: qrElement.opacity
+          opacity: qrElement.opacity,
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+          lockScalingFlip: true
         });
         break;
 
@@ -353,7 +424,12 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           left: tableElement.x,
           top: tableElement.y,
           angle: tableElement.rotation,
-          opacity: tableElement.opacity
+          opacity: tableElement.opacity,
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+          lockScalingFlip: true
         });
         break;
     }
@@ -362,15 +438,18 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
       // Store element ID on fabric object
       (fabricObject as any).elementId = element.id;
 
-      // Set common properties
+      // Override for locked elements
       if (element.locked) {
         fabricObject.set({
           selectable: false,
-          evented: false
+          evented: false,
+          hasControls: false,
+          hasBorders: false
         });
       }
 
       canvas.add(fabricObject);
+      canvas.requestRenderAll();
     }
   };
 
