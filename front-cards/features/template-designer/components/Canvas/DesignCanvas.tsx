@@ -122,12 +122,40 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
       drawGrid(fabricCanvas, gridSize);
     }
 
+    // Handle keyboard events for delete
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Delete or Backspace key
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeObject = fabricCanvas.getActiveObject();
+        if (activeObject && (activeObject as any).elementId) {
+          e.preventDefault(); // Prevent browser back navigation on Backspace
+          const elementId = (activeObject as any).elementId;
+
+          // Remove from canvas immediately
+          fabricCanvas.remove(activeObject);
+          fabricCanvas.requestRenderAll();
+
+          // Remove from store (which will keep it in sync)
+          const element = elements.find(el => el.id === elementId);
+          if (element) {
+            // Call parent's remove element function if available
+            const { removeElement } = useTemplateStore.getState();
+            removeElement(elementId);
+          }
+        }
+      }
+    };
+
+    // Add keyboard listener
+    window.addEventListener('keydown', handleKeyDown);
+
     // Cleanup
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       setCanvasInstance(null);
       fabricCanvas.dispose();
     };
-  }, [width, height, showGrid, snapToGrid, gridSize]);
+  }, [width, height, showGrid, snapToGrid, gridSize, elements]);
 
   // Update grid visibility
   useEffect(() => {
