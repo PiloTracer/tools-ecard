@@ -106,7 +106,7 @@ export interface TableElement extends TemplateElement {
   cells: Array<{
     row: number;
     column: number;
-    element?: TemplateElement;
+    elementId?: string; // Reference to element placed in this cell
     padding?: number;
     backgroundColor?: string;
   }>;

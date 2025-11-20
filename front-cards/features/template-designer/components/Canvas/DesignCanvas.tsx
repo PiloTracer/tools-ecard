@@ -83,13 +83,18 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
       }
     });
 
+    fabricCanvas.on('object:moving', (e) => {
+      console.log('object:moving fired', e.target);
+    });
+
     fabricCanvas.on('object:modified', (e) => {
+      console.log('object:modified fired', e.target);
       if (!e.target) return;
 
       const elementId = (e.target as any).elementId;
       if (!elementId) return;
 
-      // Update element in store WITHOUT triggering re-sync
+      // Update element in store
       const element = elements.find(el => el.id === elementId);
       if (element) {
         const updatedElement: any = {
@@ -112,6 +117,60 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           updatedElement.height = newHeight;
         }
 
+        // Check if element was dropped on a table (only for non-table elements)
+        if (element.type !== 'table') {
+          console.log('Checking drop on table for element:', element.type, { x: updatedElement.x, y: updatedElement.y });
+          const droppedOnTable = findTableUnderElement(fabricCanvas, e.target);
+          console.log('Dropped on table result:', droppedOnTable);
+
+          if (droppedOnTable) {
+            const { tableElement, tableObject, cellRow, cellColumn } = droppedOnTable;
+            console.log('Found table drop:', { tableId: tableElement.id, cellRow, cellColumn });
+
+            // Check if cell already has an element
+            const existingCell = tableElement.cells?.find(
+              (c: any) => c.row === cellRow && c.column === cellColumn && c.elementId
+            );
+
+            console.log('Existing cell check:', existingCell);
+
+            if (!existingCell) {
+              console.log('Snapping element to cell');
+              // Snap element to cell position
+              updatedElement.x = tableElement.x + (cellColumn * tableElement.cellWidth) + 5;
+              updatedElement.y = tableElement.y + (cellRow * tableElement.cellHeight) + 5;
+
+              // Update table cells array
+              const updatedCells = tableElement.cells ? [...tableElement.cells] : [];
+              const cellIndex = updatedCells.findIndex(
+                (c: any) => c.row === cellRow && c.column === cellColumn
+              );
+
+              if (cellIndex >= 0) {
+                updatedCells[cellIndex] = { ...updatedCells[cellIndex], elementId: element.id };
+              } else {
+                updatedCells.push({
+                  row: cellRow,
+                  column: cellColumn,
+                  elementId: element.id
+                });
+              }
+
+              // Update table in store
+              updateElement({ ...tableElement, cells: updatedCells });
+
+              // Update the target position on canvas
+              e.target.set({
+                left: updatedElement.x,
+                top: updatedElement.y
+              });
+              fabricCanvas.requestRenderAll();
+            } else {
+              console.log('Cell already occupied');
+            }
+          }
+        }
+
         updateElement(updatedElement);
       }
 
@@ -119,6 +178,67 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
         onElementUpdate(e.target);
       }
     });
+
+    // Helper function to find table under element
+    const findTableUnderElement = (canvas: fabric.Canvas, target: any) => {
+      const targetX = target.left;
+      const targetY = target.top;
+      console.log('findTableUnderElement called with target position:', { targetX, targetY });
+
+      // Find all table objects
+      const allObjects = canvas.getObjects();
+      console.log('Total objects on canvas:', allObjects.length);
+
+      for (const obj of allObjects) {
+        const objElementId = (obj as any).elementId;
+        if (!objElementId) continue;
+
+        const tableElement = elements.find(el => el.id === objElementId && el.type === 'table');
+        if (!tableElement || tableElement.type !== 'table') continue;
+
+        console.log('Found table object:', {
+          id: tableElement.id,
+          left: obj.left,
+          top: obj.top,
+          columns: tableElement.columns,
+          rows: tableElement.rows,
+          cellWidth: tableElement.cellWidth,
+          cellHeight: tableElement.cellHeight
+        });
+
+        // Check if element is over this table
+        const tableLeft = obj.left || 0;
+        const tableTop = obj.top || 0;
+        const tableWidth = tableElement.columns * tableElement.cellWidth;
+        const tableHeight = tableElement.rows * tableElement.cellHeight;
+
+        console.log('Table bounds:', {
+          left: tableLeft,
+          right: tableLeft + tableWidth,
+          top: tableTop,
+          bottom: tableTop + tableHeight
+        });
+
+        if (
+          targetX >= tableLeft &&
+          targetX <= tableLeft + tableWidth &&
+          targetY >= tableTop &&
+          targetY <= tableTop + tableHeight
+        ) {
+          // Calculate which cell
+          const relX = targetX - tableLeft;
+          const relY = targetY - tableTop;
+          const cellColumn = Math.floor(relX / tableElement.cellWidth);
+          const cellRow = Math.floor(relY / tableElement.cellHeight);
+
+          console.log('Element is over table! Cell:', { cellRow, cellColumn });
+          return { tableElement, tableObject: obj, cellRow, cellColumn };
+        }
+      }
+
+      console.log('Element not over any table');
+      return null;
+    };
 
     // Handle snapping to grid (will be set up separately)
     // Grid snapping event handler is added/removed via separate effect
