@@ -11,8 +11,8 @@ import { isTextElement, isImageElement, isQRElement, isTableElement, isShapeElem
 import type { TableElement } from '../../types';
 
 export function PropertyPanel() {
-  const { selectedElementId, width: canvasWidth, height: canvasHeight, fabricCanvas } = useCanvasStore();
-  const { elements, removeElement, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward } = useTemplateStore();
+  const { selectedElementId, fabricCanvas } = useCanvasStore();
+  const { elements, removeElement, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward, canvasWidth, canvasHeight } = useTemplateStore();
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
 
@@ -50,7 +50,7 @@ export function PropertyPanel() {
     }
   };
 
-  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'canvas-center') => {
+  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'canvas-center' | 'canvas-left' | 'canvas-right' | 'canvas-top' | 'canvas-bottom' | 'canvas-cover' | 'canvas-contain') => {
     if (!selectedElementId || !fabricCanvas || !selectedElement) return;
 
     const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
@@ -61,6 +61,8 @@ export function PropertyPanel() {
 
     let newX = selectedElement.x;
     let newY = selectedElement.y;
+    let newWidth = selectedElement.width;
+    let newHeight = selectedElement.height;
 
     switch (type) {
       case 'left':
@@ -85,9 +87,65 @@ export function PropertyPanel() {
         newX = (canvasWidth - objWidth) / 2;
         newY = (canvasHeight - objHeight) / 2;
         break;
+      case 'canvas-left':
+        newX = 0;
+        console.log('canvas-left: setting newX to 0');
+        break;
+      case 'canvas-right':
+        newX = canvasWidth - objWidth;
+        console.log('canvas-right: setting newX to', canvasWidth, '-', objWidth, '=', newX);
+        break;
+      case 'canvas-top':
+        newY = 0;
+        console.log('canvas-top: setting newY to 0');
+        break;
+      case 'canvas-bottom':
+        newY = canvasHeight - objHeight;
+        console.log('canvas-bottom: setting newY to', canvasHeight, '-', objHeight, '=', newY);
+        break;
+      case 'canvas-cover':
+        // Stretch to fill entire canvas
+        newX = 0;
+        newY = 0;
+        newWidth = canvasWidth;
+        newHeight = canvasHeight;
+        break;
+      case 'canvas-contain':
+        // Fit within canvas maintaining aspect ratio
+        const aspectRatio = objWidth / objHeight;
+        const canvasAspectRatio = canvasWidth / canvasHeight;
+
+        if (aspectRatio > canvasAspectRatio) {
+          // Fit to width
+          newWidth = canvasWidth;
+          newHeight = canvasWidth / aspectRatio;
+        } else {
+          // Fit to height
+          newHeight = canvasHeight;
+          newWidth = canvasHeight * aspectRatio;
+        }
+        newX = (canvasWidth - newWidth) / 2;
+        newY = (canvasHeight - newHeight) / 2;
+        break;
     }
 
-    updateElement(selectedElementId, { x: newX, y: newY });
+    const updates: any = { x: newX, y: newY };
+    if (newWidth !== selectedElement.width) updates.width = newWidth;
+    if (newHeight !== selectedElement.height) updates.height = newHeight;
+
+    console.log(`Align ${type}:`, {
+      oldX: selectedElement.x,
+      oldY: selectedElement.y,
+      newX,
+      newY,
+      objWidth,
+      objHeight,
+      canvasWidth,
+      canvasHeight,
+      updates
+    });
+
+    updateElement(selectedElementId, updates);
   };
 
   return (
@@ -123,6 +181,25 @@ export function PropertyPanel() {
                   Delete
                 </button>
               </div>
+            </div>
+
+            {/* Lock Toggle */}
+            <div>
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-semibold text-gray-700">Lock</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={selectedElement.locked || false}
+                    onChange={(e) => updateElement(selectedElementId!, { locked: e.target.checked })}
+                    className="sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition ${selectedElement.locked ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform ${selectedElement.locked ? 'translate-x-5' : ''}`}></div>
+                  </div>
+                </div>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">Prevent moving and resizing</p>
             </div>
 
             {/* Position */}
@@ -234,12 +311,61 @@ export function PropertyPanel() {
                     Bottom
                   </button>
                 </div>
-                <button
-                  onClick={() => handleAlign('canvas-center')}
-                  className="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
-                >
-                  Canvas Center
-                </button>
+              </div>
+
+              {/* Canvas Alignment */}
+              <div className="mt-4">
+                <h4 className="mb-2 text-xs font-semibold text-gray-600 uppercase">Canvas</h4>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleAlign('canvas-left')}
+                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
+                    >
+                      Left
+                    </button>
+                    <button
+                      onClick={() => handleAlign('canvas-right')}
+                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
+                    >
+                      Right
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleAlign('canvas-top')}
+                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
+                    >
+                      Top
+                    </button>
+                    <button
+                      onClick={() => handleAlign('canvas-bottom')}
+                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
+                    >
+                      Bottom
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleAlign('canvas-center')}
+                    className="w-full rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
+                  >
+                    Center
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleAlign('canvas-cover')}
+                      className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
+                    >
+                      Cover
+                    </button>
+                    <button
+                      onClick={() => handleAlign('canvas-contain')}
+                      className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
+                    >
+                      Contain
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 

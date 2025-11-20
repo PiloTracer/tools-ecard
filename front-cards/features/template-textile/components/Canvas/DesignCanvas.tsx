@@ -120,8 +120,8 @@ export function DesignCanvas() {
       let finalX = Math.round(target.left || element.x);
       let finalY = Math.round(target.top || element.y);
 
-      // Check if element was dropped on a table cell
-      if (element.type !== 'table') {
+      // Check if element was dropped on a table cell (only if not locked)
+      if (element.type !== 'table' && !element.locked) {
         const droppedOnTable = checkTableCellDrop(
           currentElements,
           elementId,
@@ -509,8 +509,16 @@ export function DesignCanvas() {
 
         if (existingFabricObj && imgEl.imageUrl) {
           // Check if this is a placeholder (Rect) but now has an imageUrl - recreate as actual image
-          if (existingFabricObj.type === 'Rect' || (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl) {
-            console.log('Image URL changed, need to recreate:', imgEl.id, imgEl.imageUrl.substring(0, 50));
+          // OR if dimensions changed significantly (more than 5px) - recreate to fit new size
+          const currentWidth = (existingFabricObj.width || 0) * (existingFabricObj.scaleX || 1);
+          const currentHeight = (existingFabricObj.height || 0) * (existingFabricObj.scaleY || 1);
+          const widthDiff = Math.abs(currentWidth - imgEl.width);
+          const heightDiff = Math.abs(currentHeight - imgEl.height);
+
+          if (existingFabricObj.type === 'Rect' ||
+              (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl ||
+              widthDiff > 5 || heightDiff > 5) {
+            console.log('Image needs recreation:', imgEl.id, { widthDiff, heightDiff, urlChanged: (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl });
             imagesToRecreate.push(imgEl);
           }
         }
@@ -617,6 +625,29 @@ export function DesignCanvas() {
           // Update common properties
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
+
+          // Update position
+          if (fabricObj.left !== element.x || fabricObj.top !== element.y) {
+            fabricObj.set({ left: element.x, top: element.y });
+            fabricObj.setCoords();
+          }
+
+          // Update lock state - locked objects are selectable but not movable/resizable
+          const isLocked = element.locked || false;
+          const currentLockState = fabricObj.lockMovementX || false;
+          if (currentLockState !== isLocked) {
+            fabricObj.set({
+              selectable: true, // Always selectable
+              evented: true, // Always can receive events
+              lockMovementX: isLocked,
+              lockMovementY: isLocked,
+              lockRotation: isLocked,
+              lockScalingX: isLocked,
+              lockScalingY: isLocked,
+              hasControls: !isLocked, // No resize handles when locked
+              hasBorders: true, // Always show selection border
+            });
+          }
         }
       }
     });

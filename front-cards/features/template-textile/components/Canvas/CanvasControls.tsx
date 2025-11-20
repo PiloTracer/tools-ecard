@@ -25,14 +25,13 @@ export function CanvasControls() {
     if (!fabricCanvas) return;
 
     const scaleFactor = exportWidth / canvasWidth;
-    const highResScale = scaleFactor * 1.1; // Export Width + 10%
-    console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}, highResScale ${highResScale}`);
+    console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
 
     // Temporarily remove grid lines
     const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
     gridObjects.forEach(obj => fabricCanvas.remove(obj));
 
-    // Replace image objects with high-res versions
+    // Replace image objects with high-res versions (SVG width × 4)
     const imageReplacements: Array<{ original: any, highRes: any, index: number }> = [];
     const allObjects = fabricCanvas.getObjects();
 
@@ -46,11 +45,20 @@ export function CanvasControls() {
           const tempImg = document.createElement('img');
 
           tempImg.onload = () => {
-            // Calculate high-res dimensions
+            // Get SVG natural dimensions
+            const svgNaturalWidth = tempImg.naturalWidth || tempImg.width;
+            const svgNaturalHeight = tempImg.naturalHeight || tempImg.height;
+
+            // Render at SVG width × 4
+            const renderWidth = Math.round(svgNaturalWidth * 4);
+            const renderHeight = Math.round(svgNaturalHeight * 4);
+
+            // Calculate what scale to apply to fit in current box
             const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
             const currentHeight = (obj.height || 100) * (obj.scaleY || 1);
-            const renderWidth = Math.round(currentWidth * highResScale);
-            const renderHeight = Math.round(currentHeight * highResScale);
+            const scaleToFit = currentWidth / renderWidth;
+
+            console.log(`High-res image: SVG ${svgNaturalWidth}x${svgNaturalHeight}, render ${renderWidth}x${renderHeight}, fit scale ${scaleToFit}`);
 
             // Create high-res canvas
             const tempCanvas = document.createElement('canvas');
@@ -61,14 +69,14 @@ export function CanvasControls() {
             if (ctx) {
               ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
 
-              // Create high-res fabric image
+              // Create high-res fabric image, scaled down to fit current box
               const highResImg = new (fabric as any).Image(tempCanvas, {
                 left: obj.left,
                 top: obj.top,
                 angle: obj.angle,
                 opacity: obj.opacity,
-                scaleX: 1 / highResScale,
-                scaleY: 1 / highResScale,
+                scaleX: scaleToFit,
+                scaleY: scaleToFit,
               });
 
               imageReplacements.push({ original: obj, highRes: highResImg, index: i });
@@ -114,14 +122,13 @@ export function CanvasControls() {
     if (!fabricCanvas) return;
 
     const scaleFactor = exportWidth / canvasWidth;
-    const highResScale = scaleFactor * 1.1; // Export Width + 10%
-    console.log(`Exporting JPG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}, highResScale ${highResScale}`);
+    console.log(`Exporting JPG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
 
     // Temporarily remove grid lines
     const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
     gridObjects.forEach(obj => fabricCanvas.remove(obj));
 
-    // Replace image objects with high-res versions
+    // Replace image objects with high-res versions (SVG width × 4)
     const imageReplacements: Array<{ original: any, highRes: any, index: number }> = [];
     const allObjects = fabricCanvas.getObjects();
 
@@ -134,10 +141,20 @@ export function CanvasControls() {
           const tempImg = document.createElement('img');
 
           tempImg.onload = () => {
+            // Get SVG natural dimensions
+            const svgNaturalWidth = tempImg.naturalWidth || tempImg.width;
+            const svgNaturalHeight = tempImg.naturalHeight || tempImg.height;
+
+            // Render at SVG width × 4
+            const renderWidth = Math.round(svgNaturalWidth * 4);
+            const renderHeight = Math.round(svgNaturalHeight * 4);
+
+            // Calculate what scale to apply to fit in current box
             const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
             const currentHeight = (obj.height || 100) * (obj.scaleY || 1);
-            const renderWidth = Math.round(currentWidth * highResScale);
-            const renderHeight = Math.round(currentHeight * highResScale);
+            const scaleToFit = currentWidth / renderWidth;
+
+            console.log(`High-res image: SVG ${svgNaturalWidth}x${svgNaturalHeight}, render ${renderWidth}x${renderHeight}, fit scale ${scaleToFit}`);
 
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = renderWidth;
@@ -152,8 +169,8 @@ export function CanvasControls() {
                 top: obj.top,
                 angle: obj.angle,
                 opacity: obj.opacity,
-                scaleX: 1 / highResScale,
-                scaleY: 1 / highResScale,
+                scaleX: scaleToFit,
+                scaleY: scaleToFit,
               });
 
               imageReplacements.push({ original: obj, highRes: highResImg, index: i });
