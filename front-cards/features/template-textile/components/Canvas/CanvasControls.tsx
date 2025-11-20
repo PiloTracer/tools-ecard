@@ -27,6 +27,14 @@ export function CanvasControls() {
     const scaleFactor = exportWidth / canvasWidth;
     console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
 
+    // Save current viewport transform (zoom and pan)
+    const originalViewport = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+    const originalZoom = fabricCanvas.getZoom();
+
+    // Reset viewport to capture entire canvas at 1:1 scale
+    fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    fabricCanvas.setZoom(1);
+
     // Temporarily remove grid lines
     const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
     gridObjects.forEach(obj => fabricCanvas.remove(obj));
@@ -110,6 +118,10 @@ export function CanvasControls() {
     // Add grid lines back
     gridObjects.forEach(obj => fabricCanvas.add(obj));
     gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+
+    // Restore original viewport transform (zoom and pan)
+    fabricCanvas.setViewportTransform(originalViewport);
+    fabricCanvas.setZoom(originalZoom);
     fabricCanvas.renderAll();
 
     const link = document.createElement('a');
@@ -123,6 +135,14 @@ export function CanvasControls() {
 
     const scaleFactor = exportWidth / canvasWidth;
     console.log(`Exporting JPG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
+
+    // Save current viewport transform (zoom and pan)
+    const originalViewport = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+    const originalZoom = fabricCanvas.getZoom();
+
+    // Reset viewport to capture entire canvas at 1:1 scale
+    fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    fabricCanvas.setZoom(1);
 
     // Temporarily remove grid lines
     const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
@@ -204,6 +224,10 @@ export function CanvasControls() {
     // Add grid lines back
     gridObjects.forEach(obj => fabricCanvas.add(obj));
     gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+
+    // Restore original viewport transform (zoom and pan)
+    fabricCanvas.setViewportTransform(originalViewport);
+    fabricCanvas.setZoom(originalZoom);
     fabricCanvas.renderAll();
 
     const link = document.createElement('a');
@@ -220,6 +244,14 @@ export function CanvasControls() {
 
     console.log(`Exporting SVG: canvas ${canvasWidth}x${canvasHeight}, export ${exportWidth}x${exportHeight}, multiplier ${scaleFactor}`);
 
+    // Save current viewport transform (zoom and pan)
+    const originalViewport = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+    const originalZoom = fabricCanvas.getZoom();
+
+    // Reset viewport to capture entire canvas at 1:1 scale
+    fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    fabricCanvas.setZoom(1);
+
     // Temporarily remove grid lines
     const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
     gridObjects.forEach(obj => fabricCanvas.remove(obj));
@@ -230,6 +262,10 @@ export function CanvasControls() {
     // Add grid lines back
     gridObjects.forEach(obj => fabricCanvas.add(obj));
     gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+
+    // Restore original viewport transform (zoom and pan)
+    fabricCanvas.setViewportTransform(originalViewport);
+    fabricCanvas.setZoom(originalZoom);
     fabricCanvas.renderAll();
 
     // Replace the svg tag to add proper dimensions and viewBox

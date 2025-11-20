@@ -52,7 +52,7 @@ const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = [
 
 export function CanvasSettings() {
   const { canvasWidth, canvasHeight, exportWidth, setCanvasDimensions, setExportWidth } = useTemplateStore();
-  const { setDimensions } = useCanvasStore();
+  const { setDimensions, fabricCanvas, setZoom } = useCanvasStore();
   const [customWidth, setCustomWidth] = useState(canvasWidth);
   const [customHeight, setCustomHeight] = useState(canvasHeight);
   const [showSettings, setShowSettings] = useState(false);
@@ -71,23 +71,49 @@ export function CanvasSettings() {
     }
   };
 
+  const handleResetView = () => {
+    if (!fabricCanvas) return;
+
+    // Reset viewport transform to default (no pan, no zoom)
+    fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    // Reset zoom to 100%
+    fabricCanvas.setZoom(1);
+    // Update the store's zoom state
+    setZoom(1);
+    // Re-render the canvas
+    fabricCanvas.renderAll();
+  };
+
   const currentAspectRatio = (canvasWidth / canvasHeight).toFixed(2);
 
   return (
     <div className="border-b border-slate-700 bg-slate-800 px-4 py-3">
-      <button
-        onClick={() => setShowSettings(!showSettings)}
-        className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-        Canvas Settings
-        <span className="text-xs text-slate-400">
-          ({canvasWidth}x{canvasHeight} • {currentAspectRatio})
-        </span>
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Canvas Settings
+          <span className="text-xs text-slate-400">
+            ({canvasWidth}x{canvasHeight} • {currentAspectRatio})
+          </span>
+        </button>
+
+        <button
+          onClick={handleResetView}
+          className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+          title="Reset zoom to 100% and center the canvas"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11H3m0 0l3 3m-3-3l3-3m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Reset View
+        </button>
+      </div>
 
       {showSettings && (
         <div className="mt-3 space-y-4 rounded border border-slate-700 bg-slate-900 p-4">
@@ -145,6 +171,23 @@ export function CanvasSettings() {
                 Apply
               </button>
             </div>
+          </div>
+
+          {/* View Controls */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-200">View Controls</h3>
+            <button
+              onClick={handleResetView}
+              className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+              title="Reset zoom to 100% and center the canvas"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11H3m0 0l3 3m-3-3l3-3m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Reset View to Default (100% zoom, centered)
+              </div>
+            </button>
           </div>
 
           {/* Export Width */}
