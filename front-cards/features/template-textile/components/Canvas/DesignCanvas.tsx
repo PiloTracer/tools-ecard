@@ -14,8 +14,8 @@ export function DesignCanvas() {
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
 
-  const { width, height, zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
-  const { elements, updateElement, removeElement, duplicateElement } = useTemplateStore();
+  const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
+  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement } = useTemplateStore();
   const copiedElement = useRef<TemplateElement | null>(null);
 
   // 1) Initialize Fabric canvas - ONLY width/height in deps

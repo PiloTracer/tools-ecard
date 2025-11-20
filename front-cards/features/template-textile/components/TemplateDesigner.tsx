@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { DesignCanvas } from './Canvas/DesignCanvas';
 import { CanvasControls } from './Canvas/CanvasControls';
+import { CanvasSettings } from './CanvasSettings';
 import { ElementToolbox } from './Toolbox/ElementToolbox';
 import { PropertyPanel } from './PropertyPanel/PropertyPanel';
 import { useTemplateStore } from '../stores/templateStore';
@@ -29,6 +30,7 @@ export function TemplateDesigner() {
 
       {/* Center Canvas Area */}
       <div className="flex flex-1 flex-col bg-slate-700">
+        <CanvasSettings />
         <CanvasControls />
         <DesignCanvas />
       </div>

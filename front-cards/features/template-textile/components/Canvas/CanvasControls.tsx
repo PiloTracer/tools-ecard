@@ -18,11 +18,22 @@ export function CanvasControls() {
     fabricCanvas
   } = useCanvasStore();
 
-  const { currentTemplate, undo, redo, canUndo, canRedo } = useTemplateStore();
+  const { currentTemplate, canvasWidth, canvasHeight, exportWidth, undo, redo, canUndo, canRedo } = useTemplateStore();
 
   const handleExportPNG = () => {
     if (!fabricCanvas) return;
-    const dataURL = fabricCanvas.toDataURL({ format: 'png', quality: 1 });
+
+    // Calculate scale factor based on desired export width
+    const scaleFactor = exportWidth / canvasWidth;
+
+    console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
+
+    const dataURL = fabricCanvas.toDataURL({
+      format: 'png',
+      quality: 1,
+      multiplier: scaleFactor
+    });
+
     const link = document.createElement('a');
     link.download = `${currentTemplate?.name || 'template'}.png`;
     link.href = dataURL;
@@ -31,7 +42,22 @@ export function CanvasControls() {
 
   const handleExportSVG = () => {
     if (!fabricCanvas) return;
-    const svg = fabricCanvas.toSVG();
+
+    // Calculate scale factor based on desired export width
+    const scaleFactor = exportWidth / canvasWidth;
+    const exportHeight = Math.round(canvasHeight * scaleFactor);
+
+    console.log(`Exporting SVG: canvas ${canvasWidth}x${canvasHeight}, export ${exportWidth}x${exportHeight}, multiplier ${scaleFactor}`);
+
+    // Get SVG and manually apply scaling via viewBox and width/height attributes
+    let svg = fabricCanvas.toSVG();
+
+    // Replace the svg tag to add proper dimensions and viewBox
+    svg = svg.replace(
+      /<svg([^>]*)>/,
+      `<svg width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}"$1>`
+    );
+
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

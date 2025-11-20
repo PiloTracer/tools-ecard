@@ -8,6 +8,11 @@ interface TemplateState {
   // Elements (derived from currentTemplate but kept for convenience)
   elements: TemplateElement[];
 
+  // Canvas settings
+  canvasWidth: number;
+  canvasHeight: number;
+  exportWidth: number; // Target width for export (canvas scales to this)
+
   // History for undo/redo
   history: TemplateElement[][];
   historyIndex: number;
@@ -17,6 +22,8 @@ interface TemplateState {
   createTemplate: (name: string, width: number, height: number) => void;
   loadTemplate: (template: Template) => void;
   updateTemplateName: (name: string) => void;
+  setCanvasDimensions: (width: number, height: number) => void;
+  setExportWidth: (width: number) => void;
 
   addElement: (element: TemplateElement) => void;
   updateElement: (id: string, updates: Partial<TemplateElement>) => void;
@@ -49,6 +56,9 @@ const pushHistory = (state: TemplateState, newElements: TemplateElement[]) => {
 export const useTemplateStore = create<TemplateState>((set, get) => ({
   currentTemplate: null,
   elements: [],
+  canvasWidth: 800,
+  canvasHeight: 600,
+  exportWidth: 1920, // Default export width
   history: [[]],
   historyIndex: 0,
   maxHistory: 50,
@@ -63,12 +73,38 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    set({ currentTemplate: template, elements: [] });
+    set({
+      currentTemplate: template,
+      elements: [],
+      canvasWidth: width,
+      canvasHeight: height
+    });
   },
 
   loadTemplate: (template) => {
-    set({ currentTemplate: template, elements: template.elements });
+    set({
+      currentTemplate: template,
+      elements: template.elements,
+      canvasWidth: template.width,
+      canvasHeight: template.height
+    });
   },
+
+  setCanvasDimensions: (width, height) => set((state) => {
+    if (!state.currentTemplate) return state;
+    return {
+      canvasWidth: width,
+      canvasHeight: height,
+      currentTemplate: {
+        ...state.currentTemplate,
+        width,
+        height,
+        updatedAt: new Date(),
+      }
+    };
+  }),
+
+  setExportWidth: (exportWidth) => set({ exportWidth }),
 
   updateTemplateName: (name) => set((state) => {
     if (!state.currentTemplate) return state;
