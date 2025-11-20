@@ -2,7 +2,7 @@
 
 import { useTemplateStore } from '../../stores/templateStore';
 import { useCanvasStore } from '../../stores/canvasStore';
-import type { TextElement, ImageElement, QRElement, TableElement } from '../../types';
+import type { TextElement, ImageElement, QRElement, TableElement, ShapeElement } from '../../types';
 
 export function ElementToolbox() {
   const { addElement } = useTemplateStore();
@@ -88,6 +88,25 @@ export function ElementToolbox() {
     addElement(tableElement);
   };
 
+  const handleAddShape = (shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line') => {
+    const shapeElement: ShapeElement = {
+      id: crypto.randomUUID(),
+      type: 'shape',
+      shapeType,
+      x: width / 2 - 50,
+      y: height / 2 - 50,
+      width: 100,
+      height: shapeType === 'line' ? 0 : 100,
+      fill: shapeType === 'line' ? '' : '#3b82f6',
+      stroke: '#1e40af',
+      strokeWidth: shapeType === 'line' ? 2 : 1,
+      rotation: 0,
+      opacity: 1,
+      locked: false,
+    };
+    addElement(shapeElement);
+  };
+
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 to-white p-4">
@@ -153,6 +172,51 @@ export function ElementToolbox() {
             <div className="text-xs text-slate-500">Add table element</div>
           </div>
         </button>
+
+        <div className="border-t border-slate-200 pt-3 mt-3">
+          <div className="text-xs font-semibold text-slate-600 mb-2 px-1">SHAPES</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleAddShape('rectangle')}
+              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-indigo-100 to-indigo-200">
+                <div className="w-5 h-4 border-2 border-indigo-700"></div>
+              </div>
+              <div className="text-xs font-medium text-slate-800">Rectangle</div>
+            </button>
+
+            <button
+              onClick={() => handleAddShape('circle')}
+              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-pink-100 to-pink-200">
+                <div className="w-5 h-5 rounded-full border-2 border-pink-700"></div>
+              </div>
+              <div className="text-xs font-medium text-slate-800">Circle</div>
+            </button>
+
+            <button
+              onClick={() => handleAddShape('ellipse')}
+              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-violet-100 to-violet-200">
+                <div className="w-6 h-4 rounded-full border-2 border-violet-700"></div>
+              </div>
+              <div className="text-xs font-medium text-slate-800">Ellipse</div>
+            </button>
+
+            <button
+              onClick={() => handleAddShape('line')}
+              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-slate-100 to-slate-200">
+                <div className="w-6 h-0 border-t-2 border-slate-700"></div>
+              </div>
+              <div className="text-xs font-medium text-slate-800">Line</div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

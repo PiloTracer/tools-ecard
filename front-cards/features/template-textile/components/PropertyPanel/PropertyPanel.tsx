@@ -6,12 +6,13 @@ import { TextProperties } from './TextProperties';
 import { ImageProperties } from './ImageProperties';
 import { QRProperties } from './QRProperties';
 import { TableProperties } from './TableProperties';
-import { isTextElement, isImageElement, isQRElement, isTableElement } from '../../types';
+import { ShapeProperties } from './ShapeProperties';
+import { isTextElement, isImageElement, isQRElement, isTableElement, isShapeElement } from '../../types';
 import type { TableElement } from '../../types';
 
 export function PropertyPanel() {
-  const { selectedElementId } = useCanvasStore();
-  const { elements, removeElement, updateElement } = useTemplateStore();
+  const { selectedElementId, width: canvasWidth, height: canvasHeight, fabricCanvas } = useCanvasStore();
+  const { elements, removeElement, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward } = useTemplateStore();
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
 
@@ -43,6 +44,52 @@ export function PropertyPanel() {
     }
   };
 
+  const handleDuplicate = () => {
+    if (selectedElementId) {
+      duplicateElement(selectedElementId);
+    }
+  };
+
+  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'canvas-center') => {
+    if (!selectedElementId || !fabricCanvas || !selectedElement) return;
+
+    const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+    if (!fabricObj) return;
+
+    const objWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
+    const objHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
+
+    let newX = selectedElement.x;
+    let newY = selectedElement.y;
+
+    switch (type) {
+      case 'left':
+        newX = 0;
+        break;
+      case 'center':
+        newX = (canvasWidth - objWidth) / 2;
+        break;
+      case 'right':
+        newX = canvasWidth - objWidth;
+        break;
+      case 'top':
+        newY = 0;
+        break;
+      case 'middle':
+        newY = (canvasHeight - objHeight) / 2;
+        break;
+      case 'bottom':
+        newY = canvasHeight - objHeight;
+        break;
+      case 'canvas-center':
+        newX = (canvasWidth - objWidth) / 2;
+        newY = (canvasHeight - objHeight) / 2;
+        break;
+    }
+
+    updateElement(selectedElementId, { x: newX, y: newY });
+  };
+
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-gray-200 bg-gradient-to-r from-white to-slate-50 p-4">
@@ -62,12 +109,20 @@ export function PropertyPanel() {
               <div className="rounded bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 capitalize">
                 {selectedElement.type}
               </div>
-              <button
-                onClick={handleDelete}
-                className="rounded bg-red-50 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-100"
-              >
-                Delete
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDuplicate}
+                  className="rounded bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-100"
+                >
+                  Duplicate
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="rounded bg-red-50 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-100"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
 
             {/* Position */}
@@ -104,6 +159,90 @@ export function PropertyPanel() {
               </div>
             </div>
 
+            {/* Layering */}
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-gray-700">Layering</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => bringToFront(selectedElementId!)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-gray-50 font-medium"
+                >
+                  To Front
+                </button>
+                <button
+                  onClick={() => sendToBack(selectedElementId!)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-gray-50 font-medium"
+                >
+                  To Back
+                </button>
+                <button
+                  onClick={() => bringForward(selectedElementId!)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-gray-50 font-medium"
+                >
+                  Forward
+                </button>
+                <button
+                  onClick={() => sendBackward(selectedElementId!)}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-gray-50 font-medium"
+                >
+                  Backward
+                </button>
+              </div>
+            </div>
+
+            {/* Alignment */}
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-gray-700">Align</h3>
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleAlign('left')}
+                    className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                  >
+                    Left
+                  </button>
+                  <button
+                    onClick={() => handleAlign('center')}
+                    className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                  >
+                    Center
+                  </button>
+                  <button
+                    onClick={() => handleAlign('right')}
+                    className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                  >
+                    Right
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleAlign('top')}
+                    className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                  >
+                    Top
+                  </button>
+                  <button
+                    onClick={() => handleAlign('middle')}
+                    className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                  >
+                    Middle
+                  </button>
+                  <button
+                    onClick={() => handleAlign('bottom')}
+                    className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                  >
+                    Bottom
+                  </button>
+                </div>
+                <button
+                  onClick={() => handleAlign('canvas-center')}
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-slate-800 hover:bg-gray-50 font-medium"
+                >
+                  Canvas Center
+                </button>
+              </div>
+            </div>
+
             {/* Element-specific properties */}
             <div>
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Properties</h3>
@@ -111,6 +250,7 @@ export function PropertyPanel() {
               {isImageElement(selectedElement) && <ImageProperties element={selectedElement} />}
               {isQRElement(selectedElement) && <QRProperties element={selectedElement} />}
               {isTableElement(selectedElement) && <TableProperties element={selectedElement} />}
+              {isShapeElement(selectedElement) && <ShapeProperties element={selectedElement} />}
             </div>
           </div>
         )}

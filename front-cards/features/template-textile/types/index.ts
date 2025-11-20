@@ -2,7 +2,7 @@
 
 export interface BaseElement {
   id: string;
-  type: 'text' | 'image' | 'qr' | 'table';
+  type: 'text' | 'image' | 'qr' | 'table' | 'shape';
   x: number;
   y: number;
   width?: number;
@@ -19,6 +19,11 @@ export interface TextElement extends BaseElement {
   fontFamily: string;
   color: string;
   textAlign?: 'left' | 'center' | 'right';
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  underline?: boolean;
+  stroke?: string;
+  strokeWidth?: number;
 }
 
 export interface ImageElement extends BaseElement {
@@ -59,7 +64,17 @@ export interface TableCell {
   offsetY?: number;   // Element Y position relative to cell's top-left (default: 5px padding)
 }
 
-export type TemplateElement = TextElement | ImageElement | QRElement | TableElement;
+export interface ShapeElement extends BaseElement {
+  type: 'shape';
+  shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line';
+  width: number;
+  height: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+}
+
+export type TemplateElement = TextElement | ImageElement | QRElement | TableElement | ShapeElement;
 
 export interface Template {
   id: string;
@@ -76,3 +91,4 @@ export const isTextElement = (el: TemplateElement): el is TextElement => el.type
 export const isImageElement = (el: TemplateElement): el is ImageElement => el.type === 'image';
 export const isQRElement = (el: TemplateElement): el is QRElement => el.type === 'qr';
 export const isTableElement = (el: TemplateElement): el is TableElement => el.type === 'table';
+export const isShapeElement = (el: TemplateElement): el is ShapeElement => el.type === 'shape';

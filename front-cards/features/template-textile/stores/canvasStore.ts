@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Canvas } from 'fabric';
 
 interface CanvasState {
   // Canvas dimensions
@@ -10,9 +11,13 @@ interface CanvasState {
   showGrid: boolean;
   snapToGrid: boolean;
   gridSize: number;
+  backgroundColor: string;
 
   // Selection
   selectedElementId: string | null;
+
+  // Fabric canvas reference
+  fabricCanvas: Canvas | null;
 
   // Actions
   setDimensions: (width: number, height: number) => void;
@@ -23,7 +28,9 @@ interface CanvasState {
   toggleGrid: () => void;
   toggleSnapToGrid: () => void;
   setGridSize: (size: number) => void;
+  setBackgroundColor: (color: string) => void;
   setSelectedElement: (id: string | null) => void;
+  setFabricCanvas: (canvas: Canvas | null) => void;
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -34,7 +41,9 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   showGrid: true,
   snapToGrid: false,
   gridSize: 10,
+  backgroundColor: '#ffffff',
   selectedElementId: null,
+  fabricCanvas: null,
 
   // Actions
   setDimensions: (width, height) => set({ width, height }),
@@ -57,5 +66,9 @@ export const useCanvasStore = create<CanvasState>((set) => ({
 
   setGridSize: (gridSize) => set({ gridSize }),
 
+  setBackgroundColor: (backgroundColor) => set({ backgroundColor }),
+
   setSelectedElement: (selectedElementId) => set({ selectedElementId }),
+
+  setFabricCanvas: (fabricCanvas) => set({ fabricCanvas }),
 }));

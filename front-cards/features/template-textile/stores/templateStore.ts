@@ -8,6 +8,11 @@ interface TemplateState {
   // Elements (derived from currentTemplate but kept for convenience)
   elements: TemplateElement[];
 
+  // History for undo/redo
+  history: TemplateElement[][];
+  historyIndex: number;
+  maxHistory: number;
+
   // Actions
   createTemplate: (name: string, width: number, height: number) => void;
   loadTemplate: (template: Template) => void;
@@ -16,12 +21,37 @@ interface TemplateState {
   addElement: (element: TemplateElement) => void;
   updateElement: (id: string, updates: Partial<TemplateElement>) => void;
   removeElement: (id: string) => void;
+  duplicateElement: (id: string) => void;
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  bringForward: (id: string) => void;
+  sendBackward: (id: string) => void;
   clearElements: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
-export const useTemplateStore = create<TemplateState>((set) => ({
+const pushHistory = (state: TemplateState, newElements: TemplateElement[]) => {
+  // Trim history to current index
+  const newHistory = state.history.slice(0, state.historyIndex + 1);
+  // Add new state
+  newHistory.push(JSON.parse(JSON.stringify(newElements)));
+  // Limit history size
+  if (newHistory.length > state.maxHistory) {
+    newHistory.shift();
+    return { history: newHistory, historyIndex: newHistory.length - 1 };
+  }
+  return { history: newHistory, historyIndex: newHistory.length - 1 };
+};
+
+export const useTemplateStore = create<TemplateState>((set, get) => ({
   currentTemplate: null,
   elements: [],
+  history: [[]],
+  historyIndex: 0,
+  maxHistory: 50,
 
   createTemplate: (name, width, height) => {
     const template: Template = {
@@ -53,8 +83,10 @@ export const useTemplateStore = create<TemplateState>((set) => ({
 
   addElement: (element) => set((state) => {
     const newElements = [...state.elements, element];
+    const historyUpdate = pushHistory(state, newElements);
     return {
       elements: newElements,
+      ...historyUpdate,
       currentTemplate: state.currentTemplate ? {
         ...state.currentTemplate,
         elements: newElements,
@@ -67,8 +99,10 @@ export const useTemplateStore = create<TemplateState>((set) => ({
     const newElements = state.elements.map(el =>
       el.id === id ? { ...el, ...updates } : el
     );
+    const historyUpdate = pushHistory(state, newElements);
     return {
       elements: newElements,
+      ...historyUpdate,
       currentTemplate: state.currentTemplate ? {
         ...state.currentTemplate,
         elements: newElements,
@@ -79,6 +113,95 @@ export const useTemplateStore = create<TemplateState>((set) => ({
 
   removeElement: (id) => set((state) => {
     const newElements = state.elements.filter(el => el.id !== id);
+    const historyUpdate = pushHistory(state, newElements);
+    return {
+      elements: newElements,
+      ...historyUpdate,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements: newElements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  duplicateElement: (id) => set((state) => {
+    const element = state.elements.find(el => el.id === id);
+    if (!element) return state;
+
+    // Create a duplicate with new ID and offset position
+    const duplicate = {
+      ...element,
+      id: crypto.randomUUID(),
+      x: element.x + 20,
+      y: element.y + 20,
+    };
+
+    const newElements = [...state.elements, duplicate];
+    return {
+      elements: newElements,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements: newElements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  bringToFront: (id) => set((state) => {
+    const element = state.elements.find(el => el.id === id);
+    if (!element) return state;
+
+    const newElements = [...state.elements.filter(el => el.id !== id), element];
+    return {
+      elements: newElements,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements: newElements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  sendToBack: (id) => set((state) => {
+    const element = state.elements.find(el => el.id === id);
+    if (!element) return state;
+
+    const newElements = [element, ...state.elements.filter(el => el.id !== id)];
+    return {
+      elements: newElements,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements: newElements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  bringForward: (id) => set((state) => {
+    const index = state.elements.findIndex(el => el.id === id);
+    if (index === -1 || index === state.elements.length - 1) return state;
+
+    const newElements = [...state.elements];
+    [newElements[index], newElements[index + 1]] = [newElements[index + 1], newElements[index]];
+
+    return {
+      elements: newElements,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements: newElements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  sendBackward: (id) => set((state) => {
+    const index = state.elements.findIndex(el => el.id === id);
+    if (index === -1 || index === 0) return state;
+
+    const newElements = [...state.elements];
+    [newElements[index], newElements[index - 1]] = [newElements[index - 1], newElements[index]];
+
     return {
       elements: newElements,
       currentTemplate: state.currentTemplate ? {
@@ -97,4 +220,48 @@ export const useTemplateStore = create<TemplateState>((set) => ({
       updatedAt: new Date(),
     } : null
   })),
+
+  undo: () => set((state) => {
+    if (state.historyIndex <= 0) return state;
+
+    const newIndex = state.historyIndex - 1;
+    const elements = JSON.parse(JSON.stringify(state.history[newIndex]));
+
+    return {
+      elements,
+      historyIndex: newIndex,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  redo: () => set((state) => {
+    if (state.historyIndex >= state.history.length - 1) return state;
+
+    const newIndex = state.historyIndex + 1;
+    const elements = JSON.parse(JSON.stringify(state.history[newIndex]));
+
+    return {
+      elements,
+      historyIndex: newIndex,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements,
+        updatedAt: new Date(),
+      } : null
+    };
+  }),
+
+  canUndo: () => {
+    const state = get();
+    return state.historyIndex > 0;
+  },
+
+  canRedo: () => {
+    const state = get();
+    return state.historyIndex < state.history.length - 1;
+  },
 }));

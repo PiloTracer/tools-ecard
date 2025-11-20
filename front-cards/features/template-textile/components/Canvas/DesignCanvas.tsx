@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as fabric from 'fabric';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
-import type { TemplateElement, TextElement, ImageElement, QRElement, TableElement } from '../../types';
+import type { TemplateElement, TextElement, ImageElement, QRElement, TableElement, ShapeElement } from '../../types';
 
 export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -14,8 +14,9 @@ export function DesignCanvas() {
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
 
-  const { width, height, zoom, showGrid, snapToGrid, gridSize, setSelectedElement } = useCanvasStore();
-  const { elements, updateElement, removeElement } = useTemplateStore();
+  const { width, height, zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
+  const { elements, updateElement, removeElement, duplicateElement } = useTemplateStore();
+  const copiedElement = useRef<TemplateElement | null>(null);
 
   // 1) Initialize Fabric canvas - ONLY width/height in deps
   useEffect(() => {
@@ -28,9 +29,12 @@ export function DesignCanvas() {
       selection: true,
       selectionBorderColor: '#0066CC',
       selectionLineWidth: 2,
+      selectionColor: 'rgba(0, 102, 204, 0.1)',
+      selectionFullyContained: false,
     });
 
     fabricCanvasRef.current = canvas;
+    setFabricCanvas(canvas);
     setIsReady(true);
 
     // Selection events
@@ -165,14 +169,65 @@ export function DesignCanvas() {
         const scaleY = target.scaleY || 1;
         // Only update if object was scaled
         if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
-          updates.width = Math.round((target.width || element.width) * scaleX);
-          updates.height = Math.round((target.height || element.height) * scaleY);
-          // Reset scale to 1 after applying to width/height
+          // Handle special cases for circles and ellipses
+          if (element.type === 'shape') {
+            const shapeEl = element as any;
+            if (shapeEl.shapeType === 'circle') {
+              // For circles, calculate width from radius
+              // Fabric stores unscaled radius, so actual radius = radius * scale
+              const currentRadius = target.radius || element.width / 2;
+              const newRadius = Math.round(currentRadius * scaleX);
+              updates.width = newRadius * 2;
+              updates.height = newRadius * 2;
+              console.log(`Circle scaled: radius ${currentRadius} -> ${newRadius}, width ${updates.width}`);
+              // Update the Fabric object's radius immediately
+              target.set({ radius: newRadius });
+            } else if (shapeEl.shapeType === 'ellipse') {
+              // For ellipses, calculate width/height from rx/ry
+              const currentRx = target.rx || element.width / 2;
+              const currentRy = target.ry || element.height / 2;
+              const newRx = Math.round(currentRx * scaleX);
+              const newRy = Math.round(currentRy * scaleY);
+              updates.width = newRx * 2;
+              updates.height = newRy * 2;
+              console.log(`Ellipse scaled: rx ${currentRx} -> ${newRx}, ry ${currentRy} -> ${newRy}`);
+              // Update the Fabric object's rx/ry immediately
+              target.set({ rx: newRx, ry: newRy });
+            } else {
+              // Other shapes use width/height directly
+              updates.width = Math.round((target.width || element.width) * scaleX);
+              updates.height = Math.round((target.height || element.height) * scaleY);
+            }
+          } else {
+            // Non-shape elements use width/height directly
+            updates.width = Math.round((target.width || element.width) * scaleX);
+            updates.height = Math.round((target.height || element.height) * scaleY);
+          }
+          // Reset scale to 1 after applying to width/height/radius/rx/ry
           target.set({ scaleX: 1, scaleY: 1 });
+          target.setCoords();
+          canvas.renderAll();
         }
       }
 
       updateElement(elementId, updates);
+
+      // Update the fabricObj in the map to ensure it has the latest radius/rx/ry
+      const fabricObj = fabricObjectsMap.current.get(elementId);
+      console.log(`target === fabricObj: ${target === fabricObj}`);
+      if (fabricObj && fabricObj !== target) {
+        console.log(`WARNING: fabricObj !== target, updating fabricObj separately`);
+        if (element.type === 'shape') {
+          const shapeEl = element as any;
+          if (shapeEl.shapeType === 'circle' && updates.width) {
+            fabricObj.set({ radius: updates.width / 2, scaleX: 1, scaleY: 1 });
+            fabricObj.setCoords();
+          } else if (shapeEl.shapeType === 'ellipse' && updates.width && updates.height) {
+            fabricObj.set({ rx: updates.width / 2, ry: updates.height / 2, scaleX: 1, scaleY: 1 });
+            fabricObj.setCoords();
+          }
+        }
+      }
 
       // Check if element is in a table cell - update relative position and resize cell if needed
       if (element.type !== 'table') {
@@ -191,8 +246,28 @@ export function DesignCanvas() {
             const cellHeight = table.rowHeights[cellData.row];
 
             // Check if element is still within this cell's bounds
-            const elementWidth = (target.width || 0) * (target.scaleX || 1);
-            const elementHeight = (target.height || 0) * (target.scaleY || 1);
+            // Calculate actual dimensions considering shape type
+            let elementWidth: number;
+            let elementHeight: number;
+
+            if (element.type === 'shape') {
+              const shapeEl = element as any;
+              if (shapeEl.shapeType === 'circle') {
+                const radius = (target.radius || element.width / 2) * (target.scaleX || 1);
+                elementWidth = radius * 2;
+                elementHeight = radius * 2;
+              } else if (shapeEl.shapeType === 'ellipse') {
+                elementWidth = ((target.rx || element.width / 2) * (target.scaleX || 1)) * 2;
+                elementHeight = ((target.ry || element.height / 2) * (target.scaleY || 1)) * 2;
+              } else {
+                elementWidth = (target.width || 0) * (target.scaleX || 1);
+                elementHeight = (target.height || 0) * (target.scaleY || 1);
+              }
+            } else {
+              elementWidth = (target.width || 0) * (target.scaleX || 1);
+              elementHeight = (target.height || 0) * (target.scaleY || 1);
+            }
+
             const elementCenterX = finalX + elementWidth / 2;
             const elementCenterY = finalY + elementHeight / 2;
 
@@ -356,6 +431,10 @@ export function DesignCanvas() {
     const canvas = fabricCanvasRef.current;
     if (!canvas || !isReady) return;
 
+    // Preserve the active object to prevent deselection during property updates
+    const activeObject = canvas.getActiveObject();
+    const activeElementId = activeObject ? (activeObject as any).elementId : null;
+
     // Find elements to add
     const elementsToAdd = elements.filter(el => !addedElementIds.current.has(el.id));
 
@@ -393,7 +472,90 @@ export function DesignCanvas() {
             if (fabricObj.fontFamily !== textEl.fontFamily) fabricObj.set({ fontFamily: textEl.fontFamily });
             if (fabricObj.fill !== textEl.color) fabricObj.set({ fill: textEl.color });
             if (fabricObj.textAlign !== textEl.textAlign) fabricObj.set({ textAlign: textEl.textAlign });
+            if (fabricObj.fontWeight !== textEl.fontWeight) fabricObj.set({ fontWeight: textEl.fontWeight || 'normal' });
+            if (fabricObj.fontStyle !== textEl.fontStyle) fabricObj.set({ fontStyle: textEl.fontStyle || 'normal' });
+            if (fabricObj.underline !== textEl.underline) fabricObj.set({ underline: textEl.underline || false });
+            if (fabricObj.stroke !== textEl.stroke) fabricObj.set({ stroke: textEl.stroke || '' });
+            if (fabricObj.strokeWidth !== textEl.strokeWidth) fabricObj.set({ strokeWidth: textEl.strokeWidth || 0 });
           }
+
+          // Update width/height for elements that have these properties (image, QR, shape)
+          if (element.width !== undefined && element.height !== undefined) {
+            // Handle special cases for circles and ellipses
+            if (element.type === 'shape') {
+              const shapeEl = element as any;
+
+              if (shapeEl.shapeType === 'circle') {
+                // For circles, update radius based on width
+                const currentRadius = fabricObj.radius * (fabricObj.scaleX || 1);
+                const newRadius = element.width / 2;
+
+                if (Math.abs(currentRadius - newRadius) > 0.5) {
+                  console.log(`[SYNC] Circle radius mismatch: current=${currentRadius}, new=${newRadius}, updating...`);
+                  fabricObj.set({
+                    radius: newRadius,
+                    scaleX: 1,
+                    scaleY: 1
+                  });
+                  fabricObj.setCoords();
+                }
+              } else if (shapeEl.shapeType === 'ellipse') {
+                // For ellipses, update rx and ry based on width and height
+                const currentRx = fabricObj.rx * (fabricObj.scaleX || 1);
+                const currentRy = fabricObj.ry * (fabricObj.scaleY || 1);
+                const newRx = element.width / 2;
+                const newRy = element.height / 2;
+
+                if (Math.abs(currentRx - newRx) > 0.5 || Math.abs(currentRy - newRy) > 0.5) {
+                  console.log(`[SYNC] Ellipse rx/ry mismatch: currentRx=${currentRx}, newRx=${newRx}, currentRy=${currentRy}, newRy=${newRy}`);
+                  fabricObj.set({
+                    rx: newRx,
+                    ry: newRy,
+                    scaleX: 1,
+                    scaleY: 1
+                  });
+                  fabricObj.setCoords();
+                }
+              } else {
+                // For other shapes (rectangle, line), use width/height
+                const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
+                const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
+
+                if (Math.abs(currentWidth - element.width) > 0.5 || Math.abs(currentHeight - element.height) > 0.5) {
+                  fabricObj.set({
+                    width: element.width,
+                    height: element.height,
+                    scaleX: 1,
+                    scaleY: 1
+                  });
+                  fabricObj.setCoords();
+                }
+              }
+            } else {
+              // For non-shape elements (image, QR), use width/height
+              const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
+              const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
+
+              if (Math.abs(currentWidth - element.width) > 0.5 || Math.abs(currentHeight - element.height) > 0.5) {
+                fabricObj.set({
+                  width: element.width,
+                  height: element.height,
+                  scaleX: 1,
+                  scaleY: 1
+                });
+                fabricObj.setCoords();
+              }
+            }
+          }
+
+          // Update shape-specific properties
+          if (element.type === 'shape') {
+            const shapeEl = element as any;
+            if (fabricObj.fill !== shapeEl.fill) fabricObj.set({ fill: shapeEl.fill });
+            if (fabricObj.stroke !== shapeEl.stroke) fabricObj.set({ stroke: shapeEl.stroke });
+            if (fabricObj.strokeWidth !== shapeEl.strokeWidth) fabricObj.set({ strokeWidth: shapeEl.strokeWidth });
+          }
+
           // Update common properties
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
@@ -484,6 +646,15 @@ export function DesignCanvas() {
 
     // Always render to reflect property changes
     canvas.renderAll();
+
+    // Restore the selection if it was lost during property updates
+    if (activeElementId && !canvas.getActiveObject()) {
+      const fabricObj = fabricObjectsMap.current.get(activeElementId);
+      if (fabricObj) {
+        canvas.setActiveObject(fabricObj);
+        canvas.renderAll();
+      }
+    }
   }, [elements, isReady]);
 
   // 3) Handle zoom
@@ -559,6 +730,125 @@ export function DesignCanvas() {
     };
   }, [snapToGrid, gridSize, isReady]);
 
+  // 6) Handle background color
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !isReady) return;
+
+    canvas.set('backgroundColor', backgroundColor);
+    canvas.renderAll();
+  }, [backgroundColor, isReady]);
+
+  // 7) Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const canvas = fabricCanvasRef.current;
+      if (!canvas) return;
+
+      const activeObject = canvas.getActiveObject();
+
+      // Delete key - delete selected element
+      if (e.key === 'Delete' && selectedElementId) {
+        removeElement(selectedElementId);
+        setSelectedElement(null);
+      }
+
+      // Escape - deselect
+      if (e.key === 'Escape') {
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        setSelectedElement(null);
+      }
+
+      // Ctrl/Cmd + D - duplicate
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedElementId) {
+        e.preventDefault();
+        duplicateElement(selectedElementId);
+      }
+
+      // Ctrl/Cmd + Z - undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        const { undo, canUndo } = useTemplateStore.getState();
+        if (canUndo()) {
+          undo();
+        }
+      }
+
+      // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z - redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        const { redo, canRedo } = useTemplateStore.getState();
+        if (canRedo()) {
+          redo();
+        }
+      }
+
+      // Ctrl/Cmd + C - copy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedElementId) {
+        e.preventDefault();
+        const element = elements.find(el => el.id === selectedElementId);
+        if (element) {
+          copiedElement.current = element;
+        }
+      }
+
+      // Ctrl/Cmd + V - paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedElement.current) {
+        e.preventDefault();
+        const duplicate = {
+          ...copiedElement.current,
+          id: crypto.randomUUID(),
+          x: copiedElement.current.x + 20,
+          y: copiedElement.current.y + 20,
+        };
+        useTemplateStore.getState().addElement(duplicate);
+      }
+
+      // Arrow keys - nudge element
+      if (activeObject && selectedElementId) {
+        const nudgeAmount = e.shiftKey ? 10 : 1;
+        let moved = false;
+
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          activeObject.set({ left: (activeObject.left || 0) - nudgeAmount });
+          moved = true;
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          activeObject.set({ left: (activeObject.left || 0) + nudgeAmount });
+          moved = true;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeObject.set({ top: (activeObject.top || 0) - nudgeAmount });
+          moved = true;
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeObject.set({ top: (activeObject.top || 0) + nudgeAmount });
+          moved = true;
+        }
+
+        if (moved) {
+          activeObject.setCoords();
+          canvas.renderAll();
+          // Update element position in store
+          updateElement(selectedElementId, {
+            x: activeObject.left || 0,
+            y: activeObject.top || 0
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedElementId, elements, isReady]);
+
   // Helper: Recalculate column widths after element removal
   const recalculateColumnWidths = (
     table: TableElement,
@@ -584,7 +874,21 @@ export function DesignCanvas() {
           if (element && element.id !== removedElementId) {
             const fabricObj = fabricObjectsMap.current.get(element.id);
             if (fabricObj) {
-              const elementWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
+              // Calculate actual width considering shape type
+              let elementWidth: number;
+              if (element.type === 'shape') {
+                const shapeEl = element as any;
+                if (shapeEl.shapeType === 'circle') {
+                  elementWidth = ((fabricObj.radius || element.width / 2) * (fabricObj.scaleX || 1)) * 2;
+                } else if (shapeEl.shapeType === 'ellipse') {
+                  elementWidth = ((fabricObj.rx || element.width / 2) * (fabricObj.scaleX || 1)) * 2;
+                } else {
+                  elementWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
+                }
+              } else {
+                elementWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
+              }
+
               const offsetX = cellData.offsetX ?? 5;
               const requiredWidth = elementWidth + offsetX + 5;
               maxWidth = Math.max(maxWidth, requiredWidth);
@@ -623,7 +927,21 @@ export function DesignCanvas() {
           if (element && element.id !== removedElementId) {
             const fabricObj = fabricObjectsMap.current.get(element.id);
             if (fabricObj) {
-              const elementHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
+              // Calculate actual height considering shape type
+              let elementHeight: number;
+              if (element.type === 'shape') {
+                const shapeEl = element as any;
+                if (shapeEl.shapeType === 'circle') {
+                  elementHeight = ((fabricObj.radius || element.width / 2) * (fabricObj.scaleY || 1)) * 2;
+                } else if (shapeEl.shapeType === 'ellipse') {
+                  elementHeight = ((fabricObj.ry || element.height / 2) * (fabricObj.scaleY || 1)) * 2;
+                } else {
+                  elementHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
+                }
+              } else {
+                elementHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
+              }
+
               const offsetY = cellData.offsetY ?? 5;
               const requiredHeight = elementHeight + offsetY + 5;
               maxHeight = Math.max(maxHeight, requiredHeight);
@@ -662,8 +980,29 @@ export function DesignCanvas() {
       const tableBottom = table.y + tableHeight;
 
       // Check if element center is within table bounds (account for scale)
-      const elementWidth = (fabricTarget.width || 0) * (fabricTarget.scaleX || 1);
-      const elementHeight = (fabricTarget.height || 0) * (fabricTarget.scaleY || 1);
+      // Calculate actual dimensions considering shape type
+      const droppedElement = currentElements.find(el => el.id === droppedElementId);
+      let elementWidth: number;
+      let elementHeight: number;
+
+      if (droppedElement && droppedElement.type === 'shape') {
+        const shapeEl = droppedElement as any;
+        if (shapeEl.shapeType === 'circle') {
+          const radius = (fabricTarget.radius || droppedElement.width / 2) * (fabricTarget.scaleX || 1);
+          elementWidth = radius * 2;
+          elementHeight = radius * 2;
+        } else if (shapeEl.shapeType === 'ellipse') {
+          elementWidth = ((fabricTarget.rx || droppedElement.width / 2) * (fabricTarget.scaleX || 1)) * 2;
+          elementHeight = ((fabricTarget.ry || droppedElement.height / 2) * (fabricTarget.scaleY || 1)) * 2;
+        } else {
+          elementWidth = (fabricTarget.width || 0) * (fabricTarget.scaleX || 1);
+          elementHeight = (fabricTarget.height || 0) * (fabricTarget.scaleY || 1);
+        }
+      } else {
+        elementWidth = (fabricTarget.width || 0) * (fabricTarget.scaleX || 1);
+        elementHeight = (fabricTarget.height || 0) * (fabricTarget.scaleY || 1);
+      }
+
       const elementCenterX = x + elementWidth / 2;
       const elementCenterY = y + elementHeight / 2;
 
@@ -809,6 +1148,12 @@ export function DesignCanvas() {
           fontSize: textEl.fontSize,
           fontFamily: textEl.fontFamily,
           fill: textEl.color,
+          fontWeight: textEl.fontWeight || 'normal',
+          fontStyle: textEl.fontStyle || 'normal',
+          underline: textEl.underline || false,
+          stroke: textEl.stroke || '',
+          strokeWidth: textEl.strokeWidth || 0,
+          textAlign: textEl.textAlign || 'left',
           angle: textEl.rotation || 0,
           opacity: textEl.opacity || 1,
           selectable: true,
@@ -907,6 +1252,79 @@ export function DesignCanvas() {
           lockScalingY: false,
           lockRotation: false,
         });
+        break;
+      }
+
+      case 'shape': {
+        const shapeEl = element as ShapeElement;
+
+        switch (shapeEl.shapeType) {
+          case 'rectangle':
+            fabricObject = new fabric.Rect({
+              left: shapeEl.x,
+              top: shapeEl.y,
+              width: shapeEl.width,
+              height: shapeEl.height,
+              fill: shapeEl.fill || '#3b82f6',
+              stroke: shapeEl.stroke || '#1e40af',
+              strokeWidth: shapeEl.strokeWidth || 1,
+              angle: shapeEl.rotation || 0,
+              opacity: shapeEl.opacity || 1,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+            });
+            break;
+
+          case 'circle':
+            fabricObject = new fabric.Circle({
+              left: shapeEl.x,
+              top: shapeEl.y,
+              radius: shapeEl.width / 2,
+              fill: shapeEl.fill || '#3b82f6',
+              stroke: shapeEl.stroke || '#1e40af',
+              strokeWidth: shapeEl.strokeWidth || 1,
+              angle: shapeEl.rotation || 0,
+              opacity: shapeEl.opacity || 1,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+            });
+            break;
+
+          case 'ellipse':
+            fabricObject = new fabric.Ellipse({
+              left: shapeEl.x,
+              top: shapeEl.y,
+              rx: shapeEl.width / 2,
+              ry: shapeEl.height / 2,
+              fill: shapeEl.fill || '#3b82f6',
+              stroke: shapeEl.stroke || '#1e40af',
+              strokeWidth: shapeEl.strokeWidth || 1,
+              angle: shapeEl.rotation || 0,
+              opacity: shapeEl.opacity || 1,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+            });
+            break;
+
+          case 'line':
+            fabricObject = new fabric.Line([shapeEl.x, shapeEl.y, shapeEl.x + shapeEl.width, shapeEl.y], {
+              stroke: shapeEl.stroke || '#1e40af',
+              strokeWidth: shapeEl.strokeWidth || 2,
+              angle: shapeEl.rotation || 0,
+              opacity: shapeEl.opacity || 1,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+            });
+            break;
+        }
         break;
       }
     }

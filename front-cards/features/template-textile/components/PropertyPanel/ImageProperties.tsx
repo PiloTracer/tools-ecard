@@ -14,6 +14,18 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
     updateElement(element.id, updates);
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      handleChange({ imageUrl: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -24,6 +36,16 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
           onChange={(e) => handleChange({ imageUrl: e.target.value })}
           className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           placeholder="Enter image URL"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Or Upload Image</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
         />
       </div>
 

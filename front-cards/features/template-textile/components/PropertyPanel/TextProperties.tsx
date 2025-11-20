@@ -76,6 +76,61 @@ export function TextProperties({ element }: TextPropertiesProps) {
         </select>
       </div>
 
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          onClick={() => handleChange({ fontWeight: element.fontWeight === 'bold' ? 'normal' : 'bold' })}
+          className={`rounded border px-3 py-2 text-sm font-bold transition-colors ${
+            element.fontWeight === 'bold'
+              ? 'border-blue-500 bg-blue-100 text-blue-800'
+              : 'border-gray-300 bg-white text-slate-800 hover:bg-gray-50'
+          }`}
+        >
+          B
+        </button>
+        <button
+          onClick={() => handleChange({ fontStyle: element.fontStyle === 'italic' ? 'normal' : 'italic' })}
+          className={`rounded border px-3 py-2 text-sm italic font-medium transition-colors ${
+            element.fontStyle === 'italic'
+              ? 'border-blue-500 bg-blue-100 text-blue-800'
+              : 'border-gray-300 bg-white text-slate-800 hover:bg-gray-50'
+          }`}
+        >
+          I
+        </button>
+        <button
+          onClick={() => handleChange({ underline: !element.underline })}
+          className={`rounded border px-3 py-2 text-sm underline font-medium transition-colors ${
+            element.underline
+              ? 'border-blue-500 bg-blue-100 text-blue-800'
+              : 'border-gray-300 bg-white text-slate-800 hover:bg-gray-50'
+          }`}
+        >
+          U
+        </button>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Color</label>
+        <input
+          type="color"
+          value={element.stroke || '#000000'}
+          onChange={(e) => handleChange({ stroke: e.target.value })}
+          className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Width</label>
+        <input
+          type="number"
+          value={element.strokeWidth || 0}
+          onChange={(e) => handleChange({ strokeWidth: parseInt(e.target.value) || 0 })}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          min={0}
+          max={10}
+        />
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Opacity</label>
         <input
