@@ -8,10 +8,68 @@ interface TablePropertiesProps {
 }
 
 export function TableProperties({ element }: TablePropertiesProps) {
-  const { updateElement } = useTemplateStore();
+  const { updateElement, elements } = useTemplateStore();
 
   const handleChange = (updates: Partial<TableElement>) => {
     updateElement(element.id, updates);
+  };
+
+  const handleRowsChange = (newRows: number) => {
+    if (newRows === element.rows) return;
+
+    const oldRows = element.rows;
+
+    // Remove cells that are now outside bounds
+    const newCells = element.cells.filter(cell => cell.row < newRows);
+
+    // Resize rowHeights array
+    const newRowHeights = [...element.rowHeights];
+    if (newRows > oldRows) {
+      // Adding rows - extend with default height
+      const defaultHeight = element.minCellHeight || element.cellHeight || 50;
+      for (let i = oldRows; i < newRows; i++) {
+        newRowHeights[i] = defaultHeight;
+      }
+    } else {
+      // Removing rows - shrink array
+      newRowHeights.length = newRows;
+    }
+
+    updateElement(element.id, {
+      rows: newRows,
+      cells: newCells,
+      rowHeights: newRowHeights,
+      needsRecalculation: true  // Flag for DesignCanvas to recalculate
+    });
+  };
+
+  const handleColumnsChange = (newColumns: number) => {
+    if (newColumns === element.columns) return;
+
+    const oldColumns = element.columns;
+
+    // Remove cells that are now outside bounds
+    const newCells = element.cells.filter(cell => cell.column < newColumns);
+
+    // Resize columnWidths array
+    const newColumnWidths = [...element.columnWidths];
+    if (newColumns > oldColumns) {
+      // Adding columns - extend with default width
+      const defaultWidth = element.minCellWidth || element.cellWidth || 60;
+      for (let i = oldColumns; i < newColumns; i++) {
+        newColumnWidths[i] = defaultWidth;
+      }
+    } else {
+      // Removing columns - shrink array
+      newColumnWidths.length = newColumns;
+    }
+
+    updateElement(element.id, {
+      columns: newColumns,
+      cells: newCells,
+      columnWidths: newColumnWidths,
+      needsRecalculation: true  // Flag for DesignCanvas to recalculate
+    });
   };
 
   return (
@@ -22,7 +80,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
           <input
             type="number"
             value={element.rows}
-            onChange={(e) => handleChange({ rows: parseInt(e.target.value) || 1 })}
+            onChange={(e) => handleRowsChange(parseInt(e.target.value) || 1)}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={1}
             max={20}
@@ -33,7 +91,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
           <input
             type="number"
             value={element.columns}
-            onChange={(e) => handleChange({ columns: parseInt(e.target.value) || 1 })}
+            onChange={(e) => handleColumnsChange(parseInt(e.target.value) || 1)}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={1}
             max={20}

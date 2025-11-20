@@ -458,6 +458,20 @@ export function DesignCanvas() {
               }
             }
           });
+
+          // If table structure changed (rows/columns added/removed), recalculate dimensions
+          if ((table as any).needsRecalculation) {
+            const currentElements = useTemplateStore.getState().elements;
+            const newColumnWidths = recalculateColumnWidths(table, table.cells, currentElements, '');
+            const newRowHeights = recalculateRowHeights(table, table.cells, currentElements, '');
+
+            // Update the table with recalculated dimensions
+            updateElement(table.id, {
+              columnWidths: newColumnWidths,
+              rowHeights: newRowHeights,
+              needsRecalculation: undefined  // Clear the flag
+            });
+          }
         }
       });
     }
@@ -695,6 +709,10 @@ export function DesignCanvas() {
         // Default padding inside cell
         const padding = 5;
 
+        // Check if element was in a different cell before
+        const oldCell = table.cells.find(c => c.elementId === droppedElementId);
+        const movedBetweenCells = oldCell && (oldCell.row !== row || oldCell.column !== col);
+
         // Store position RELATIVE to cell's top-left corner
         const newCells = table.cells.filter(c => c.elementId !== droppedElementId);
         newCells.push({
@@ -720,32 +738,45 @@ export function DesignCanvas() {
         // Bring element to front so it stays selectable above the table
         canvas.bringObjectToFront(fabricTarget);
 
-        // Auto-resize cell to fit element if needed (use already calculated dimensions)
-        const requiredWidth = elementWidth + padding * 2;
-        const requiredHeight = elementHeight + padding * 2;
-        const minWidth = table.minCellWidth || 60;
-        const minHeight = table.minCellHeight || 50;
+        // If element moved between cells, recalculate all dimensions
+        if (movedBetweenCells) {
+          const newColumnWidths = recalculateColumnWidths(table, newCells, currentElements, '');
+          const newRowHeights = recalculateRowHeights(table, newCells, currentElements, '');
 
-        let cellsChanged = false;
+          // Update table with new cells and recalculated dimensions
+          updateElement(table.id, {
+            cells: newCells,
+            columnWidths: newColumnWidths,
+            rowHeights: newRowHeights
+          });
+        } else {
+          // Element dropped into same cell or new to this table - just resize if needed
+          const requiredWidth = elementWidth + padding * 2;
+          const requiredHeight = elementHeight + padding * 2;
+          const minWidth = table.minCellWidth || 60;
+          const minHeight = table.minCellHeight || 50;
 
-        if (table.columnWidths[col] < requiredWidth) {
-          table.columnWidths[col] = Math.max(requiredWidth, minWidth);
-          cellsChanged = true;
+          let cellsChanged = false;
+
+          if (table.columnWidths[col] < requiredWidth) {
+            table.columnWidths[col] = Math.max(requiredWidth, minWidth);
+            cellsChanged = true;
+          }
+
+          if (table.rowHeights[row] < requiredHeight) {
+            table.rowHeights[row] = Math.max(requiredHeight, minHeight);
+            cellsChanged = true;
+          }
+
+          // Update table with new cells and possibly new dimensions
+          updateElement(table.id, {
+            cells: newCells,
+            ...(cellsChanged ? {
+              columnWidths: [...table.columnWidths],
+              rowHeights: [...table.rowHeights]
+            } : {})
+          });
         }
-
-        if (table.rowHeights[row] < requiredHeight) {
-          table.rowHeights[row] = Math.max(requiredHeight, minHeight);
-          cellsChanged = true;
-        }
-
-        // Update table with new cells and possibly new dimensions
-        updateElement(table.id, {
-          cells: newCells,
-          ...(cellsChanged ? {
-            columnWidths: [...table.columnWidths],
-            rowHeights: [...table.rowHeights]
-          } : {})
-        });
 
         canvas.renderAll();
 
