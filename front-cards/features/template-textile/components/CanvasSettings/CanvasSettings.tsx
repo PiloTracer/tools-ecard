@@ -119,7 +119,6 @@ export function CanvasSettings() {
         <div className="mt-3 space-y-4 rounded border border-slate-700 bg-slate-900 p-4">
           {/* Preset Aspect Ratios */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">Preset Aspect Ratios</h3>
             <div className="grid grid-cols-2 gap-2">
               {ASPECT_RATIO_PRESETS.map((preset) => (
                 <button
@@ -140,7 +139,6 @@ export function CanvasSettings() {
 
           {/* Custom Dimensions */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">Custom Dimensions</h3>
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <label className="mb-1 block text-xs text-slate-400">Width (px)</label>
@@ -173,26 +171,8 @@ export function CanvasSettings() {
             </div>
           </div>
 
-          {/* View Controls */}
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">View Controls</h3>
-            <button
-              onClick={handleResetView}
-              className="w-full rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
-              title="Reset zoom to 100% and center the canvas"
-            >
-              <div className="flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11H3m0 0l3 3m-3-3l3-3m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Reset View to Default (100% zoom, centered)
-              </div>
-            </button>
-          </div>
-
           {/* Export Width */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">Export Settings</h3>
             <div>
               <label className="mb-1 block text-xs text-slate-400">
                 Export Width (px) - Canvas will scale to this width
