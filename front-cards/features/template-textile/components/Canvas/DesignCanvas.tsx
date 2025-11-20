@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as fabric from 'fabric';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
-import type { TemplateElement, TextElement, ImageElement, QRElement, TableElement, ShapeElement } from '../../types';
+import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 
 export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -117,43 +117,14 @@ export function DesignCanvas() {
       const element = currentElements.find(el => el.id === elementId);
       if (!element) return;
 
-      let finalX = Math.round(target.left || element.x);
-      let finalY = Math.round(target.top || element.y);
-
-      // Check if element was dropped on a table cell (only if not locked)
-      if (element.type !== 'table' && !element.locked) {
-        const droppedOnTable = checkTableCellDrop(
-          currentElements,
-          elementId,
-          finalX,
-          finalY,
-          target
-        );
-
-        if (droppedOnTable) {
-          finalX = droppedOnTable.x;
-          finalY = droppedOnTable.y;
-
-          // Update visual position
-          target.set({ left: finalX, top: finalY });
-          canvas.renderAll();
-        }
-      }
-
-      // Check if element is in a table cell
-      const isInCell = currentElements.some(el =>
-        el.type === 'table' && (el as TableElement).cells.some(c => c.elementId === elementId)
-      );
+      const finalX = Math.round(target.left || element.x);
+      const finalY = Math.round(target.top || element.y);
 
       const updates: Partial<TemplateElement> = {
         rotation: target.angle || element.rotation,
+        x: finalX,
+        y: finalY,
       };
-
-      // Only update x,y if element is NOT in a cell (free-standing elements)
-      if (!isInCell) {
-        updates.x = finalX;
-        updates.y = finalY;
-      }
 
       // Handle size updates for text (fontSize) vs others (width/height)
       // Only update size if object was actually scaled (scaleX/scaleY changed from 1)
@@ -263,153 +234,6 @@ export function DesignCanvas() {
           }
         }
       }
-
-      // Check if element is in a table cell - update relative position and resize cell if needed
-      if (element.type !== 'table') {
-        const tables = currentElements.filter(el => el.type === 'table') as TableElement[];
-        for (const table of tables) {
-          const cellIndex = table.cells.findIndex(c => c.elementId === elementId);
-          if (cellIndex !== -1) {
-            const cellData = table.cells[cellIndex];
-
-            // Calculate cell position on canvas
-            const cellX = table.columnWidths.slice(0, cellData.column).reduce((sum, w) => sum + w, 0);
-            const cellY = table.rowHeights.slice(0, cellData.row).reduce((sum, h) => sum + h, 0);
-            const cellCanvasX = table.x + cellX;
-            const cellCanvasY = table.y + cellY;
-            const cellWidth = table.columnWidths[cellData.column];
-            const cellHeight = table.rowHeights[cellData.row];
-
-            // Check if element is still within this cell's bounds
-            // Calculate actual dimensions considering shape type
-            let elementWidth: number;
-            let elementHeight: number;
-
-            if (element.type === 'shape') {
-              const shapeEl = element as any;
-              if (shapeEl.shapeType === 'circle') {
-                const radius = (target.radius || element.width / 2) * (target.scaleX || 1);
-                elementWidth = radius * 2;
-                elementHeight = radius * 2;
-              } else if (shapeEl.shapeType === 'ellipse') {
-                elementWidth = ((target.rx || element.width / 2) * (target.scaleX || 1)) * 2;
-                elementHeight = ((target.ry || element.height / 2) * (target.scaleY || 1)) * 2;
-              } else {
-                elementWidth = (target.width || 0) * (target.scaleX || 1);
-                elementHeight = (target.height || 0) * (target.scaleY || 1);
-              }
-            } else {
-              elementWidth = (target.width || 0) * (target.scaleX || 1);
-              elementHeight = (target.height || 0) * (target.scaleY || 1);
-            }
-
-            const elementCenterX = finalX + elementWidth / 2;
-            const elementCenterY = finalY + elementHeight / 2;
-
-            const withinCell = (
-              elementCenterX >= cellCanvasX &&
-              elementCenterX <= cellCanvasX + cellWidth &&
-              elementCenterY >= cellCanvasY &&
-              elementCenterY <= cellCanvasY + cellHeight
-            );
-
-            if (!withinCell) {
-              // Element moved outside this cell - don't update this cell, let checkTableCellDrop handle it
-              console.log(`Element ${elementId} moved outside cell [${cellData.row},${cellData.column}]`);
-              break;
-            }
-
-            // Element is still in the same cell - update relative position
-            const newOffsetX = finalX - cellCanvasX;
-            const newOffsetY = finalY - cellCanvasY;
-            const requiredWidth = elementWidth + newOffsetX + 5; // 5px right padding
-            const requiredHeight = elementHeight + newOffsetY + 5; // 5px bottom padding
-            const minWidth = table.minCellWidth || 60;
-            const minHeight = table.minCellHeight || 50;
-
-            let needsUpdate = false;
-            const newColumnWidths = [...table.columnWidths];
-            const newRowHeights = [...table.rowHeights];
-            const newCells = [...table.cells];
-
-            // Update cell data with new relative offset
-            if (newOffsetX !== cellData.offsetX || newOffsetY !== cellData.offsetY) {
-              newCells[cellIndex] = {
-                ...cellData,
-                offsetX: newOffsetX,
-                offsetY: newOffsetY
-              };
-              needsUpdate = true;
-            }
-
-            // Resize column if element is wider
-            if (newColumnWidths[cellData.column] < requiredWidth) {
-              newColumnWidths[cellData.column] = Math.max(requiredWidth, minWidth);
-              needsUpdate = true;
-            }
-
-            // Resize row if element is taller
-            if (newRowHeights[cellData.row] < requiredHeight) {
-              newRowHeights[cellData.row] = Math.max(requiredHeight, minHeight);
-              needsUpdate = true;
-            }
-
-            if (needsUpdate) {
-              updateElement(table.id, {
-                cells: newCells,
-                columnWidths: newColumnWidths,
-                rowHeights: newRowHeights
-              });
-              console.log(`Updated cell [${cellData.row},${cellData.column}] - offset=(${newOffsetX.toFixed(1)},${newOffsetY.toFixed(1)})`);
-            }
-            break;
-          }
-        }
-      }
-    });
-
-    // Table movement - move child elements with table
-    canvas.on('object:moving', (e: any) => {
-      const target = e.target;
-      if (!target) return;
-
-      const elementId = (target as any).elementId;
-      if (!elementId) return;
-
-      // Get fresh elements from store
-      const currentElements = useTemplateStore.getState().elements;
-      const element = currentElements.find(el => el.id === elementId);
-
-      // Only handle table movement
-      if (element?.type !== 'table') return;
-
-      const table = element as TableElement;
-      const tableLeft = target.left || table.x;
-      const tableTop = target.top || table.y;
-
-      // Move all child elements with the table using relative offsets
-      table.cells.forEach(cellData => {
-        if (cellData.elementId) {
-          const childFabricObj = fabricObjectsMap.current.get(cellData.elementId);
-          if (childFabricObj) {
-            // Calculate cell offset using cumulative widths/heights
-            const cellX = table.columnWidths.slice(0, cellData.column).reduce((sum, w) => sum + w, 0);
-            const cellY = table.rowHeights.slice(0, cellData.row).reduce((sum, h) => sum + h, 0);
-
-            // Use stored relative offset
-            const offsetX = cellData.offsetX ?? 5;
-            const offsetY = cellData.offsetY ?? 5;
-
-            childFabricObj.set({
-              left: tableLeft + cellX + offsetX,
-              top: tableTop + cellY + offsetY,
-            });
-            childFabricObj.setCoords();
-          }
-        }
-      });
-
-      canvas.renderAll();
     });
 
     // Keyboard delete
@@ -420,26 +244,6 @@ export function DesignCanvas() {
           const elementId = (activeObject as any).elementId;
           if (elementId) {
             e.preventDefault();
-
-            // Remove element from any table cells and recalculate cell sizes
-            const currentElements = useTemplateStore.getState().elements;
-            const tables = currentElements.filter(el => el.type === 'table') as TableElement[];
-            tables.forEach(table => {
-              const cellWithElement = table.cells.find(c => c.elementId === elementId);
-              if (cellWithElement) {
-                const newCells = table.cells.filter(c => c.elementId !== elementId);
-
-                // Recalculate dimensions for the affected column and row
-                const newColumnWidths = recalculateColumnWidths(table, newCells, currentElements, elementId);
-                const newRowHeights = recalculateRowHeights(table, newCells, currentElements, elementId);
-
-                updateElement(table.id, {
-                  cells: newCells,
-                  columnWidths: newColumnWidths,
-                  rowHeights: newRowHeights
-                });
-              }
-            });
 
             canvas.remove(activeObject);
             removeElement(elementId);
@@ -481,19 +285,6 @@ export function DesignCanvas() {
       }
     });
 
-    // Find tables that need to be recreated (dimensions changed)
-    const tablesToRecreate: TableElement[] = [];
-    elements.forEach(element => {
-      if (element.type === 'table' && addedElementIds.current.has(element.id)) {
-        const table = element as TableElement;
-        const existingFabricObj = fabricObjectsMap.current.get(element.id);
-        if (existingFabricObj) {
-          // Check if table dimensions have changed - recreate if so
-          tablesToRecreate.push(table);
-        }
-      }
-    });
-
     // Find images that need to be recreated (imageUrl changed)
     const imagesToRecreate: ImageElement[] = [];
     elements.forEach(element => {
@@ -527,7 +318,7 @@ export function DesignCanvas() {
 
     // Sync properties for existing elements (text content, colors, etc.)
     elements.forEach(element => {
-      if (addedElementIds.current.has(element.id) && element.type !== 'table') {
+      if (addedElementIds.current.has(element.id)) {
         const fabricObj = fabricObjectsMap.current.get(element.id);
         if (fabricObj) {
           // Update text properties
@@ -660,69 +451,6 @@ export function DesignCanvas() {
           canvas.remove(fabricObj);
           fabricObjectsMap.current.delete(elementId);
           addedElementIds.current.delete(elementId);
-        }
-      });
-    }
-
-    // Recreate tables with changed dimensions
-    if (tablesToRecreate.length > 0) {
-      tablesToRecreate.forEach(table => {
-        const oldFabricObj = fabricObjectsMap.current.get(table.id);
-        if (oldFabricObj) {
-          // Preserve current position before recreating
-          const currentX = oldFabricObj.left || table.x;
-          const currentY = oldFabricObj.top || table.y;
-
-          canvas.remove(oldFabricObj);
-          fabricObjectsMap.current.delete(table.id);
-          addedElementIds.current.delete(table.id);
-
-          // Update table position if it moved
-          if (currentX !== table.x || currentY !== table.y) {
-            table.x = currentX;
-            table.y = currentY;
-          }
-
-          addElementToCanvas(canvas, table);
-          addedElementIds.current.add(table.id);
-
-          // Reposition all child elements to match new cell dimensions using relative offsets
-          table.cells.forEach(cellData => {
-            if (cellData.elementId) {
-              const childFabricObj = fabricObjectsMap.current.get(cellData.elementId);
-              if (childFabricObj) {
-                const cellX = table.columnWidths.slice(0, cellData.column).reduce((sum, w) => sum + w, 0);
-                const cellY = table.rowHeights.slice(0, cellData.row).reduce((sum, h) => sum + h, 0);
-
-                // Use stored relative offset (default to 5 if not set)
-                const offsetX = cellData.offsetX ?? 5;
-                const offsetY = cellData.offsetY ?? 5;
-
-                childFabricObj.set({
-                  left: table.x + cellX + offsetX,
-                  top: table.y + cellY + offsetY,
-                });
-                childFabricObj.setCoords();
-
-                // Bring to front to keep it selectable
-                canvas.bringObjectToFront(childFabricObj);
-              }
-            }
-          });
-
-          // If table structure changed (rows/columns added/removed), recalculate dimensions
-          if ((table as any).needsRecalculation) {
-            const currentElements = useTemplateStore.getState().elements;
-            const newColumnWidths = recalculateColumnWidths(table, table.cells, currentElements, '');
-            const newRowHeights = recalculateRowHeights(table, table.cells, currentElements, '');
-
-            // Update the table with recalculated dimensions
-            updateElement(table.id, {
-              columnWidths: newColumnWidths,
-              rowHeights: newRowHeights,
-              needsRecalculation: undefined  // Clear the flag
-            });
-          }
         }
       });
     }
@@ -929,7 +657,75 @@ export function DesignCanvas() {
     canvas.renderAll();
   }, [backgroundColor, isReady]);
 
-  // 7) Handle keyboard shortcuts
+  // 7) Sync element z-order (layering) from store to Fabric canvas
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !isReady) return;
+
+    // Get all objects and separate grid from elements
+    const allObjects = canvas.getObjects();
+    const gridObjects = allObjects.filter((obj: any) => obj.isGrid);
+    const elementObjects = allObjects.filter((obj: any) => !obj.isGrid);
+
+    let needsReorder = false;
+
+    // Build a map of element IDs to their index in elements array (z-order)
+    const elementOrderMap = new Map<string, number>();
+    elements.forEach((el, index) => {
+      elementOrderMap.set(el.id, index);
+    });
+
+    // Sort element objects by element order
+    const sortedObjects = [...elementObjects].sort((a, b) => {
+      const aId = (a as any).elementId;
+      const bId = (b as any).elementId;
+      const aOrder = elementOrderMap.get(aId) ?? 9999;
+      const bOrder = elementOrderMap.get(bId) ?? 9999;
+      return aOrder - bOrder;
+    });
+
+    // Check if order changed (only check element objects, not grid)
+    for (let i = 0; i < elementObjects.length; i++) {
+      if (elementObjects[i] !== sortedObjects[i]) {
+        needsReorder = true;
+        break;
+      }
+    }
+
+    if (needsReorder) {
+      // Preserve background color
+      const bgColor = canvas.backgroundColor;
+
+      // Clear canvas
+      canvas.clear();
+
+      // Restore background color
+      canvas.set('backgroundColor', bgColor);
+
+      // Re-add grid objects first (at the back)
+      gridObjects.forEach(obj => canvas.add(obj));
+
+      // Then add sorted element objects
+      sortedObjects.forEach(obj => canvas.add(obj));
+
+      canvas.renderAll();
+      console.log('[LAYERING] Synced fabric object order with elements array');
+    }
+  }, [elements, isReady]);
+
+  // 8) Apply zoom to Fabric canvas
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !isReady) return;
+
+    // Apply zoom to the entire canvas
+    canvas.setZoom(zoom);
+    canvas.renderAll();
+
+    console.log(`[ZOOM] Applied zoom: ${zoom}`);
+  }, [zoom, isReady]);
+
+  // 9) Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input
@@ -1038,292 +834,6 @@ export function DesignCanvas() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedElementId, elements, isReady]);
-
-  // Helper: Recalculate column widths after element removal
-  const recalculateColumnWidths = (
-    table: TableElement,
-    newCells: any[],
-    allElements: TemplateElement[],
-    removedElementId: string
-  ): number[] => {
-    const minWidth = table.minCellWidth || 60;
-    const newWidths = [...table.columnWidths];
-
-    // For each column, find the widest element
-    for (let col = 0; col < table.columns; col++) {
-      const cellsInColumn = newCells.filter(c => c.column === col && c.elementId);
-
-      if (cellsInColumn.length === 0) {
-        // No elements in this column, use minimum
-        newWidths[col] = minWidth;
-      } else {
-        // Find max required width
-        let maxWidth = minWidth;
-        cellsInColumn.forEach(cellData => {
-          const element = allElements.find(el => el.id === cellData.elementId);
-          if (element && element.id !== removedElementId) {
-            const fabricObj = fabricObjectsMap.current.get(element.id);
-            if (fabricObj) {
-              // Calculate actual width considering shape type
-              let elementWidth: number;
-              if (element.type === 'shape') {
-                const shapeEl = element as any;
-                if (shapeEl.shapeType === 'circle') {
-                  elementWidth = ((fabricObj.radius || element.width / 2) * (fabricObj.scaleX || 1)) * 2;
-                } else if (shapeEl.shapeType === 'ellipse') {
-                  elementWidth = ((fabricObj.rx || element.width / 2) * (fabricObj.scaleX || 1)) * 2;
-                } else {
-                  elementWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
-                }
-              } else {
-                elementWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
-              }
-
-              const offsetX = cellData.offsetX ?? 5;
-              const requiredWidth = elementWidth + offsetX + 5;
-              maxWidth = Math.max(maxWidth, requiredWidth);
-            }
-          }
-        });
-        newWidths[col] = maxWidth;
-      }
-    }
-
-    return newWidths;
-  };
-
-  // Helper: Recalculate row heights after element removal
-  const recalculateRowHeights = (
-    table: TableElement,
-    newCells: any[],
-    allElements: TemplateElement[],
-    removedElementId: string
-  ): number[] => {
-    const minHeight = table.minCellHeight || 50;
-    const newHeights = [...table.rowHeights];
-
-    // For each row, find the tallest element
-    for (let row = 0; row < table.rows; row++) {
-      const cellsInRow = newCells.filter(c => c.row === row && c.elementId);
-
-      if (cellsInRow.length === 0) {
-        // No elements in this row, use minimum
-        newHeights[row] = minHeight;
-      } else {
-        // Find max required height
-        let maxHeight = minHeight;
-        cellsInRow.forEach(cellData => {
-          const element = allElements.find(el => el.id === cellData.elementId);
-          if (element && element.id !== removedElementId) {
-            const fabricObj = fabricObjectsMap.current.get(element.id);
-            if (fabricObj) {
-              // Calculate actual height considering shape type
-              let elementHeight: number;
-              if (element.type === 'shape') {
-                const shapeEl = element as any;
-                if (shapeEl.shapeType === 'circle') {
-                  elementHeight = ((fabricObj.radius || element.width / 2) * (fabricObj.scaleY || 1)) * 2;
-                } else if (shapeEl.shapeType === 'ellipse') {
-                  elementHeight = ((fabricObj.ry || element.height / 2) * (fabricObj.scaleY || 1)) * 2;
-                } else {
-                  elementHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
-                }
-              } else {
-                elementHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
-              }
-
-              const offsetY = cellData.offsetY ?? 5;
-              const requiredHeight = elementHeight + offsetY + 5;
-              maxHeight = Math.max(maxHeight, requiredHeight);
-            }
-          }
-        });
-        newHeights[row] = maxHeight;
-      }
-    }
-
-    return newHeights;
-  };
-
-  // Helper: Check if element dropped on table cell
-  const checkTableCellDrop = (
-    currentElements: TemplateElement[],
-    droppedElementId: string,
-    x: number,
-    y: number,
-    fabricTarget: any
-  ): { x: number; y: number } | null => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return null;
-
-    // Find all table elements
-    const tables = currentElements.filter(el => el.type === 'table') as TableElement[];
-
-    for (const table of tables) {
-      const tableGroup = fabricObjectsMap.current.get(table.id);
-      if (!tableGroup) continue;
-
-      // Calculate table total dimensions
-      const tableWidth = table.columnWidths.reduce((sum, w) => sum + w, 0);
-      const tableHeight = table.rowHeights.reduce((sum, h) => sum + h, 0);
-      const tableRight = table.x + tableWidth;
-      const tableBottom = table.y + tableHeight;
-
-      // Check if element center is within table bounds (account for scale)
-      // Calculate actual dimensions considering shape type
-      const droppedElement = currentElements.find(el => el.id === droppedElementId);
-      let elementWidth: number;
-      let elementHeight: number;
-
-      if (droppedElement && droppedElement.type === 'shape') {
-        const shapeEl = droppedElement as any;
-        if (shapeEl.shapeType === 'circle') {
-          const radius = (fabricTarget.radius || droppedElement.width / 2) * (fabricTarget.scaleX || 1);
-          elementWidth = radius * 2;
-          elementHeight = radius * 2;
-        } else if (shapeEl.shapeType === 'ellipse') {
-          elementWidth = ((fabricTarget.rx || droppedElement.width / 2) * (fabricTarget.scaleX || 1)) * 2;
-          elementHeight = ((fabricTarget.ry || droppedElement.height / 2) * (fabricTarget.scaleY || 1)) * 2;
-        } else {
-          elementWidth = (fabricTarget.width || 0) * (fabricTarget.scaleX || 1);
-          elementHeight = (fabricTarget.height || 0) * (fabricTarget.scaleY || 1);
-        }
-      } else {
-        elementWidth = (fabricTarget.width || 0) * (fabricTarget.scaleX || 1);
-        elementHeight = (fabricTarget.height || 0) * (fabricTarget.scaleY || 1);
-      }
-
-      const elementCenterX = x + elementWidth / 2;
-      const elementCenterY = y + elementHeight / 2;
-
-      if (
-        elementCenterX >= table.x &&
-        elementCenterX <= tableRight &&
-        elementCenterY >= table.y &&
-        elementCenterY <= tableBottom
-      ) {
-        // Find which cell the element is in by calculating cumulative widths/heights
-        let col = 0;
-        let cumulativeX = 0;
-        for (let c = 0; c < table.columns; c++) {
-          cumulativeX += table.columnWidths[c];
-          if (elementCenterX - table.x < cumulativeX) {
-            col = c;
-            break;
-          }
-        }
-
-        let row = 0;
-        let cumulativeY = 0;
-        for (let r = 0; r < table.rows; r++) {
-          cumulativeY += table.rowHeights[r];
-          if (elementCenterY - table.y < cumulativeY) {
-            row = r;
-            break;
-          }
-        }
-
-        // Check if cell is already occupied
-        const existingCell = table.cells.find(c => c.row === row && c.column === col);
-
-        if (existingCell && existingCell.elementId && existingCell.elementId !== droppedElementId) {
-          console.log(`Cell [${row},${col}] is already occupied`);
-          return null;
-        }
-
-        // Calculate cell offset from table origin
-        const cellX = table.columnWidths.slice(0, col).reduce((sum, w) => sum + w, 0);
-        const cellY = table.rowHeights.slice(0, row).reduce((sum, h) => sum + h, 0);
-
-        // Default padding inside cell
-        const padding = 5;
-
-        // Check if element was in a different cell before
-        const oldCell = table.cells.find(c => c.elementId === droppedElementId);
-        const movedBetweenCells = oldCell && (oldCell.row !== row || oldCell.column !== col);
-
-        // Store position RELATIVE to cell's top-left corner
-        const newCells = table.cells.filter(c => c.elementId !== droppedElementId);
-        newCells.push({
-          row,
-          column: col,
-          elementId: droppedElementId,
-          offsetX: padding,  // Relative to cell
-          offsetY: padding   // Relative to cell
-        });
-
-        // Calculate absolute canvas position for Fabric.js
-        const canvasX = table.x + cellX + padding;
-        const canvasY = table.y + cellY + padding;
-
-        console.log(`Dropped element into table cell [${row},${col}], relative offset=(${padding},${padding})`);
-
-        // Position element WITHOUT scaling - let user resize it
-        fabricTarget.set({
-          left: canvasX,
-          top: canvasY,
-        });
-
-        // Bring element to front so it stays selectable above the table
-        canvas.bringObjectToFront(fabricTarget);
-
-        // If element moved between cells, recalculate all dimensions
-        if (movedBetweenCells) {
-          const newColumnWidths = recalculateColumnWidths(table, newCells, currentElements, '');
-          const newRowHeights = recalculateRowHeights(table, newCells, currentElements, '');
-
-          // Update table with new cells and recalculated dimensions
-          updateElement(table.id, {
-            cells: newCells,
-            columnWidths: newColumnWidths,
-            rowHeights: newRowHeights
-          });
-        } else {
-          // Element dropped into same cell or new to this table - just resize if needed
-          const requiredWidth = elementWidth + padding * 2;
-          const requiredHeight = elementHeight + padding * 2;
-          const minWidth = table.minCellWidth || 60;
-          const minHeight = table.minCellHeight || 50;
-
-          let cellsChanged = false;
-
-          if (table.columnWidths[col] < requiredWidth) {
-            table.columnWidths[col] = Math.max(requiredWidth, minWidth);
-            cellsChanged = true;
-          }
-
-          if (table.rowHeights[row] < requiredHeight) {
-            table.rowHeights[row] = Math.max(requiredHeight, minHeight);
-            cellsChanged = true;
-          }
-
-          // Update table with new cells and possibly new dimensions
-          updateElement(table.id, {
-            cells: newCells,
-            ...(cellsChanged ? {
-              columnWidths: [...table.columnWidths],
-              rowHeights: [...table.rowHeights]
-            } : {})
-          });
-        }
-
-        canvas.renderAll();
-
-        return { x: Math.round(canvasX), y: Math.round(canvasY) };
-      }
-    }
-
-    // Not dropped on any table - remove from table cells tracking
-    tables.forEach(table => {
-      const wasInCell = table.cells.some(c => c.elementId === droppedElementId);
-      if (wasInCell) {
-        const newCells = table.cells.filter(c => c.elementId !== droppedElementId);
-        updateElement(table.id, { cells: newCells });
-      }
-    });
-
-    return null;
-  };
 
   // Helper: Add element to canvas
   const addElementToCanvas = (canvas: fabric.Canvas, element: TemplateElement) => {
@@ -1464,48 +974,6 @@ export function DesignCanvas() {
         break;
       }
 
-      case 'table': {
-        const tableEl = element as TableElement;
-        const cells: any[] = [];
-
-        let yOffset = 0;
-        for (let row = 0; row < tableEl.rows; row++) {
-          let xOffset = 0;
-          for (let col = 0; col < tableEl.columns; col++) {
-            const cellWidth = tableEl.columnWidths[col] || 60;
-            const cellHeight = tableEl.rowHeights[row] || 50;
-
-            const cell = new fabric.Rect({
-              left: xOffset,
-              top: yOffset,
-              width: cellWidth,
-              height: cellHeight,
-              fill: 'transparent',
-              stroke: tableEl.borderColor || '#ccc',
-              strokeWidth: tableEl.borderWidth || 1,
-            });
-            cells.push(cell);
-            xOffset += cellWidth;
-          }
-          yOffset += tableEl.rowHeights[row] || 50;
-        }
-
-        fabricObject = new fabric.Group(cells, {
-          left: tableEl.x,
-          top: tableEl.y,
-          angle: tableEl.rotation || 0,
-          opacity: tableEl.opacity || 1,
-          selectable: true,
-          evented: true,
-          hasControls: true,
-          hasBorders: true,
-          lockScalingX: false,
-          lockScalingY: false,
-          lockRotation: false,
-        });
-        break;
-      }
-
       case 'shape': {
         const shapeEl = element as ShapeElement;
 
@@ -1586,48 +1054,8 @@ export function DesignCanvas() {
       // Store in map
       fabricObjectsMap.current.set(element.id, fabricObject);
 
-      // Check if this element should be positioned in a table cell
-      if (element.type !== 'table') {
-        const currentElements = useTemplateStore.getState().elements;
-        const tables = currentElements.filter(el => el.type === 'table') as TableElement[];
-
-        // Check if element belongs to a cell
-        for (const table of tables) {
-          const cellData = table.cells.find(c => c.elementId === element.id);
-          if (cellData) {
-            // Calculate cell offset using cumulative widths/heights
-            const cellX = table.columnWidths.slice(0, cellData.column).reduce((sum, w) => sum + w, 0);
-            const cellY = table.rowHeights.slice(0, cellData.row).reduce((sum, h) => sum + h, 0);
-
-            // Use stored relative offset
-            const offsetX = cellData.offsetX ?? 5;
-            const offsetY = cellData.offsetY ?? 5;
-
-            const canvasX = table.x + cellX + offsetX;
-            const canvasY = table.y + cellY + offsetY;
-
-            fabricObject.set({
-              left: canvasX,
-              top: canvasY,
-            });
-            break;
-          }
-        }
-      }
-
-      // Add to canvas (not to groups)
+      // Add to canvas
       canvas.add(fabricObject);
-
-      // If element is in a table cell, bring it to front so it's selectable above the table
-      if (element.type !== 'table') {
-        const currentElements = useTemplateStore.getState().elements;
-        const isInCell = currentElements.some(el =>
-          el.type === 'table' && (el as TableElement).cells.some(c => c.elementId === element.id)
-        );
-        if (isInCell) {
-          canvas.bringObjectToFront(fabricObject);
-        }
-      }
     }
   };
 

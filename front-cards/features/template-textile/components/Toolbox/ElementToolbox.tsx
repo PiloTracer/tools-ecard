@@ -63,30 +63,9 @@ export function ElementToolbox() {
   };
 
   const handleAddTable = () => {
-    const defaultColWidth = 60;
-    const defaultRowHeight = 50;
-    const cols = 3;
-    const rows = 3;
-
-    const tableElement: TableElement = {
-      id: crypto.randomUUID(),
-      type: 'table',
-      x: width / 2 - (cols * defaultColWidth) / 2,
-      y: height / 2 - (rows * defaultRowHeight) / 2,
-      rows,
-      columns: cols,
-      columnWidths: Array(cols).fill(defaultColWidth),
-      rowHeights: Array(rows).fill(defaultRowHeight),
-      minCellWidth: 60,
-      minCellHeight: 50,
-      borderColor: '#cccccc',
-      borderWidth: 1,
-      cells: [],
-      rotation: 0,
-      opacity: 1,
-      locked: false,
-    };
-    addElement(tableElement);
+    // TABLE FEATURE DISABLED - Unable to implement proper auto-sizing behavior
+    alert('Table feature is currently disabled.');
+    return;
   };
 
   const handleAddShape = (shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line') => {

@@ -2,7 +2,7 @@
 
 export interface BaseElement {
   id: string;
-  type: 'text' | 'image' | 'qr' | 'table' | 'shape';
+  type: 'text' | 'image' | 'qr' | 'shape';
   x: number;
   y: number;
   width?: number;
@@ -43,27 +43,6 @@ export interface QRElement extends BaseElement {
   colorLight?: string;
 }
 
-export interface TableElement extends BaseElement {
-  type: 'table';
-  rows: number;
-  columns: number;
-  columnWidths: number[];  // Array of widths, one per column
-  rowHeights: number[];     // Array of heights, one per row
-  minCellWidth?: number;    // Minimum width for cells (default: 60)
-  minCellHeight?: number;   // Minimum height for cells (default: 50)
-  borderColor?: string;
-  borderWidth?: number;
-  cells: TableCell[];
-}
-
-export interface TableCell {
-  row: number;
-  column: number;
-  elementId?: string; // Reference to element in this cell
-  offsetX?: number;   // Element X position relative to cell's top-left (default: 5px padding)
-  offsetY?: number;   // Element Y position relative to cell's top-left (default: 5px padding)
-}
-
 export interface ShapeElement extends BaseElement {
   type: 'shape';
   shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line';
@@ -74,7 +53,7 @@ export interface ShapeElement extends BaseElement {
   strokeWidth?: number;
 }
 
-export type TemplateElement = TextElement | ImageElement | QRElement | TableElement | ShapeElement;
+export type TemplateElement = TextElement | ImageElement | QRElement | ShapeElement;
 
 export interface Template {
   id: string;
@@ -90,5 +69,4 @@ export interface Template {
 export const isTextElement = (el: TemplateElement): el is TextElement => el.type === 'text';
 export const isImageElement = (el: TemplateElement): el is ImageElement => el.type === 'image';
 export const isQRElement = (el: TemplateElement): el is QRElement => el.type === 'qr';
-export const isTableElement = (el: TemplateElement): el is TableElement => el.type === 'table';
 export const isShapeElement = (el: TemplateElement): el is ShapeElement => el.type === 'shape';
