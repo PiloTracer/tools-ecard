@@ -292,6 +292,16 @@ export function DesignCanvas() {
     // Keyboard delete
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Check if user is editing an input field
+        const target = e.target as HTMLElement;
+        const isEditingInput = target.tagName === 'INPUT' ||
+                              target.tagName === 'TEXTAREA' ||
+                              target.getAttribute('contenteditable') === 'true';
+
+        if (isEditingInput) {
+          return; // Don't delete canvas object, let the input handle the key
+        }
+
         const activeObject = canvas.getActiveObject();
         if (activeObject) {
           const elementId = (activeObject as any).elementId;
@@ -892,7 +902,10 @@ export function DesignCanvas() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      const target = e.target as HTMLElement;
+      if (target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target.getAttribute('contenteditable') === 'true') {
         return;
       }
 
@@ -901,8 +914,9 @@ export function DesignCanvas() {
 
       const activeObject = canvas.getActiveObject();
 
-      // Delete key - delete selected element
-      if (e.key === 'Delete' && selectedElementId) {
+      // Delete/Backspace key - delete selected element
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
+        e.preventDefault(); // Prevent default browser behavior
         removeElement(selectedElementId);
         setSelectedElement(null);
       }
