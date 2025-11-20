@@ -1,0 +1,74 @@
+// Core template types for template-textile feature
+
+export interface BaseElement {
+  id: string;
+  type: 'text' | 'image' | 'qr' | 'table';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  opacity?: number;
+  locked?: boolean;
+}
+
+export interface TextElement extends BaseElement {
+  type: 'text';
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  textAlign?: 'left' | 'center' | 'right';
+}
+
+export interface ImageElement extends BaseElement {
+  type: 'image';
+  width: number;
+  height: number;
+  imageUrl: string;
+  scaleMode?: 'fill' | 'fit' | 'stretch';
+}
+
+export interface QRElement extends BaseElement {
+  type: 'qr';
+  size: number;
+  data: string;
+  qrType: 'url' | 'text' | 'vcard';
+  colorDark?: string;
+  colorLight?: string;
+}
+
+export interface TableElement extends BaseElement {
+  type: 'table';
+  rows: number;
+  columns: number;
+  cellWidth: number;
+  cellHeight: number;
+  borderColor?: string;
+  borderWidth?: number;
+  cells: TableCell[];
+}
+
+export interface TableCell {
+  row: number;
+  column: number;
+  elementId?: string; // Reference to element in this cell
+}
+
+export type TemplateElement = TextElement | ImageElement | QRElement | TableElement;
+
+export interface Template {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  elements: TemplateElement[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Helper type guards
+export const isTextElement = (el: TemplateElement): el is TextElement => el.type === 'text';
+export const isImageElement = (el: TemplateElement): el is ImageElement => el.type === 'image';
+export const isQRElement = (el: TemplateElement): el is QRElement => el.type === 'qr';
+export const isTableElement = (el: TemplateElement): el is TableElement => el.type === 'table';
