@@ -9,15 +9,68 @@ import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElemen
 export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const addedElementIds = useRef<Set<string>>(new Set());
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
   const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
 
+  // Panning state
+  const [isPanning, setIsPanning] = useState(false);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const panStartPoint = useRef<{ x: number; y: number } | null>(null);
+  const viewportTransform = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
   const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement, exportWidth } = useTemplateStore();
   const copiedElement = useRef<TemplateElement | null>(null);
+
+  // Handle drag over and drop for vCard fields
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+
+    const vcardData = e.dataTransfer.getData('vcardField');
+    if (vcardData) {
+      try {
+        const { fieldId, placeholder } = JSON.parse(vcardData);
+
+        // Get the canvas container position
+        const canvasContainer = e.currentTarget as HTMLElement;
+        const rect = canvasContainer.getBoundingClientRect();
+
+        // Calculate drop position relative to canvas
+        const x = (e.clientX - rect.left) / zoom;
+        const y = (e.clientY - rect.top - 20) / zoom; // Apply -20px Y offset as per spec
+
+        // Create text element with vCard field
+        const textElement: TextElement = {
+          id: crypto.randomUUID(),
+          type: 'text',
+          x: Math.max(0, Math.min(x, width - 100)),
+          y: Math.max(0, Math.min(y, height - 50)),
+          text: placeholder,
+          fontSize: 16,
+          fontFamily: 'Arial',
+          color: '#000000',
+          textAlign: 'left',
+          rotation: 0,
+          opacity: 1,
+          locked: false,
+          fieldId: fieldId,
+        };
+
+        useTemplateStore.getState().addElement(textElement);
+      } catch (error) {
+        console.error('Failed to handle vCard field drop:', error);
+      }
+    }
+  };
 
   // 1) Initialize Fabric canvas - ONLY width/height in deps
   useEffect(() => {
@@ -725,6 +778,116 @@ export function DesignCanvas() {
     console.log(`[ZOOM] Applied zoom: ${zoom}`);
   }, [zoom, isReady]);
 
+  // 8.5) Spacebar panning functionality
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !isReady) return;
+
+    const handleSpaceKeyDown = (e: KeyboardEvent) => {
+      // Check if space is pressed and not in an input field
+      if (e.code === 'Space' && !isSpacePressed) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          return; // Don't activate panning when typing
+        }
+
+        e.preventDefault(); // Prevent page scroll
+        setIsSpacePressed(true);
+
+        // Disable object selection while panning
+        canvas.selection = false;
+        canvas.defaultCursor = 'grab';
+        canvas.hoverCursor = 'grab';
+
+        // Deselect any active object
+        canvas.discardActiveObject();
+        canvas.renderAll();
+      }
+    };
+
+    const handleSpaceKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsSpacePressed(false);
+        setIsPanning(false);
+        panStartPoint.current = null;
+
+        // Re-enable object selection
+        canvas.selection = true;
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+        canvas.renderAll();
+      }
+    };
+
+    const handleMouseDown = (e: fabric.IEvent) => {
+      if (isSpacePressed && e.e instanceof MouseEvent) {
+        setIsPanning(true);
+        panStartPoint.current = {
+          x: e.e.clientX,
+          y: e.e.clientY
+        };
+        canvas.defaultCursor = 'grabbing';
+        canvas.hoverCursor = 'grabbing';
+      }
+    };
+
+    const handleMouseMove = (e: fabric.IEvent) => {
+      if (isPanning && panStartPoint.current && e.e instanceof MouseEvent) {
+        const deltaX = e.e.clientX - panStartPoint.current.x;
+        const deltaY = e.e.clientY - panStartPoint.current.y;
+
+        // Update viewport transform
+        const vpt = canvas.viewportTransform;
+        if (vpt) {
+          vpt[4] = viewportTransform.current.x + deltaX;
+          vpt[5] = viewportTransform.current.y + deltaY;
+          canvas.requestRenderAll();
+        }
+      }
+    };
+
+    const handleMouseUp = (e: fabric.IEvent) => {
+      if (isPanning && panStartPoint.current) {
+        setIsPanning(false);
+
+        // Save the new viewport position
+        const vpt = canvas.viewportTransform;
+        if (vpt) {
+          viewportTransform.current = {
+            x: vpt[4],
+            y: vpt[5]
+          };
+        }
+
+        panStartPoint.current = null;
+
+        if (isSpacePressed) {
+          canvas.defaultCursor = 'grab';
+          canvas.hoverCursor = 'grab';
+        }
+      }
+    };
+
+    // Add keyboard event listeners
+    window.addEventListener('keydown', handleSpaceKeyDown);
+    window.addEventListener('keyup', handleSpaceKeyUp);
+
+    // Add Fabric.js mouse event listeners
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.on('mouse:move', handleMouseMove);
+    canvas.on('mouse:up', handleMouseUp);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('keydown', handleSpaceKeyDown);
+      window.removeEventListener('keyup', handleSpaceKeyUp);
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:up', handleMouseUp);
+    };
+  }, [isReady, isSpacePressed, isPanning]);
+
   // 9) Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1061,8 +1224,23 @@ export function DesignCanvas() {
 
   return (
     <div className="flex flex-1 items-center justify-center bg-slate-700 p-8">
-      <div className="shadow-2xl rounded-sm" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)' }}>
+      <div
+        ref={containerRef}
+        className="shadow-2xl rounded-sm relative"
+        style={{
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)',
+          cursor: isSpacePressed ? (isPanning ? 'grabbing' : 'grab') : 'default'
+        }}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
         <canvas ref={canvasRef} />
+        {/* Visual indicator when space is pressed */}
+        {isSpacePressed && (
+          <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg pointer-events-none">
+            Panning Mode (Hold Space + Drag)
+          </div>
+        )}
       </div>
     </div>
   );

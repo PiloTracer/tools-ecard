@@ -14,8 +14,31 @@ export function TextProperties({ element }: TextPropertiesProps) {
     updateElement(element.id, updates);
   };
 
+  // Validate field name format (snake_case)
+  const validateFieldName = (value: string): string => {
+    // Remove any characters that aren't lowercase letters, numbers, or underscores
+    return value.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  };
+
   return (
     <div className="space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Field Name</label>
+        <input
+          type="text"
+          value={element.fieldId || ''}
+          onChange={(e) => {
+            const validatedValue = validateFieldName(e.target.value);
+            handleChange({ fieldId: validatedValue });
+          }}
+          placeholder="e.g., full_name, business_title"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Optional field identifier for template variables (snake_case format)
+        </p>
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Text</label>
         <textarea

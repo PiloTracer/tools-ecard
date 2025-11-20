@@ -2,6 +2,7 @@
 
 import { useTemplateStore } from '../../stores/templateStore';
 import { useCanvasStore } from '../../stores/canvasStore';
+import { VCardFieldsSection } from './VCardFieldsSection';
 import type { TextElement, ImageElement, QRElement, TableElement, ShapeElement } from '../../types';
 
 export function ElementToolbox() {
@@ -197,6 +198,9 @@ export function ElementToolbox() {
             </button>
           </div>
         </div>
+
+        {/* vCard Fields Section */}
+        <VCardFieldsSection />
       </div>
     </div>
   );

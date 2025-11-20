@@ -24,6 +24,7 @@ export interface TextElement extends BaseElement {
   underline?: boolean;
   stroke?: string;
   strokeWidth?: number;
+  fieldId?: string; // vCard field identifier (e.g., 'full_name', 'business_title')
 }
 
 export interface ImageElement extends BaseElement {
