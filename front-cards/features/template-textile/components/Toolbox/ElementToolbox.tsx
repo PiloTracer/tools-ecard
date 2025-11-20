@@ -8,6 +8,7 @@ export function ElementToolbox() {
   const { addElement } = useTemplateStore();
   const { width, height } = useCanvasStore();
 
+
   const handleAddText = () => {
     const textElement: TextElement = {
       id: crypto.randomUUID(),

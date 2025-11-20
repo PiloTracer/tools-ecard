@@ -13,9 +13,10 @@ export function DesignCanvas() {
   const addedElementIds = useRef<Set<string>>(new Set());
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
+  const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
 
   const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
-  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement } = useTemplateStore();
+  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement, exportWidth } = useTemplateStore();
   const copiedElement = useRef<TemplateElement | null>(null);
 
   // 1) Initialize Fabric canvas - ONLY width/height in deps
@@ -104,6 +105,7 @@ export function DesignCanvas() {
 
       processingModification.current.add(elementId);
       console.log(`=== object:modified event for element ${elementId} ===`);
+      console.log('Current scale:', { scaleX: target.scaleX, scaleY: target.scaleY, width: target.width, height: target.height });
 
       // Clear the flag after a short delay
       setTimeout(() => {
@@ -200,11 +202,44 @@ export function DesignCanvas() {
             }
           } else {
             // Non-shape elements use width/height directly
-            updates.width = Math.round((target.width || element.width) * scaleX);
-            updates.height = Math.round((target.height || element.height) * scaleY);
+
+            // For image elements, calculate the NEW display dimensions
+            if (element.type === 'image') {
+              // Only update if scale changed (user is actively resizing)
+              if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
+                // Simple: image stored at logical size with scale=1
+                const newWidth = Math.round((target.width || element.width) * scaleX);
+                const newHeight = Math.round((target.height || element.height) * scaleY);
+
+                console.log('Image resize:', {
+                  oldWidth: element.width,
+                  oldHeight: element.height,
+                  targetWidth: target.width,
+                  targetHeight: target.height,
+                  scaleX,
+                  scaleY,
+                  newWidth,
+                  newHeight
+                });
+
+                updates.width = newWidth;
+                updates.height = newHeight;
+
+                // DON'T reset scale - it will be reset to 1 when image is recreated
+              }
+            } else {
+              // Non-image elements: apply scale to dimensions and reset scale
+              const newWidth = Math.round((target.width || element.width) * scaleX);
+              const newHeight = Math.round((target.height || element.height) * scaleY);
+
+              updates.width = newWidth;
+              updates.height = newHeight;
+              // Reset scale to 1 after applying to width/height
+              target.set({ scaleX: 1, scaleY: 1 });
+            }
           }
-          // Reset scale to 1 after applying to width/height/radius/rx/ry
-          target.set({ scaleX: 1, scaleY: 1 });
+
+          // Scale is already reset above for each element type
           target.setCoords();
           canvas.renderAll();
         }
@@ -459,6 +494,29 @@ export function DesignCanvas() {
       }
     });
 
+    // Find images that need to be recreated (imageUrl changed)
+    const imagesToRecreate: ImageElement[] = [];
+    elements.forEach(element => {
+      if (element.type === 'image' && addedElementIds.current.has(element.id)) {
+        const imgEl = element as ImageElement;
+        const existingFabricObj = fabricObjectsMap.current.get(element.id);
+
+        // Skip if already loading to prevent infinite loops
+        if (loadingImages.current.has(element.id)) {
+          console.log('Image already loading, skipping:', element.id);
+          return;
+        }
+
+        if (existingFabricObj && imgEl.imageUrl) {
+          // Check if this is a placeholder (Rect) but now has an imageUrl - recreate as actual image
+          if (existingFabricObj.type === 'Rect' || (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl) {
+            console.log('Image URL changed, need to recreate:', imgEl.id, imgEl.imageUrl.substring(0, 50));
+            imagesToRecreate.push(imgEl);
+          }
+        }
+      }
+    });
+
     // Sync properties for existing elements (text content, colors, etc.)
     elements.forEach(element => {
       if (addedElementIds.current.has(element.id) && element.type !== 'table') {
@@ -638,6 +696,105 @@ export function DesignCanvas() {
       });
     }
 
+    // Recreate images with changed imageUrl
+    if (imagesToRecreate.length > 0) {
+      imagesToRecreate.forEach(imgEl => {
+        const oldFabricObj = fabricObjectsMap.current.get(imgEl.id);
+        if (oldFabricObj) {
+          console.log('Recreating image element:', imgEl.id);
+
+          // Mark as loading to prevent infinite loops
+          loadingImages.current.add(imgEl.id);
+
+          // Preserve current position and transformations
+          const currentX = oldFabricObj.left || imgEl.x;
+          const currentY = oldFabricObj.top || imgEl.y;
+          const currentAngle = oldFabricObj.angle || imgEl.rotation || 0;
+          const currentOpacity = oldFabricObj.opacity || imgEl.opacity || 1;
+
+          // Update element position if it moved
+          if (currentX !== imgEl.x || currentY !== imgEl.y) {
+            imgEl.x = currentX;
+            imgEl.y = currentY;
+          }
+          if (currentAngle !== imgEl.rotation) {
+            imgEl.rotation = currentAngle;
+          }
+          if (currentOpacity !== imgEl.opacity) {
+            imgEl.opacity = currentOpacity;
+          }
+
+          // Load the new image first, THEN remove the old placeholder
+          console.log('Loading new image:', imgEl.imageUrl.substring(0, 100) + '...');
+
+          // Create an img element in the DOM temporarily to load the image
+          const tempImg = document.createElement('img');
+
+          tempImg.onload = () => {
+            console.log('Temp image loaded:', { naturalWidth: tempImg.naturalWidth, naturalHeight: tempImg.naturalHeight, targetWidth: imgEl.width, targetHeight: imgEl.height });
+
+            // SIMPLE: Render at LOGICAL size for editing
+            // Store original for high-res export
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = imgEl.width;
+            tempCanvas.height = imgEl.height;
+            const ctx = tempCanvas.getContext('2d');
+
+            if (ctx) {
+              // Draw at LOGICAL size
+              ctx.drawImage(tempImg, 0, 0, imgEl.width, imgEl.height);
+
+              console.log('Image drawn at logical size');
+
+              // Create fabric image with scale = 1
+              const fabricImg = new fabric.Image(tempCanvas, {
+                left: imgEl.x,
+                top: imgEl.y,
+                angle: imgEl.rotation || 0,
+                opacity: imgEl.opacity || 1,
+                selectable: true,
+                evented: true,
+                hasControls: true,
+                hasBorders: true,
+                scaleX: 1,
+                scaleY: 1,
+              });
+
+              (fabricImg as any).elementId = imgEl.id;
+              (fabricImg as any)._originalImageUrl = imgEl.imageUrl; // Keep original for high-res export
+
+              console.log('Created fabric image - fills box perfectly');
+
+              console.log('Replacing placeholder with image from canvas');
+              canvas.remove(oldFabricObj);
+              canvas.add(fabricImg);
+              fabricObjectsMap.current.set(imgEl.id, fabricImg);
+
+              // Force scale to 1
+              fabricImg.set({ scaleX: 1, scaleY: 1 });
+              fabricImg.setCoords();
+
+              canvas.setActiveObject(fabricImg);
+              canvas.renderAll();
+
+              loadingImages.current.delete(imgEl.id);
+              console.log('Image replacement complete - scale = 1');
+            } else {
+              console.error('Failed to get 2d context');
+              loadingImages.current.delete(imgEl.id);
+            }
+          };
+
+          tempImg.onerror = (error) => {
+            console.error('Failed to load temp image:', error);
+            loadingImages.current.delete(imgEl.id);
+          };
+
+          tempImg.src = imgEl.imageUrl;
+        }
+      });
+    }
+
     // Add new elements
     elementsToAdd.forEach(element => {
       addElementToCanvas(canvas, element);
@@ -683,6 +840,7 @@ export function DesignCanvas() {
           strokeWidth: 1,
           selectable: false,
           evented: false,
+          excludeFromExport: true,
         });
         (line as any).isGrid = true;
         canvas.add(line);
@@ -695,6 +853,7 @@ export function DesignCanvas() {
           strokeWidth: 1,
           selectable: false,
           evented: false,
+          excludeFromExport: true,
         });
         (line as any).isGrid = true;
         canvas.add(line);
@@ -1169,24 +1328,85 @@ export function DesignCanvas() {
 
       case 'image': {
         const imgEl = element as ImageElement;
-        fabricObject = new fabric.Rect({
-          left: imgEl.x,
-          top: imgEl.y,
-          width: imgEl.width,
-          height: imgEl.height,
-          fill: '#334155',
-          stroke: '#64748b',
-          strokeWidth: 2,
-          angle: imgEl.rotation || 0,
-          opacity: imgEl.opacity || 1,
-          selectable: true,
-          evented: true,
-          hasControls: true,
-          hasBorders: true,
-          lockScalingX: false,
-          lockScalingY: false,
-          lockRotation: false,
-        });
+
+        if (imgEl.imageUrl) {
+          // Load actual image/SVG
+          console.log('Loading image from URL:', imgEl.imageUrl.substring(0, 100) + '...');
+
+          // Mark as loading
+          loadingImages.current.add(element.id);
+
+          // Create an img element in the DOM temporarily to load the image
+          const tempImg = document.createElement('img');
+
+          tempImg.onload = () => {
+            // Create a canvas at the TARGET size to render high quality
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = imgEl.width;
+            tempCanvas.height = imgEl.height;
+            const ctx = tempCanvas.getContext('2d');
+
+            if (ctx) {
+              // Draw the image scaled to fill the entire canvas
+              ctx.drawImage(tempImg, 0, 0, imgEl.width, imgEl.height);
+
+              // Create fabric image from the canvas (already at correct size, so scale = 1)
+              const fabricImg = new fabric.Image(tempCanvas, {
+                left: imgEl.x,
+                top: imgEl.y,
+                angle: imgEl.rotation || 0,
+                opacity: imgEl.opacity || 1,
+                selectable: true,
+                evented: true,
+                hasControls: true,
+                hasBorders: true,
+                scaleX: 1,
+                scaleY: 1,
+              });
+
+              (fabricImg as any).elementId = element.id;
+              (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
+              canvas.add(fabricImg);
+              fabricObjectsMap.current.set(element.id, fabricImg);
+              canvas.renderAll();
+
+              loadingImages.current.delete(element.id);
+            } else {
+              console.error('Failed to get 2d context');
+              loadingImages.current.delete(element.id);
+            }
+          };
+
+          tempImg.onerror = (error) => {
+            console.error('Failed to load image:', error);
+            loadingImages.current.delete(element.id);
+          };
+
+          tempImg.src = imgEl.imageUrl;
+
+          // Return early - loading is async
+          return;
+        } else {
+          // Placeholder when no image URL
+          fabricObject = new fabric.Rect({
+            left: imgEl.x,
+            top: imgEl.y,
+            width: imgEl.width,
+            height: imgEl.height,
+            fill: '#334155',
+            stroke: '#64748b',
+            strokeWidth: 2,
+            angle: imgEl.rotation || 0,
+            opacity: imgEl.opacity || 1,
+            selectable: true,
+            evented: true,
+            hasControls: true,
+            hasBorders: true,
+            lockScalingX: false,
+            lockScalingY: false,
+            lockRotation: false,
+          });
+        }
         break;
       }
 

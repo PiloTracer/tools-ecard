@@ -1,5 +1,6 @@
 'use client';
 
+import * as fabric from 'fabric';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 
@@ -20,19 +21,88 @@ export function CanvasControls() {
 
   const { currentTemplate, canvasWidth, canvasHeight, exportWidth, undo, redo, canUndo, canRedo } = useTemplateStore();
 
-  const handleExportPNG = () => {
+  const handleExportPNG = async () => {
     if (!fabricCanvas) return;
 
-    // Calculate scale factor based on desired export width
     const scaleFactor = exportWidth / canvasWidth;
+    const highResScale = scaleFactor * 1.1; // Export Width + 10%
+    console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}, highResScale ${highResScale}`);
 
-    console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
+    // Temporarily remove grid lines
+    const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
+    gridObjects.forEach(obj => fabricCanvas.remove(obj));
+
+    // Replace image objects with high-res versions
+    const imageReplacements: Array<{ original: any, highRes: any, index: number }> = [];
+    const allObjects = fabricCanvas.getObjects();
+
+    for (let i = 0; i < allObjects.length; i++) {
+      const obj = allObjects[i];
+      const originalImageUrl = (obj as any)._originalImageUrl;
+
+      if (originalImageUrl) {
+        // This is an image object with original SVG/PNG/JPG
+        await new Promise<void>((resolve) => {
+          const tempImg = document.createElement('img');
+
+          tempImg.onload = () => {
+            // Calculate high-res dimensions
+            const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
+            const currentHeight = (obj.height || 100) * (obj.scaleY || 1);
+            const renderWidth = Math.round(currentWidth * highResScale);
+            const renderHeight = Math.round(currentHeight * highResScale);
+
+            // Create high-res canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = renderWidth;
+            tempCanvas.height = renderHeight;
+            const ctx = tempCanvas.getContext('2d');
+
+            if (ctx) {
+              ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
+
+              // Create high-res fabric image
+              const highResImg = new (fabric as any).Image(tempCanvas, {
+                left: obj.left,
+                top: obj.top,
+                angle: obj.angle,
+                opacity: obj.opacity,
+                scaleX: 1 / highResScale,
+                scaleY: 1 / highResScale,
+              });
+
+              imageReplacements.push({ original: obj, highRes: highResImg, index: i });
+              fabricCanvas.remove(obj);
+              fabricCanvas.add(highResImg);
+            }
+            resolve();
+          };
+
+          tempImg.onerror = () => resolve();
+          tempImg.src = originalImageUrl;
+        });
+      }
+    }
+
+    fabricCanvas.renderAll();
 
     const dataURL = fabricCanvas.toDataURL({
       format: 'png',
       quality: 1,
-      multiplier: scaleFactor
+      multiplier: scaleFactor,
+      enableRetinaScaling: false,
     });
+
+    // Restore original images
+    imageReplacements.forEach(({ original, highRes }) => {
+      fabricCanvas.remove(highRes);
+      fabricCanvas.add(original);
+    });
+
+    // Add grid lines back
+    gridObjects.forEach(obj => fabricCanvas.add(obj));
+    gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+    fabricCanvas.renderAll();
 
     const link = document.createElement('a');
     link.download = `${currentTemplate?.name || 'template'}.png`;
@@ -40,17 +110,110 @@ export function CanvasControls() {
     link.click();
   };
 
+  const handleExportJPG = async () => {
+    if (!fabricCanvas) return;
+
+    const scaleFactor = exportWidth / canvasWidth;
+    const highResScale = scaleFactor * 1.1; // Export Width + 10%
+    console.log(`Exporting JPG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}, highResScale ${highResScale}`);
+
+    // Temporarily remove grid lines
+    const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
+    gridObjects.forEach(obj => fabricCanvas.remove(obj));
+
+    // Replace image objects with high-res versions
+    const imageReplacements: Array<{ original: any, highRes: any, index: number }> = [];
+    const allObjects = fabricCanvas.getObjects();
+
+    for (let i = 0; i < allObjects.length; i++) {
+      const obj = allObjects[i];
+      const originalImageUrl = (obj as any)._originalImageUrl;
+
+      if (originalImageUrl) {
+        await new Promise<void>((resolve) => {
+          const tempImg = document.createElement('img');
+
+          tempImg.onload = () => {
+            const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
+            const currentHeight = (obj.height || 100) * (obj.scaleY || 1);
+            const renderWidth = Math.round(currentWidth * highResScale);
+            const renderHeight = Math.round(currentHeight * highResScale);
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = renderWidth;
+            tempCanvas.height = renderHeight;
+            const ctx = tempCanvas.getContext('2d');
+
+            if (ctx) {
+              ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
+
+              const highResImg = new (fabric as any).Image(tempCanvas, {
+                left: obj.left,
+                top: obj.top,
+                angle: obj.angle,
+                opacity: obj.opacity,
+                scaleX: 1 / highResScale,
+                scaleY: 1 / highResScale,
+              });
+
+              imageReplacements.push({ original: obj, highRes: highResImg, index: i });
+              fabricCanvas.remove(obj);
+              fabricCanvas.add(highResImg);
+            }
+            resolve();
+          };
+
+          tempImg.onerror = () => resolve();
+          tempImg.src = originalImageUrl;
+        });
+      }
+    }
+
+    fabricCanvas.renderAll();
+
+    const dataURL = fabricCanvas.toDataURL({
+      format: 'jpeg',
+      quality: 0.95,
+      multiplier: scaleFactor,
+      enableRetinaScaling: false,
+    });
+
+    // Restore original images
+    imageReplacements.forEach(({ original, highRes }) => {
+      fabricCanvas.remove(highRes);
+      fabricCanvas.add(original);
+    });
+
+    // Add grid lines back
+    gridObjects.forEach(obj => fabricCanvas.add(obj));
+    gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+    fabricCanvas.renderAll();
+
+    const link = document.createElement('a');
+    link.download = `${currentTemplate?.name || 'template'}.jpg`;
+    link.href = dataURL;
+    link.click();
+  };
+
   const handleExportSVG = () => {
     if (!fabricCanvas) return;
 
-    // Calculate scale factor based on desired export width
     const scaleFactor = exportWidth / canvasWidth;
     const exportHeight = Math.round(canvasHeight * scaleFactor);
 
     console.log(`Exporting SVG: canvas ${canvasWidth}x${canvasHeight}, export ${exportWidth}x${exportHeight}, multiplier ${scaleFactor}`);
 
-    // Get SVG and manually apply scaling via viewBox and width/height attributes
+    // Temporarily remove grid lines
+    const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
+    gridObjects.forEach(obj => fabricCanvas.remove(obj));
+
+    // Get SVG with proper dimensions and viewBox
     let svg = fabricCanvas.toSVG();
+
+    // Add grid lines back
+    gridObjects.forEach(obj => fabricCanvas.add(obj));
+    gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+    fabricCanvas.renderAll();
 
     // Replace the svg tag to add proper dimensions and viewBox
     svg = svg.replace(
@@ -183,6 +346,13 @@ export function CanvasControls() {
           title="Export as PNG"
         >
           PNG
+        </button>
+        <button
+          onClick={handleExportJPG}
+          className="rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+          title="Export as JPG"
+        >
+          JPG
         </button>
         <button
           onClick={handleExportSVG}
