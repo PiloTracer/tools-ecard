@@ -21,20 +21,20 @@ export function TemplateDesigner() {
   }, [currentTemplate, createTemplate, setDimensions]);
 
   return (
-    <div className="flex h-screen w-full bg-gray-50">
+    <div className="flex h-screen w-full bg-slate-600">
       {/* Left Toolbox */}
-      <div className="w-64 border-r border-gray-200 shadow-sm">
+      <div className="w-64 border-r border-slate-700 shadow-lg bg-white">
         <ElementToolbox />
       </div>
 
       {/* Center Canvas Area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col bg-slate-700">
         <CanvasControls />
         <DesignCanvas />
       </div>
 
       {/* Right Property Panel */}
-      <div className="w-80 border-l border-gray-200 shadow-sm">
+      <div className="w-80 border-l border-slate-700 shadow-lg bg-white">
         <PropertyPanel />
       </div>
     </div>

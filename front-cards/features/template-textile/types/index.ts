@@ -42,8 +42,10 @@ export interface TableElement extends BaseElement {
   type: 'table';
   rows: number;
   columns: number;
-  cellWidth: number;
-  cellHeight: number;
+  columnWidths: number[];  // Array of widths, one per column
+  rowHeights: number[];     // Array of heights, one per row
+  minCellWidth?: number;    // Minimum width for cells (default: 60)
+  minCellHeight?: number;   // Minimum height for cells (default: 50)
   borderColor?: string;
   borderWidth?: number;
   cells: TableCell[];
@@ -53,6 +55,8 @@ export interface TableCell {
   row: number;
   column: number;
   elementId?: string; // Reference to element in this cell
+  offsetX?: number;   // Element X position relative to cell's top-left (default: 5px padding)
+  offsetY?: number;   // Element Y position relative to cell's top-left (default: 5px padding)
 }
 
 export type TemplateElement = TextElement | ImageElement | QRElement | TableElement;

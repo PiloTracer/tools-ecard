@@ -7,23 +7,35 @@ import { ImageProperties } from './ImageProperties';
 import { QRProperties } from './QRProperties';
 import { TableProperties } from './TableProperties';
 import { isTextElement, isImageElement, isQRElement, isTableElement } from '../../types';
+import type { TableElement } from '../../types';
 
 export function PropertyPanel() {
   const { selectedElementId } = useCanvasStore();
-  const { elements, removeElement } = useTemplateStore();
+  const { elements, removeElement, updateElement } = useTemplateStore();
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
 
   const handleDelete = () => {
     if (selectedElementId) {
+      // Remove element from any table cells
+      const tables = elements.filter(el => el.type === 'table') as TableElement[];
+      tables.forEach(table => {
+        const wasInCell = table.cells.some(c => c.elementId === selectedElementId);
+        if (wasInCell) {
+          const newCells = table.cells.filter(c => c.elementId !== selectedElementId);
+          updateElement(table.id, { cells: newCells });
+        }
+      });
+
       removeElement(selectedElementId);
     }
   };
 
   return (
     <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-gray-200 p-4">
-        <h2 className="text-lg font-semibold text-gray-800">Properties</h2>
+      <div className="border-b border-gray-200 bg-gradient-to-r from-white to-slate-50 p-4">
+        <h2 className="text-lg font-bold text-slate-800">Properties</h2>
+        <p className="text-xs text-slate-500 mt-0.5">Element settings</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

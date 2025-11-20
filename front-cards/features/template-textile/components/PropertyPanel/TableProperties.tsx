@@ -23,7 +23,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
             type="number"
             value={element.rows}
             onChange={(e) => handleChange({ rows: parseInt(e.target.value) || 1 })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={1}
             max={20}
           />
@@ -34,7 +34,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
             type="number"
             value={element.columns}
             onChange={(e) => handleChange({ columns: parseInt(e.target.value) || 1 })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={1}
             max={20}
           />
@@ -48,7 +48,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
             type="number"
             value={element.cellWidth}
             onChange={(e) => handleChange({ cellWidth: parseInt(e.target.value) || 50 })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={20}
           />
         </div>
@@ -58,7 +58,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
             type="number"
             value={element.cellHeight}
             onChange={(e) => handleChange({ cellHeight: parseInt(e.target.value) || 50 })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={20}
           />
         </div>
@@ -80,7 +80,7 @@ export function TableProperties({ element }: TablePropertiesProps) {
           type="number"
           value={element.borderWidth || 1}
           onChange={(e) => handleChange({ borderWidth: parseInt(e.target.value) || 1 })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={0}
           max={10}
         />
