@@ -10,6 +10,10 @@ export interface BaseElement {
   rotation?: number;
   opacity?: number;
   locked?: boolean;
+  // Line metadata for visibility and reordering logic
+  lineGroup?: string; // e.g., 'contact-line-1', 'contact-line-2'
+  requiredFields?: string[]; // vCard fields required for this line to be visible
+  linePriority?: number; // Priority for reordering (1, 2, 3...)
 }
 
 export interface TextElement extends BaseElement {

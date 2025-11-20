@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { ImageElement } from '../../types';
+import { LineMetadataProperties } from './LineMetadataProperties';
 
 interface ImagePropertiesProps {
   element: ImageElement;
@@ -201,6 +202,9 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
         />
         <div className="text-xs text-gray-500 text-right">{Math.round((element.opacity || 1) * 100)}%</div>
       </div>
+
+      {/* Line Metadata Section */}
+      <LineMetadataProperties element={element} />
     </div>
   );
 }

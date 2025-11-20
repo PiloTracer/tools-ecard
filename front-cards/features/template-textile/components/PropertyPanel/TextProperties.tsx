@@ -2,6 +2,7 @@
 
 import { useTemplateStore } from '../../stores/templateStore';
 import type { TextElement } from '../../types';
+import { LineMetadataProperties } from './LineMetadataProperties';
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -166,6 +167,9 @@ export function TextProperties({ element }: TextPropertiesProps) {
         />
         <div className="text-xs text-gray-500 text-right">{Math.round((element.opacity || 1) * 100)}%</div>
       </div>
+
+      {/* Line Metadata Section */}
+      <LineMetadataProperties element={element} />
     </div>
   );
 }
