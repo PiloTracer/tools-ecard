@@ -11,6 +11,7 @@ export interface BaseElement {
   opacity?: number;
   locked?: boolean;
   // Line metadata for visibility and reordering logic
+  sectionGroup?: string; // Groups multiple lines together into a logical section (e.g., 'contact-info', 'business-details')
   lineGroup?: string; // e.g., 'contact-line-1', 'contact-line-2'
   requiredFields?: string[]; // vCard fields required for this line to be visible
   linePriority?: number; // Priority for reordering (1, 2, 3...)

@@ -17,6 +17,17 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
     updateElement(element.id, updates);
   };
 
+  // Get existing section groups from other elements for suggestions
+  const existingSectionGroups = useMemo(() => {
+    const groups = new Set<string>();
+    elements.forEach(el => {
+      if (el.sectionGroup && el.id !== element.id) {
+        groups.add(el.sectionGroup);
+      }
+    });
+    return Array.from(groups).sort();
+  }, [elements, element.id]);
+
   // Get existing line groups from other elements for suggestions
   const existingLineGroups = useMemo(() => {
     const groups = new Set<string>();
@@ -27,6 +38,19 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
     });
     return Array.from(groups).sort();
   }, [elements, element.id]);
+
+  // Generate section group suggestions
+  const sectionGroupSuggestions = [
+    'contact-info',
+    'business-details',
+    'social-media',
+    'address-section',
+    'phone-section',
+    'email-section',
+    'company-info',
+    'personal-info',
+    ...existingSectionGroups
+  ].filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
 
   // Generate line group suggestions
   const lineGroupSuggestions = [
@@ -57,6 +81,27 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
   return (
     <div className="space-y-4 border-t border-gray-200 pt-4">
       <h3 className="text-sm font-semibold text-gray-700">Line Metadata</h3>
+
+      {/* Section Group */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Section Group</label>
+        <input
+          type="text"
+          value={element.sectionGroup || ''}
+          onChange={(e) => handleChange({ sectionGroup: e.target.value })}
+          placeholder="e.g., contact-info, business-details"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          list="sectionGroupSuggestions"
+        />
+        <datalist id="sectionGroupSuggestions">
+          {sectionGroupSuggestions.map(suggestion => (
+            <option key={suggestion} value={suggestion} />
+          ))}
+        </datalist>
+        <p className="mt-1 text-xs text-gray-500">
+          Groups multiple lines together into a logical section
+        </p>
+      </div>
 
       {/* Line Group */}
       <div>
@@ -163,11 +208,16 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
       </div>
 
       {/* Summary */}
-      {element.lineGroup && (
+      {(element.sectionGroup || element.lineGroup) && (
         <div className="rounded bg-gray-50 p-3 text-xs">
           <p className="font-semibold text-gray-700 mb-1">Metadata Summary:</p>
           <ul className="space-y-1 text-gray-600">
-            <li>• Group: <span className="font-medium">{element.lineGroup}</span></li>
+            {element.sectionGroup && (
+              <li>• Section: <span className="font-medium">{element.sectionGroup}</span></li>
+            )}
+            {element.lineGroup && (
+              <li>• Line Group: <span className="font-medium">{element.lineGroup}</span></li>
+            )}
             {element.linePriority && (
               <li>• Priority: <span className="font-medium">{element.linePriority}</span></li>
             )}
