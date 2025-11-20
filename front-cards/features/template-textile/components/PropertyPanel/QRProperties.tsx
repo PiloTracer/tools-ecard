@@ -21,7 +21,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
         <select
           value={element.qrType}
           onChange={(e) => handleChange({ qrType: e.target.value as 'url' | 'text' | 'vcard' })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         >
           <option value="url">URL</option>
           <option value="text">Text</option>
@@ -34,7 +34,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
         <textarea
           value={element.data}
           onChange={(e) => handleChange({ data: e.target.value })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           rows={3}
           placeholder={element.qrType === 'url' ? 'https://example.com' : 'Enter data'}
         />
@@ -46,7 +46,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
           type="number"
           value={element.size}
           onChange={(e) => handleChange({ size: parseInt(e.target.value) || 100 })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={50}
           max={500}
         />

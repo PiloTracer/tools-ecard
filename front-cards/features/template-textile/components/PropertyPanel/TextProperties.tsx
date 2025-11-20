@@ -21,7 +21,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <textarea
           value={element.text}
           onChange={(e) => handleChange({ text: e.target.value })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           rows={3}
         />
       </div>
@@ -32,7 +32,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
           type="number"
           value={element.fontSize}
           onChange={(e) => handleChange({ fontSize: parseInt(e.target.value) || 12 })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={8}
           max={200}
         />
@@ -43,7 +43,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <select
           value={element.fontFamily}
           onChange={(e) => handleChange({ fontFamily: e.target.value })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         >
           <option value="Arial">Arial</option>
           <option value="Times New Roman">Times New Roman</option>
@@ -68,7 +68,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <select
           value={element.textAlign || 'left'}
           onChange={(e) => handleChange({ textAlign: e.target.value as 'left' | 'center' | 'right' })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         >
           <option value="left">Left</option>
           <option value="center">Center</option>

@@ -22,7 +22,7 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
           type="text"
           value={element.imageUrl}
           onChange={(e) => handleChange({ imageUrl: e.target.value })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           placeholder="Enter image URL"
         />
       </div>
@@ -34,7 +34,7 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
             type="number"
             value={element.width}
             onChange={(e) => handleChange({ width: parseInt(e.target.value) || 100 })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={10}
           />
         </div>
@@ -44,7 +44,7 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
             type="number"
             value={element.height}
             onChange={(e) => handleChange({ height: parseInt(e.target.value) || 100 })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={10}
           />
         </div>
@@ -55,7 +55,7 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
         <select
           value={element.scaleMode || 'fit'}
           onChange={(e) => handleChange({ scaleMode: e.target.value as 'fill' | 'fit' | 'stretch' })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         >
           <option value="fit">Fit</option>
           <option value="fill">Fill</option>

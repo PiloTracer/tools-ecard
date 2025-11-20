@@ -15,6 +15,18 @@ export function PropertyPanel() {
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
 
+  // Check if selected element is in a table cell
+  const cellInfo = selectedElement && selectedElement.type !== 'table' ? (() => {
+    const tables = elements.filter(el => el.type === 'table') as TableElement[];
+    for (const table of tables) {
+      const cellData = table.cells.find(c => c.elementId === selectedElement.id);
+      if (cellData) {
+        return { table, cellData };
+      }
+    }
+    return null;
+  })() : null;
+
   const handleDelete = () => {
     if (selectedElementId) {
       // Remove element from any table cells
@@ -60,27 +72,34 @@ export function PropertyPanel() {
 
             {/* Position */}
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Position</h3>
+              <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                Position {cellInfo && <span className="text-xs font-normal text-gray-500">(relative to cell)</span>}
+              </h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">X</label>
-                  <div className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                    {Math.round(selectedElement.x)}
+                  <div className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium">
+                    {cellInfo ? Math.round(cellInfo.cellData.offsetX ?? 5) : Math.round(selectedElement.x)}
                   </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">Y</label>
-                  <div className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                    {Math.round(selectedElement.y)}
+                  <div className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium">
+                    {cellInfo ? Math.round(cellInfo.cellData.offsetY ?? 5) : Math.round(selectedElement.y)}
                   </div>
                 </div>
               </div>
+              {cellInfo && (
+                <div className="mt-2 text-xs text-gray-500">
+                  In table cell [{cellInfo.cellData.row}, {cellInfo.cellData.column}]
+                </div>
+              )}
             </div>
 
             {/* Rotation */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Rotation</h3>
-              <div className="rounded border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              <div className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium">
                 {Math.round(selectedElement.rotation || 0)}°
               </div>
             </div>
