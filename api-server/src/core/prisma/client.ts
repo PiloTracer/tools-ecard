@@ -406,6 +406,7 @@ export const projectOperations = {
     if (!project) {
       project = await prisma.project.create({
         data: {
+          id: 'default', // Explicitly use 'default' as ID to match hardcoded value in template service
           userId,
           name: 'Default Project',
           isDefault: true
