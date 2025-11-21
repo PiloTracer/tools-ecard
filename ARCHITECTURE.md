@@ -207,7 +207,7 @@ Build an **E-Cards/QR-Code Designer** application supporting:
 │   ├── init-postgres/            # PostgreSQL init scripts
 │   └── init-cassandra/           # Cassandra init scripts
 ├── docker-compose.dev.yml
-├── CONTEXT.md                    # Project documentation
+├── CLAUDE_CONTEXT.md                    # Project documentation
 ├── ARCHITECTURE.md               # This file
 ├── README.md
 └── package.json                  # Root workspace config

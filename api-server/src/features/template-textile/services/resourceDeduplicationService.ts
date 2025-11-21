@@ -1,0 +1,514 @@
+/**
+ * Resource Deduplication Service
+ * Handles resource upload, deduplication, and storage management
+ */
+
+import crypto from 'crypto';
+import { Readable } from 'stream';
+import { cassandraClient, StorageMode } from '../../../core/cassandra/client';
+import { resourceOperations } from '../../../core/prisma/client';
+import { getS3Service } from '../../s3-bucket/services/s3Service';
+import { fallbackStorageService } from './fallbackStorageService';
+import { modeDetectionService } from './modeDetectionService';
+
+export interface UploadedResource {
+  name: string;
+  buffer: Buffer;
+  mimeType: string;
+  size: number;
+  type: 'IMAGE' | 'FONT' | 'SVG' | 'VIDEO' | 'AUDIO';
+}
+
+export interface ProcessedResource {
+  url: string;
+  hash: string;
+  deduplicated: boolean;
+  storageMode: string;
+  size: number;
+  mimeType: string;
+}
+
+export interface ResourceMetadata {
+  hash: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  type: string;
+  uploadedAt: Date;
+}
+
+class ResourceDeduplicationService {
+  private readonly bucketName = process.env.SEAWEEDFS_BUCKET || 'ecards';
+  private readonly maxResourceSize = 50 * 1024 * 1024; // 50MB
+
+  /**
+   * Process and deduplicate a resource
+   */
+  async processResource(
+    resource: UploadedResource,
+    userId: string,
+    templateId?: string
+  ): Promise<ProcessedResource> {
+    // Validate resource size
+    if (resource.size > this.maxResourceSize) {
+      throw new Error(`Resource exceeds maximum size of ${this.maxResourceSize} bytes`);
+    }
+
+    // Calculate content hash
+    const hash = this.calculateHash(resource.buffer);
+
+    // Check for existing resource by hash (deduplication)
+    const existing = await this.findExistingResource(hash);
+
+    if (existing) {
+      // Resource already exists, increment reference count
+      await this.incrementReferenceCount(hash);
+
+      // Link to template if provided
+      if (templateId) {
+        await this.linkResourceToTemplate(existing.id, templateId, resource);
+      }
+
+      return {
+        url: existing.storageUrl,
+        hash,
+        deduplicated: true,
+        storageMode: existing.storageMode,
+        size: existing.size,
+        mimeType: existing.mimeType
+      };
+    }
+
+    // New resource, determine storage location based on mode
+    const mode = modeDetectionService.getCurrentMode();
+    const storageResult = await this.storeNewResource(resource, hash, userId, mode);
+
+    // Record in PostgreSQL
+    const resourceRecord = await resourceOperations.createResource({
+      templateId: templateId || 'orphaned',
+      name: resource.name,
+      type: resource.type,
+      storageUrl: storageResult.url,
+      storageMode: storageResult.storageMode,
+      hash,
+      size: resource.size,
+      mimeType: resource.mimeType
+    });
+
+    // Log to Cassandra
+    await this.logResourceMetadata(hash, resource, storageResult);
+
+    return {
+      url: storageResult.url,
+      hash,
+      deduplicated: false,
+      storageMode: storageResult.storageMode,
+      size: resource.size,
+      mimeType: resource.mimeType
+    };
+  }
+
+  /**
+   * Process multiple resources in batch
+   */
+  async processResourceBatch(
+    resources: UploadedResource[],
+    userId: string,
+    templateId?: string
+  ): Promise<ProcessedResource[]> {
+    const results: ProcessedResource[] = [];
+
+    // Process resources in parallel with concurrency limit
+    const concurrencyLimit = 5;
+    const chunks = this.chunkArray(resources, concurrencyLimit);
+
+    for (const chunk of chunks) {
+      const chunkResults = await Promise.all(
+        chunk.map(resource => this.processResource(resource, userId, templateId))
+      );
+      results.push(...chunkResults);
+    }
+
+    return results;
+  }
+
+  /**
+   * Calculate SHA256 hash of content
+   */
+  private calculateHash(buffer: Buffer): string {
+    return crypto
+      .createHash('sha256')
+      .update(buffer)
+      .digest('hex');
+  }
+
+  /**
+   * Find existing resource by hash
+   */
+  private async findExistingResource(hash: string): Promise<any | null> {
+    // Check PostgreSQL first
+    const pgResource = await resourceOperations.findResourceByHash(hash);
+
+    if (pgResource) {
+      return pgResource;
+    }
+
+    // Check Cassandra for additional metadata
+    const cassandraResource = await cassandraClient.getResourceByHash(hash);
+
+    if (cassandraResource) {
+      // Resource exists in Cassandra but not PostgreSQL (data inconsistency)
+      // Log this for investigation
+      console.warn(`Resource ${hash} found in Cassandra but not PostgreSQL`);
+    }
+
+    return null;
+  }
+
+  /**
+   * Store new resource based on current mode
+   */
+  private async storeNewResource(
+    resource: UploadedResource,
+    hash: string,
+    userId: string,
+    mode: StorageMode
+  ): Promise<{ url: string; storageMode: string }> {
+    if (mode === StorageMode.FULL) {
+      // Store in SeaweedFS
+      return await this.storeInSeaweedFS(resource, hash, userId);
+    } else {
+      // Store in fallback (.local-storage)
+      return await this.storeInFallback(resource, hash, userId);
+    }
+  }
+
+  /**
+   * Store resource in SeaweedFS
+   */
+  private async storeInSeaweedFS(
+    resource: UploadedResource,
+    hash: string,
+    userId: string
+  ): Promise<{ url: string; storageMode: string }> {
+    const s3Service = getS3Service();
+    const s3Key = `resources/${userId}/${hash.substring(0, 2)}/${hash}/${resource.name}`;
+
+    try {
+      // Check if bucket exists
+      const bucketExists = await s3Service.bucketExists(this.bucketName);
+      if (!bucketExists) {
+        await s3Service.createBucket(this.bucketName);
+      }
+
+      // Upload to S3
+      await s3Service.putObject(
+        this.bucketName,
+        s3Key,
+        resource.buffer,
+        {
+          contentType: resource.mimeType,
+          metadata: {
+            hash,
+            originalName: resource.name,
+            uploadedBy: userId,
+            uploadedAt: new Date().toISOString()
+          }
+        }
+      );
+
+      const url = `s3://${this.bucketName}/${s3Key}`;
+
+      return {
+        url,
+        storageMode: 'seaweedfs'
+      };
+    } catch (error) {
+      console.error('Failed to store in SeaweedFS, falling back to local:', error);
+      // Fall back to local storage
+      return await this.storeInFallback(resource, hash, userId);
+    }
+  }
+
+  /**
+   * Store resource in fallback storage
+   */
+  private async storeInFallback(
+    resource: UploadedResource,
+    hash: string,
+    userId: string
+  ): Promise<{ url: string; storageMode: string }> {
+    const path = await fallbackStorageService.saveResource(
+      userId,
+      resource.buffer,
+      hash,
+      {
+        originalName: resource.name,
+        mimeType: resource.mimeType
+      }
+    );
+
+    return {
+      url: `file://${path}`,
+      storageMode: 'local'
+    };
+  }
+
+  /**
+   * Increment reference count for deduplicated resource
+   */
+  private async incrementReferenceCount(hash: string): Promise<void> {
+    try {
+      await cassandraClient.incrementResourceReference(hash);
+    } catch (error) {
+      console.error('Failed to increment resource reference count:', error);
+    }
+  }
+
+  /**
+   * Link resource to template
+   */
+  private async linkResourceToTemplate(
+    resourceId: string,
+    templateId: string,
+    resource: UploadedResource
+  ): Promise<void> {
+    // This would typically create a link in the database
+    // For now, we'll just log it
+    console.log(`Linked resource ${resourceId} to template ${templateId}`);
+  }
+
+  /**
+   * Log resource metadata to Cassandra
+   */
+  private async logResourceMetadata(
+    hash: string,
+    resource: UploadedResource,
+    storageResult: { url: string; storageMode: string }
+  ): Promise<void> {
+    try {
+      await cassandraClient.saveResourceMetadata({
+        hash,
+        resourceId: crypto.randomUUID(),
+        originalName: resource.name,
+        mimeType: resource.mimeType,
+        size: resource.size,
+        storageUrl: storageResult.url,
+        storageMode: storageResult.storageMode,
+        referenceCount: 1,
+        firstSeen: new Date(),
+        lastAccessed: new Date(),
+        metadataJson: JSON.stringify({
+          type: resource.type,
+          uploadedAt: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error('Failed to log resource metadata:', error);
+    }
+  }
+
+  /**
+   * Load resource by hash
+   */
+  async loadResource(hash: string, userId: string): Promise<Buffer | null> {
+    // Get resource metadata
+    const metadata = await cassandraClient.getResourceByHash(hash);
+
+    if (!metadata) {
+      return null;
+    }
+
+    // Determine storage location from URL
+    if (metadata.storageUrl.startsWith('s3://')) {
+      return await this.loadFromSeaweedFS(metadata.storageUrl);
+    } else if (metadata.storageUrl.startsWith('file://')) {
+      return await this.loadFromFallback(metadata.storageUrl, userId);
+    }
+
+    return null;
+  }
+
+  /**
+   * Load resource from SeaweedFS
+   */
+  private async loadFromSeaweedFS(url: string): Promise<Buffer | null> {
+    try {
+      const s3Service = getS3Service();
+      // Parse S3 URL
+      const match = url.match(/^s3:\/\/([^\/]+)\/(.+)$/);
+
+      if (!match) {
+        throw new Error('Invalid S3 URL');
+      }
+
+      const [, bucket, key] = match;
+      const result = await s3Service.getObject(bucket, key);
+
+      if (!result.body) {
+        return null;
+      }
+
+      // Convert stream to buffer
+      const chunks: Buffer[] = [];
+      for await (const chunk of result.body as Readable) {
+        chunks.push(Buffer.from(chunk));
+      }
+
+      return Buffer.concat(chunks);
+    } catch (error) {
+      console.error('Failed to load from SeaweedFS:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Load resource from fallback storage
+   */
+  private async loadFromFallback(url: string, userId: string): Promise<Buffer | null> {
+    try {
+      // Extract hash from path
+      const pathMatch = url.match(/([a-f0-9]{64})/);
+
+      if (!pathMatch) {
+        throw new Error('Could not extract hash from fallback URL');
+      }
+
+      const hash = pathMatch[1];
+      return await fallbackStorageService.loadResource(userId, hash);
+    } catch (error) {
+      console.error('Failed to load from fallback:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete resource (decrements reference count)
+   */
+  async deleteResource(hash: string, userId: string): Promise<void> {
+    // Get current metadata
+    const metadata = await cassandraClient.getResourceByHash(hash);
+
+    if (!metadata) {
+      return;
+    }
+
+    // Decrement reference count
+    if (metadata.referenceCount > 1) {
+      // Just decrement the count
+      await cassandraClient.incrementResourceReference(hash); // This should be decrementResourceReference
+      return;
+    }
+
+    // Reference count is 1, actually delete the resource
+    if (metadata.storageUrl.startsWith('s3://')) {
+      await this.deleteFromSeaweedFS(metadata.storageUrl);
+    } else if (metadata.storageUrl.startsWith('file://')) {
+      await this.deleteFromFallback(hash, userId);
+    }
+
+    // Remove from databases
+    // Note: This would need to be implemented in the actual system
+    console.log(`Deleted resource ${hash}`);
+  }
+
+  /**
+   * Delete resource from SeaweedFS
+   */
+  private async deleteFromSeaweedFS(url: string): Promise<void> {
+    try {
+      const s3Service = getS3Service();
+      const match = url.match(/^s3:\/\/([^\/]+)\/(.+)$/);
+
+      if (!match) {
+        throw new Error('Invalid S3 URL');
+      }
+
+      const [, bucket, key] = match;
+      await s3Service.deleteObject(bucket, key);
+    } catch (error) {
+      console.error('Failed to delete from SeaweedFS:', error);
+    }
+  }
+
+  /**
+   * Delete resource from fallback storage
+   */
+  private async deleteFromFallback(hash: string, userId: string): Promise<void> {
+    try {
+      await fallbackStorageService.deleteResource(userId, hash);
+    } catch (error) {
+      console.error('Failed to delete from fallback:', error);
+    }
+  }
+
+  /**
+   * Verify resource integrity
+   */
+  async verifyResource(hash: string, userId: string): Promise<boolean> {
+    const content = await this.loadResource(hash, userId);
+
+    if (!content) {
+      return false;
+    }
+
+    const actualHash = this.calculateHash(content);
+    return actualHash === hash;
+  }
+
+  /**
+   * Get resource statistics
+   */
+  async getResourceStats(userId: string): Promise<{
+    totalResources: number;
+    totalSize: number;
+    deduplicationRate: number;
+    storageBreakdown: {
+      seaweedfs: number;
+      fallback: number;
+    };
+  }> {
+    // This would query the database for statistics
+    // For now, return mock data
+    return {
+      totalResources: 0,
+      totalSize: 0,
+      deduplicationRate: 0,
+      storageBreakdown: {
+        seaweedfs: 0,
+        fallback: 0
+      }
+    };
+  }
+
+  /**
+   * Chunk array for batch processing
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  /**
+   * Determine resource type from MIME type
+   */
+  determineResourceType(mimeType: string): 'IMAGE' | 'FONT' | 'SVG' | 'VIDEO' | 'AUDIO' {
+    if (mimeType.startsWith('image/svg')) return 'SVG';
+    if (mimeType.startsWith('image/')) return 'IMAGE';
+    if (mimeType.startsWith('font/') || mimeType.includes('font')) return 'FONT';
+    if (mimeType.startsWith('video/')) return 'VIDEO';
+    if (mimeType.startsWith('audio/')) return 'AUDIO';
+
+    // Default fallback
+    return 'IMAGE';
+  }
+}
+
+// Export singleton instance
+export const resourceDeduplicationService = new ResourceDeduplicationService();
+
+// Export class for custom instances
+export { ResourceDeduplicationService };

@@ -1,4 +1,4 @@
-Based on /pre-context.md
+Based on /pre-CLAUDE_CONTEXT.md
   1. Analyze and acquire understanding of the general project to   
   be initiated.
   2. Adjust the following: the name can be received in separate    
@@ -25,7 +25,7 @@ Based on /pre-context.md
   the user's information and status.
   9. The application will have to use external applications for    
   bucket functionality (seaweedfs)
-  10. Generate /CONTEXT.md for the whole project with all the      
+  10. Generate /CLAUDE_CONTEXT.md for the whole project with all the      
   necessary knowledge, and including (properly stated and
   formatted) these requirements, but not limited to these ones,    
   you can define this more professionally and with more

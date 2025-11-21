@@ -14,6 +14,9 @@ cat db/init-cassandra/02-template-configs.cql | docker exec -i ecards-cassandra 
 echo "3. Creating textile templates..."
 cat db/init-cassandra/03-template-textile-tables.cql | docker exec -i ecards-cassandra cqlsh 2>&1 | grep -v "Materialized views are disabled"
 
+echo "4. Creating multimode templates..."
+cat db/init-cassandra/04-template-multimode-tables.cql | docker exec -i ecards-cassandra cqlsh 2>&1 | grep -v "Materialized views are disabled" || echo "Note: Some schema updates may have warnings"
+
 echo ""
 echo "✅ Cassandra initialization complete!"
 echo ""

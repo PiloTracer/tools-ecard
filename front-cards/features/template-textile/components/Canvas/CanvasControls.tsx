@@ -73,15 +73,10 @@ export function CanvasControls() {
     setIsSaving(true);
 
     try {
-      // Extract resources from elements
-      const resources = templateService.extractResources(currentTemplate.elements);
-
-      // Save the template
+      // Save the template (resource extraction happens inside saveTemplate)
       const metadata = await templateService.saveTemplate({
-        templateName,
-        projectName,
-        template: currentTemplate,
-        resources,
+        name: templateName,
+        templateData: currentTemplate,
       });
 
       // Update store with saved metadata

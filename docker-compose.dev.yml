@@ -174,11 +174,12 @@ services:
       # External LLM (Backward Compatibility)
       EXTERNAL_LLM_API: ${EXTERNAL_LLM_API:-http://remote-llm-server:5000/api/llm}
       # SeaweedFS (Remote - Client Configuration)
-      USE_LOCAL_STORAGE: ${USE_LOCAL_STORAGE:-true}
-      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://localhost:8333}
-      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-your_seaweedfs_access_key}
-      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-your_seaweedfs_secret_key}
+      USE_LOCAL_STORAGE: ${USE_LOCAL_STORAGE:-false}
+      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://192.168.65.254:8333}
+      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-any}
+      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-any}
       SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-ecards}
+      SEAWEEDFS_REGION: ${SEAWEEDFS_REGION:-us-east-1}
       # External services (Remote Auth & User Management API)
       EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://epicdev.com/app}
       EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://epicdev.com/admin/ws}

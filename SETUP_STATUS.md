@@ -9,7 +9,7 @@
 
 ### 1. Project Documentation
 - ✅ **ARCHITECTURE.md** - Complete feature-centered scaffolding guide
-- ✅ **CONTEXT.md** - Full project documentation with .claude folder guide
+- ✅ **CLAUDE_CONTEXT.md** - Full project documentation with .claude folder guide
 - ✅ **README.md** - Project overview and quick start
 - ✅ **.claude/SESSION_STARTERS.md** - Session templates for AI assistance
 

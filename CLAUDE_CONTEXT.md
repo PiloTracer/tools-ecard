@@ -834,7 +834,7 @@ RENDER_ENGINE=puppeteer # or 'node-canvas'
 
 1. **Project Documentation**
    - ARCHITECTURE.md (feature-centered scaffolding)
-   - CONTEXT.md (comprehensive project documentation)
+   - CLAUDE_CONTEXT.md (comprehensive project documentation)
    - README.md (quick start guide)
    - .claude/SESSION_STARTERS.md (session templates)
 
@@ -1107,7 +1107,7 @@ docker exec -it ecards-redis redis-cli
 ├── db/                           # Database initialization
 ├── docker-compose.dev.yml
 ├── CLAUDE_CONTEXT.md             # THIS FILE - Complete context
-├── CONTEXT.md                    # Detailed project docs
+├── CLAUDE_CONTEXT.md                    # Detailed project docs
 ├── ARCHITECTURE.md               # Feature-centered architecture
 └── README.md                     # Quick start guide
 ```
