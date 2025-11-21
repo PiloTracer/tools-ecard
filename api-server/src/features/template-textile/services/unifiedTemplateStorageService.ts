@@ -56,9 +56,30 @@ class UnifiedTemplateStorageService {
       throw new Error('User not authenticated');
     }
 
-    const templateId = uuidv4();
+    // Check if a template with this name already exists for this user
+    let templateId: string;
+    let existingTemplate: any = null;
+
+    try {
+      const templates = await templateOperations.listTemplates(userId);
+      existingTemplate = templates.templates.find(
+        t => t.name === input.name && t.projectName === 'Default Project'
+      );
+
+      if (existingTemplate) {
+        templateId = existingTemplate.id;
+        console.log('[UnifiedTemplateStorage] Updating existing template:', templateId);
+      } else {
+        templateId = uuidv4();
+        console.log('[UnifiedTemplateStorage] Creating new template:', templateId);
+      }
+    } catch (error) {
+      // If can't check, generate new ID
+      templateId = uuidv4();
+      console.log('[UnifiedTemplateStorage] Template ID (fallback):', templateId);
+    }
+
     const timestamp = new Date();
-    console.log('[UnifiedTemplateStorage] Template ID:', templateId);
 
     // Detect current storage mode
     const modeResult = await modeDetectionService.detectMode();
@@ -151,6 +172,8 @@ class UnifiedTemplateStorageService {
       console.log('[UnifiedTemplateStorage] Mode is', storageMode, '- saving to PostgreSQL');
       try {
         const templateData = input.templateData || {};
+        const version = existingTemplate ? (existingTemplate.version || 1) + 1 : 1;
+
         await templateOperations.upsertTemplate({
           id: templateId,
           userId,
@@ -164,7 +187,7 @@ class UnifiedTemplateStorageService {
           storageUrl,
           storageMode,
           elementCount: templateData.elements?.length || 0,
-          version: 1
+          version
         });
 
         metadata = {
@@ -174,8 +197,8 @@ class UnifiedTemplateStorageService {
           storageUrl,
           storageMode,
           resourceUrls,
-          version: 1,
-          createdAt: timestamp,
+          version,
+          createdAt: existingTemplate?.createdAt || timestamp,
           updatedAt: timestamp
         };
         console.log('[UnifiedTemplateStorage] Successfully saved to PostgreSQL');
