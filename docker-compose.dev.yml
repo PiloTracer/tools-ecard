@@ -297,11 +297,16 @@ services:
     volumes:
       - ./db/init-cassandra:/scripts
     command: >
-      bash -c "
-      echo '🔄 Initializing Cassandra keyspace...';
-      cqlsh cassandra -f /scripts/01-create-keyspace.cql;
-      echo '✅ Cassandra keyspace initialized!';
-      "
+      bash -c '
+      echo "Initializing Cassandra...";
+      for script in /scripts/*.cql; do
+        if [ -f "$script" ]; then
+          echo "Running $script...";
+          cqlsh cassandra -f "$script" || { echo "Failed to run $script"; exit 1; };
+        fi
+      done;
+      echo "Cassandra initialization complete!";
+      '
     restart: "no"
     mem_limit: 128m
 
