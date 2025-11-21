@@ -44,7 +44,7 @@ Implementar una estructura de metadatos en los objetos del canvas que permita a 
    - `lineGroup` (con sugerencias de nombres de líneas existentes)  
    - `linePriority` (números enteros positivos)  
 4. No se implementa lógica de exportación - los metadatos deben ser suficientemente claros para que un proceso futuro los interprete  
-
+1
 **Restricciones:**  
 - Preservar compatibilidad con vCard 4.0 (RFC 6350)  
 - No alterar estructura existente de `front-cards/app/template-textile`  
