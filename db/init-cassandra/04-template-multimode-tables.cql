@@ -14,6 +14,18 @@
 USE ecards_canonical;
 
 -- ============================================================
+-- Drop old tables and views from 02-template-configs.cql to avoid conflicts
+-- ============================================================
+DROP MATERIALIZED VIEW IF EXISTS templates_by_storage_mode;
+DROP MATERIALIZED VIEW IF EXISTS pending_sync_by_user;
+DROP MATERIALIZED VIEW IF EXISTS recent_mode_transitions;
+DROP TABLE IF EXISTS template_events;
+DROP TABLE IF EXISTS resource_metadata;
+DROP TABLE IF EXISTS mode_transitions;
+DROP TABLE IF EXISTS sync_queue;
+DROP TABLE IF EXISTS storage_health;
+
+-- ============================================================
 -- Table: template_metadata
 -- Purpose: Complete template metadata with mode tracking
 -- ============================================================
