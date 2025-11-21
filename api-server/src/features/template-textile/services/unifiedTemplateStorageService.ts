@@ -117,7 +117,7 @@ class UnifiedTemplateStorageService {
       try {
         // Save to SeaweedFS (S3)
         const s3Service = getS3Service();
-        const bucketName = process.env.SEAWEEDFS_BUCKET || 'ecards';
+        const bucketName = process.env.SEAWEEDFS_BUCKET || 'templates';
         const s3Key = `templates/${userId}/${templateId}/template.json`;
         console.log('[UnifiedTemplateStorage] S3 bucket:', bucketName, 'key:', s3Key);
 

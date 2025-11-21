@@ -178,7 +178,7 @@ services:
       SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://192.168.65.254:8333}
       SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-any}
       SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-any}
-      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-ecards}
+      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-templates}
       SEAWEEDFS_REGION: ${SEAWEEDFS_REGION:-us-east-1}
       # External services (Remote Auth & User Management API)
       EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://epicdev.com/app}
@@ -266,7 +266,7 @@ services:
       SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://localhost:8333}
       SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-your_seaweedfs_access_key}
       SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-your_seaweedfs_secret_key}
-      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-ecards}
+      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET:-templates}
       # Worker config
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}

@@ -207,7 +207,7 @@ CASSANDRA_DC=dc1
 
 USE_LOCAL_STORAGE=false  # Set to true to force FALLBACK mode
 SEAWEEDFS_ENDPOINT=http://localhost:8333
-SEAWEEDFS_BUCKET=ecards
+SEAWEEDFS_BUCKET=templates
 ```
 
 ### Database Migrations

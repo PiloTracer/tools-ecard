@@ -38,7 +38,7 @@ export const appConfig = {
     endpoint: process.env.SEAWEEDFS_ENDPOINT || '',
     accessKey: process.env.SEAWEEDFS_ACCESS_KEY || '',
     secretKey: process.env.SEAWEEDFS_SECRET_KEY || '',
-    bucket: process.env.SEAWEEDFS_BUCKET || 'ecards',
+    bucket: process.env.SEAWEEDFS_BUCKET || 'templates',
   },
 
   // JWT

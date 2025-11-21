@@ -603,7 +603,7 @@ REDIS_PORT=6379
 SEAWEEDFS_ENDPOINT=http://remote-seaweedfs:8888
 SEAWEEDFS_ACCESS_KEY=change_me
 SEAWEEDFS_SECRET_KEY=change_me
-SEAWEEDFS_BUCKET=ecards
+SEAWEEDFS_BUCKET=templates
 
 # JWT
 JWT_SECRET=change_me_in_production

@@ -801,7 +801,7 @@ DEEPSEEK_TEMPERATURE=0.3
 SEAWEEDFS_ENDPOINT=http://remote-seaweedfs-host:8888
 SEAWEEDFS_ACCESS_KEY=your_seaweedfs_access_key
 SEAWEEDFS_SECRET_KEY=your_seaweedfs_secret_key
-SEAWEEDFS_BUCKET=ecards
+SEAWEEDFS_BUCKET=templates
 
 # External Auth & User Management API (NOT this api-server)
 EXTERNAL_AUTH_URL=http://remote-auth-server:5000

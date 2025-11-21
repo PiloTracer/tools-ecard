@@ -157,7 +157,7 @@ class ModeDetectionService {
 
     try {
       const s3Service = getS3Service();
-      const bucketName = process.env.SEAWEEDFS_BUCKET || 'ecards';
+      const bucketName = process.env.SEAWEEDFS_BUCKET || 'templates';
 
       // Try to check if bucket exists (this is a lightweight operation)
       const exists = await Promise.race([

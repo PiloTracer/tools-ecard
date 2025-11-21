@@ -38,7 +38,7 @@ export interface ResourceMetadata {
 }
 
 class ResourceDeduplicationService {
-  private readonly bucketName = process.env.SEAWEEDFS_BUCKET || 'ecards';
+  private readonly bucketName = process.env.SEAWEEDFS_BUCKET || 'templates';
   private readonly maxResourceSize = 50 * 1024 * 1024; // 50MB
 
   /**

@@ -17,7 +17,7 @@ import { Readable } from 'stream';
 
 export class TemplateStorageService {
   private s3Service = getS3Service();
-  private readonly bucketName = 'ecards';
+  private readonly bucketName = 'templates';
   private readonly maxVersions = 3; // Keep last 3 versions
 
   /**

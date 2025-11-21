@@ -52,7 +52,7 @@ USE_LOCAL_STORAGE=true  # Set to true to force local storage (development)
 SEAWEEDFS_ENDPOINT=http://localhost:8333
 SEAWEEDFS_ACCESS_KEY=your_access_key
 SEAWEEDFS_SECRET_KEY=your_secret_key
-SEAWEEDFS_BUCKET=ecards
+SEAWEEDFS_BUCKET=templates
 SEAWEEDFS_REGION=us-east-1
 
 # Storage Configuration
