@@ -22,7 +22,8 @@ export interface TextElement extends BaseElement {
   text: string;
   fontSize: number;
   fontFamily: string;
-  color: string;
+  color?: string; // Kept for backward compatibility
+  colors?: string[]; // NEW: Array of colors for per-word coloring
   textAlign?: 'left' | 'center' | 'right';
   fontWeight?: 'normal' | 'bold';
   fontStyle?: 'normal' | 'italic';

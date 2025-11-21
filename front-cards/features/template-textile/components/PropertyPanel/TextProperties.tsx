@@ -77,14 +77,96 @@ export function TextProperties({ element }: TextPropertiesProps) {
         </select>
       </div>
 
+      {/* Per-Word Color Management */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Color</label>
-        <input
-          type="color"
-          value={element.color}
-          onChange={(e) => handleChange({ color: e.target.value })}
-          className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
-        />
+        <label className="mb-1 block text-sm font-medium text-gray-700">Word Colors</label>
+        <div className="space-y-2">
+          {/* Display current colors */}
+          {element.colors && element.colors.length > 0 ? (
+            <>
+              {element.colors.map((color, index) => {
+                const words = element.text.trim().split(/\s+/);
+                const isLastColor = index === element.colors!.length - 1;
+                const appliedWords = isLastColor
+                  ? `Words ${index + 1}${words.length > index + 1 ? '+' : ''}`
+                  : `Word ${index + 1}`;
+
+                return (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-20">{appliedWords}</span>
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => {
+                        const newColors = [...(element.colors || [])];
+                        newColors[index] = e.target.value;
+                        handleChange({ colors: newColors });
+                      }}
+                      className="h-8 w-20 rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        const newColors = element.colors!.filter((_, i) => i !== index);
+                        handleChange({
+                          colors: newColors.length > 0 ? newColors : undefined,
+                          color: newColors.length === 0 ? '#000000' : undefined
+                        });
+                      }}
+                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-300"
+                      disabled={element.colors!.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            /* Fallback to single color for backward compatibility */
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 w-20">All words</span>
+              <input
+                type="color"
+                value={element.color || '#000000'}
+                onChange={(e) => handleChange({ color: e.target.value })}
+                className="h-8 w-20 rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Add Color button */}
+          <button
+            onClick={() => {
+              const currentColors = element.colors || (element.color ? [element.color] : ['#000000']);
+              const lastColor = currentColors[currentColors.length - 1];
+              handleChange({
+                colors: [...currentColors, lastColor],
+                color: undefined // Clear old single color property
+              });
+            }}
+            className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded border border-blue-300"
+          >
+            + Add Color
+          </button>
+
+          {/* Preview hint */}
+          {element.colors && element.colors.length > 0 && (
+            <div className="p-2 bg-gray-50 rounded text-xs text-gray-600">
+              <div className="font-semibold mb-1">Preview:</div>
+              <div className="flex flex-wrap gap-1">
+                {element.text.trim().split(/\s+/).map((word, index) => {
+                  const colorIndex = Math.min(index, (element.colors?.length || 1) - 1);
+                  const color = element.colors?.[colorIndex] || element.color || '#000000';
+                  return (
+                    <span key={index} style={{ color }}>
+                      {word}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div>

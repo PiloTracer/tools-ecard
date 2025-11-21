@@ -5,6 +5,7 @@ import * as fabric from 'fabric';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
+import { createMultiColorText, updateMultiColorText, shouldUseMultiColor } from '../../utils/multiColorText';
 
 export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -387,16 +388,38 @@ export function DesignCanvas() {
           // Update text properties
           if (element.type === 'text') {
             const textEl = element as TextElement;
-            if (fabricObj.text !== textEl.text) fabricObj.set({ text: textEl.text });
-            if (fabricObj.fontSize !== textEl.fontSize) fabricObj.set({ fontSize: textEl.fontSize });
-            if (fabricObj.fontFamily !== textEl.fontFamily) fabricObj.set({ fontFamily: textEl.fontFamily });
-            if (fabricObj.fill !== textEl.color) fabricObj.set({ fill: textEl.color });
-            if (fabricObj.textAlign !== textEl.textAlign) fabricObj.set({ textAlign: textEl.textAlign });
-            if (fabricObj.fontWeight !== textEl.fontWeight) fabricObj.set({ fontWeight: textEl.fontWeight || 'normal' });
-            if (fabricObj.fontStyle !== textEl.fontStyle) fabricObj.set({ fontStyle: textEl.fontStyle || 'normal' });
-            if (fabricObj.underline !== textEl.underline) fabricObj.set({ underline: textEl.underline || false });
-            if (fabricObj.stroke !== textEl.stroke) fabricObj.set({ stroke: textEl.stroke || '' });
-            if (fabricObj.strokeWidth !== textEl.strokeWidth) fabricObj.set({ strokeWidth: textEl.strokeWidth || 0 });
+
+            // Check if this is a multi-color text group
+            if ((fabricObj as any).isMultiColorText) {
+              // Update the multi-color group
+              updateMultiColorText(fabricObj as fabric.Group, textEl);
+            } else if (shouldUseMultiColor(textEl)) {
+              // Need to replace single-color text with multi-color group
+              canvas.remove(fabricObj);
+              fabricObjectsMap.current.delete(element.id);
+              addedElementIds.current.delete(element.id);
+
+              const newMultiColorText = createMultiColorText(textEl);
+              canvas.add(newMultiColorText);
+              fabricObjectsMap.current.set(element.id, newMultiColorText);
+              addedElementIds.current.add(element.id);
+            } else {
+              // Update standard single-color text
+              if (fabricObj.text !== textEl.text) fabricObj.set({ text: textEl.text });
+              if (fabricObj.fontSize !== textEl.fontSize) fabricObj.set({ fontSize: textEl.fontSize });
+              if (fabricObj.fontFamily !== textEl.fontFamily) fabricObj.set({ fontFamily: textEl.fontFamily });
+
+              // Handle color (prefer colors array if present, fall back to single color)
+              const textColor = textEl.colors?.[0] || textEl.color || '#000000';
+              if (fabricObj.fill !== textColor) fabricObj.set({ fill: textColor });
+
+              if (fabricObj.textAlign !== textEl.textAlign) fabricObj.set({ textAlign: textEl.textAlign });
+              if (fabricObj.fontWeight !== textEl.fontWeight) fabricObj.set({ fontWeight: textEl.fontWeight || 'normal' });
+              if (fabricObj.fontStyle !== textEl.fontStyle) fabricObj.set({ fontStyle: textEl.fontStyle || 'normal' });
+              if (fabricObj.underline !== textEl.underline) fabricObj.set({ underline: textEl.underline || false });
+              if (fabricObj.stroke !== textEl.stroke) fabricObj.set({ stroke: textEl.stroke || '' });
+              if (fabricObj.strokeWidth !== textEl.strokeWidth) fabricObj.set({ strokeWidth: textEl.strokeWidth || 0 });
+            }
           }
 
           // Update width/height for elements that have these properties (image, QR, shape)
@@ -1019,28 +1042,35 @@ export function DesignCanvas() {
     switch (element.type) {
       case 'text': {
         const textEl = element as TextElement;
-        fabricObject = new fabric.IText(textEl.text || 'Text', {
-          left: textEl.x,
-          top: textEl.y,
-          fontSize: textEl.fontSize,
-          fontFamily: textEl.fontFamily,
-          fill: textEl.color,
-          fontWeight: textEl.fontWeight || 'normal',
-          fontStyle: textEl.fontStyle || 'normal',
-          underline: textEl.underline || false,
-          stroke: textEl.stroke || '',
-          strokeWidth: textEl.strokeWidth || 0,
-          textAlign: textEl.textAlign || 'left',
-          angle: textEl.rotation || 0,
-          opacity: textEl.opacity || 1,
-          selectable: true,
-          evented: true,
-          hasControls: true,
-          hasBorders: true,
-          lockScalingX: false,
-          lockScalingY: false,
-          lockRotation: false,
-        });
+
+        // Check if we should use multi-color rendering
+        if (shouldUseMultiColor(textEl)) {
+          fabricObject = createMultiColorText(textEl);
+        } else {
+          // Use standard single-color text
+          fabricObject = new fabric.IText(textEl.text || 'Text', {
+            left: textEl.x,
+            top: textEl.y,
+            fontSize: textEl.fontSize,
+            fontFamily: textEl.fontFamily,
+            fill: textEl.color || textEl.colors?.[0] || '#000000',
+            fontWeight: textEl.fontWeight || 'normal',
+            fontStyle: textEl.fontStyle || 'normal',
+            underline: textEl.underline || false,
+            stroke: textEl.stroke || '',
+            strokeWidth: textEl.strokeWidth || 0,
+            textAlign: textEl.textAlign || 'left',
+            angle: textEl.rotation || 0,
+            opacity: textEl.opacity || 1,
+            selectable: true,
+            evented: true,
+            hasControls: true,
+            hasBorders: true,
+            lockScalingX: false,
+            lockScalingY: false,
+            lockRotation: false,
+          });
+        }
         break;
       }
 
