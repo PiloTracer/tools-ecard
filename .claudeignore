@@ -101,3 +101,4 @@
 .dev-notes/
 .documentation/
 **/bin/
+.db.misc/

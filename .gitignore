@@ -163,3 +163,5 @@ SUBAGENTS/
 
 # Local Storage (development fallback for SeaweedFS)
 .local-storage/
+.claude/
+.db.misc/
