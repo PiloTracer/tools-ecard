@@ -58,8 +58,8 @@ export function CanvasControls() {
             const svgNaturalHeight = tempImg.naturalHeight || tempImg.height;
 
             // Render at SVG width × 4
-            const renderWidth = Math.round(svgNaturalWidth * 4);
-            const renderHeight = Math.round(svgNaturalHeight * 4);
+            const renderWidth = Math.round(svgNaturalWidth * 5);
+            const renderHeight = Math.round(svgNaturalHeight * 5);
 
             // Calculate what scale to apply to fit in current box
             const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
@@ -166,8 +166,8 @@ export function CanvasControls() {
             const svgNaturalHeight = tempImg.naturalHeight || tempImg.height;
 
             // Render at SVG width × 4
-            const renderWidth = Math.round(svgNaturalWidth * 4);
-            const renderHeight = Math.round(svgNaturalHeight * 4);
+            const renderWidth = Math.round(svgNaturalWidth * 5);
+            const renderHeight = Math.round(svgNaturalHeight * 5);
 
             // Calculate what scale to apply to fit in current box
             const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
