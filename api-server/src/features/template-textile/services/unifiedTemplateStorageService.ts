@@ -113,22 +113,30 @@ class UnifiedTemplateStorageService {
     let storageUrl: string;
 
     if (storageMode === 'full') {
+      console.log('[UnifiedTemplateStorage] FULL mode - saving to SeaweedFS S3');
       try {
         // Save to SeaweedFS (S3)
         const s3Service = getS3Service();
         const bucketName = process.env.SEAWEEDFS_BUCKET || 'ecards';
         const s3Key = `templates/${userId}/${templateId}/template.json`;
+        console.log('[UnifiedTemplateStorage] S3 bucket:', bucketName, 'key:', s3Key);
 
         // Ensure bucket exists
         const bucketExists = await s3Service.bucketExists(bucketName);
+        console.log('[UnifiedTemplateStorage] Bucket exists:', bucketExists);
         if (!bucketExists) {
+          console.log('[UnifiedTemplateStorage] Creating bucket...');
           await s3Service.createBucket(bucketName);
         }
+
+        console.log('[UnifiedTemplateStorage] Uploading to S3...');
+        const templateJson = JSON.stringify(input.templateData);
+        console.log('[UnifiedTemplateStorage] Template JSON size:', templateJson.length, 'bytes');
 
         await s3Service.putObject(
           bucketName,
           s3Key,
-          JSON.stringify(input.templateData),
+          templateJson,
           {
             contentType: 'application/json',
             metadata: {
@@ -139,9 +147,10 @@ class UnifiedTemplateStorageService {
           }
         );
 
+        console.log('[UnifiedTemplateStorage] ✓ Successfully uploaded to S3');
         storageUrl = `s3://${bucketName}/${s3Key}`;
       } catch (error) {
-        console.error('Failed to save template to SeaweedFS:', error);
+        console.error('[UnifiedTemplateStorage] ✗ Failed to save template to SeaweedFS:', error);
         throw new Error('Storage service unavailable');
       }
     } else if (storageMode === 'fallback') {
