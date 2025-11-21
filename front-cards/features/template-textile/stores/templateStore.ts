@@ -5,6 +5,12 @@ interface TemplateState {
   // Current template
   currentTemplate: Template | null;
 
+  // Current template metadata (for saved templates)
+  currentProjectName: string | null;
+  currentTemplateName: string | null;
+  lastSavedAt: Date | null;
+  hasUnsavedChanges: boolean;
+
   // Elements (derived from currentTemplate but kept for convenience)
   elements: TemplateElement[];
 
@@ -24,6 +30,9 @@ interface TemplateState {
   updateTemplateName: (name: string) => void;
   setCanvasDimensions: (width: number, height: number) => void;
   setExportWidth: (width: number) => void;
+  setSaveMetadata: (projectName: string, templateName: string) => void;
+  markAsSaved: () => void;
+  markAsChanged: () => void;
 
   addElement: (element: TemplateElement) => void;
   updateElement: (id: string, updates: Partial<TemplateElement>) => void;
@@ -55,6 +64,10 @@ const pushHistory = (state: TemplateState, newElements: TemplateElement[]) => {
 
 export const useTemplateStore = create<TemplateState>((set, get) => ({
   currentTemplate: null,
+  currentProjectName: null,
+  currentTemplateName: null,
+  lastSavedAt: null,
+  hasUnsavedChanges: false,
   elements: [],
   canvasWidth: 800,
   canvasHeight: 600,
@@ -113,8 +126,23 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         ...state.currentTemplate,
         name,
         updatedAt: new Date(),
-      }
+      },
+      hasUnsavedChanges: true
     };
+  }),
+
+  setSaveMetadata: (projectName, templateName) => set({
+    currentProjectName: projectName,
+    currentTemplateName: templateName,
+  }),
+
+  markAsSaved: () => set({
+    lastSavedAt: new Date(),
+    hasUnsavedChanges: false,
+  }),
+
+  markAsChanged: () => set({
+    hasUnsavedChanges: true,
   }),
 
   addElement: (element) => set((state) => {
@@ -127,7 +155,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         ...state.currentTemplate,
         elements: newElements,
         updatedAt: new Date(),
-      } : null
+      } : null,
+      hasUnsavedChanges: true
     };
   }),
 
@@ -143,7 +172,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         ...state.currentTemplate,
         elements: newElements,
         updatedAt: new Date(),
-      } : null
+      } : null,
+      hasUnsavedChanges: true
     };
   }),
 
@@ -157,7 +187,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         ...state.currentTemplate,
         elements: newElements,
         updatedAt: new Date(),
-      } : null
+      } : null,
+      hasUnsavedChanges: true
     };
   }),
 

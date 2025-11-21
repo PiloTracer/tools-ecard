@@ -1,6 +1,6 @@
 # S3-Bucket Feature
 
-Complete S3-compatible storage implementation for the E-Cards application using SeaweedFS as the external storage backend.
+Complete S3-compatible storage implementation for the E-Cards application with automatic fallback to local file storage for development environments.
 
 ## ✅ Implementation Status
 
@@ -29,7 +29,8 @@ api-server/src/features/s3-bucket/
 ├── routes/
 │   └── s3Routes.ts           # Fastify route definitions
 ├── services/
-│   └── s3Service.ts          # Core S3 operations service
+│   ├── s3Service.ts          # Core S3 operations service with fallback
+│   └── localStorageService.ts # Local file storage fallback
 ├── types/
 │   └── index.ts              # TypeScript types and interfaces
 ├── index.ts                  # Public API exports
@@ -44,8 +45,11 @@ api-server/src/features/s3-bucket/
 Add these variables to your `.env` file:
 
 ```env
-# SeaweedFS Configuration (External Service)
-SEAWEEDFS_ENDPOINT=http://your-seaweedfs-host:8333
+# Storage Mode
+USE_LOCAL_STORAGE=true  # Set to true to force local storage (development)
+
+# SeaweedFS Configuration (When Available)
+SEAWEEDFS_ENDPOINT=http://localhost:8333
 SEAWEEDFS_ACCESS_KEY=your_access_key
 SEAWEEDFS_SECRET_KEY=your_secret_key
 SEAWEEDFS_BUCKET=ecards
@@ -56,6 +60,14 @@ STORAGE_MAX_FILE_SIZE=104857600  # 100MB
 STORAGE_MULTIPART_THRESHOLD=10485760  # 10MB
 STORAGE_ALLOWED_TYPES=image/png,image/jpeg,image/jpg,application/pdf,application/zip
 ```
+
+### Storage Fallback Behavior
+
+In development mode (`NODE_ENV=development`), the service:
+1. Attempts to connect to SeaweedFS
+2. If connection fails, automatically switches to local file storage
+3. Stores files in `.local-storage/` directory (gitignored)
+4. All operations continue working seamlessly
 
 ### Testing the Integration
 

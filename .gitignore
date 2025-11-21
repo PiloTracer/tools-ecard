@@ -160,3 +160,6 @@ SUBAGENTS/
 
 # NEXT:
 .next/
+
+# Local Storage (development fallback for SeaweedFS)
+.local-storage/

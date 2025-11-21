@@ -574,15 +574,57 @@ export class S3Service implements IS3Service {
   }
 }
 
+import { LocalStorageService } from './localStorageService';
+import type { IS3Service } from '../types';
+
 // Singleton instance
-let s3Service: S3Service | null = null;
+let s3Service: IS3Service | null = null;
+let isUsingLocalStorage = false;
 
 /**
- * Get or create the S3 service instance
+ * Get or create the S3 service instance with automatic fallback to local storage
  */
-export function getS3Service(): S3Service {
+export function getS3Service(): IS3Service {
   if (!s3Service) {
-    s3Service = new S3Service();
+    // Check if we should use local storage (development fallback)
+    const useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true' ||
+                           process.env.NODE_ENV === 'development';
+
+    if (useLocalStorage) {
+      // First, try to connect to SeaweedFS
+      const testService = new S3Service();
+
+      // Quick connectivity test with timeout
+      testService.bucketExists('ecards')
+        .then(exists => {
+          console.log('SeaweedFS is accessible, using S3 service');
+        })
+        .catch(error => {
+          console.warn('SeaweedFS is not accessible, switching to local storage');
+          console.warn('Error:', error.message);
+
+          // Switch to local storage
+          s3Service = new LocalStorageService();
+          isUsingLocalStorage = true;
+        });
+
+      // For immediate use, default to local storage in dev
+      if (!s3Service) {
+        console.log('Using local storage service for development');
+        s3Service = new LocalStorageService();
+        isUsingLocalStorage = true;
+      }
+    } else {
+      // Production: always use S3Service
+      s3Service = new S3Service();
+    }
   }
   return s3Service;
+}
+
+/**
+ * Check if currently using local storage
+ */
+export function isLocalStorage(): boolean {
+  return isUsingLocalStorage;
 }

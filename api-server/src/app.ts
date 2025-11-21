@@ -14,6 +14,7 @@ import { authMiddleware } from './core/middleware/authMiddleware';
 // Feature routes
 import { projectRoutes } from './features/simple-projects/routes';
 import { s3Routes, initializeS3Feature } from './features/s3-bucket';
+import { templateRoutes } from './features/template-textile';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
@@ -96,6 +97,9 @@ export async function buildApp() {
 
   // Initialize S3 buckets on startup
   await initializeS3Feature();
+
+  // Register template-textile routes (already prefixed in route definitions)
+  await app.register(templateRoutes);
 
   // app.register(templateRoutes, { prefix: '/api/v1/templates' });
   // app.register(batchRoutes, { prefix: '/api/v1/batches' });

@@ -1,10 +1,17 @@
 'use client';
 
 import * as fabric from 'fabric';
+import { useState, useEffect } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
+import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
+import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
+import { templateService } from '../../services/templateService';
 
 export function CanvasControls() {
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const {
     zoom,
     showGrid,
@@ -19,7 +26,80 @@ export function CanvasControls() {
     fabricCanvas
   } = useCanvasStore();
 
-  const { currentTemplate, canvasWidth, canvasHeight, exportWidth, undo, redo, canUndo, canRedo } = useTemplateStore();
+  const {
+    currentTemplate,
+    currentProjectName,
+    currentTemplateName,
+    hasUnsavedChanges,
+    canvasWidth,
+    canvasHeight,
+    exportWidth,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    setSaveMetadata,
+    markAsSaved
+  } = useTemplateStore();
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+S or Cmd+S for saving
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+
+        if (currentTemplate) {
+          if (currentTemplateName && hasUnsavedChanges) {
+            // Quick save with existing name
+            handleSaveTemplate(currentTemplateName, currentProjectName || 'default');
+          } else if (!currentTemplateName) {
+            // Open save modal for new templates
+            setShowSaveModal(true);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTemplate, currentTemplateName, currentProjectName, hasUnsavedChanges]);
+
+  const handleSaveTemplate = async (templateName: string, projectName: string) => {
+    if (!currentTemplate) {
+      throw new Error('No template to save');
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Extract resources from elements
+      const resources = templateService.extractResources(currentTemplate.elements);
+
+      // Save the template
+      const metadata = await templateService.saveTemplate({
+        templateName,
+        projectName,
+        template: currentTemplate,
+        resources,
+      });
+
+      // Update store with saved metadata
+      setSaveMetadata(projectName, templateName);
+      markAsSaved();
+
+      // Close the modal
+      setShowSaveModal(false);
+
+      // Show success message (could use a toast here)
+      console.log('Template saved successfully:', metadata);
+    } catch (error) {
+      console.error('Error saving template:', error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleExportPNG = async () => {
     if (!fabricCanvas) return;
@@ -296,7 +376,65 @@ export function CanvasControls() {
   };
 
   return (
-    <div className="flex items-center gap-4 border-b border-slate-800 bg-slate-800 px-4 py-3 shadow-md">
+    <>
+      {/* Save Modal */}
+      <SaveTemplateModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={handleSaveTemplate}
+        currentTemplateName={currentTemplateName || ''}
+        currentProjectName={currentProjectName || 'default'}
+      />
+
+      {/* Template Status Bar */}
+      <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-2">
+        <TemplateStatus />
+        <div className="flex items-center gap-2">
+          {/* Save Button */}
+          <button
+            onClick={() => setShowSaveModal(true)}
+            disabled={!currentTemplate || isSaving}
+            className={`flex items-center gap-2 rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
+              hasUnsavedChanges
+                ? 'border-amber-500 bg-amber-600 text-white hover:bg-amber-700'
+                : 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={hasUnsavedChanges ? 'Save Template (Unsaved Changes)' : 'Save Template'}
+          >
+            {isSaving ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V2" />
+                </svg>
+                Save
+              </>
+            )}
+          </button>
+
+          {/* Quick Save (Ctrl+S) */}
+          {currentTemplateName && (
+            <button
+              onClick={() => handleSaveTemplate(currentTemplateName, currentProjectName || 'default')}
+              disabled={!hasUnsavedChanges || isSaving}
+              className="text-xs text-slate-500 hover:text-slate-400 disabled:opacity-50"
+              title="Quick Save (Ctrl+S)"
+            >
+              Ctrl+S
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Controls Bar */}
+      <div className="flex items-center gap-4 border-b border-slate-800 bg-slate-800 px-4 py-3 shadow-md">
       {/* Zoom Controls */}
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-slate-300">Zoom:</span>
@@ -423,5 +561,6 @@ export function CanvasControls() {
         </button>
       </div>
     </div>
+    </>
   );
 }
