@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { cassandraClient } from '../../../core/cassandra/client';
-import { prismaClient } from '../../../core/prisma/client';
+import { templateOperations, resourceOperations } from '../../../core/prisma/client';
 import { fallbackStorageService } from './fallbackStorageService';
 import { resourceDeduplicationService } from './resourceDeduplicationService';
 import { modeDetectionService, StorageMode } from './modeDetectionService';
+import { getS3Service } from '../../s3-bucket/services/s3Service';
 import type { Request } from 'express';
 
 export interface TemplateMetadata {
@@ -45,27 +46,44 @@ class UnifiedTemplateStorageService {
     input: SaveTemplateInput,
     request: Request
   ): Promise<TemplateMetadata> {
+    console.log('[UnifiedTemplateStorage] saveTemplate called');
+
     // Extract userId from authenticated request
     const userId = (request as any).user?.id;
+    console.log('[UnifiedTemplateStorage] User ID:', userId);
+
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const templateId = uuidv4();
     const timestamp = new Date();
+    console.log('[UnifiedTemplateStorage] Template ID:', templateId);
 
     // Detect current storage mode
-    const storageMode = await modeDetectionService.detectMode();
+    const modeResult = await modeDetectionService.detectMode();
+    const storageMode = modeResult.mode;
+    console.log('[UnifiedTemplateStorage] Storage mode:', storageMode);
 
     // Process and deduplicate resources
     const resourceUrls: string[] = [];
     if (input.resources && input.resources.length > 0) {
-      for (const resource of input.resources) {
+      console.log('[UnifiedTemplateStorage] Processing', input.resources.length, 'resources');
+      for (let i = 0; i < input.resources.length; i++) {
+        const resource = input.resources[i];
+        console.log('[UnifiedTemplateStorage] Resource', i, 'keys:', Object.keys(resource || {}));
+
+        // Skip if resource doesn't have data
+        if (!resource || !resource.data) {
+          console.warn('[UnifiedTemplateStorage] Skipping resource', i, '- no data field');
+          continue;
+        }
+
         const resourceUrl = await resourceDeduplicationService.storeResource({
           data: resource.data,
           type: resource.type,
           hash: resource.hash
-        });
+        }, userId);
         resourceUrls.push(resourceUrl);
       }
     }
@@ -73,20 +91,50 @@ class UnifiedTemplateStorageService {
     // Store template JSON based on mode
     let storageUrl: string;
 
-    if (storageMode === 'FULL' || storageMode === 'FALLBACK') {
+    if (storageMode === 'full') {
       try {
-        // Try S3/Fallback storage
-        storageUrl = await fallbackStorageService.saveTemplate(
-          templateId,
+        // Save to SeaweedFS (S3)
+        const s3Service = getS3Service();
+        const bucketName = process.env.SEAWEEDFS_BUCKET || 'ecards';
+        const s3Key = `templates/${userId}/${templateId}/template.json`;
+
+        // Ensure bucket exists
+        const bucketExists = await s3Service.bucketExists(bucketName);
+        if (!bucketExists) {
+          await s3Service.createBucket(bucketName);
+        }
+
+        await s3Service.putObject(
+          bucketName,
+          s3Key,
+          JSON.stringify(input.templateData),
+          {
+            contentType: 'application/json',
+            metadata: {
+              userId,
+              templateId,
+              uploadedAt: new Date().toISOString()
+            }
+          }
+        );
+
+        storageUrl = `s3://${bucketName}/${s3Key}`;
+      } catch (error) {
+        console.error('Failed to save template to SeaweedFS:', error);
+        throw new Error('Storage service unavailable');
+      }
+    } else if (storageMode === 'fallback') {
+      try {
+        // Save to local fallback storage
+        const localPath = await fallbackStorageService.saveTemplate(
           userId,
+          'default', // projectId
+          templateId,
           input.templateData
         );
+        storageUrl = `fallback://${localPath}`;
       } catch (error) {
-        console.error('Failed to save template to storage:', error);
-        if (storageMode === 'FULL') {
-          throw new Error('Storage service unavailable');
-        }
-        // In FALLBACK mode, we continue without remote storage
+        console.error('Failed to save template to fallback storage:', error);
         storageUrl = `local://${templateId}`;
       }
     } else {
@@ -97,9 +145,29 @@ class UnifiedTemplateStorageService {
     // Save metadata to PostgreSQL (if available)
     let metadata: TemplateMetadata;
 
-    if (storageMode === 'FULL') {
+    console.log('[UnifiedTemplateStorage] Checking if should save to PostgreSQL, mode:', storageMode);
+
+    if (storageMode === 'full' || storageMode === 'fallback') {
+      console.log('[UnifiedTemplateStorage] Mode is', storageMode, '- saving to PostgreSQL');
       try {
-        metadata = await prismaClient.saveTemplateMetadata({
+        const templateData = input.templateData || {};
+        await templateOperations.upsertTemplate({
+          id: templateId,
+          userId,
+          projectId: 'default',
+          projectName: 'Default Project',
+          name: input.name,
+          width: templateData.width || 1000,
+          height: templateData.height || 600,
+          exportWidth: templateData.exportWidth || templateData.width || 1000,
+          exportHeight: templateData.exportHeight || templateData.height || 600,
+          storageUrl,
+          storageMode,
+          elementCount: templateData.elements?.length || 0,
+          version: 1
+        });
+
+        metadata = {
           id: templateId,
           userId,
           name: input.name,
@@ -109,13 +177,40 @@ class UnifiedTemplateStorageService {
           version: 1,
           createdAt: timestamp,
           updatedAt: timestamp
-        });
+        };
+        console.log('[UnifiedTemplateStorage] Successfully saved to PostgreSQL');
+
+        // Now link resources to the template
+        if (input.resources && input.resources.length > 0) {
+          console.log('[UnifiedTemplateStorage] Linking', input.resources.length, 'resources to template');
+          for (let i = 0; i < input.resources.length; i++) {
+            const resource = input.resources[i];
+            try {
+              await resourceOperations.createResource({
+                id: uuidv4(),
+                templateId,
+                name: resource.hash || `resource-${i}`,
+                type: resource.type,
+                storageUrl: resourceUrls[i],
+                storageMode,
+                hash: resource.hash || '',
+                size: Buffer.from(resource.data.split(',')[1] || resource.data, 'base64').length,
+                mimeType: resource.data.match(/^data:([^;]+);/)?.[1] || 'application/octet-stream'
+              });
+            } catch (error) {
+              console.error('[UnifiedTemplateStorage] Failed to link resource:', error);
+              // Continue with other resources
+            }
+          }
+          console.log('[UnifiedTemplateStorage] Resources linked successfully');
+        }
       } catch (error) {
-        console.error('Failed to save metadata to PostgreSQL:', error);
+        console.error('[UnifiedTemplateStorage] Failed to save metadata to PostgreSQL:', error);
         throw new Error('Database unavailable');
       }
     } else {
-      // In FALLBACK or LOCAL_ONLY mode, construct metadata without DB
+      console.log('[UnifiedTemplateStorage] Mode is', storageMode, '- constructing metadata without DB (LOCAL_ONLY)');
+      // In LOCAL_ONLY mode, construct metadata without DB
       metadata = {
         id: templateId,
         userId,
@@ -130,7 +225,8 @@ class UnifiedTemplateStorageService {
     }
 
     // Log event to Cassandra (if available)
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
+      console.log('[UnifiedTemplateStorage] Logging event to Cassandra');
       try {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),
@@ -163,17 +259,30 @@ class UnifiedTemplateStorageService {
       throw new Error('User not authenticated');
     }
 
-    const storageMode = await modeDetectionService.detectMode();
+    const modeResult = await modeDetectionService.detectMode();
+    const storageMode = modeResult.mode;
 
     // Load metadata from PostgreSQL
     let metadata: TemplateMetadata | null = null;
 
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
       try {
-        metadata = await prismaClient.getTemplateMetadata(templateId);
-        if (!metadata) {
+        const dbTemplate = await templateOperations.getTemplate(templateId, userId);
+        if (!dbTemplate) {
           throw new Error('Template not found');
         }
+
+        metadata = {
+          id: dbTemplate.id,
+          userId: dbTemplate.userId,
+          name: dbTemplate.name,
+          storageUrl: dbTemplate.storageUrl,
+          storageMode: dbTemplate.storageMode,
+          resourceUrls: dbTemplate.resources?.map(r => r.storageUrl) || [],
+          version: dbTemplate.version || 1,
+          createdAt: dbTemplate.createdAt,
+          updatedAt: dbTemplate.updatedAt
+        };
 
         // Verify ownership
         if (metadata.userId !== userId) {
@@ -181,7 +290,7 @@ class UnifiedTemplateStorageService {
         }
       } catch (error) {
         console.error('Failed to load metadata from PostgreSQL:', error);
-        if (storageMode === 'FULL') {
+        if (storageMode === 'full') {
           throw error;
         }
       }
@@ -211,7 +320,7 @@ class UnifiedTemplateStorageService {
     }
 
     // Log access event
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
       try {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),
@@ -246,15 +355,26 @@ class UnifiedTemplateStorageService {
       throw new Error('User not authenticated');
     }
 
-    const storageMode = await modeDetectionService.detectMode();
+    const modeResult = await modeDetectionService.detectMode();
+    const storageMode = modeResult.mode;
 
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
       try {
-        const templates = await prismaClient.listTemplatesByUser(userId);
-        return templates;
+        const result = await templateOperations.listTemplates(userId);
+        return result.templates.map(t => ({
+          id: t.id,
+          userId: t.userId,
+          name: t.name,
+          storageUrl: t.storageUrl,
+          storageMode: t.storageMode,
+          resourceUrls: t.resources?.map(r => r.storageUrl) || [],
+          version: t.version || 1,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt
+        }));
       } catch (error) {
         console.error('Failed to list templates from PostgreSQL:', error);
-        if (storageMode === 'FULL') {
+        if (storageMode === 'full' || storageMode === 'fallback') {
           throw new Error('Database unavailable');
         }
       }
@@ -274,24 +394,37 @@ class UnifiedTemplateStorageService {
       throw new Error('User not authenticated');
     }
 
-    const storageMode = await modeDetectionService.detectMode();
+    const modeResult = await modeDetectionService.detectMode();
+    const storageMode = modeResult.mode;
 
     // Load metadata first to verify ownership
     let metadata: TemplateMetadata | null = null;
 
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
       try {
-        metadata = await prismaClient.getTemplateMetadata(templateId);
-        if (!metadata) {
+        const dbTemplate = await templateOperations.getTemplate(templateId, userId);
+        if (!dbTemplate) {
           throw new Error('Template not found');
         }
+
+        metadata = {
+          id: dbTemplate.id,
+          userId: dbTemplate.userId,
+          name: dbTemplate.name,
+          storageUrl: dbTemplate.storageUrl,
+          storageMode: dbTemplate.storageMode,
+          resourceUrls: dbTemplate.resources?.map(r => r.storageUrl) || [],
+          version: dbTemplate.version || 1,
+          createdAt: dbTemplate.createdAt,
+          updatedAt: dbTemplate.updatedAt
+        };
 
         if (metadata.userId !== userId) {
           throw new Error('Unauthorized');
         }
       } catch (error) {
         console.error('Failed to load metadata:', error);
-        if (storageMode === 'FULL') {
+        if (storageMode === 'full' || storageMode === 'fallback') {
           throw error;
         }
       }
@@ -311,9 +444,9 @@ class UnifiedTemplateStorageService {
     }
 
     // Delete metadata from PostgreSQL
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
       try {
-        await prismaClient.deleteTemplateMetadata(templateId);
+        await templateOperations.deleteTemplate(templateId, userId);
       } catch (error) {
         console.error('Failed to delete metadata:', error);
         throw new Error('Failed to delete template');
@@ -321,7 +454,7 @@ class UnifiedTemplateStorageService {
     }
 
     // Log deletion event
-    if (storageMode === 'FULL') {
+    if (storageMode === 'full' || storageMode === 'fallback') {
       try {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),

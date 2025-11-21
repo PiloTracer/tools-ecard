@@ -15,9 +15,14 @@ export class TemplateController {
    */
   async saveTemplate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     try {
+      console.log('[TemplateController] saveTemplate called');
+
       // Get user ID from auth middleware
       const userId = (request as any).user?.id;
+      console.log('[TemplateController] User ID:', userId);
+
       if (!userId) {
+        console.log('[TemplateController] No user ID - returning 401');
         return reply.status(401).send({
           success: false,
           error: 'User not authenticated'
@@ -25,14 +30,18 @@ export class TemplateController {
       }
 
       const saveRequest = request.body as any;
+      console.log('[TemplateController] Request body keys:', Object.keys(saveRequest || {}));
 
       // Validate required fields
       if (!saveRequest.name || !saveRequest.templateData) {
+        console.log('[TemplateController] Missing fields - name:', !!saveRequest.name, 'templateData:', !!saveRequest.templateData);
         return reply.status(400).send({
           success: false,
           error: 'Missing required fields: name or templateData'
         });
       }
+
+      console.log('[TemplateController] Calling unifiedTemplateStorageService.saveTemplate');
 
       // Save template using unified service
       const metadata = await unifiedTemplateStorageService.saveTemplate(
@@ -44,13 +53,15 @@ export class TemplateController {
         request as any
       );
 
+      console.log('[TemplateController] Template saved successfully:', metadata.id);
+
       return reply.status(200).send({
         success: true,
         data: metadata,
         message: 'Template saved successfully'
       });
     } catch (error) {
-      console.error('Error saving template:', error);
+      console.error('[TemplateController] Error saving template:', error);
       return reply.status(500).send({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to save template'
@@ -215,7 +226,7 @@ export class TemplateController {
           data: resource.data,
           type: resource.type,
           hash: resource.hash
-        });
+        }, userId);
 
         processedResources.push({
           originalHash: resource.hash,

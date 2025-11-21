@@ -335,18 +335,21 @@ export const userOperations = {
    * Get or create user from OAuth
    */
   async upsertUser(data: {
+    id: string;
     email: string;
     name?: string;
     oauthId?: string;
   }) {
     return prisma.user.upsert({
       where: {
-        email: data.email
+        id: data.id
       },
       create: data,
       update: {
+        email: data.email,
         name: data.name,
-        oauthId: data.oauthId
+        oauthId: data.oauthId,
+        updatedAt: new Date()
       }
     });
   },
@@ -441,6 +444,13 @@ export const projectOperations = {
         selectedAt: new Date()
       }
     });
+  },
+
+  /**
+   * Ensure user has a default project (alias for getOrCreateDefaultProject)
+   */
+  async ensureDefaultProject(userId: string) {
+    return this.getOrCreateDefaultProject(userId);
   }
 };
 

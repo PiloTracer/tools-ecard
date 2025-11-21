@@ -5,6 +5,7 @@
  */
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import { userOperations, projectOperations } from '../prisma/client';
 
 const OAUTH_CONFIG = {
   userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'http://epicdev.com/api/users/me',
@@ -66,6 +67,22 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
         email: request.user.email,
         username: request.user.username,
       });
+
+      // Ensure user exists in database
+      try {
+        await userOperations.upsertUser({
+          id: request.user.id,
+          email: request.user.email,
+          name: request.user.displayName,
+          oauthId: userData.oauth_id || userData.id?.toString()
+        });
+
+        // Ensure user has a default project
+        await projectOperations.ensureDefaultProject(request.user.id);
+      } catch (dbError) {
+        console.error('[Auth] Failed to sync user to database:', dbError);
+        // Continue even if DB sync fails
+      }
     } else {
       console.warn('[Auth] Failed to fetch user info:', userResponse.status);
       // Token might be expired or invalid - proceed without user

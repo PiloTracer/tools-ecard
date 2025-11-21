@@ -42,6 +42,54 @@ class ResourceDeduplicationService {
   private readonly maxResourceSize = 50 * 1024 * 1024; // 50MB
 
   /**
+   * Store a resource from base64 data (simplified interface for backward compatibility)
+   */
+  async storeResource(input: {
+    data: string;
+    type: string;
+    hash?: string;
+  }, userId?: string): Promise<string> {
+    // Validate input
+    if (!input || !input.data) {
+      throw new Error('Resource data is required');
+    }
+
+    // Decode base64 data to buffer
+    const buffer = Buffer.from(input.data.split(',')[1] || input.data, 'base64');
+
+    // Determine MIME type from base64 prefix or type
+    let mimeType = 'application/octet-stream';
+    if (input.data.includes('data:')) {
+      const match = input.data.match(/^data:([^;]+);/);
+      if (match) {
+        mimeType = match[1];
+      }
+    } else {
+      // Infer from type
+      if (input.type === 'IMAGE') mimeType = 'image/png';
+      else if (input.type === 'FONT') mimeType = 'font/ttf';
+      else if (input.type === 'SVG') mimeType = 'image/svg+xml';
+    }
+
+    // Determine resource type
+    const resourceType = this.determineResourceType(mimeType);
+
+    // Create UploadedResource object
+    const resource: UploadedResource = {
+      name: input.hash || `resource-${Date.now()}`,
+      buffer,
+      mimeType,
+      size: buffer.length,
+      type: resourceType
+    };
+
+    // Process using the main processResource method
+    const result = await this.processResource(resource, userId || 'system');
+
+    return result.url;
+  }
+
+  /**
    * Process and deduplicate a resource
    */
   async processResource(
@@ -83,17 +131,23 @@ class ResourceDeduplicationService {
     const mode = modeDetectionService.getCurrentMode();
     const storageResult = await this.storeNewResource(resource, hash, userId, mode);
 
-    // Record in PostgreSQL
-    const resourceRecord = await resourceOperations.createResource({
-      templateId: templateId || 'orphaned',
-      name: resource.name,
-      type: resource.type,
-      storageUrl: storageResult.url,
-      storageMode: storageResult.storageMode,
-      hash,
-      size: resource.size,
-      mimeType: resource.mimeType
-    });
+    // Record in PostgreSQL (only if we have a templateId)
+    if (templateId) {
+      const resourceRecord = await resourceOperations.createResource({
+        templateId,
+        name: resource.name,
+        type: resource.type,
+        storageUrl: storageResult.url,
+        storageMode: storageResult.storageMode,
+        hash,
+        size: resource.size,
+        mimeType: resource.mimeType
+      });
+    } else {
+      // No templateId yet - resource is being uploaded before template creation
+      // It will be linked to the template later when the template is saved
+      console.log(`Resource ${hash} stored without template link (will be linked later)`);
+    }
 
     // Log to Cassandra
     await this.logResourceMetadata(hash, resource, storageResult);
