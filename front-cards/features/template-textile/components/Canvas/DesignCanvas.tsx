@@ -621,10 +621,17 @@ export function DesignCanvas() {
               fabricImg.setCoords();
 
               canvas.setActiveObject(fabricImg);
-              canvas.renderAll();
 
               loadingImages.current.delete(imgEl.id);
               console.log('Image replacement complete - scale = 1');
+
+              // Force z-order sync after image loads
+              console.log('[IMAGE-LOAD] Image recreated, need to sync z-order');
+              const currentElements = useTemplateStore.getState().elements;
+              if (currentElements.length > 0) {
+                useTemplateStore.setState({ elements: [...currentElements] });
+              }
+              canvas.renderAll();
             } else {
               console.error('Failed to get 2d context');
               loadingImages.current.delete(imgEl.id);
@@ -1122,9 +1129,18 @@ export function DesignCanvas() {
               (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
               canvas.add(fabricImg);
               fabricObjectsMap.current.set(element.id, fabricImg);
-              canvas.renderAll();
 
               loadingImages.current.delete(element.id);
+
+              // Force z-order sync after image loads to ensure correct layering
+              console.log('[IMAGE-LOAD] Image loaded, need to sync z-order');
+              // Trigger the elements dependency to force re-sync
+              const currentElements = useTemplateStore.getState().elements;
+              if (currentElements.length > 0) {
+                // Force a re-render by updating the template store (no-op but triggers effects)
+                useTemplateStore.setState({ elements: [...currentElements] });
+              }
+              canvas.renderAll();
             } else {
               console.error('Failed to get 2d context');
               loadingImages.current.delete(element.id);
