@@ -55,8 +55,9 @@ class TemplateService {
 
       if (response.ok) {
         const data = await response.json();
-        this.currentMode = data.data?.mode || 'FALLBACK';
-        return this.currentMode;
+        const mode: StorageMode = data.data?.mode || 'FALLBACK';
+        this.currentMode = mode;
+        return mode;
       }
     } catch (error) {
       console.error('Failed to get storage mode:', error);

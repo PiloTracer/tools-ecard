@@ -23,6 +23,7 @@ interface TemplateState {
   history: TemplateElement[][];
   historyIndex: number;
   maxHistory: number;
+  lastUndoRedoTimestamp: number; // Timestamp of last undo/redo operation
 
   // Actions
   createTemplate: (name: string, width: number, height: number) => void;
@@ -75,6 +76,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   history: [[]],
   historyIndex: 0,
   maxHistory: 50,
+  lastUndoRedoTimestamp: 0,
 
   createTemplate: (name, width, height) => {
     const template: Template = {
@@ -162,7 +164,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
   updateElement: (id, updates) => set((state) => {
     const newElements = state.elements.map(el =>
-      el.id === id ? { ...el, ...updates } : el
+      el.id === id ? { ...el, ...updates } as TemplateElement : el
     );
     const historyUpdate = pushHistory(state, newElements);
     return {
@@ -297,6 +299,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     return {
       elements,
       historyIndex: newIndex,
+      lastUndoRedoTimestamp: Date.now(),
       currentTemplate: state.currentTemplate ? {
         ...state.currentTemplate,
         elements,
@@ -314,6 +317,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     return {
       elements,
       historyIndex: newIndex,
+      lastUndoRedoTimestamp: Date.now(),
       currentTemplate: state.currentTemplate ? {
         ...state.currentTemplate,
         elements,

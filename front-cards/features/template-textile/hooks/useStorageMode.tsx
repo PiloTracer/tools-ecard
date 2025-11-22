@@ -3,7 +3,7 @@
  * React hook for detecting and monitoring storage mode
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 
 export type StorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
 
@@ -231,7 +231,6 @@ export function useStorageMode(options: UseStorageModeOptions = {}) {
 /**
  * Storage mode context for sharing state across components
  */
-import { createContext, useContext, ReactNode } from 'react';
 
 interface StorageModeContextValue {
   mode: StorageMode | null;

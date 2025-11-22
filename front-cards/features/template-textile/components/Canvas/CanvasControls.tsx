@@ -76,6 +76,7 @@ async function rasterizeImages(template: Template, canvas: fabric.Canvas | null)
 export function CanvasControls() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
+  const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const {
@@ -106,7 +107,8 @@ export function CanvasControls() {
     canRedo,
     setSaveMetadata,
     markAsSaved,
-    loadTemplate
+    loadTemplate,
+    createTemplate
   } = useTemplateStore();
 
   // Keyboard shortcuts
@@ -174,7 +176,7 @@ export function CanvasControls() {
       // Clear current canvas
       if (fabricCanvas) {
         fabricCanvas.clear();
-        fabricCanvas.backgroundColor = loadedTemplate.data.backgroundColor || '#ffffff';
+        fabricCanvas.backgroundColor = '#ffffff';
       }
 
       // Load template into store (this will trigger canvas re-render)
@@ -194,6 +196,37 @@ export function CanvasControls() {
     }
   };
 
+  const handleCloseTemplate = () => {
+    // If there are unsaved changes, show confirmation modal
+    if (hasUnsavedChanges) {
+      setShowCloseConfirmModal(true);
+    } else {
+      // No unsaved changes, close immediately
+      executeCloseTemplate();
+    }
+  };
+
+  const executeCloseTemplate = () => {
+    // Clear the canvas
+    if (fabricCanvas) {
+      fabricCanvas.clear();
+      fabricCanvas.backgroundColor = '#ffffff';
+    }
+
+    // Create a new empty template
+    const { setDimensions } = useCanvasStore.getState();
+    createTemplate('Untitled Template', 800, 600);
+    setDimensions(800, 600);
+
+    // Reset save metadata
+    setSaveMetadata('', '');
+
+    // Close the confirmation modal if open
+    setShowCloseConfirmModal(false);
+
+    console.log('Template closed, new template created');
+  };
+
   const handleExportPNG = async () => {
     if (!fabricCanvas) return;
 
@@ -201,7 +234,7 @@ export function CanvasControls() {
     console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
 
     // Save current viewport transform (zoom and pan)
-    const originalViewport = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+    const originalViewport = (fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0]) as [number, number, number, number, number, number];
     const originalZoom = fabricCanvas.getZoom();
 
     // Reset viewport to capture entire canvas at 1:1 scale
@@ -310,7 +343,7 @@ export function CanvasControls() {
     console.log(`Exporting JPG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
 
     // Save current viewport transform (zoom and pan)
-    const originalViewport = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+    const originalViewport = (fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0]) as [number, number, number, number, number, number];
     const originalZoom = fabricCanvas.getZoom();
 
     // Reset viewport to capture entire canvas at 1:1 scale
@@ -418,7 +451,7 @@ export function CanvasControls() {
     console.log(`Exporting SVG: canvas ${canvasWidth}x${canvasHeight}, export ${exportWidth}x${exportHeight}, multiplier ${scaleFactor}`);
 
     // Save current viewport transform (zoom and pan)
-    const originalViewport = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+    const originalViewport = (fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0]) as [number, number, number, number, number, number];
     const originalZoom = fabricCanvas.getZoom();
 
     // Reset viewport to capture entire canvas at 1:1 scale
@@ -486,6 +519,44 @@ export function CanvasControls() {
         onOpen={handleOpenTemplate}
       />
 
+      {/* Close Confirmation Modal */}
+      {showCloseConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+                <svg className="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Unsaved Changes</h3>
+                <p className="text-sm text-gray-600">You have unsaved changes</p>
+              </div>
+            </div>
+
+            <p className="mb-6 text-sm text-gray-700">
+              Are you sure you want to close this template? All unsaved changes will be lost.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowCloseConfirmModal(false)}
+                className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeCloseTemplate}
+                className="rounded border border-red-600 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Close Without Saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Template Status Bar */}
       <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-2">
         <TemplateStatus />
@@ -529,6 +600,18 @@ export function CanvasControls() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
             </svg>
             Open
+          </button>
+
+          {/* Close Button */}
+          <button
+            onClick={handleCloseTemplate}
+            className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600 hover:border-red-500 hover:text-red-300"
+            title="Close Template"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Close
           </button>
 
           {/* Quick Save (Ctrl+S) */}

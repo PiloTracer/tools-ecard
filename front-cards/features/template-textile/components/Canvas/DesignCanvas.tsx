@@ -17,6 +17,7 @@ export function DesignCanvas() {
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
   const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
+  const lastModifiedFromCanvas = useRef<Map<string, number>>(new Map()); // elementId -> timestamp of last canvas modification
 
   // Panning state
   const [isPanning, setIsPanning] = useState(false);
@@ -25,8 +26,9 @@ export function DesignCanvas() {
   const viewportTransform = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
-  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement, exportWidth } = useTemplateStore();
+  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement, exportWidth, lastUndoRedoTimestamp } = useTemplateStore();
   const copiedElement = useRef<TemplateElement | null>(null);
+  const lastKnownUndoRedoTimestamp = useRef<number>(0);
 
   // Handle drag over and drop for vCard fields
   const handleDragOver = (e: React.DragEvent) => {
@@ -159,6 +161,8 @@ export function DesignCanvas() {
       }
 
       processingModification.current.add(elementId);
+      // Record the timestamp of this canvas modification
+      lastModifiedFromCanvas.current.set(elementId, Date.now());
       console.log(`=== object:modified event for element ${elementId} ===`);
       console.log('Current scale:', { scaleX: target.scaleX, scaleY: target.scaleY, width: target.width, height: target.height });
 
@@ -190,7 +194,7 @@ export function DesignCanvas() {
         // Only update fontSize if text was scaled (not just moved)
         if (Math.abs(scaleY - 1) > 0.01) {
           const newFontSize = Math.round(target.fontSize * scaleY);
-          updates.fontSize = newFontSize;
+          (updates as Partial<TextElement>).fontSize = newFontSize;
           // Reset scale to 1 after applying to fontSize
           target.set({ scaleX: 1, scaleY: 1 });
         }
@@ -287,8 +291,9 @@ export function DesignCanvas() {
               target.set({ scaleX: 1, scaleY: 1 });
             } else {
               // Non-image, non-QR elements: apply scale to dimensions and reset scale
-              const newWidth = Math.round((target.width || element.width) * scaleX);
-              const newHeight = Math.round((target.height || element.height) * scaleY);
+              const elementAny = element as any;
+              const newWidth = Math.round((target.width || elementAny.width) * scaleX);
+              const newHeight = Math.round((target.height || elementAny.height) * scaleY);
 
               updates.width = newWidth;
               updates.height = newHeight;
@@ -538,13 +543,22 @@ export function DesignCanvas() {
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
-          // Update position ONLY if not currently being modified by user
-          if (!processingModification.current.has(element.id)) {
-            if (fabricObj.left !== element.x || fabricObj.top !== element.y) {
+          // Position sync strategy: Canvas is the source of truth EXCEPT for undo/redo
+          // Check if this is an undo/redo operation (timestamp changed recently)
+          const isUndoRedo = lastUndoRedoTimestamp !== lastKnownUndoRedoTimestamp.current;
+
+          if (isUndoRedo && !processingModification.current.has(element.id)) {
+            // Undo/Redo: Force sync position from store to canvas
+            const positionDiffX = Math.abs((fabricObj.left || 0) - element.x);
+            const positionDiffY = Math.abs((fabricObj.top || 0) - element.y);
+
+            if (positionDiffX > 0.1 || positionDiffY > 0.1) {
+              console.log(`[UNDO/REDO] Syncing position for ${element.id}: canvas=(${fabricObj.left},${fabricObj.top}) store=(${element.x},${element.y})`);
               fabricObj.set({ left: element.x, top: element.y });
               fabricObj.setCoords();
             }
           }
+          // Otherwise: DO NOT sync position - canvas is source of truth during normal operations
 
           // Update lock state - locked objects are selectable but not movable/resizable
           const isLocked = element.locked || false;
@@ -784,6 +798,9 @@ export function DesignCanvas() {
     // Always render to reflect property changes
     canvas.renderAll();
 
+    // Update the known undo/redo timestamp after processing
+    lastKnownUndoRedoTimestamp.current = lastUndoRedoTimestamp;
+
     // Restore the selection if it was lost during property updates
     if (activeElementId && !canvas.getActiveObject()) {
       const fabricObj = fabricObjectsMap.current.get(activeElementId);
@@ -792,7 +809,7 @@ export function DesignCanvas() {
         canvas.renderAll();
       }
     }
-  }, [elements, isReady]);
+  }, [elements, isReady, lastUndoRedoTimestamp]);
 
   // 3) Handle zoom
   useEffect(() => {
@@ -993,7 +1010,7 @@ export function DesignCanvas() {
       }
     };
 
-    const handleMouseDown = (e: fabric.IEvent) => {
+    const handleMouseDown = (e: fabric.TEvent) => {
       if (isSpacePressed && e.e instanceof MouseEvent) {
         setIsPanning(true);
         panStartPoint.current = {
@@ -1005,7 +1022,7 @@ export function DesignCanvas() {
       }
     };
 
-    const handleMouseMove = (e: fabric.IEvent) => {
+    const handleMouseMove = (e: fabric.TEvent) => {
       if (isPanning && panStartPoint.current && e.e instanceof MouseEvent) {
         const deltaX = e.e.clientX - panStartPoint.current.x;
         const deltaY = e.e.clientY - panStartPoint.current.y;
@@ -1020,7 +1037,7 @@ export function DesignCanvas() {
       }
     };
 
-    const handleMouseUp = (e: fabric.IEvent) => {
+    const handleMouseUp = (e: fabric.TEvent) => {
       if (isPanning && panStartPoint.current) {
         setIsPanning(false);
 

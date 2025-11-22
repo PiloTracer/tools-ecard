@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { templateService } from '../../services/templateService';
-import type { TemplateMetadata } from '../../types';
+import { templateService, type TemplateMetadata } from '../../services/templateService';
 
 interface OpenTemplateModalProps {
   isOpen: boolean;
