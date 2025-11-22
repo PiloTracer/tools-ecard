@@ -43,8 +43,8 @@ async function rasterizeImages(template: Template, canvas: fabric.Canvas | null)
       console.log(`[RASTERIZE] Found fabric object for ${element.id}:`, fabricObj?.type);
 
       if (fabricObj && (fabricObj.type === 'image' || fabricObj.type === 'Image')) {
+        // Try to rasterize, but fall back to original URL if it fails (e.g., CORS taint)
         try {
-          // Export the Fabric.js image as PNG data URL
           const fabricImage = fabricObj as fabric.Image;
           const pngDataUrl = fabricImage.toDataURL({
             format: 'png',
@@ -58,8 +58,10 @@ async function rasterizeImages(template: Template, canvas: fabric.Canvas | null)
           // Replace the imageUrl with the rasterized PNG
           imageElement.imageUrl = pngDataUrl;
         } catch (error) {
-          console.error(`[RASTERIZE] Failed to rasterize image ${element.id}:`, error);
-          // Keep the original imageUrl if rasterization fails
+          // Canvas is tainted (loaded from cross-origin URL), keep the original URL
+          console.warn(`[RASTERIZE] Cannot rasterize ${element.id} (CORS taint), keeping original URL`);
+          console.log(`[RASTERIZE] Original URL:`, imageElement.imageUrl?.substring(0, 100));
+          // imageElement.imageUrl stays unchanged
         }
       } else {
         console.warn(`[RASTERIZE] No fabric Image object found for element ${element.id}`);

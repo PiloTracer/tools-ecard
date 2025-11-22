@@ -780,6 +780,10 @@ export function DesignCanvas() {
     }
 
     if (needsReorder) {
+      console.log('[LAYERING] Reordering needed!');
+      console.log('[LAYERING] Elements array order:', elements.map((el, i) => `${i}: ${el.type}-${el.id.substring(0, 8)}`));
+      console.log('[LAYERING] Current canvas order:', elementObjects.map((obj: any, i) => `${i}: ${obj.type}-${obj.elementId?.substring(0, 8)}`));
+
       // Preserve background color
       const bgColor = canvas.backgroundColor;
 
@@ -797,6 +801,7 @@ export function DesignCanvas() {
 
       canvas.renderAll();
       console.log('[LAYERING] Synced fabric object order with elements array');
+      console.log('[LAYERING] New canvas order:', canvas.getObjects().filter((obj: any) => !obj.isGrid).map((obj: any, i) => `${i}: ${obj.type}-${obj.elementId?.substring(0, 8)}`));
     }
   }, [elements, isReady]);
 
