@@ -51,6 +51,8 @@ export function ElementToolbox() {
       type: 'qr',
       x: width / 2 - 50,
       y: height / 2 - 50,
+      width: 100,
+      height: 100,
       size: 100,
       data: 'https://example.com',
       qrType: 'url',

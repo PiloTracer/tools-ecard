@@ -181,6 +181,8 @@ export function DesignCanvas() {
         y: finalY,
       };
 
+      console.log(`[MODIFY] Element ${elementId} type=${element.type}, has width=${element.width !== undefined}, has height=${element.height !== undefined}`);
+
       // Handle size updates for text (fontSize) vs others (width/height)
       // Only update size if object was actually scaled (scaleX/scaleY changed from 1)
       if (element.type === 'text') {
@@ -192,7 +194,8 @@ export function DesignCanvas() {
           // Reset scale to 1 after applying to fontSize
           target.set({ scaleX: 1, scaleY: 1 });
         }
-      } else if (element.width !== undefined && element.height !== undefined) {
+      } else if (element.type === 'qr' || (element.width !== undefined && element.height !== undefined)) {
+        // For QR elements OR elements with width/height defined
         const scaleX = target.scaleX || 1;
         const scaleY = target.scaleY || 1;
         // Only update if object was scaled
@@ -253,8 +256,37 @@ export function DesignCanvas() {
 
                 // DON'T reset scale - it will be reset to 1 when image is recreated
               }
+            } else if (element.type === 'qr') {
+              // QR code elements: update size property along with width/height
+              // Use size as fallback if width/height not defined (for backward compatibility)
+              const qrElement = element as any;
+              const currentWidth = element.width || qrElement.size;
+              const currentHeight = element.height || qrElement.size;
+
+              const newWidth = Math.round((target.width || currentWidth) * scaleX);
+              const newHeight = Math.round((target.height || currentHeight) * scaleY);
+
+              console.log('QR resize:', {
+                oldSize: qrElement.size,
+                oldWidth: element.width,
+                oldHeight: element.height,
+                currentWidth,
+                currentHeight,
+                targetWidth: target.width,
+                targetHeight: target.height,
+                scaleX,
+                scaleY,
+                newWidth,
+                newHeight
+              });
+
+              updates.width = newWidth;
+              updates.height = newHeight;
+              (updates as any).size = newWidth; // QR codes are square, use width as size
+              // Reset scale to 1 after applying to width/height
+              target.set({ scaleX: 1, scaleY: 1 });
             } else {
-              // Non-image elements: apply scale to dimensions and reset scale
+              // Non-image, non-QR elements: apply scale to dimensions and reset scale
               const newWidth = Math.round((target.width || element.width) * scaleX);
               const newHeight = Math.round((target.height || element.height) * scaleY);
 
@@ -271,6 +303,7 @@ export function DesignCanvas() {
         }
       }
 
+      console.log(`[MODIFY] Updating element ${elementId} with:`, updates);
       updateElement(elementId, updates);
 
       // Update the fabricObj in the map to ensure it has the latest radius/rx/ry
@@ -475,8 +508,9 @@ export function DesignCanvas() {
                   fabricObj.setCoords();
                 }
               }
-            } else {
-              // For non-shape elements (image, QR), use width/height
+            } else if (element.type !== 'qr') {
+              // For non-shape, non-QR elements (images), use width/height
+              // QR elements are excluded because they manage their own scaling during regeneration
               const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
               const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
 
@@ -505,8 +539,7 @@ export function DesignCanvas() {
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
           // Update position ONLY if not currently being modified by user
-          // AND not a QR code (QR codes manage their own position during regeneration)
-          if (!processingModification.current.has(element.id) && element.type !== 'qr') {
+          if (!processingModification.current.has(element.id)) {
             if (fabricObj.left !== element.x || fabricObj.top !== element.y) {
               fabricObj.set({ left: element.x, top: element.y });
               fabricObj.setCoords();
@@ -545,7 +578,7 @@ export function DesignCanvas() {
       });
     }
 
-    // Regenerate QR codes when data changes
+    // Regenerate QR codes when data OR size changes
     elements.forEach(element => {
       if (element.type === 'qr') {
         const qrEl = element as QRElement;
@@ -553,20 +586,32 @@ export function DesignCanvas() {
 
         if (fabricObj) {
           const currentQRData = (fabricObj as any)._qrData;
-          if (currentQRData !== qrEl.data) {
-            // QR data changed, regenerate
-            console.log('[QR] Data changed for', element.id, 'regenerating...');
+          const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
+          const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
 
-            // Save current position, size, and rotation from the Fabric object (not element)
+          // Get target size from element (with fallback to size property)
+          const targetWidth = qrEl.width || qrEl.size;
+          const targetHeight = qrEl.height || qrEl.size;
+
+          const dataChanged = currentQRData !== qrEl.data;
+          const sizeChanged = Math.abs(currentWidth - targetWidth) > 1 || Math.abs(currentHeight - targetHeight) > 1;
+
+          if (dataChanged || sizeChanged) {
+            // QR data or size changed, regenerate
+            console.log('[QR] Regenerating QR for', element.id, 'dataChanged:', dataChanged, 'sizeChanged:', sizeChanged);
+
+            // Mark as being modified to prevent position sync during regeneration
+            processingModification.current.add(element.id);
+
+            // Save current position and rotation from the Fabric object
             const currentLeft = fabricObj.left;
             const currentTop = fabricObj.top;
-            const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
-            const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
             const currentAngle = fabricObj.angle;
             const currentOpacity = fabricObj.opacity;
 
+            // Use the target size from the element for regeneration
             QRCode.toDataURL(qrEl.data || 'https://example.com', {
-              width: Math.round(currentWidth),
+              width: Math.round(targetWidth),
               margin: 1,
               color: {
                 dark: qrEl.colorDark || '#000000',
@@ -576,12 +621,19 @@ export function DesignCanvas() {
             })
               .then(qrDataUrl => {
                 fabric.Image.fromURL(qrDataUrl).then(qrImage => {
-                  // Use CURRENT position/size from Fabric object, not from element
+                  // The QR image has its intrinsic dimensions from QRCode.toDataURL
+                  // We need to scale it to match targetWidth/targetHeight
+                  const scaleX = targetWidth / (qrImage.width || targetWidth);
+                  const scaleY = targetHeight / (qrImage.height || targetHeight);
+
+                  console.log('[QR] QR image dimensions:', qrImage.width, 'x', qrImage.height, 'scaling to', targetWidth, 'x', targetHeight, 'scale:', scaleX, scaleY);
+
+                  // Use position from Fabric object, scale to target size
                   qrImage.set({
                     left: currentLeft,
                     top: currentTop,
-                    scaleX: 1,
-                    scaleY: 1,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
                     angle: currentAngle,
                     opacity: currentOpacity,
                     selectable: true,
@@ -598,11 +650,18 @@ export function DesignCanvas() {
                   canvas.add(qrImage);
                   fabricObjectsMap.current.set(element.id, qrImage);
                   canvas.renderAll();
-                  console.log('[QR] Regenerated QR code at position', currentLeft, currentTop, 'size', currentWidth, currentHeight);
+                  console.log('[QR] Regenerated QR code at position', currentLeft, currentTop, 'size', targetWidth, 'x', targetHeight);
+
+                  // Clear the modification flag after a short delay
+                  setTimeout(() => {
+                    processingModification.current.delete(element.id);
+                  }, 100);
                 });
               })
               .catch(error => {
                 console.error('[QR] Failed to regenerate QR code:', error);
+                // Clear flag even on error
+                processingModification.current.delete(element.id);
               });
           }
         }
@@ -1253,12 +1312,16 @@ export function DesignCanvas() {
       case 'qr': {
         const qrEl = element as QRElement;
 
+        // Use width/height if available, fallback to size for backward compatibility
+        const qrWidth = qrEl.width || qrEl.size;
+        const qrHeight = qrEl.height || qrEl.size;
+
         // Create a placeholder rectangle first (will be replaced with QR code)
         fabricObject = new fabric.Rect({
           left: qrEl.x,
           top: qrEl.y,
-          width: qrEl.size,
-          height: qrEl.size,
+          width: qrWidth,
+          height: qrHeight,
           fill: qrEl.colorLight || '#ffffff',
           stroke: '#94a3b8',
           strokeWidth: 1,
@@ -1274,7 +1337,7 @@ export function DesignCanvas() {
         const qrData = qrEl.data || 'https://example.com';
 
         QRCode.toDataURL(qrData, {
-          width: qrEl.size,
+          width: qrWidth,
           margin: 1,
           color: {
             dark: qrEl.colorDark || '#000000',
@@ -1285,11 +1348,17 @@ export function DesignCanvas() {
           .then(qrDataUrl => {
             // Load QR code as image
             fabric.Image.fromURL(qrDataUrl).then(qrImage => {
+              // Scale the image to match the desired qrWidth/qrHeight
+              const scaleX = qrWidth / (qrImage.width || qrWidth);
+              const scaleY = qrHeight / (qrImage.height || qrHeight);
+
+              console.log('[QR] Initial QR image dimensions:', qrImage.width, 'x', qrImage.height, 'scaling to', qrWidth, 'x', qrHeight, 'scale:', scaleX, scaleY);
+
               qrImage.set({
                 left: qrEl.x,
                 top: qrEl.y,
-                scaleX: 1,
-                scaleY: 1,
+                scaleX: scaleX,
+                scaleY: scaleY,
                 angle: qrEl.rotation || 0,
                 opacity: qrEl.opacity || 1,
                 selectable: true,
@@ -1308,7 +1377,7 @@ export function DesignCanvas() {
                 canvas.add(qrImage);
                 fabricObjectsMap.current.set(element.id, qrImage);
                 canvas.renderAll();
-                console.log('[QR] Generated QR code for element', element.id);
+                console.log('[QR] Generated QR code for element', element.id, 'at size', qrWidth, 'x', qrHeight);
               }
             });
           })
