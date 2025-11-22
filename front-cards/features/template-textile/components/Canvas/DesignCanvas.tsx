@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as fabric from 'fabric';
+import QRCode from 'qrcode';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
@@ -503,10 +504,13 @@ export function DesignCanvas() {
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
-          // Update position
-          if (fabricObj.left !== element.x || fabricObj.top !== element.y) {
-            fabricObj.set({ left: element.x, top: element.y });
-            fabricObj.setCoords();
+          // Update position ONLY if not currently being modified by user
+          // AND not a QR code (QR codes manage their own position during regeneration)
+          if (!processingModification.current.has(element.id) && element.type !== 'qr') {
+            if (fabricObj.left !== element.x || fabricObj.top !== element.y) {
+              fabricObj.set({ left: element.x, top: element.y });
+              fabricObj.setCoords();
+            }
           }
 
           // Update lock state - locked objects are selectable but not movable/resizable
@@ -540,6 +544,70 @@ export function DesignCanvas() {
         }
       });
     }
+
+    // Regenerate QR codes when data changes
+    elements.forEach(element => {
+      if (element.type === 'qr') {
+        const qrEl = element as QRElement;
+        const fabricObj = fabricObjectsMap.current.get(element.id);
+
+        if (fabricObj) {
+          const currentQRData = (fabricObj as any)._qrData;
+          if (currentQRData !== qrEl.data) {
+            // QR data changed, regenerate
+            console.log('[QR] Data changed for', element.id, 'regenerating...');
+
+            // Save current position, size, and rotation from the Fabric object (not element)
+            const currentLeft = fabricObj.left;
+            const currentTop = fabricObj.top;
+            const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
+            const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
+            const currentAngle = fabricObj.angle;
+            const currentOpacity = fabricObj.opacity;
+
+            QRCode.toDataURL(qrEl.data || 'https://example.com', {
+              width: Math.round(currentWidth),
+              margin: 1,
+              color: {
+                dark: qrEl.colorDark || '#000000',
+                light: qrEl.colorLight || '#ffffff',
+              },
+              errorCorrectionLevel: 'M',
+            })
+              .then(qrDataUrl => {
+                fabric.Image.fromURL(qrDataUrl).then(qrImage => {
+                  // Use CURRENT position/size from Fabric object, not from element
+                  qrImage.set({
+                    left: currentLeft,
+                    top: currentTop,
+                    scaleX: 1,
+                    scaleY: 1,
+                    angle: currentAngle,
+                    opacity: currentOpacity,
+                    selectable: true,
+                    evented: true,
+                    hasControls: true,
+                    hasBorders: true,
+                  });
+
+                  (qrImage as any).elementId = element.id;
+                  (qrImage as any)._qrData = qrEl.data;
+
+                  // Replace old QR with new one
+                  canvas.remove(fabricObj);
+                  canvas.add(qrImage);
+                  fabricObjectsMap.current.set(element.id, qrImage);
+                  canvas.renderAll();
+                  console.log('[QR] Regenerated QR code at position', currentLeft, currentTop, 'size', currentWidth, currentHeight);
+                });
+              })
+              .catch(error => {
+                console.error('[QR] Failed to regenerate QR code:', error);
+              });
+          }
+        }
+      }
+    });
 
     // Recreate images with changed imageUrl
     if (imagesToRecreate.length > 0) {
@@ -1184,24 +1252,70 @@ export function DesignCanvas() {
 
       case 'qr': {
         const qrEl = element as QRElement;
+
+        // Create a placeholder rectangle first (will be replaced with QR code)
         fabricObject = new fabric.Rect({
           left: qrEl.x,
           top: qrEl.y,
           width: qrEl.size,
           height: qrEl.size,
-          fill: '#1e293b',
-          stroke: '#475569',
-          strokeWidth: 2,
+          fill: qrEl.colorLight || '#ffffff',
+          stroke: '#94a3b8',
+          strokeWidth: 1,
           angle: qrEl.rotation || 0,
           opacity: qrEl.opacity || 1,
           selectable: true,
           evented: true,
           hasControls: true,
           hasBorders: true,
-          lockScalingX: false,
-          lockScalingY: false,
-          lockRotation: false,
         });
+
+        // Generate QR code asynchronously and replace placeholder
+        const qrData = qrEl.data || 'https://example.com';
+
+        QRCode.toDataURL(qrData, {
+          width: qrEl.size,
+          margin: 1,
+          color: {
+            dark: qrEl.colorDark || '#000000',
+            light: qrEl.colorLight || '#ffffff',
+          },
+          errorCorrectionLevel: 'M',
+        })
+          .then(qrDataUrl => {
+            // Load QR code as image
+            fabric.Image.fromURL(qrDataUrl).then(qrImage => {
+              qrImage.set({
+                left: qrEl.x,
+                top: qrEl.y,
+                scaleX: 1,
+                scaleY: 1,
+                angle: qrEl.rotation || 0,
+                opacity: qrEl.opacity || 1,
+                selectable: true,
+                evented: true,
+                hasControls: true,
+                hasBorders: true,
+              });
+
+              (qrImage as any).elementId = element.id;
+              (qrImage as any)._qrData = qrData;
+
+              // Replace placeholder with actual QR code
+              const placeholder = fabricObjectsMap.current.get(element.id);
+              if (placeholder && canvas) {
+                canvas.remove(placeholder);
+                canvas.add(qrImage);
+                fabricObjectsMap.current.set(element.id, qrImage);
+                canvas.renderAll();
+                console.log('[QR] Generated QR code for element', element.id);
+              }
+            });
+          })
+          .catch(error => {
+            console.error('[QR] Failed to generate QR code:', error);
+          });
+
         break;
       }
 

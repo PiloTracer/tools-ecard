@@ -26,6 +26,83 @@ export function PropertyPanel() {
     }
   };
 
+  const handleGenerateQRs = () => {
+    // Collect all text elements that have a fieldId (vCard fields)
+    const fieldElements = elements.filter(el =>
+      el.type === 'text' && (el as any).fieldId
+    );
+
+    if (fieldElements.length === 0) {
+      alert('No vCard fields found. Please add some fields to the canvas first.');
+      return;
+    }
+
+    // Build vCard data from field elements
+    const vCardLines: string[] = ['BEGIN:VCARD', 'VERSION:3.0'];
+
+    fieldElements.forEach(el => {
+      const textEl = el as any;
+      const fieldId = textEl.fieldId;
+      const value = textEl.text || '';
+
+      // Map fieldId to vCard properties
+      switch (fieldId) {
+        case 'name':
+          vCardLines.push(`FN:${value}`);
+          break;
+        case 'org':
+          vCardLines.push(`ORG:${value}`);
+          break;
+        case 'title':
+          vCardLines.push(`TITLE:${value}`);
+          break;
+        case 'email':
+          vCardLines.push(`EMAIL:${value}`);
+          break;
+        case 'phone':
+          vCardLines.push(`TEL:${value}`);
+          break;
+        case 'mobile':
+          vCardLines.push(`TEL;TYPE=CELL:${value}`);
+          break;
+        case 'address':
+          vCardLines.push(`ADR:;;${value};;;`);
+          break;
+        case 'city':
+          vCardLines.push(`ADR;TYPE=WORK:;;;;${value};;`);
+          break;
+        case 'url':
+          vCardLines.push(`URL:${value}`);
+          break;
+        default:
+          // For custom fields, use NOTE
+          vCardLines.push(`NOTE:${fieldId}: ${value}`);
+      }
+    });
+
+    vCardLines.push('END:VCARD');
+    const vCardData = vCardLines.join('\n');
+
+    console.log('[QR Generation] Generated vCard:', vCardData);
+
+    // Update all QR elements with the vCard data
+    const qrElements = elements.filter(el => el.type === 'qr');
+
+    if (qrElements.length === 0) {
+      alert('No QR code elements found on the canvas.');
+      return;
+    }
+
+    qrElements.forEach(qrEl => {
+      updateElement(qrEl.id, {
+        data: vCardData,
+        qrType: 'vcard'
+      });
+    });
+
+    console.log(`[QR Generation] Updated ${qrElements.length} QR code(s) with vCard data`);
+  };
+
   const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'cover' | 'contain') => {
     if (!selectedElementId || !fabricCanvas || !selectedElement) return;
 
@@ -113,8 +190,30 @@ export function PropertyPanel() {
 
       <div className="flex-1 overflow-y-auto p-4">
         {!selectedElement ? (
-          <div className="text-center text-sm text-gray-500 mt-8">
-            Select an element to view its properties
+          <div className="space-y-4">
+            <div className="text-center text-sm text-gray-500 mt-8">
+              Select an element to view its properties
+            </div>
+
+            {/* Show Generate QRs button if there are QR elements */}
+            {elements.some(el => el.type === 'qr') && (
+              <div className="mt-8">
+                <button
+                  onClick={handleGenerateQRs}
+                  className="w-full rounded-lg border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100 px-4 py-3 text-sm font-semibold text-amber-800 hover:from-amber-100 hover:to-amber-200 hover:border-amber-400 transition-all shadow-sm hover:shadow-md"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                    Generate QRs
+                  </div>
+                  <div className="text-xs text-amber-700 mt-1 opacity-75">
+                    Create vCard from field elements
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
