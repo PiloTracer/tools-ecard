@@ -576,6 +576,12 @@ export function DesignCanvas() {
               hasBorders: true, // Always show selection border
             });
           }
+
+          // Update excludeFromExport state
+          const shouldExclude = element.excludeFromExport || false;
+          if (fabricObj.excludeFromExport !== shouldExclude) {
+            fabricObj.set({ excludeFromExport: shouldExclude });
+          }
         }
       }
     });
@@ -654,6 +660,7 @@ export function DesignCanvas() {
                     evented: true,
                     hasControls: true,
                     hasBorders: true,
+                    excludeFromExport: qrEl.excludeFromExport || false,
                   });
 
                   (qrImage as any).elementId = element.id;
@@ -710,81 +717,95 @@ export function DesignCanvas() {
             imgEl.opacity = currentOpacity;
           }
 
-          // Load the new image first, THEN remove the old placeholder
+          // Load the new image using blob URL to avoid CORS tainting
           console.log('Loading new image:', imgEl.imageUrl.substring(0, 100) + '...');
 
-          // Create an img element in the DOM temporarily to load the image
-          const tempImg = document.createElement('img');
+          const loadImageSafely = async () => {
+            // Convert data URL to blob URL if needed
+            let safeUrl = imgEl.imageUrl;
+            let blobUrl: string | null = null;
 
-          tempImg.onload = () => {
-            console.log('Temp image loaded successfully:', imgEl.imageUrl.substring(0, 100));
-            console.log('Image dimensions:', { naturalWidth: tempImg.naturalWidth, naturalHeight: tempImg.naturalHeight, targetWidth: imgEl.width, targetHeight: imgEl.height });
+            if (imgEl.imageUrl.startsWith('data:')) {
+              try {
+                const response = await fetch(imgEl.imageUrl);
+                const blob = await response.blob();
+                blobUrl = URL.createObjectURL(blob);
+                safeUrl = blobUrl;
+              } catch (err) {
+                console.warn('Failed to convert data URL to blob URL:', err);
+              }
+            }
 
-            // SIMPLE: Render at LOGICAL size for editing
-            // Store original for high-res export
+            // Create a temporary Image element to load the blob URL
+            const img = new Image();
+            img.src = safeUrl;
+
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = reject;
+            });
+
+            console.log('Image loaded successfully');
+
+            // Create an UNTAINTED canvas by drawing from blob URL (not data URL)
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = imgEl.width;
             tempCanvas.height = imgEl.height;
-            const ctx = tempCanvas.getContext('2d');
+            const ctx = tempCanvas.getContext('2d', { willReadFrequently: false });
 
-            if (ctx) {
-              // Draw at LOGICAL size
-              ctx.drawImage(tempImg, 0, 0, imgEl.width, imgEl.height);
+            if (!ctx) {
+              throw new Error('Failed to get 2d context');
+            }
 
-              console.log('Image drawn at logical size');
+            // Draw image scaled to exact target size
+            ctx.drawImage(img, 0, 0, imgEl.width, imgEl.height);
 
-              // Create fabric image with scale = 1
-              const fabricImg = new fabric.Image(tempCanvas, {
-                left: imgEl.x,
-                top: imgEl.y,
-                angle: imgEl.rotation || 0,
-                opacity: imgEl.opacity || 1,
-                selectable: true,
-                evented: true,
-                hasControls: true,
-                hasBorders: true,
-                scaleX: 1,
-                scaleY: 1,
-              });
+            // Create fabric image from the untainted canvas (scale = 1)
+            const fabricImg = new fabric.Image(tempCanvas, {
+              left: imgEl.x,
+              top: imgEl.y,
+              angle: imgEl.rotation || 0,
+              opacity: imgEl.opacity || 1,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              scaleX: 1,
+              scaleY: 1,
+              excludeFromExport: imgEl.excludeFromExport || false,
+            });
 
-              (fabricImg as any).elementId = imgEl.id;
-              (fabricImg as any)._originalImageUrl = imgEl.imageUrl; // Keep original for high-res export
+            (fabricImg as any).elementId = imgEl.id;
+            (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
 
-              console.log('Created fabric image - fills box perfectly');
+            console.log('Replacing placeholder with image');
+            canvas.remove(oldFabricObj);
+            canvas.add(fabricImg);
+            fabricObjectsMap.current.set(imgEl.id, fabricImg);
 
-              console.log('Replacing placeholder with image from canvas');
-              canvas.remove(oldFabricObj);
-              canvas.add(fabricImg);
-              fabricObjectsMap.current.set(imgEl.id, fabricImg);
+            canvas.setActiveObject(fabricImg);
 
-              // Force scale to 1
-              fabricImg.set({ scaleX: 1, scaleY: 1 });
-              fabricImg.setCoords();
+            loadingImages.current.delete(imgEl.id);
+            console.log('Image replacement complete');
 
-              canvas.setActiveObject(fabricImg);
+            // Force z-order sync after image loads
+            console.log('[IMAGE-LOAD] Image recreated, need to sync z-order');
+            const currentElements = useTemplateStore.getState().elements;
+            if (currentElements.length > 0) {
+              useTemplateStore.setState({ elements: [...currentElements] });
+            }
+            canvas.renderAll();
 
-              loadingImages.current.delete(imgEl.id);
-              console.log('Image replacement complete - scale = 1');
-
-              // Force z-order sync after image loads
-              console.log('[IMAGE-LOAD] Image recreated, need to sync z-order');
-              const currentElements = useTemplateStore.getState().elements;
-              if (currentElements.length > 0) {
-                useTemplateStore.setState({ elements: [...currentElements] });
-              }
-              canvas.renderAll();
-            } else {
-              console.error('Failed to get 2d context');
-              loadingImages.current.delete(imgEl.id);
+            // Clean up blob URL
+            if (blobUrl) {
+              URL.revokeObjectURL(blobUrl);
             }
           };
 
-          tempImg.onerror = (error) => {
-            console.error('Failed to load temp image:', error);
+          loadImageSafely().catch((error) => {
+            console.error('Failed to load image:', error);
             loadingImages.current.delete(imgEl.id);
-          };
-
-          tempImg.src = imgEl.imageUrl;
+          });
         }
       });
     }
@@ -1226,6 +1247,7 @@ export function DesignCanvas() {
             lockScalingX: false,
             lockScalingY: false,
             lockRotation: false,
+            excludeFromExport: textEl.excludeFromExport || false,
           });
         }
         break;
@@ -1241,64 +1263,84 @@ export function DesignCanvas() {
           // Mark as loading
           loadingImages.current.add(element.id);
 
-          // Create an img element in the DOM temporarily to load the image
-          const tempImg = document.createElement('img');
+          // Load image using blob URL to avoid CORS tainting
+          const loadImageSafely = async () => {
+            // Convert data URL to blob URL if needed
+            let safeUrl = imgEl.imageUrl;
+            let blobUrl: string | null = null;
 
-          tempImg.onload = () => {
-            // Create a canvas at the TARGET size to render high quality
+            if (imgEl.imageUrl.startsWith('data:')) {
+              try {
+                const response = await fetch(imgEl.imageUrl);
+                const blob = await response.blob();
+                blobUrl = URL.createObjectURL(blob);
+                safeUrl = blobUrl;
+              } catch (err) {
+                console.warn('Failed to convert data URL to blob URL:', err);
+              }
+            }
+
+            // Create a temporary Image element to load the blob URL
+            const img = new Image();
+            img.src = safeUrl;
+
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = reject;
+            });
+
+            // Create an UNTAINTED canvas by drawing from blob URL (not data URL)
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = imgEl.width;
             tempCanvas.height = imgEl.height;
-            const ctx = tempCanvas.getContext('2d');
+            const ctx = tempCanvas.getContext('2d', { willReadFrequently: false });
 
-            if (ctx) {
-              // Draw the image scaled to fill the entire canvas
-              ctx.drawImage(tempImg, 0, 0, imgEl.width, imgEl.height);
+            if (!ctx) {
+              throw new Error('Failed to get 2d context');
+            }
 
-              // Create fabric image from the canvas (already at correct size, so scale = 1)
-              const fabricImg = new fabric.Image(tempCanvas, {
-                left: imgEl.x,
-                top: imgEl.y,
-                angle: imgEl.rotation || 0,
-                opacity: imgEl.opacity || 1,
-                selectable: true,
-                evented: true,
-                hasControls: true,
-                hasBorders: true,
-                scaleX: 1,
-                scaleY: 1,
-              });
+            // Draw image scaled to exact target size
+            ctx.drawImage(img, 0, 0, imgEl.width, imgEl.height);
 
-              (fabricImg as any).elementId = element.id;
-              (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
-              canvas.add(fabricImg);
-              fabricObjectsMap.current.set(element.id, fabricImg);
+            // Create fabric image from the untainted canvas (scale = 1)
+            const fabricImg = new fabric.Image(tempCanvas, {
+              left: imgEl.x,
+              top: imgEl.y,
+              angle: imgEl.rotation || 0,
+              opacity: imgEl.opacity || 1,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              scaleX: 1,
+              scaleY: 1,
+              excludeFromExport: imgEl.excludeFromExport || false,
+            });
 
-              loadingImages.current.delete(element.id);
+            (fabricImg as any).elementId = element.id;
+            (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
 
-              // Force z-order sync after image loads to ensure correct layering
-              console.log('[IMAGE-LOAD] Image loaded, need to sync z-order');
-              // Trigger the elements dependency to force re-sync
-              const currentElements = useTemplateStore.getState().elements;
-              if (currentElements.length > 0) {
-                // Force a re-render by updating the template store (no-op but triggers effects)
-                useTemplateStore.setState({ elements: [...currentElements] });
-              }
-              canvas.renderAll();
-            } else {
-              console.error('Failed to get 2d context');
-              loadingImages.current.delete(element.id);
+            canvas.add(fabricImg);
+            fabricObjectsMap.current.set(element.id, fabricImg);
+
+            loadingImages.current.delete(element.id);
+
+            // Force z-order sync after image loads to ensure correct layering
+            console.log('[IMAGE-LOAD] Image loaded, triggering z-order sync');
+            const currentElements = useTemplateStore.getState().elements;
+            useTemplateStore.setState({ elements: [...currentElements] });
+
+            // Clean up blob URL
+            if (blobUrl) {
+              URL.revokeObjectURL(blobUrl);
             }
           };
 
-          tempImg.onerror = (error) => {
+          loadImageSafely().catch((error) => {
             console.error('Failed to load image:', imgEl.imageUrl);
             console.error('Error details:', error);
             loadingImages.current.delete(element.id);
-          };
-
-          console.log('Loading image URL:', imgEl.imageUrl.substring(0, 150));
-          tempImg.src = imgEl.imageUrl;
+          });
 
           // Return early - loading is async
           return;
@@ -1321,6 +1363,7 @@ export function DesignCanvas() {
             lockScalingX: false,
             lockScalingY: false,
             lockRotation: false,
+            excludeFromExport: imgEl.excludeFromExport || false,
           });
         }
         break;
@@ -1348,6 +1391,7 @@ export function DesignCanvas() {
           evented: true,
           hasControls: true,
           hasBorders: true,
+          excludeFromExport: qrEl.excludeFromExport || false,
         });
 
         // Generate QR code asynchronously and replace placeholder
@@ -1382,6 +1426,7 @@ export function DesignCanvas() {
                 evented: true,
                 hasControls: true,
                 hasBorders: true,
+                excludeFromExport: qrEl.excludeFromExport || false,
               });
 
               (qrImage as any).elementId = element.id;
@@ -1424,6 +1469,7 @@ export function DesignCanvas() {
               evented: true,
               hasControls: true,
               hasBorders: true,
+              excludeFromExport: shapeEl.excludeFromExport || false,
             });
             break;
 
@@ -1441,6 +1487,7 @@ export function DesignCanvas() {
               evented: true,
               hasControls: true,
               hasBorders: true,
+              excludeFromExport: shapeEl.excludeFromExport || false,
             });
             break;
 
@@ -1459,6 +1506,7 @@ export function DesignCanvas() {
               evented: true,
               hasControls: true,
               hasBorders: true,
+              excludeFromExport: shapeEl.excludeFromExport || false,
             });
             break;
 
@@ -1472,6 +1520,7 @@ export function DesignCanvas() {
               evented: true,
               hasControls: true,
               hasBorders: true,
+              excludeFromExport: shapeEl.excludeFromExport || false,
             });
             break;
         }

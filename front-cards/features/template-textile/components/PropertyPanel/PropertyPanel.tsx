@@ -451,6 +451,25 @@ export function PropertyPanel() {
               <p className="text-xs text-gray-500 mt-1">Prevent moving and resizing</p>
             </div>
 
+            {/* No-output */}
+            <div>
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-semibold text-gray-700">No-output</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={selectedElement.excludeFromExport || false}
+                    onChange={(e) => updateElement(selectedElementId!, { excludeFromExport: e.target.checked })}
+                    className="sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition ${selectedElement.excludeFromExport ? 'bg-orange-600' : 'bg-gray-300'}`}>
+                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform ${selectedElement.excludeFromExport ? 'translate-x-5' : ''}`}></div>
+                  </div>
+                </div>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">Exclude from exports</p>
+            </div>
+
             {/* Position */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Position</h3>

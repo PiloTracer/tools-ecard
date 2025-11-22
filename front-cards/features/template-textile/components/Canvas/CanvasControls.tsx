@@ -46,22 +46,30 @@ async function rasterizeImages(template: Template, canvas: fabric.Canvas | null)
         // Try to rasterize, but fall back to original URL if it fails (e.g., CORS taint)
         try {
           const fabricImage = fabricObj as fabric.Image;
-          const pngDataUrl = fabricImage.toDataURL({
-            format: 'png',
-            quality: 1.0,
-            multiplier: 1 // Use the current canvas resolution
-          });
 
-          console.log(`[RASTERIZE] Converted image ${element.id} to PNG (${pngDataUrl.length} bytes)`);
-          console.log(`[RASTERIZE] PNG preview:`, pngDataUrl.substring(0, 100));
+          // Check if the image element is already a safe data URL
+          if (imageElement.imageUrl && imageElement.imageUrl.startsWith('data:image/png;base64,')) {
+            console.log(`[RASTERIZE] Image ${element.id} is already a PNG data URL, skipping`);
+          } else {
+            const pngDataUrl = fabricImage.toDataURL({
+              format: 'png',
+              quality: 1.0,
+              multiplier: 1 // Use the current canvas resolution
+            });
 
-          // Replace the imageUrl with the rasterized PNG
-          imageElement.imageUrl = pngDataUrl;
+            console.log(`[RASTERIZE] Converted image ${element.id} to PNG (${pngDataUrl.length} bytes)`);
+            console.log(`[RASTERIZE] PNG preview:`, pngDataUrl.substring(0, 100));
+
+            // Replace the imageUrl with the rasterized PNG
+            imageElement.imageUrl = pngDataUrl;
+          }
         } catch (error) {
           // Canvas is tainted (loaded from cross-origin URL), keep the original URL
-          console.warn(`[RASTERIZE] Cannot rasterize ${element.id} (CORS taint), keeping original URL`);
-          console.log(`[RASTERIZE] Original URL:`, imageElement.imageUrl?.substring(0, 100));
-          // imageElement.imageUrl stays unchanged
+          console.error(`[RASTERIZE] Cannot rasterize ${element.id} (CORS taint):`, error);
+          console.log(`[RASTERIZE] Original URL type:`, imageElement.imageUrl?.substring(0, 50));
+          console.log(`[RASTERIZE] Fabric object element:`, (fabricObj as any)._element);
+          console.log(`[RASTERIZE] This image will cause export errors!`);
+          // imageElement.imageUrl stays unchanged - THIS WILL CAUSE EXPORT ERRORS
         }
       } else {
         console.warn(`[RASTERIZE] No fabric Image object found for element ${element.id}`);
@@ -241,9 +249,15 @@ export function CanvasControls() {
     fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     fabricCanvas.setZoom(1);
 
-    // Temporarily remove grid lines
+    // Temporarily remove grid lines and objects marked for exclusion
     const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid || obj.excludeFromExport);
-    gridObjects.forEach(obj => fabricCanvas.remove(obj));
+    console.log('[EXPORT PNG] Total objects before removal:', fabricCanvas.getObjects().length);
+    console.log('[EXPORT PNG] Objects to exclude:', gridObjects.length);
+    gridObjects.forEach(obj => {
+      console.log('[EXPORT PNG] Excluding:', (obj as any).elementId, 'excludeFromExport:', (obj as any).excludeFromExport, 'isGrid:', (obj as any).isGrid, 'type:', obj.type);
+      fabricCanvas.remove(obj);
+    });
+    console.log('[EXPORT PNG] Objects after removal:', fabricCanvas.getObjects().length);
 
     // Replace image objects with high-res versions (SVG width × 4)
     const imageReplacements: Array<{ original: any, highRes: any, index: number }> = [];
@@ -281,21 +295,29 @@ export function CanvasControls() {
             const ctx = tempCanvas.getContext('2d');
 
             if (ctx) {
-              ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
+              try {
+                ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
 
-              // Create high-res fabric image, scaled down to fit current box
-              const highResImg = new (fabric as any).Image(tempCanvas, {
-                left: obj.left,
-                top: obj.top,
-                angle: obj.angle,
-                opacity: obj.opacity,
-                scaleX: scaleToFit,
-                scaleY: scaleToFit,
-              });
+                // Test if canvas is tainted by trying to read it
+                tempCanvas.toDataURL();
 
-              imageReplacements.push({ original: obj, highRes: highResImg, index: i });
-              fabricCanvas.remove(obj);
-              fabricCanvas.add(highResImg);
+                // Create high-res fabric image, scaled down to fit current box
+                const highResImg = new (fabric as any).Image(tempCanvas, {
+                  left: obj.left,
+                  top: obj.top,
+                  angle: obj.angle,
+                  opacity: obj.opacity,
+                  scaleX: scaleToFit,
+                  scaleY: scaleToFit,
+                });
+
+                imageReplacements.push({ original: obj, highRes: highResImg, index: i });
+                fabricCanvas.remove(obj);
+                fabricCanvas.add(highResImg);
+              } catch (err) {
+                console.warn('[EXPORT PNG] Cannot create high-res version (CORS), using original:', err);
+                // Don't replace this image - just use the original fabric object
+              }
             }
             resolve();
           };
@@ -308,12 +330,37 @@ export function CanvasControls() {
 
     fabricCanvas.renderAll();
 
-    const dataURL = fabricCanvas.toDataURL({
-      format: 'png',
-      quality: 1,
-      multiplier: scaleFactor,
-      enableRetinaScaling: false,
-    });
+    let dataURL: string;
+    try {
+      dataURL = fabricCanvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: scaleFactor,
+        enableRetinaScaling: false,
+      });
+    } catch (error) {
+      console.error('[EXPORT PNG] Canvas is tainted:', error);
+
+      // Log all objects to see which one might be causing the taint
+      console.log('[EXPORT PNG] Current objects on canvas:');
+      fabricCanvas.getObjects().forEach((obj: any) => {
+        console.log('  -', obj.type, 'elementId:', obj.elementId, '_originalImageUrl:', obj._originalImageUrl?.substring(0, 50));
+      });
+
+      alert('Cannot export: Canvas contains cross-origin images. This is a bug - data URL images should not cause CORS issues. Check console for details.');
+
+      // Restore everything before returning
+      imageReplacements.forEach(({ original, highRes }) => {
+        fabricCanvas.remove(highRes);
+        fabricCanvas.add(original);
+      });
+      gridObjects.forEach(obj => fabricCanvas.add(obj));
+      gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+      fabricCanvas.setViewportTransform(originalViewport);
+      fabricCanvas.setZoom(originalZoom);
+      fabricCanvas.renderAll();
+      return;
+    }
 
     // Restore original images
     imageReplacements.forEach(({ original, highRes }) => {
@@ -388,20 +435,28 @@ export function CanvasControls() {
             const ctx = tempCanvas.getContext('2d');
 
             if (ctx) {
-              ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
+              try {
+                ctx.drawImage(tempImg, 0, 0, renderWidth, renderHeight);
 
-              const highResImg = new (fabric as any).Image(tempCanvas, {
-                left: obj.left,
-                top: obj.top,
-                angle: obj.angle,
-                opacity: obj.opacity,
-                scaleX: scaleToFit,
-                scaleY: scaleToFit,
-              });
+                // Test if canvas is tainted by trying to read it
+                tempCanvas.toDataURL();
 
-              imageReplacements.push({ original: obj, highRes: highResImg, index: i });
-              fabricCanvas.remove(obj);
-              fabricCanvas.add(highResImg);
+                const highResImg = new (fabric as any).Image(tempCanvas, {
+                  left: obj.left,
+                  top: obj.top,
+                  angle: obj.angle,
+                  opacity: obj.opacity,
+                  scaleX: scaleToFit,
+                  scaleY: scaleToFit,
+                });
+
+                imageReplacements.push({ original: obj, highRes: highResImg, index: i });
+                fabricCanvas.remove(obj);
+                fabricCanvas.add(highResImg);
+              } catch (err) {
+                console.warn('[EXPORT JPG] Cannot create high-res version (CORS), using original:', err);
+                // Don't replace this image - just use the original fabric object
+              }
             }
             resolve();
           };
@@ -414,12 +469,30 @@ export function CanvasControls() {
 
     fabricCanvas.renderAll();
 
-    const dataURL = fabricCanvas.toDataURL({
-      format: 'jpeg',
-      quality: 0.95,
-      multiplier: scaleFactor,
-      enableRetinaScaling: false,
-    });
+    let dataURL: string;
+    try {
+      dataURL = fabricCanvas.toDataURL({
+        format: 'jpeg',
+        quality: 0.95,
+        multiplier: scaleFactor,
+        enableRetinaScaling: false,
+      });
+    } catch (error) {
+      console.error('[EXPORT JPG] Canvas is tainted, trying without CORS-sensitive images:', error);
+      alert('Cannot export: Canvas contains cross-origin images. Please re-import your images or save and reload the template to rasterize them.');
+
+      // Restore everything before returning
+      imageReplacements.forEach(({ original, highRes }) => {
+        fabricCanvas.remove(highRes);
+        fabricCanvas.add(original);
+      });
+      gridObjects.forEach(obj => fabricCanvas.add(obj));
+      gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
+      fabricCanvas.setViewportTransform(originalViewport);
+      fabricCanvas.setZoom(originalZoom);
+      fabricCanvas.renderAll();
+      return;
+    }
 
     // Restore original images
     imageReplacements.forEach(({ original, highRes }) => {

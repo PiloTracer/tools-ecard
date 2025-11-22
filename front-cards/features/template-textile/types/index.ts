@@ -10,6 +10,7 @@ export interface BaseElement {
   rotation?: number;
   opacity?: number;
   locked?: boolean;
+  excludeFromExport?: boolean; // If true, element will not be included in exports
   // Original values for reset functionality
   originalX?: number;
   originalY?: number;

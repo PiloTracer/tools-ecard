@@ -56,6 +56,7 @@ export function createMultiColorText(element: TextElement): fabric.Group {
     lockScalingY: false,
     lockRotation: false,
     subTargetCheck: false, // Treat as single object
+    excludeFromExport: element.excludeFromExport || false,
   });
 
   // Store element metadata on the group
@@ -125,6 +126,7 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
   group.set({
     angle: element.rotation || 0,
     opacity: element.opacity || 1,
+    excludeFromExport: element.excludeFromExport || false,
   });
 
   // Update stored metadata
