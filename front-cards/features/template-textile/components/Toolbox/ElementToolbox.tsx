@@ -11,11 +11,13 @@ export function ElementToolbox() {
 
 
   const handleAddText = () => {
+    const x = width / 2 - 50;
+    const y = height / 2 - 20;
     const textElement: TextElement = {
       id: crypto.randomUUID(),
       type: 'text',
-      x: width / 2 - 50,
-      y: height / 2 - 20,
+      x,
+      y,
       text: 'Text',
       fontSize: 24,
       fontFamily: 'Arial',
@@ -24,35 +26,49 @@ export function ElementToolbox() {
       rotation: 0,
       opacity: 1,
       locked: false,
+      originalX: x,
+      originalY: y,
     };
     addElement(textElement);
   };
 
   const handleAddImage = () => {
+    const x = width / 2 - 75;
+    const y = height / 2 - 75;
+    const w = 150;
+    const h = 150;
     const imageElement: ImageElement = {
       id: crypto.randomUUID(),
       type: 'image',
-      x: width / 2 - 75,
-      y: height / 2 - 75,
-      width: 150,
-      height: 150,
+      x,
+      y,
+      width: w,
+      height: h,
       imageUrl: '',
       scaleMode: 'fit',
       rotation: 0,
       opacity: 1,
       locked: false,
+      originalX: x,
+      originalY: y,
+      originalWidth: w,
+      originalHeight: h,
     };
     addElement(imageElement);
   };
 
   const handleAddQR = () => {
+    const x = width / 2 - 50;
+    const y = height / 2 - 50;
+    const w = 100;
+    const h = 100;
     const qrElement: QRElement = {
       id: crypto.randomUUID(),
       type: 'qr',
-      x: width / 2 - 50,
-      y: height / 2 - 50,
-      width: 100,
-      height: 100,
+      x,
+      y,
+      width: w,
+      height: h,
       size: 100,
       data: 'https://example.com',
       qrType: 'url',
@@ -61,25 +77,37 @@ export function ElementToolbox() {
       rotation: 0,
       opacity: 1,
       locked: false,
+      originalX: x,
+      originalY: y,
+      originalWidth: w,
+      originalHeight: h,
     };
     addElement(qrElement);
   };
 
   const handleAddShape = (shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line') => {
+    const x = width / 2 - 50;
+    const y = height / 2 - 50;
+    const w = 100;
+    const h = shapeType === 'line' ? 0 : 100;
     const shapeElement: ShapeElement = {
       id: crypto.randomUUID(),
       type: 'shape',
       shapeType,
-      x: width / 2 - 50,
-      y: height / 2 - 50,
-      width: 100,
-      height: shapeType === 'line' ? 0 : 100,
+      x,
+      y,
+      width: w,
+      height: h,
       fill: shapeType === 'line' ? '' : '#3b82f6',
       stroke: '#1e40af',
       strokeWidth: shapeType === 'line' ? 2 : 1,
       rotation: 0,
       opacity: 1,
       locked: false,
+      originalX: x,
+      originalY: y,
+      originalWidth: w,
+      originalHeight: h,
     };
     addElement(shapeElement);
   };

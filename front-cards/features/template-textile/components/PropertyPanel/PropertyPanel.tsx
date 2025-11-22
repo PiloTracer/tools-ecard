@@ -200,19 +200,71 @@ export function PropertyPanel() {
     console.log(`[QR Generation] Updated ${qrElements.length} QR code(s) with vCard data`);
   };
 
+  const handleReset = () => {
+    if (!selectedElementId || !fabricCanvas || !selectedElement) return;
+
+    const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+    if (!fabricObj) return;
+
+    // Get original values or use current as fallback
+    const origX = selectedElement.originalX ?? selectedElement.x;
+    const origY = selectedElement.originalY ?? selectedElement.y;
+    const origWidth = selectedElement.originalWidth ?? selectedElement.width;
+    const origHeight = selectedElement.originalHeight ?? selectedElement.height;
+
+    const updates: any = {
+      x: origX,
+      y: origY,
+    };
+
+    if (origWidth !== undefined) updates.width = origWidth;
+    if (origHeight !== undefined) updates.height = origHeight;
+
+    console.log('[Reset] Resetting to original:', {
+      origX, origY, origWidth, origHeight
+    });
+
+    // Update the store
+    updateElement(selectedElementId, updates);
+
+    // Update position in Fabric immediately
+    fabricObj.set({
+      left: origX,
+      top: origY
+    });
+
+    // For width/height, only update directly for non-QR/non-Image elements
+    if (selectedElement.type !== 'qr' && selectedElement.type !== 'image') {
+      if (origWidth !== undefined) {
+        fabricObj.set({ width: origWidth, scaleX: 1 });
+      }
+      if (origHeight !== undefined) {
+        fabricObj.set({ height: origHeight, scaleY: 1 });
+      }
+    }
+
+    fabricObj.setCoords();
+    fabricCanvas.renderAll();
+  };
+
   const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'cover' | 'contain') => {
     if (!selectedElementId || !fabricCanvas || !selectedElement) return;
 
     const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
     if (!fabricObj) return;
 
-    const objWidth = (fabricObj.width || 0) * (fabricObj.scaleX || 1);
-    const objHeight = (fabricObj.height || 0) * (fabricObj.scaleY || 1);
+    // Get CURRENT BOX dimensions
+    const currentBoxWidth = selectedElement.width ?? 100;
+    const currentBoxHeight = selectedElement.height ?? 100;
+
+    // For alignment, use current box dimensions
+    let objWidth = currentBoxWidth;
+    let objHeight = currentBoxHeight;
 
     let newX = selectedElement.x;
     let newY = selectedElement.y;
-    let newWidth = selectedElement.width;
-    let newHeight = selectedElement.height;
+    let newWidth = currentBoxWidth;
+    let newHeight = currentBoxHeight;
 
     switch (type) {
       case 'left':
@@ -234,26 +286,40 @@ export function PropertyPanel() {
         newY = canvasHeight - objHeight;
         break;
       case 'cover':
-        // Stretch to fill entire canvas
+        // Stretch BOX to fill entire canvas
         newX = 0;
         newY = 0;
         newWidth = canvasWidth;
         newHeight = canvasHeight;
         break;
       case 'contain':
-        // Fit within canvas maintaining aspect ratio
-        const aspectRatio = objWidth / objHeight;
+        // Fit box within canvas maintaining CURRENT box aspect ratio
+        // Simply scale the box to fit, keeping its current proportions INTACT
+        const currentBoxAspectRatio = currentBoxWidth / currentBoxHeight;
         const canvasAspectRatio = canvasWidth / canvasHeight;
 
-        if (aspectRatio > canvasAspectRatio) {
-          // Fit to width
+        console.log('[Contain] Scaling box to fit canvas:', {
+          elementType: selectedElement.type,
+          currentBoxWidth,
+          currentBoxHeight,
+          currentBoxAspectRatio,
+          canvasWidth,
+          canvasHeight,
+          canvasAspectRatio,
+          willFitTo: currentBoxAspectRatio > canvasAspectRatio ? 'WIDTH' : 'HEIGHT'
+        });
+
+        if (currentBoxAspectRatio > canvasAspectRatio) {
+          // Box is WIDER than canvas → fit to canvas WIDTH
           newWidth = canvasWidth;
-          newHeight = canvasWidth / aspectRatio;
+          newHeight = canvasWidth / currentBoxAspectRatio;
         } else {
-          // Fit to height
+          // Box is TALLER than canvas → fit to canvas HEIGHT
           newHeight = canvasHeight;
-          newWidth = canvasHeight * aspectRatio;
+          newWidth = canvasHeight * currentBoxAspectRatio;
         }
+
+        // Center the box
         newX = (canvasWidth - newWidth) / 2;
         newY = (canvasHeight - newHeight) / 2;
         break;
@@ -275,7 +341,38 @@ export function PropertyPanel() {
       updates
     });
 
+    // Update the store
     updateElement(selectedElementId, updates);
+
+    // IMPORTANT: Also update the Fabric.js object directly for position
+    // Since we changed the position sync strategy, we need to update the canvas immediately
+    fabricObj.set({
+      left: newX,
+      top: newY
+    });
+
+    // For width/height changes:
+    // - QR codes: Don't update Fabric directly, let the QR regeneration logic handle it
+    // - Images: Don't update Fabric directly, let the image recreation logic handle it
+    // - Other elements (text, shapes): Update Fabric directly
+    if (selectedElement.type !== 'qr' && selectedElement.type !== 'image') {
+      if (newWidth !== undefined && newWidth !== selectedElement.width) {
+        fabricObj.set({
+          width: newWidth,
+          scaleX: 1
+        });
+      }
+      if (newHeight !== undefined && newHeight !== selectedElement.height) {
+        fabricObj.set({
+          height: newHeight,
+          scaleY: 1
+        });
+      }
+    }
+    // For QR and Image, the size change in the store will trigger regeneration/recreation
+
+    fabricObj.setCoords();
+    fabricCanvas.renderAll();
   };
 
   return (
@@ -461,7 +558,7 @@ export function PropertyPanel() {
               {/* Coverage */}
               <div className="mt-4">
                 <h4 className="mb-2 text-xs font-semibold text-gray-600 uppercase">Coverage</h4>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleAlign('cover')}
                     className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
@@ -473,6 +570,12 @@ export function PropertyPanel() {
                     className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
                   >
                     Contain
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs text-slate-800 hover:bg-slate-100 font-medium"
+                  >
+                    Reset
                   </button>
                 </div>
               </div>

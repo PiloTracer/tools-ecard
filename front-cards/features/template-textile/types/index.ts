@@ -10,6 +10,11 @@ export interface BaseElement {
   rotation?: number;
   opacity?: number;
   locked?: boolean;
+  // Original values for reset functionality
+  originalX?: number;
+  originalY?: number;
+  originalWidth?: number;
+  originalHeight?: number;
   // Line metadata for visibility and reordering logic
   sectionGroup?: string; // Groups multiple lines together into a logical section (e.g., 'contact-info', 'business-details')
   lineGroup?: string; // e.g., 'contact-line-1', 'contact-line-2'
