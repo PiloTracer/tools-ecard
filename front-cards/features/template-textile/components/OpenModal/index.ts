@@ -1,0 +1,1 @@
+export { OpenTemplateModal } from './OpenTemplateModal';

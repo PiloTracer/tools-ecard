@@ -5,11 +5,13 @@ import { useState, useEffect } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
+import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
 import { templateService } from '../../services/templateService';
 
 export function CanvasControls() {
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showOpenModal, setShowOpenModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const {
@@ -39,7 +41,8 @@ export function CanvasControls() {
     canUndo,
     canRedo,
     setSaveMetadata,
-    markAsSaved
+    markAsSaved,
+    loadTemplate
   } = useTemplateStore();
 
   // Keyboard shortcuts
@@ -93,6 +96,34 @@ export function CanvasControls() {
       throw error;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleOpenTemplate = async (templateId: string) => {
+    try {
+      // Load template from service
+      const loadedTemplate = await templateService.loadTemplate(templateId);
+
+      // Clear current canvas
+      if (fabricCanvas) {
+        fabricCanvas.clear();
+        fabricCanvas.backgroundColor = loadedTemplate.data.backgroundColor || '#ffffff';
+      }
+
+      // Load template into store (this will trigger canvas re-render)
+      loadTemplate(loadedTemplate.data);
+
+      // Update save metadata
+      setSaveMetadata(
+        'Default Project',
+        loadedTemplate.name
+      );
+      markAsSaved();
+
+      console.log('Template opened successfully:', loadedTemplate.name);
+    } catch (error) {
+      console.error('Error opening template:', error);
+      throw error;
     }
   };
 
@@ -381,6 +412,13 @@ export function CanvasControls() {
         currentProjectName={currentProjectName || 'default'}
       />
 
+      {/* Open Modal */}
+      <OpenTemplateModal
+        isOpen={showOpenModal}
+        onClose={() => setShowOpenModal(false)}
+        onOpen={handleOpenTemplate}
+      />
+
       {/* Template Status Bar */}
       <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-2">
         <TemplateStatus />
@@ -412,6 +450,18 @@ export function CanvasControls() {
                 Save
               </>
             )}
+          </button>
+
+          {/* Open Button */}
+          <button
+            onClick={() => setShowOpenModal(true)}
+            className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600"
+            title="Open Template"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+            </svg>
+            Open
           </button>
 
           {/* Quick Save (Ctrl+S) */}

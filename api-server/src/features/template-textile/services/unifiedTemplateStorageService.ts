@@ -337,18 +337,79 @@ class UnifiedTemplateStorageService {
     // Load template data from storage
     let templateData: any;
 
-    if (metadata.storageUrl.startsWith('s3://') || metadata.storageUrl.startsWith('fallback://')) {
+    if (metadata.storageUrl.startsWith('s3://')) {
       try {
-        templateData = await fallbackStorageService.loadTemplate(metadata.storageUrl);
+        // Parse S3 URL: s3://bucketName/vcards/userId/templateId/template.json
+        const s3UrlParts = metadata.storageUrl.replace('s3://', '').split('/');
+        const bucketName = s3UrlParts[0];
+        const s3Key = s3UrlParts.slice(1).join('/');
+
+        console.log('[UnifiedTemplateStorage] Loading from S3:', bucketName, s3Key);
+
+        const s3Service = getS3Service();
+        const s3Result = await s3Service.getObject(bucketName, s3Key);
+
+        // Convert body (Readable or Buffer) to Buffer
+        let buffer: Buffer;
+        if (Buffer.isBuffer(s3Result.body)) {
+          buffer = s3Result.body;
+        } else {
+          // Convert Readable stream to Buffer
+          const chunks: Buffer[] = [];
+          for await (const chunk of s3Result.body) {
+            chunks.push(Buffer.from(chunk));
+          }
+          buffer = Buffer.concat(chunks);
+        }
+
+        templateData = JSON.parse(buffer.toString('utf-8'));
       } catch (error) {
-        console.error('Failed to load template from storage:', error);
-        throw new Error('Failed to load template data');
+        console.error('Failed to load template from S3:', error);
+        throw new Error('Failed to load template data from S3');
+      }
+    } else if (metadata.storageUrl.startsWith('fallback://')) {
+      try {
+        // For fallback storage, use userId, projectId (default), and templateId
+        const projectId = 'default';
+        console.log('[UnifiedTemplateStorage] Loading from fallback storage:', metadata.userId, projectId, metadata.id);
+
+        templateData = await fallbackStorageService.loadTemplate(
+          metadata.userId,
+          projectId,
+          metadata.id
+        );
+
+        if (!templateData) {
+          throw new Error('Template file not found in fallback storage');
+        }
+      } catch (error) {
+        console.error('Failed to load template from fallback storage:', error);
+        throw new Error('Failed to load template data from fallback storage');
       }
     } else if (metadata.storageUrl.startsWith('local://')) {
       // In real implementation, would load from local storage
       templateData = { placeholder: 'local template data' };
     } else {
       throw new Error('Unknown storage URL format');
+    }
+
+    // Convert S3 URLs in templateData to HTTP URLs
+    if (templateData && templateData.elements) {
+      // Use public endpoint for browser access (not the Docker-internal endpoint)
+      const apiEndpoint = process.env.API_PUBLIC_ENDPOINT || 'http://localhost:7400';
+      console.log('[UnifiedTemplateStorage] Converting S3 URLs, apiEndpoint:', apiEndpoint);
+      templateData.elements = templateData.elements.map((element: any) => {
+        if (element.type === 'image' && element.imageUrl && element.imageUrl.startsWith('s3://')) {
+          // Convert s3://bucket/key to http://localhost:7400/api/v1/template-textile/resource/bucket/key
+          const s3UrlParts = element.imageUrl.replace('s3://', '').split('/');
+          const bucketName = s3UrlParts[0];
+          const key = s3UrlParts.slice(1).join('/');
+          const httpUrl = `${apiEndpoint}/api/v1/template-textile/resource/${bucketName}/${key}`;
+          console.log('[UnifiedTemplateStorage] Converting:', element.imageUrl, '->', httpUrl);
+          element.imageUrl = httpUrl;
+        }
+        return element;
+      });
     }
 
     // Log access event
