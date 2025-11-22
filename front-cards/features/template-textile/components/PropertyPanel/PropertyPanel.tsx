@@ -26,7 +26,7 @@ export function PropertyPanel() {
     }
   };
 
-  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'canvas-center' | 'canvas-left' | 'canvas-right' | 'canvas-top' | 'canvas-bottom' | 'canvas-cover' | 'canvas-contain') => {
+  const handleAlign = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'cover' | 'contain') => {
     if (!selectedElementId || !fabricCanvas || !selectedElement) return;
 
     const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
@@ -59,34 +59,14 @@ export function PropertyPanel() {
       case 'bottom':
         newY = canvasHeight - objHeight;
         break;
-      case 'canvas-center':
-        newX = (canvasWidth - objWidth) / 2;
-        newY = (canvasHeight - objHeight) / 2;
-        break;
-      case 'canvas-left':
-        newX = 0;
-        console.log('canvas-left: setting newX to 0');
-        break;
-      case 'canvas-right':
-        newX = canvasWidth - objWidth;
-        console.log('canvas-right: setting newX to', canvasWidth, '-', objWidth, '=', newX);
-        break;
-      case 'canvas-top':
-        newY = 0;
-        console.log('canvas-top: setting newY to 0');
-        break;
-      case 'canvas-bottom':
-        newY = canvasHeight - objHeight;
-        console.log('canvas-bottom: setting newY to', canvasHeight, '-', objHeight, '=', newY);
-        break;
-      case 'canvas-cover':
+      case 'cover':
         // Stretch to fill entire canvas
         newX = 0;
         newY = 0;
         newWidth = canvasWidth;
         newHeight = canvasHeight;
         break;
-      case 'canvas-contain':
+      case 'contain':
         // Fit within canvas maintaining aspect ratio
         const aspectRatio = objWidth / objHeight;
         const canvasAspectRatio = canvasWidth / canvasHeight;
@@ -282,58 +262,22 @@ export function PropertyPanel() {
                 </div>
               </div>
 
-              {/* Canvas Alignment */}
+              {/* Coverage */}
               <div className="mt-4">
-                <h4 className="mb-2 text-xs font-semibold text-gray-600 uppercase">Canvas</h4>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleAlign('canvas-left')}
-                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
-                    >
-                      Left
-                    </button>
-                    <button
-                      onClick={() => handleAlign('canvas-right')}
-                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
-                    >
-                      Right
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleAlign('canvas-top')}
-                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
-                    >
-                      Top
-                    </button>
-                    <button
-                      onClick={() => handleAlign('canvas-bottom')}
-                      className="rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
-                    >
-                      Bottom
-                    </button>
-                  </div>
+                <h4 className="mb-2 text-xs font-semibold text-gray-600 uppercase">Coverage</h4>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => handleAlign('canvas-center')}
-                    className="w-full rounded border border-blue-300 bg-blue-50 px-2 py-1.5 text-xs text-blue-800 hover:bg-blue-100 font-medium"
+                    onClick={() => handleAlign('cover')}
+                    className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
                   >
-                    Center
+                    Cover
                   </button>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleAlign('canvas-cover')}
-                      className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
-                    >
-                      Cover
-                    </button>
-                    <button
-                      onClick={() => handleAlign('canvas-contain')}
-                      className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
-                    >
-                      Contain
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleAlign('contain')}
+                    className="rounded border border-purple-300 bg-purple-50 px-2 py-1.5 text-xs text-purple-800 hover:bg-purple-100 font-medium"
+                  >
+                    Contain
+                  </button>
                 </div>
               </div>
             </div>
