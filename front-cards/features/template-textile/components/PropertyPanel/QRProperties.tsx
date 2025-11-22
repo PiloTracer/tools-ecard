@@ -47,7 +47,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
           value={element.size}
           onChange={(e) => {
             const newSize = parseInt(e.target.value) || 100;
-            handleChange({ size: newSize, width: newSize, height: newSize });
+            handleChange({ size: newSize, width: newSize, height: newSize, originalWidth: newSize, originalHeight: newSize });
           }}
           className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={50}

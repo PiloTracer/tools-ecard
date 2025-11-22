@@ -73,7 +73,9 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
           handleChange({
             imageUrl: dataUrl,
             width: newWidth,
-            height: newHeight
+            height: newHeight,
+            originalWidth: newWidth,
+            originalHeight: newHeight
           });
 
           URL.revokeObjectURL(url);
@@ -115,7 +117,9 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
           handleChange({
             imageUrl: dataUrl,
             width: newWidth,
-            height: newHeight
+            height: newHeight,
+            originalWidth: newWidth,
+            originalHeight: newHeight
           });
         };
         img.src = dataUrl;
