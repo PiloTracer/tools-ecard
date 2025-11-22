@@ -721,19 +721,18 @@ export function DesignCanvas() {
           console.log('Loading new image:', imgEl.imageUrl.substring(0, 100) + '...');
 
           const loadImageSafely = async () => {
-            // Convert data URL to blob URL if needed
+            // ALWAYS convert to blob URL to avoid CORS tainting
             let safeUrl = imgEl.imageUrl;
             let blobUrl: string | null = null;
 
-            if (imgEl.imageUrl.startsWith('data:')) {
-              try {
-                const response = await fetch(imgEl.imageUrl);
-                const blob = await response.blob();
-                blobUrl = URL.createObjectURL(blob);
-                safeUrl = blobUrl;
-              } catch (err) {
-                console.warn('Failed to convert data URL to blob URL:', err);
-              }
+            try {
+              const response = await fetch(imgEl.imageUrl);
+              const blob = await response.blob();
+              blobUrl = URL.createObjectURL(blob);
+              safeUrl = blobUrl;
+            } catch (err) {
+              console.warn('Failed to convert URL to blob URL:', err);
+              // Fall back to original URL
             }
 
             // Create a temporary Image element to load the blob URL
@@ -1265,19 +1264,18 @@ export function DesignCanvas() {
 
           // Load image using blob URL to avoid CORS tainting
           const loadImageSafely = async () => {
-            // Convert data URL to blob URL if needed
+            // ALWAYS convert to blob URL to avoid CORS tainting
             let safeUrl = imgEl.imageUrl;
             let blobUrl: string | null = null;
 
-            if (imgEl.imageUrl.startsWith('data:')) {
-              try {
-                const response = await fetch(imgEl.imageUrl);
-                const blob = await response.blob();
-                blobUrl = URL.createObjectURL(blob);
-                safeUrl = blobUrl;
-              } catch (err) {
-                console.warn('Failed to convert data URL to blob URL:', err);
-              }
+            try {
+              const response = await fetch(imgEl.imageUrl);
+              const blob = await response.blob();
+              blobUrl = URL.createObjectURL(blob);
+              safeUrl = blobUrl;
+            } catch (err) {
+              console.warn('Failed to convert URL to blob URL:', err);
+              // Fall back to original URL
             }
 
             // Create a temporary Image element to load the blob URL
