@@ -3,7 +3,7 @@
 import { useTemplateStore } from '../../stores/templateStore';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { VCardFieldsSection } from './VCardFieldsSection';
-import type { TextElement, ImageElement, QRElement, TableElement, ShapeElement } from '../../types';
+import type { TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 
 export function ElementToolbox() {
   const { addElement } = useTemplateStore();
@@ -61,12 +61,6 @@ export function ElementToolbox() {
       locked: false,
     };
     addElement(qrElement);
-  };
-
-  const handleAddTable = () => {
-    // TABLE FEATURE DISABLED - Unable to implement proper auto-sizing behavior
-    alert('Table feature is currently disabled.');
-    return;
   };
 
   const handleAddShape = (shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line') => {
@@ -136,21 +130,6 @@ export function ElementToolbox() {
           <div>
             <div className="font-semibold text-slate-800">QR Code</div>
             <div className="text-xs text-slate-500">Add QR code element</div>
-          </div>
-        </button>
-
-        <button
-          onClick={handleAddTable}
-          className="flex items-center gap-3 rounded-lg border-2 border-slate-200 p-3 text-left hover:border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-100 to-cyan-200 shadow-sm">
-            <svg className="h-6 w-6 text-cyan-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <div className="font-semibold text-slate-800">Table</div>
-            <div className="text-xs text-slate-500">Add table element</div>
           </div>
         </button>
 

@@ -48,6 +48,12 @@ const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = [
     height: 768,
     description: 'Classic screen',
   },
+  {
+    name: '9:16 (Vertical)',
+    width: 1080,
+    height: 1920,
+    description: 'Mobile/Cellphone',
+  },
 ];
 
 export function CanvasSettings() {
