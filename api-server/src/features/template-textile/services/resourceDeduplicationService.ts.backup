@@ -4,7 +4,6 @@
  */
 
 import crypto from 'crypto';
-import { decodeBase64Data } from '../utils/base64Helper';
 import { Readable } from 'stream';
 import { cassandraClient, StorageMode } from '../../../core/cassandra/client';
 import { resourceOperations } from '../../../core/prisma/client';
@@ -54,9 +53,9 @@ class ResourceDeduplicationService {
     if (!input || !input.data) {
       throw new Error('Resource data is required');
     }
+
     // Decode base64 data to buffer
-    const buffer = decodeBase64Data(input.data);
-    console.log("[ResourceDedup] Buffer size:", buffer.length, "First bytes:", buffer[0]?.toString(16), buffer[1]?.toString(16), buffer[2]?.toString(16));
+    const buffer = Buffer.from(input.data.split(',')[1] || input.data, 'base64');
 
     // Determine MIME type from base64 prefix or type
     let mimeType = 'application/octet-stream';

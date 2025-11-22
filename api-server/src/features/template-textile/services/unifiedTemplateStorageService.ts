@@ -6,6 +6,7 @@ import { resourceDeduplicationService } from './resourceDeduplicationService';
 import { modeDetectionService, StorageMode } from './modeDetectionService';
 import { getS3Service } from '../../s3-bucket/services/s3Service';
 import type { Request } from 'express';
+import { decodeBase64Data } from '../utils/base64Helper';
 
 export interface TemplateMetadata {
   id: string;
@@ -225,8 +226,8 @@ class UnifiedTemplateStorageService {
                 type: resource.type,
                 storageUrl: resourceUrls[i],
                 storageMode,
-                hash: resource.hash || '',
-                size: Buffer.from(resource.data.split(',')[1] || resource.data, 'base64').length,
+                size: decodeBase64Data(resource.data).length,
+                size: Buffer.from(resource.data.includes(',') ? resource.data.substring(resource.data.indexOf(',') + 1) : resource.data, 'base64').length,
                 mimeType: resource.data.match(/^data:([^;]+);/)?.[1] || 'application/octet-stream'
               });
             } catch (error) {

@@ -8,6 +8,68 @@ import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
 import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
 import { templateService } from '../../services/templateService';
+import type { Template, ImageElement } from '../../types';
+
+/**
+ * Rasterize all images in a template to PNG format
+ * This prevents SVG corruption issues when saving/loading templates
+ */
+async function rasterizeImages(template: Template, canvas: fabric.Canvas | null): Promise<Template> {
+  if (!canvas) {
+    console.warn('[RASTERIZE] No canvas available for rasterization, using original template');
+    return template;
+  }
+
+  console.log('[RASTERIZE] Starting image rasterization...');
+  console.log('[RASTERIZE] Template has', template.elements.length, 'elements');
+
+  // Clone the template to avoid modifying the original
+  const processedTemplate: Template = JSON.parse(JSON.stringify(template));
+
+  // Find all Fabric.js objects
+  const fabricObjects = canvas.getObjects();
+  console.log('[RASTERIZE] Canvas has', fabricObjects.length, 'fabric objects');
+
+  // Process each image element
+  for (let i = 0; i < processedTemplate.elements.length; i++) {
+    const element = processedTemplate.elements[i];
+
+    if (element.type === 'image') {
+      const imageElement = element as ImageElement;
+      console.log(`[RASTERIZE] Processing image element ${element.id}, current URL:`, imageElement.imageUrl?.substring(0, 100));
+
+      // Find the corresponding Fabric.js object
+      const fabricObj = fabricObjects.find((obj: any) => obj.elementId === element.id);
+      console.log(`[RASTERIZE] Found fabric object for ${element.id}:`, fabricObj?.type);
+
+      if (fabricObj && (fabricObj.type === 'image' || fabricObj.type === 'Image')) {
+        try {
+          // Export the Fabric.js image as PNG data URL
+          const fabricImage = fabricObj as fabric.Image;
+          const pngDataUrl = fabricImage.toDataURL({
+            format: 'png',
+            quality: 1.0,
+            multiplier: 1 // Use the current canvas resolution
+          });
+
+          console.log(`[RASTERIZE] Converted image ${element.id} to PNG (${pngDataUrl.length} bytes)`);
+          console.log(`[RASTERIZE] PNG preview:`, pngDataUrl.substring(0, 100));
+
+          // Replace the imageUrl with the rasterized PNG
+          imageElement.imageUrl = pngDataUrl;
+        } catch (error) {
+          console.error(`[RASTERIZE] Failed to rasterize image ${element.id}:`, error);
+          // Keep the original imageUrl if rasterization fails
+        }
+      } else {
+        console.warn(`[RASTERIZE] No fabric Image object found for element ${element.id}`);
+      }
+    }
+  }
+
+  console.log('[RASTERIZE] Rasterization complete');
+  return processedTemplate;
+}
 
 export function CanvasControls() {
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -76,10 +138,13 @@ export function CanvasControls() {
     setIsSaving(true);
 
     try {
+      // Rasterize all images before saving to avoid SVG corruption
+      const processedTemplate = await rasterizeImages(currentTemplate, fabricCanvas);
+
       // Save the template (resource extraction happens inside saveTemplate)
       const metadata = await templateService.saveTemplate({
         name: templateName,
-        templateData: currentTemplate,
+        templateData: processedTemplate,
       });
 
       // Update store with saved metadata

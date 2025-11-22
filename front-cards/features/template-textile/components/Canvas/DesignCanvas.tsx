@@ -576,7 +576,8 @@ export function DesignCanvas() {
           const tempImg = document.createElement('img');
 
           tempImg.onload = () => {
-            console.log('Temp image loaded:', { naturalWidth: tempImg.naturalWidth, naturalHeight: tempImg.naturalHeight, targetWidth: imgEl.width, targetHeight: imgEl.height });
+            console.log('Temp image loaded successfully:', imgEl.imageUrl.substring(0, 100));
+            console.log('Image dimensions:', { naturalWidth: tempImg.naturalWidth, naturalHeight: tempImg.naturalHeight, targetWidth: imgEl.width, targetHeight: imgEl.height });
 
             // SIMPLE: Render at LOGICAL size for editing
             // Store original for high-res export
@@ -1126,10 +1127,12 @@ export function DesignCanvas() {
           };
 
           tempImg.onerror = (error) => {
-            console.error('Failed to load image:', error);
+            console.error('Failed to load image:', imgEl.imageUrl);
+            console.error('Error details:', error);
             loadingImages.current.delete(element.id);
           };
 
+          console.log('Loading image URL:', imgEl.imageUrl.substring(0, 150));
           tempImg.src = imgEl.imageUrl;
 
           // Return early - loading is async
