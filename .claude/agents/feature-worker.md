@@ -1,7 +1,7 @@
 ---
 name: feature-worker
 description: Use this agent when the user mentions working on, implementing, reviewing, or discussing a specific feature by name. Examples include:\n\n<example>\nContext: User wants to implement a new authentication feature.\nuser: "I need to work on the user-authentication feature"\nassistant: "I'll use the Task tool to launch the feature-worker agent to help you implement the user-authentication feature."\n<commentary>\nThe user has specified a feature name, so the feature-worker agent should be activated to understand and work on this feature.\n</commentary>\n</example>\n\n<example>\nContext: User wants to review progress on a dashboard feature.\nuser: "Can you check the status of the admin-dashboard feature?"\nassistant: "Let me use the Task tool to launch the feature-worker agent to review the admin-dashboard feature."\n<commentary>\nThe user is asking about a specific feature, so the feature-worker agent should handle this request.\n</commentary>\n</example>\n\n<example>\nContext: User mentions multiple features and wants to switch context.\nuser: "I've finished with the payment-processing feature, now let's work on the notification-system feature"\nassistant: "I'll use the Task tool to launch the feature-worker agent to switch context to the notification-system feature."\n<commentary>\nThe user is transitioning between features, which the feature-worker agent is designed to handle with its context management capabilities.\n</commentary>\n</example>
-model: opus
+model: opusplan
 color: orange
 ---
 

@@ -23,6 +23,7 @@ model User {
   projects          Project[]
   projectSelection  UserProjectSelection?
   templates         TemplateMetadata[]
+  batches           Batch[]
 
   @@map("users")
 }
@@ -150,4 +151,39 @@ model TemplateShare {
   @@index([sharedWithId])
   @@index([shareToken])
   @@map("template_shares")
+}
+
+// Batch - Tracks uploaded batch files for card generation
+model Batch {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  userEmail     String    @map("user_email")
+  fileName      String    @map("file_name")
+  fileSize      Int       @map("file_size")
+  filePath      String    @map("file_path")
+  status        BatchStatus @default(UPLOADED)
+  errorMessage  String?   @map("error_message")
+  processedAt   DateTime? @map("processed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userEmail])
+  @@index([status])
+  @@index([createdAt])
+  @@map("batches")
+}
+
+// Batch status enumeration
+enum BatchStatus {
+  UPLOADED
+  PARSING
+  PARSED
+  LOADED
+  ERROR
+
+  @@map("batch_status")
 }
