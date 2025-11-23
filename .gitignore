@@ -165,3 +165,4 @@ SUBAGENTS/
 .local-storage/
 .claude/
 .db.misc/
+.misc/
