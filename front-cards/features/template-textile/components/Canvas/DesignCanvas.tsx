@@ -403,16 +403,10 @@ export function DesignCanvas() {
 
         if (existingFabricObj && imgEl.imageUrl) {
           // Check if this is a placeholder (Rect) but now has an imageUrl - recreate as actual image
-          // OR if dimensions changed significantly (more than 5px) - recreate to fit new size
-          const currentWidth = (existingFabricObj.width || 0) * (existingFabricObj.scaleX || 1);
-          const currentHeight = (existingFabricObj.height || 0) * (existingFabricObj.scaleY || 1);
-          const widthDiff = Math.abs(currentWidth - imgEl.width);
-          const heightDiff = Math.abs(currentHeight - imgEl.height);
-
+          // OR if URL changed
           if (existingFabricObj.type === 'Rect' ||
-              (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl ||
-              widthDiff > 5 || heightDiff > 5) {
-            console.log('Image needs recreation:', imgEl.id, { widthDiff, heightDiff, urlChanged: (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl });
+              (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl) {
+            console.log('Image needs recreation:', imgEl.id, { isRect: existingFabricObj.type === 'Rect', urlChanged: (existingFabricObj as any)._originalImageUrl !== imgEl.imageUrl });
             imagesToRecreate.push(imgEl);
           }
         }
@@ -513,9 +507,10 @@ export function DesignCanvas() {
                   fabricObj.setCoords();
                 }
               }
-            } else if (element.type !== 'qr') {
-              // For non-shape, non-QR elements (images), use width/height
+            } else if (element.type !== 'qr' && element.type !== 'image') {
+              // For non-shape, non-QR, non-image elements (text), use width/height
               // QR elements are excluded because they manage their own scaling during regeneration
+              // Image elements are excluded because they maintain full resolution and use scale
               const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
               const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
 
@@ -542,6 +537,41 @@ export function DesignCanvas() {
           // Update common properties
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
+
+          // For images, update scale if box dimensions changed
+          if (element.type === 'image' && element.width !== undefined && element.height !== undefined) {
+            const imgEl = element as ImageElement;
+            const currentDisplayWidth = (fabricObj.width || 1) * (fabricObj.scaleX || 1);
+            const currentDisplayHeight = (fabricObj.height || 1) * (fabricObj.scaleY || 1);
+            const widthDiff = Math.abs(currentDisplayWidth - imgEl.width);
+            const heightDiff = Math.abs(currentDisplayHeight - imgEl.height);
+
+            console.log(`[IMAGE-SYNC] Checking ${element.id}:`, {
+              fabricWidth: fabricObj.width,
+              fabricHeight: fabricObj.height,
+              fabricScaleX: fabricObj.scaleX,
+              fabricScaleY: fabricObj.scaleY,
+              currentDisplayWidth,
+              currentDisplayHeight,
+              targetWidth: imgEl.width,
+              targetHeight: imgEl.height,
+              widthDiff,
+              heightDiff
+            });
+
+            if (widthDiff > 1 || heightDiff > 1) {
+              // Box dimensions changed - update scale to fit new box
+              const newScaleX = imgEl.width / (fabricObj.width || imgEl.width);
+              const newScaleY = imgEl.height / (fabricObj.height || imgEl.height);
+              console.log(`[IMAGE-SYNC] Updating scale for ${element.id}: ${newScaleX}x${newScaleY}`);
+              fabricObj.set({
+                scaleX: newScaleX,
+                scaleY: newScaleY,
+              });
+              fabricObj.setCoords();
+              canvas.renderAll();
+            }
+          }
 
           // Position sync strategy: Canvas is the source of truth EXCEPT for undo/redo
           // Check if this is an undo/redo operation (timestamp changed recently)
@@ -746,21 +776,15 @@ export function DesignCanvas() {
 
             console.log('Image loaded successfully');
 
-            // Create an UNTAINTED canvas by drawing from blob URL (not data URL)
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = imgEl.width;
-            tempCanvas.height = imgEl.height;
-            const ctx = tempCanvas.getContext('2d', { willReadFrequently: false });
+            // Get FULL RESOLUTION dimensions from the loaded image
+            const fullResWidth = img.naturalWidth || img.width;
+            const fullResHeight = img.naturalHeight || img.height;
 
-            if (!ctx) {
-              throw new Error('Failed to get 2d context');
-            }
+            console.log('[IMAGE-RECREATE] Full resolution:', fullResWidth, 'x', fullResHeight);
+            console.log('[IMAGE-RECREATE] Box size:', imgEl.width, 'x', imgEl.height);
 
-            // Draw image scaled to exact target size
-            ctx.drawImage(img, 0, 0, imgEl.width, imgEl.height);
-
-            // Create fabric image from the untainted canvas (scale = 1)
-            const fabricImg = new fabric.Image(tempCanvas, {
+            // Create fabric image directly from the Image element (keeps FULL resolution)
+            const fabricImg = new fabric.Image(img, {
               left: imgEl.x,
               top: imgEl.y,
               angle: imgEl.rotation || 0,
@@ -769,10 +793,19 @@ export function DesignCanvas() {
               evented: true,
               hasControls: true,
               hasBorders: true,
-              scaleX: 1,
-              scaleY: 1,
               excludeFromExport: imgEl.excludeFromExport || false,
             });
+
+            // Calculate scale to fit the box while keeping full resolution
+            const scaleX = imgEl.width / fullResWidth;
+            const scaleY = imgEl.height / fullResHeight;
+
+            fabricImg.set({
+              scaleX: scaleX,
+              scaleY: scaleY,
+            });
+
+            console.log('[IMAGE-RECREATE] Scale:', scaleX, 'x', scaleY);
 
             (fabricImg as any).elementId = imgEl.id;
             (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
@@ -1287,21 +1320,17 @@ export function DesignCanvas() {
               img.onerror = reject;
             });
 
-            // Create an UNTAINTED canvas by drawing from blob URL (not data URL)
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = imgEl.width;
-            tempCanvas.height = imgEl.height;
-            const ctx = tempCanvas.getContext('2d', { willReadFrequently: false });
+            // Get FULL RESOLUTION dimensions from the loaded image
+            const fullResWidth = img.naturalWidth || img.width;
+            const fullResHeight = img.naturalHeight || img.height;
 
-            if (!ctx) {
-              throw new Error('Failed to get 2d context');
-            }
+            console.log('[IMAGE-LOAD] ==========================================');
+            console.log('[IMAGE-LOAD] Element ID:', element.id);
+            console.log('[IMAGE-LOAD] Full resolution:', fullResWidth, 'x', fullResHeight);
+            console.log('[IMAGE-LOAD] Box size:', imgEl.width, 'x', imgEl.height);
 
-            // Draw image scaled to exact target size
-            ctx.drawImage(img, 0, 0, imgEl.width, imgEl.height);
-
-            // Create fabric image from the untainted canvas (scale = 1)
-            const fabricImg = new fabric.Image(tempCanvas, {
+            // Create fabric image directly from the Image element (keeps FULL resolution)
+            const fabricImg = new fabric.Image(img, {
               left: imgEl.x,
               top: imgEl.y,
               angle: imgEl.rotation || 0,
@@ -1310,10 +1339,23 @@ export function DesignCanvas() {
               evented: true,
               hasControls: true,
               hasBorders: true,
-              scaleX: 1,
-              scaleY: 1,
               excludeFromExport: imgEl.excludeFromExport || false,
             });
+
+            console.log('[IMAGE-LOAD] Fabric image dimensions:', fabricImg.width, 'x', fabricImg.height);
+
+            // Calculate scale to fit the box while keeping full resolution
+            const scaleX = imgEl.width / fullResWidth;
+            const scaleY = imgEl.height / fullResHeight;
+
+            fabricImg.set({
+              scaleX: scaleX,
+              scaleY: scaleY,
+            });
+
+            console.log('[IMAGE-LOAD] Calculated scale:', scaleX, 'x', scaleY);
+            console.log('[IMAGE-LOAD] Final display size:', (fabricImg.width * scaleX), 'x', (fabricImg.height * scaleY));
+            console.log('[IMAGE-LOAD] ==========================================');
 
             (fabricImg as any).elementId = element.id;
             (fabricImg as any)._originalImageUrl = imgEl.imageUrl;

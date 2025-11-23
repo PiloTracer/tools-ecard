@@ -43,39 +43,60 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
         // Get SVG dimensions
         const img = new Image();
         img.onload = () => {
-          const originalWidth = img.width;
-          const originalHeight = img.height;
+          const svgWidth = img.width;
+          const svgHeight = img.height;
 
-          // Calculate 50% of canvas area while maintaining aspect ratio
+          // RASTERIZE at 5x resolution for high quality
+          const rasterWidth = svgWidth * 5;
+          const rasterHeight = svgHeight * 5;
+
+          console.log('SVG dimensions:', svgWidth, 'x', svgHeight);
+          console.log('Rasterizing to:', rasterWidth, 'x', rasterHeight);
+
+          // Create canvas at 5x resolution
+          const canvas = document.createElement('canvas');
+          canvas.width = rasterWidth;
+          canvas.height = rasterHeight;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            console.error('Failed to get canvas context');
+            return;
+          }
+
+          // Draw SVG at 5x resolution
+          ctx.drawImage(img, 0, 0, rasterWidth, rasterHeight);
+
+          // Convert to PNG data URL
+          const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+
+          console.log('SVG rasterized to PNG:', pngDataUrl.length, 'bytes');
+
+          // Calculate box size to fit 50% of canvas area
           const maxWidth = canvasWidth * 0.5;
           const maxHeight = canvasHeight * 0.5;
 
-          let newWidth = originalWidth;
-          let newHeight = originalHeight;
+          let boxWidth = svgWidth;
+          let boxHeight = svgHeight;
 
           // Scale to fit within 50% of canvas
-          if (newWidth > maxWidth || newHeight > maxHeight) {
-            const widthRatio = maxWidth / newWidth;
-            const heightRatio = maxHeight / newHeight;
+          if (boxWidth > maxWidth || boxHeight > maxHeight) {
+            const widthRatio = maxWidth / boxWidth;
+            const heightRatio = maxHeight / boxHeight;
             const scale = Math.min(widthRatio, heightRatio);
 
-            newWidth = Math.round(newWidth * scale);
-            newHeight = Math.round(newHeight * scale);
+            boxWidth = Math.round(boxWidth * scale);
+            boxHeight = Math.round(boxHeight * scale);
           }
 
-          // Use URL encoding for SVG (more reliable than base64 for Unicode)
-          const dataUrl = svgContent.startsWith('data:')
-            ? svgContent
-            : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
-
-          console.log('SVG imported:', { originalWidth, originalHeight, newWidth, newHeight });
+          console.log('Box size:', boxWidth, 'x', boxHeight);
 
           handleChange({
-            imageUrl: dataUrl,
-            width: newWidth,
-            height: newHeight,
-            originalWidth: newWidth,
-            originalHeight: newHeight
+            imageUrl: pngDataUrl,  // Use rasterized PNG
+            width: boxWidth,
+            height: boxHeight,
+            originalWidth: boxWidth,
+            originalHeight: boxHeight
           });
 
           URL.revokeObjectURL(url);

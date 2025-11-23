@@ -51,10 +51,17 @@ async function rasterizeImages(template: Template, canvas: fabric.Canvas | null)
           if (imageElement.imageUrl && imageElement.imageUrl.startsWith('data:image/png;base64,')) {
             console.log(`[RASTERIZE] Image ${element.id} is already a PNG data URL, skipping`);
           } else {
+            // Calculate multiplier to get FULL RESOLUTION (inverse of scale)
+            const scaleX = fabricImage.scaleX || 1;
+            const scaleY = fabricImage.scaleY || 1;
+            const multiplier = 1 / Math.min(scaleX, scaleY);
+
+            console.log(`[RASTERIZE] Image ${element.id} scale: ${scaleX}x${scaleY}, multiplier: ${multiplier}`);
+
             const pngDataUrl = fabricImage.toDataURL({
               format: 'png',
               quality: 1.0,
-              multiplier: 1 // Use the current canvas resolution
+              multiplier: multiplier // Use inverse of scale to get full resolution
             });
 
             console.log(`[RASTERIZE] Converted image ${element.id} to PNG (${pngDataUrl.length} bytes)`);
@@ -277,16 +284,18 @@ export function CanvasControls() {
             const svgNaturalWidth = tempImg.naturalWidth || tempImg.width;
             const svgNaturalHeight = tempImg.naturalHeight || tempImg.height;
 
-            // Render at SVG width × 4
+            // Render at SVG width × 5 for high quality
             const renderWidth = Math.round(svgNaturalWidth * 5);
             const renderHeight = Math.round(svgNaturalHeight * 5);
 
-            // Calculate what scale to apply to fit in current box
-            const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
-            const currentHeight = (obj.height || 100) * (obj.scaleY || 1);
-            const scaleToFit = currentWidth / renderWidth;
+            // Calculate what scale to apply to match current display dimensions
+            // IMPORTANT: Use separate scaleX/scaleY to preserve distortion/stretching
+            const currentDisplayWidth = (obj.width || 100) * (obj.scaleX || 1);
+            const currentDisplayHeight = (obj.height || 100) * (obj.scaleY || 1);
+            const scaleToFitX = currentDisplayWidth / renderWidth;
+            const scaleToFitY = currentDisplayHeight / renderHeight;
 
-            console.log(`High-res image: SVG ${svgNaturalWidth}x${svgNaturalHeight}, render ${renderWidth}x${renderHeight}, fit scale ${scaleToFit}`);
+            console.log(`High-res image: SVG ${svgNaturalWidth}x${svgNaturalHeight}, render ${renderWidth}x${renderHeight}, scale ${scaleToFitX}x${scaleToFitY}`);
 
             // Create high-res canvas
             const tempCanvas = document.createElement('canvas');
@@ -301,14 +310,14 @@ export function CanvasControls() {
                 // Test if canvas is tainted by trying to read it
                 tempCanvas.toDataURL();
 
-                // Create high-res fabric image, scaled down to fit current box
+                // Create high-res fabric image with SEPARATE scaleX/scaleY to preserve distortion
                 const highResImg = new (fabric as any).Image(tempCanvas, {
                   left: obj.left,
                   top: obj.top,
                   angle: obj.angle,
                   opacity: obj.opacity,
-                  scaleX: scaleToFit,
-                  scaleY: scaleToFit,
+                  scaleX: scaleToFitX,
+                  scaleY: scaleToFitY,
                 });
 
                 imageReplacements.push({ original: obj, highRes: highResImg, index: i });
@@ -418,16 +427,18 @@ export function CanvasControls() {
             const svgNaturalWidth = tempImg.naturalWidth || tempImg.width;
             const svgNaturalHeight = tempImg.naturalHeight || tempImg.height;
 
-            // Render at SVG width × 4
+            // Render at SVG width × 5 for high quality
             const renderWidth = Math.round(svgNaturalWidth * 5);
             const renderHeight = Math.round(svgNaturalHeight * 5);
 
-            // Calculate what scale to apply to fit in current box
-            const currentWidth = (obj.width || 100) * (obj.scaleX || 1);
-            const currentHeight = (obj.height || 100) * (obj.scaleY || 1);
-            const scaleToFit = currentWidth / renderWidth;
+            // Calculate what scale to apply to match current display dimensions
+            // IMPORTANT: Use separate scaleX/scaleY to preserve distortion/stretching
+            const currentDisplayWidth = (obj.width || 100) * (obj.scaleX || 1);
+            const currentDisplayHeight = (obj.height || 100) * (obj.scaleY || 1);
+            const scaleToFitX = currentDisplayWidth / renderWidth;
+            const scaleToFitY = currentDisplayHeight / renderHeight;
 
-            console.log(`High-res image: SVG ${svgNaturalWidth}x${svgNaturalHeight}, render ${renderWidth}x${renderHeight}, fit scale ${scaleToFit}`);
+            console.log(`High-res image: SVG ${svgNaturalWidth}x${svgNaturalHeight}, render ${renderWidth}x${renderHeight}, scale ${scaleToFitX}x${scaleToFitY}`);
 
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = renderWidth;
@@ -441,13 +452,14 @@ export function CanvasControls() {
                 // Test if canvas is tainted by trying to read it
                 tempCanvas.toDataURL();
 
+                // Create high-res fabric image with SEPARATE scaleX/scaleY to preserve distortion
                 const highResImg = new (fabric as any).Image(tempCanvas, {
                   left: obj.left,
                   top: obj.top,
                   angle: obj.angle,
                   opacity: obj.opacity,
-                  scaleX: scaleToFit,
-                  scaleY: scaleToFit,
+                  scaleX: scaleToFitX,
+                  scaleY: scaleToFitY,
                 });
 
                 imageReplacements.push({ original: obj, highRes: highResImg, index: i });
