@@ -28,6 +28,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const [validationError, setValidationError] = useState<FileValidationError | null>(null);
   const [uploadedBatch, setUploadedBatch] = useState<BatchUploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { selectedProjectId, loading } = useProjects();
 
   const isDisabled = !selectedProjectId || loading;
@@ -160,6 +161,84 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     }
   };
 
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      e.preventDefault();
+
+      if (isDisabled || isUploading) return;
+
+      const clipboardData = e.clipboardData;
+
+      // Check if there are files in the clipboard
+      const files = clipboardData.files;
+      if (files && files.length > 0) {
+        handleFile(files[0]);
+        return;
+      }
+
+      // Check if there's text content
+      const text = clipboardData.getData('text/plain');
+      if (text && text.trim()) {
+        // Create a file from the pasted text
+        const blob = new Blob([text], { type: 'text/plain' });
+        const file = new File([blob], 'pasted-content.txt', { type: 'text/plain' });
+        handleFile(file);
+      }
+    },
+    [handleFile, isDisabled, isUploading]
+  );
+
+  // Set up paste event listener - works on hover
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || isDisabled || isUploading) return;
+
+    let isHovering = false;
+
+    const handleMouseEnter = () => {
+      isHovering = true;
+    };
+
+    const handleMouseLeave = () => {
+      isHovering = false;
+    };
+
+    const handleDocumentPaste = (e: ClipboardEvent) => {
+      // Only handle paste if hovering over the container
+      if (!isHovering) return;
+
+      const clipboardData = e.clipboardData;
+      if (!clipboardData) return;
+
+      // Check for files
+      const files = clipboardData.files;
+      if (files && files.length > 0) {
+        e.preventDefault();
+        handleFile(files[0]);
+        return;
+      }
+
+      // Check for text
+      const text = clipboardData.getData('text/plain');
+      if (text && text.trim()) {
+        e.preventDefault();
+        const blob = new Blob([text], { type: 'text/plain' });
+        const file = new File([blob], 'pasted-content.txt', { type: 'text/plain' });
+        handleFile(file);
+      }
+    };
+
+    container.addEventListener('mouseenter', handleMouseEnter);
+    container.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('paste', handleDocumentPaste);
+
+    return () => {
+      container.removeEventListener('mouseenter', handleMouseEnter);
+      container.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('paste', handleDocumentPaste);
+    };
+  }, [handleFile, isDisabled, isUploading]);
+
   // Button classes
   const getButtonClasses = () => {
     const baseClasses = "flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200";
@@ -198,7 +277,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   };
 
   return (
-    <div className={className}>
+    <div className={className} ref={containerRef}>
       <input
         ref={fileInputRef}
         type="file"
@@ -216,11 +295,12 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onPaste={handlePaste}
         role="button"
         tabIndex={isDisabled ? -1 : 0}
         aria-label="Import Batch"
         aria-disabled={isDisabled}
-        title={isDisabled ? "Select a project to import batches" : "Click to upload or drag and drop a file"}
+        title={isDisabled ? "Select a project to import batches" : "Click, drag and drop, or paste content"}
       >
         <svg
           className={getIconClasses()}
@@ -243,6 +323,11 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
           <p className={getDescriptionClasses()}>
             .csv, .txt, .vcf, .xls, .xlsx up to {MAX_SIZE_MB}MB
           </p>
+          {!isDisabled && !isUploading && !isDragging && (
+            <p className="text-xs text-gray-400 mt-1">
+              Click, drag & drop, or hover and paste (Ctrl+V)
+            </p>
+          )}
         </div>
         {isUploading && (
           <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>

@@ -178,31 +178,58 @@ class BatchService {
     };
   }
 
+  // Store mock batch states
+  private mockBatchStates: Map<string, { status: BatchStatus; progress: number; startTime: number }> = new Map();
+
   async getBatchStatusMock(batchId: string): Promise<BatchStatusResponse> {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Simulate different statuses randomly
-    const statuses = [
-      BatchStatus.UPLOADED,
-      BatchStatus.PARSING,
-      BatchStatus.PARSED,
-      BatchStatus.LOADED,
-      BatchStatus.ERROR,
-    ];
+    // Get or initialize batch state
+    let batchState = this.mockBatchStates.get(batchId);
 
-    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+    if (!batchState) {
+      // New batch - start with UPLOADED status
+      batchState = {
+        status: BatchStatus.UPLOADED,
+        progress: 0,
+        startTime: Date.now(),
+      };
+      this.mockBatchStates.set(batchId, batchState);
+    }
+
+    // Simulate realistic progression based on time elapsed
+    const elapsed = Date.now() - batchState.startTime;
+
+    // Progress through stages over ~12 seconds
+    if (elapsed < 2000) {
+      // First 2 seconds: UPLOADED
+      batchState.status = BatchStatus.UPLOADED;
+      batchState.progress = 10;
+    } else if (elapsed < 6000) {
+      // 2-6 seconds: PARSING
+      batchState.status = BatchStatus.PARSING;
+      batchState.progress = 10 + Math.floor((elapsed - 2000) / 40); // Progress to ~50
+    } else if (elapsed < 9000) {
+      // 6-9 seconds: PARSED
+      batchState.status = BatchStatus.PARSED;
+      batchState.progress = 60 + Math.floor((elapsed - 6000) / 30); // Progress to ~90
+    } else {
+      // After 9 seconds: LOADED (complete)
+      batchState.status = BatchStatus.LOADED;
+      batchState.progress = 100;
+    }
 
     return {
       id: batchId,
-      status: randomStatus,
-      progress: randomStatus === BatchStatus.LOADED ? 100 : Math.floor(Math.random() * 80),
-      errorMessage: randomStatus === BatchStatus.ERROR ? 'Mock error message' : null,
-      fileName: 'contacts.csv',
-      fileSize: 1024 * 512, // 512KB
-      createdAt: new Date(),
+      status: batchState.status,
+      progress: Math.min(batchState.progress, 100),
+      errorMessage: null,
+      fileName: 'pasted-content.txt',
+      fileSize: 1024 * 10, // 10KB
+      createdAt: new Date(batchState.startTime),
       updatedAt: new Date(),
-      processedAt: randomStatus === BatchStatus.LOADED ? new Date() : null,
+      processedAt: batchState.status === BatchStatus.LOADED ? new Date() : null,
     };
   }
 }
