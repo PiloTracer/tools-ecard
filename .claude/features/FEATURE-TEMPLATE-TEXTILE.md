@@ -1,299 +1,285 @@
 # Template-Textile Feature Documentation
 
-## Feature Overview
-Template-Textile is a comprehensive canvas-based template designer for creating business card and eCard templates using Fabric.js. It provides a visual design environment where users can create, edit, and export templates with dynamic vCard field integration, allowing for batch generation of personalized cards from employee data.
+## Overview
+Canvas-based template designer using Fabric.js v6 for creating business card/eCard templates with dynamic vCard field integration and batch generation support.
 
-## Key Components
+## Reference Codebases
+When extending functionality or debugging Fabric.js/Canvas issues, refer to:
+- **Fabric.js source**: `D:\Projects\EPIC\tools-fabric-reference\fabric.js`
+- **Node Canvas reference**: `D:\Projects\EPIC\tools-fabric-canvas-reference\node-canvas`
 
-### Frontend Components (`front-cards/features/template-textile/`)
+## Core Components
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| **TemplateDesigner** | `components/TemplateDesigner.tsx` | Main container component that orchestrates the entire designer |
-| **DesignCanvas** | `components/Canvas/DesignCanvas.tsx` | Core Fabric.js canvas implementation with element manipulation |
-| **CanvasControls** | `components/Canvas/CanvasControls.tsx` | Toolbar with zoom, export, save, and canvas control buttons |
-| **CanvasSettings** | `components/CanvasSettings/` | Panel for canvas dimensions and export settings |
-| **PropertyPanel** | `components/PropertyPanel/` | Context-sensitive property editor for selected elements |
-| **Toolbox** | `components/Toolbox/` | Element creation tools (Text, Image, Shapes, vCard fields) |
-| **SaveModal** | `components/SaveModal/SaveTemplateModal.tsx` | Modal dialog for saving templates with project/name |
-| **TemplateStatus** | `components/TemplateStatus/TemplateStatus.tsx` | Status bar showing save state and template name |
+### Frontend (`front-cards/features/template-textile/`)
+- **TemplateDesigner**: Main container orchestrating canvas, toolbox, properties
+- **DesignCanvas**: Fabric.js canvas with element manipulation and sync logic
+- **CanvasControls**: Toolbar (zoom, pan, export, save, undo/redo)
+- **PropertyPanel**: Context-sensitive property editor for selected elements
+- **Toolbox**: Element creation tools (Text, Image, Shapes, QR, vCard fields)
 
-### State Management (`front-cards/features/template-textile/stores/`)
+### State Management
+- **templateStore** (Zustand): Template data, elements, history (50 states), save metadata
+- **canvasStore** (Zustand): Fabric canvas instance, zoom, selection, grid, pan mode
 
-| Store | Purpose | Key State |
-|-------|---------|-----------|
-| **templateStore** | Template data and history | `currentTemplate`, `elements`, `canvasDimensions`, `history`, `saveMetadata` |
-| **canvasStore** | Canvas view and interaction | `fabricCanvas`, `zoom`, `selectedElement`, `grid`, `panMode` |
+### Backend (`api-server/src/features/template-textile/`)
+- **templateController**: REST API handlers for save/load/list operations
+- **templateStorageService**: SeaweedFS storage with resource extraction and versioning
+- **templateRoutes**: Express routes at `/api/v1/template-textile`
 
-### Services & Utils (`front-cards/features/template-textile/`)
+## Element Types
 
-| Service/Util | Location | Purpose |
-|--------------|----------|---------|
-| **templateService** | `services/templateService.ts` | API communication for save/load operations |
-| **vcardFields** | `utils/vcardFields.ts` | vCard field definitions and helpers |
-| **multiColorText** | `utils/multiColorText.ts` | Per-word color text rendering |
-
-### Backend API (`api-server/src/features/template-textile/`)
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| **templateController** | `controllers/templateController.ts` | REST API request handlers |
-| **templateStorageService** | `services/templateStorageService.ts` | SeaweedFS storage operations |
-| **templateRoutes** | `routes/templateRoutes.ts` | Express route definitions |
-
-## Core Functionality
-
-### Canvas Operations
-- **Zoom Controls**: Zoom in/out (10-300%), reset zoom to 100%
-- **Pan Mode**: Spacebar-activated pan mode for navigating large canvases
-- **Reset View**: Button to reset zoom to 100% and center canvas
-- **Grid System**: Toggle grid display and snap-to-grid functionality
-- **Background Color**: Customizable canvas background
-
-### Element Types
-
-#### Text Elements
+### BaseElement
 ```typescript
 {
-  type: 'text',
-  text: string,
-  fontSize: number,
-  fontFamily: string,
-  color?: string,          // Single color (backward compatible)
-  colors?: string[],        // Per-word colors array
-  fieldId?: string,         // vCard field binding
-  sectionGroup?: string,    // Logical section grouping
-  lineGroup?: string,       // Line grouping for visibility
-  requiredFields?: string[], // Fields needed for visibility
-  linePriority?: number     // Reordering priority
-}
-```
-
-#### Image Elements
-```typescript
-{
-  type: 'image',
-  imageUrl: string,
-  width: number,
-  height: number,
-  scaleMode: 'fill' | 'fit' | 'stretch'
-}
-```
-
-#### Shape Elements
-```typescript
-{
-  type: 'shape',
-  shapeType: 'rectangle' | 'circle' | 'ellipse' | 'line',
-  fill?: string,
-  stroke?: string,
-  strokeWidth?: number
-}
-```
-
-#### QR Code Elements
-```typescript
-{
-  type: 'qr',
-  data: string,
-  qrType: 'url' | 'text' | 'vcard',
-  size: number,
-  colorDark?: string,
-  colorLight?: string
-}
-```
-
-### vCard Integration
-- **Field Binding**: Text elements can be bound to vCard fields for dynamic content
-- **Categories**: Core, Business, and Personal field categories
-- **Dynamic Visibility**: Elements show/hide based on available vCard data
-- **Line Metadata**: Advanced control over element visibility and grouping
-
-### Line Metadata Properties
-| Property | Purpose | Example |
-|----------|---------|---------|
-| `sectionGroup` | Groups lines into logical sections | `"contact-info"`, `"business-details"` |
-| `lineGroup` | Groups elements on same line | `"contact-line-1"`, `"address-line"` |
-| `requiredFields` | vCard fields required for visibility | `["work_phone", "mobile_phone"]` |
-| `linePriority` | Ordering priority for dynamic reflow | `1`, `2`, `3` |
-
-### Export Functionality
-- **Formats**: PNG, JPG, SVG export
-- **Resolution**: 5x upscaling for high-quality raster exports
-- **Behavior**: Always exports full canvas (not just viewport)
-- **Export Width**: Configurable target width with proportional scaling
-
-### Template Management
-- **Save/Load**: Store templates in SeaweedFS with versioning
-- **Project Organization**: Templates organized by project and name
-- **Version History**: Automatic versioning (keeps last 3 versions)
-- **Auto-save Metadata**: Tracks last saved time and unsaved changes
-
-## Data Structures
-
-### Template Structure
-```typescript
-interface Template {
-  id: string;
-  name: string;
-  width: number;
-  height: number;
-  elements: TemplateElement[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-### Base Element Interface
-```typescript
-interface BaseElement {
   id: string;
   type: 'text' | 'image' | 'qr' | 'shape';
-  x: number;
+  x: number;           // Canvas position
   y: number;
-  width?: number;
+  width?: number;      // Display dimensions
   height?: number;
-  rotation?: number;
-  opacity?: number;
-  locked?: boolean;
-  // Line metadata
+  rotation?: number;   // Degrees
+  opacity?: number;    // 0-1
+  locked?: boolean;    // Prevents selection/editing
+  excludeFromExport?: boolean;  // Hide from exports
+  // Line metadata for dynamic visibility
   sectionGroup?: string;
   lineGroup?: string;
-  requiredFields?: string[];
+  requiredFields?: string[];  // vCard fields needed
   linePriority?: number;
 }
 ```
 
-## Technical Details
+### TextElement
+- Per-word colors: `colors?: string[]` (overrides `color`)
+- vCard binding: `fieldId?: string`
+- Font properties: `fontSize`, `fontFamily`, `fontWeight`, `fontStyle`, `underline`
+- Stroke: `stroke`, `strokeWidth`
+- Alignment: `textAlign`
+- **Rendering**: Multi-color text uses `fabric.Group` with separate `fabric.Text` per word
 
-### Keyboard Shortcuts
-- **Ctrl+S / Cmd+S**: Save template
-- **Spacebar**: Activate pan mode (hold)
-- **Delete/Backspace**: Delete selected element (disabled in input fields)
-- **Ctrl+Z / Cmd+Z**: Undo
-- **Ctrl+Y / Cmd+Y**: Redo
-
-### Canvas Export Behavior
-- SVG exports use 5x upscaling for high resolution
-- Canvas dimensions separate from export dimensions
-- Maintains aspect ratio during export
-- Full canvas export (ignores viewport/zoom)
-
-### Performance Optimizations
-- Fabric.js native grouping for complex layouts
-- Template cloning for batch generation
-- Preloaded icon resources
-- Efficient history management (50 states max)
-
-## File Structure
-
-```
-front-cards/features/template-textile/
-├── components/
-│   ├── Canvas/
-│   │   ├── DesignCanvas.tsx        # Main canvas component
-│   │   └── CanvasControls.tsx      # Toolbar controls
-│   ├── CanvasSettings/             # Canvas dimension settings
-│   ├── PropertyPanel/              # Element property editor
-│   ├── SaveModal/                  # Save dialog
-│   ├── TemplateStatus/             # Status bar
-│   ├── Toolbox/                    # Element creation tools
-│   └── TemplateDesigner.tsx        # Main container
-├── stores/
-│   ├── canvasStore.ts              # Canvas state
-│   └── templateStore.ts            # Template data state
-├── services/
-│   └── templateService.ts          # API client
-├── types/
-│   └── index.ts                    # TypeScript interfaces
-├── utils/
-│   ├── vcardFields.ts              # vCard field definitions
-│   └── multiColorText.ts           # Per-word coloring
-└── index.ts                        # Public exports
-
-api-server/src/features/template-textile/
-├── controllers/
-│   └── templateController.ts       # REST handlers
-├── services/
-│   └── templateStorageService.ts   # Storage operations
-├── routes/
-│   └── templateRoutes.ts           # Route definitions
-├── types/
-│   └── index.ts                    # Backend types
-└── index.ts                        # Feature registration
+### ImageElement
+```typescript
+{
+  imageUrl: string;    // PNG/JPG data URL (full resolution)
+  width: number;       // Box display width
+  height: number;      // Box display height
+  originalWidth: number;   // Original image dimensions
+  originalHeight: number;
+  scaleMode?: 'cover' | 'contain';
+}
 ```
 
-## Recent Implementations
+**CRITICAL Image Handling:**
+1. **Import**: SVGs rasterized at **5x resolution** immediately (539x171 → 2695x857 PNG)
+2. **Storage**: Full-resolution PNG data URLs stored in template JSON
+3. **Display**: Fabric image keeps full resolution, uses `scaleX/scaleY` to fit box
+4. **Scale Calculation**: `scaleX = boxWidth / imageWidth`, `scaleY = boxHeight / imageHeight`
+5. **Save**: Images with HTTP URLs converted to PNG data URLs at full resolution
+6. **Load**: Blob URL conversion via fetch to avoid CORS tainting
+7. **Export**: High-res version created at 5x, scaled separately on X/Y to preserve distortion
 
-### Completed Features
-- ✅ **Reset View Button**: Resets zoom to 100% and centers canvas
-- ✅ **Section Group Metadata**: Groups lines into logical sections
-- ✅ **Per-Word Color Support**: Individual color for each word in text
-- ✅ **Template Save/Load**: Full persistence with SeaweedFS
-- ✅ **Canvas Export Fixes**: Proper full-canvas export behavior
-- ✅ **Version History**: Automatic versioning with 3-version retention
-- ✅ **Keyboard Shortcuts**: Ctrl+S save, spacebar pan
-- ✅ **Template Status Bar**: Shows save state and template info
+### ShapeElement
+- Types: `rectangle | circle | ellipse | line`
+- Properties: `fill`, `stroke`, `strokeWidth`, `rx/ry` (rounded corners)
 
-### Implementation Guides
-- `PER_WORD_COLOR_IMPLEMENTATION.md`: Per-word coloring details
-- `RESET-VIEW-IMPLEMENTATION.md`: Reset view button implementation
-- `SAVE-TEMPLATE-IMPLEMENTATION.md`: Save/load functionality details
+### QRElement
+- Types: `url | text | vcard`
+- Properties: `data`, `size`, `colorDark`, `colorLight`
+- QR data regenerated on property change
 
-## Integration Points
+## Critical Implementation Details
 
-### Backend API
-- **Base URL**: `/api/v1/template-textile`
-- **Authentication**: JWT token required (Bearer auth)
-- **Storage**: SeaweedFS for template and resource storage
+### Image Resolution Pipeline
+```
+SVG Import → Rasterize 5x → PNG DataURL (full-res) → Store in JSON
+                                    ↓
+                            Display via scale (scaleX/scaleY)
+                                    ↓
+         Manual resize → Update box (width/height) → Recalc scale
+                                    ↓
+                Save → Convert HTTP to PNG DataURL (full-res)
+                                    ↓
+                Load → Blob URL → fabric.Image (full-res) → Scale to box
+                                    ↓
+            Export → Create 5x high-res → Scale X/Y separately → Preserve distortion
+```
 
-### SeaweedFS Storage
-- **Templates**: Stored as JSON with metadata
-- **Resources**: Images extracted and stored separately
-- **Versioning**: Automatic version management
+**Key File: `ImageProperties.tsx:49-71`**
+```typescript
+// RASTERIZE at 5x resolution for high quality
+const rasterWidth = svgWidth * 5;
+const rasterHeight = svgHeight * 5;
+canvas.width = rasterWidth;
+canvas.height = rasterHeight;
+ctx.drawImage(img, 0, 0, rasterWidth, rasterHeight);
+const pngDataUrl = canvas.toDataURL('image/png', 1.0);
+```
 
-### Authentication
-- User context from JWT token
-- Templates scoped to authenticated user
-- Project-based organization
+### Canvas Sync Logic (DesignCanvas.tsx)
 
-### Related Features
-- **vCard System**: Integration with employee vCard data
-- **Batch Generation**: Templates used for bulk card creation
-- **Export System**: Integration with image export services
+**Two-way Sync:**
+- **Canvas → Store**: Object modification events update store
+- **Store → Canvas**: Store changes update fabric objects
 
-## Usage Flow
+**Position Sync:**
+- Canvas is source of truth EXCEPT during undo/redo
+- Undo/redo forces store position to canvas
 
-1. **Create Template**: User creates new template with dimensions
-2. **Add Elements**: Drag elements from toolbox to canvas
-3. **Configure Properties**: Edit element properties in property panel
-4. **Bind vCard Fields**: Connect text elements to vCard fields
-5. **Set Line Metadata**: Configure visibility rules and grouping
-6. **Save Template**: Save with project and template name
-7. **Export/Generate**: Export as image or use for batch generation
+**Image Dimension Sync (Lines 540-573):**
+```typescript
+// Images excluded from text width/height sync (line 510)
+if (element.type !== 'qr' && element.type !== 'image') {
+  // Text elements: set width/height, reset scale to 1
+}
 
-## Key Design Decisions
+// Image scale sync: update scale when box dimensions change
+const currentDisplayWidth = (fabricObj.width || 1) * (fabricObj.scaleX || 1);
+const currentDisplayHeight = (fabricObj.height || 1) * (fabricObj.scaleY || 1);
+if (Math.abs(currentDisplayWidth - imgEl.width) > 1) {
+  const newScaleX = imgEl.width / fabricObj.width;
+  const newScaleY = imgEl.height / fabricObj.height;
+  fabricObj.set({ scaleX: newScaleX, scaleY: newScaleY });
+}
+```
 
-1. **Fabric.js over HTML Canvas**: Provides rich object model and interaction
-2. **Line Metadata**: Enables dynamic layout without complex table structures
-3. **Per-Word Colors**: Allows granular text styling for brand consistency
-4. **Project Organization**: Helps manage multiple template sets
-5. **5x Export Scaling**: Ensures high-quality output for print/digital use
-6. **Separate Canvas/Export Dimensions**: Flexibility in design vs output size
+**Image Recreation (Lines 404-412):**
+- Only recreate if: placeholder (Rect) OR imageUrl changed
+- NOT recreated on dimension changes (scale sync handles it)
 
-## Performance Considerations
+### Export High-Res Logic (CanvasControls.tsx:287-321, 430-463)
 
-- **Element Limits**: Recommended max 100 elements per template
-- **Image Optimization**: Compress images before upload
-- **History States**: Limited to 50 for memory efficiency
-- **Batch Generation**: Clone templates rather than recreate
-- **Resource Preloading**: Load all assets before batch operations
+**PNG/JPG Export:**
+1. Remove grid and `excludeFromExport` objects
+2. For each image with `_originalImageUrl`:
+   - Load original URL
+   - Rasterize at 5x resolution
+   - Calculate **separate** `scaleToFitX` and `scaleToFitY`
+   - Create fabric image with different X/Y scales (preserves distortion)
+3. Export canvas with multiplier (e.g., 2x for 2400px from 1200px canvas)
+4. Restore original objects
 
-## Future Enhancements (Potential)
-- Layer management system
-- Template inheritance/variants
-- Advanced alignment tools
-- Custom font upload
-- Animation support for digital cards
-- Collaborative editing
-- Template marketplace/sharing
+**Key Code (Lines 293-296, 319-320):**
+```typescript
+const currentDisplayWidth = (obj.width || 100) * (obj.scaleX || 1);
+const currentDisplayHeight = (obj.height || 100) * (obj.scaleY || 1);
+const scaleToFitX = currentDisplayWidth / renderWidth;
+const scaleToFitY = currentDisplayHeight / renderHeight;
+// ...
+scaleX: scaleToFitX,  // Separate X/Y scales preserve distortion
+scaleY: scaleToFitY,
+```
+
+### Cover/Contain (ImageProperties.tsx via PropertyPanel)
+- **Cover**: Scale to fill box, crop overflow (larger scale wins)
+- **Contain**: Scale to fit box, show all (smaller scale wins)
+- Updates `width/height` in store → triggers scale sync in DesignCanvas
+
+### Layer Order (Z-Index)
+- Stored as array order in `template.elements`
+- Fabric canvas order matches array order
+- Sync maintains order during modifications
+- Send to back/front modifies array order
+
+### CORS Prevention
+- All images converted to blob URLs on load: `fetch(url) → blob → URL.createObjectURL()`
+- Prevents canvas tainting from cross-origin images
+- File: `DesignCanvas.tsx:1267-1295`
+
+### Multi-Color Text (multiColorText.ts)
+- Splits text by whitespace: `text.split(/\s+/)`
+- Creates `fabric.Text` per word with color from `colors[index]`
+- Positions with space width calculation
+- Groups into `fabric.Group`
+- Stores `elementId`, `isMultiColorText`, `originalElement` on group
+
+## State Synchronization Flow
+
+```
+User Action (canvas drag, property edit, keyboard)
+    ↓
+Event Handler (DesignCanvas, PropertyPanel)
+    ↓
+Store Update (updateElement, addElement, etc.)
+    ↓
+useEffect Sync Loop (DesignCanvas:369-608)
+    ↓
+Fabric Object Update (set properties, setCoords, renderAll)
+```
+
+**Sync Prevention:**
+- `processingModification` ref prevents circular updates
+- Undo/redo timestamp detection: `lastUndoRedoTimestamp`
+
+## Export Behavior
+
+### PNG/JPG
+- Full canvas export (ignores zoom/pan)
+- Viewport reset to `[1,0,0,1,0,0]`, zoom to 1
+- Multiplier: `exportWidth / canvasWidth`
+- Grid and `excludeFromExport` objects removed
+- Images replaced with 5x high-res versions
+- Separate scaleX/scaleY to preserve distortion
+
+### SVG
+- Not implemented (Fabric.js toSVG has limitations with embedded images)
+
+## Keyboard Shortcuts
+- **Ctrl/Cmd+S**: Save template
+- **Ctrl/Cmd+Z**: Undo
+- **Ctrl/Cmd+Y**: Redo
+- **Delete/Backspace**: Delete selected (disabled in inputs)
+- **Spacebar**: Pan mode (hold)
+
+## Key Files Reference
+
+### Critical Image Logic
+- `ImageProperties.tsx:36-153` - SVG 5x rasterization, PNG/JPG import, dimensions
+- `DesignCanvas.tsx:404-412` - Image recreation conditions
+- `DesignCanvas.tsx:510-526` - Text dimension sync (images EXCLUDED)
+- `DesignCanvas.tsx:540-573` - Image scale sync
+- `DesignCanvas.tsx:1267-1347` - Image loading with blob URLs
+- `CanvasControls.tsx:287-321` - PNG high-res export with distortion preservation
+- `CanvasControls.tsx:430-463` - JPG high-res export with distortion preservation
+
+### Critical Sync Logic
+- `DesignCanvas.tsx:369-608` - Main sync loop
+- `DesignCanvas.tsx:123-244` - Canvas event handlers (modified, selection, moving)
+- `templateStore.ts` - All state mutations
+
+### Save/Load
+- `CanvasControls.tsx:152-184` - Save with rasterization
+- `CanvasControls.tsx:32-73` - Image rasterization before save
+- `CanvasControls.tsx:186-212` - Load template
+
+## Common Issues & Solutions
+
+### Images blurry after save/load
+**Cause**: SVGs stored as SVG URLs, rasterized at display size
+**Solution**: Rasterize SVGs at 5x DURING IMPORT (ImageProperties.tsx:49-71)
+
+### Images not fitting box after Cover/Contain
+**Cause**: Scale reset by text sync logic
+**Solution**: Exclude images from text dimension sync (line 510: `&& element.type !== 'image'`)
+
+### Export doesn't match canvas (distortion lost)
+**Cause**: Export uses single scale for both X/Y
+**Solution**: Calculate separate `scaleToFitX` and `scaleToFitY` (CanvasControls.tsx:293-296)
+
+### CORS tainting on export
+**Cause**: Images loaded from cross-origin HTTP URLs
+**Solution**: Convert all URLs to blob URLs on load (DesignCanvas.tsx:1279-1287)
+
+### No-output not working
+**Cause**: Property not synced from store to fabric object
+**Solution**: Sync `excludeFromExport` in sync loop (DesignCanvas.tsx:574-578)
+
+## Version History & Versioning
+- Keeps last 3 versions per template
+- Version metadata includes timestamp, size
+- Automatic cleanup of old versions
+
+## Performance Notes
+- Max 50 history states (memory limit)
+- Image data URLs can be large (base64 overhead)
+- Sync loop runs on every store update (optimized with dirty checks)
+- Multi-color text creates multiple fabric objects per element
