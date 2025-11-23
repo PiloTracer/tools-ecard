@@ -16,9 +16,13 @@ jest.mock('@/features/simple-projects', () => ({
 
 import { useProjects } from '@/features/simple-projects';
 
+// Mock the batch-upload component
+jest.mock('@/features/batch-upload', () => ({
+  UploadBatchComponent: () => <div data-testid="upload-batch-component">Upload Batch Component</div>
+}));
+
 describe('QuickActions Component', () => {
   const mockOnCreateTemplate = jest.fn();
-  const mockOnImportBatch = jest.fn();
   const mockOnViewBatches = jest.fn();
 
   beforeEach(() => {
@@ -33,21 +37,20 @@ describe('QuickActions Component', () => {
       });
     });
 
-    it('renders all action buttons enabled', () => {
+    it('renders all action buttons and components', () => {
       render(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
-          onImportBatch={mockOnImportBatch}
           onViewBatches={mockOnViewBatches}
         />
       );
 
       const createButton = screen.getByRole('button', { name: /Template Designer/i });
-      const importButton = screen.getByRole('button', { name: /import batch/i });
+      const uploadBatchComponent = screen.getByTestId('upload-batch-component');
       const viewButton = screen.getByRole('button', { name: /view batches/i });
 
       expect(createButton).not.toBeDisabled();
-      expect(importButton).not.toBeDisabled();
+      expect(uploadBatchComponent).toBeInTheDocument();
       expect(viewButton).not.toBeDisabled();
     });
 
@@ -55,16 +58,12 @@ describe('QuickActions Component', () => {
       render(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
-          onImportBatch={mockOnImportBatch}
           onViewBatches={mockOnViewBatches}
         />
       );
 
       fireEvent.click(screen.getByRole('button', { name: /Template Designer/i }));
       expect(mockOnCreateTemplate).toHaveBeenCalledTimes(1);
-
-      fireEvent.click(screen.getByRole('button', { name: /import batch/i }));
-      expect(mockOnImportBatch).toHaveBeenCalledTimes(1);
 
       fireEvent.click(screen.getByRole('button', { name: /view batches/i }));
       expect(mockOnViewBatches).toHaveBeenCalledTimes(1);
@@ -88,17 +87,14 @@ describe('QuickActions Component', () => {
       render(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
-          onImportBatch={mockOnImportBatch}
           onViewBatches={mockOnViewBatches}
         />
       );
 
       const createButton = screen.getByRole('button', { name: /Template Designer/i });
-      const importButton = screen.getByRole('button', { name: /import batch/i });
       const viewButton = screen.getByRole('button', { name: /view batches/i });
 
       expect(createButton).toBeDisabled();
-      expect(importButton).toBeDisabled();
       expect(viewButton).toBeDisabled();
     });
 
@@ -106,17 +102,14 @@ describe('QuickActions Component', () => {
       render(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
-          onImportBatch={mockOnImportBatch}
           onViewBatches={mockOnViewBatches}
         />
       );
 
       fireEvent.click(screen.getByRole('button', { name: /Template Designer/i }));
-      fireEvent.click(screen.getByRole('button', { name: /import batch/i }));
       fireEvent.click(screen.getByRole('button', { name: /view batches/i }));
 
       expect(mockOnCreateTemplate).not.toHaveBeenCalled();
-      expect(mockOnImportBatch).not.toHaveBeenCalled();
       expect(mockOnViewBatches).not.toHaveBeenCalled();
     });
 
@@ -138,17 +131,14 @@ describe('QuickActions Component', () => {
       render(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
-          onImportBatch={mockOnImportBatch}
           onViewBatches={mockOnViewBatches}
         />
       );
 
       const createButton = screen.getByRole('button', { name: /Template Designer/i });
-      const importButton = screen.getByRole('button', { name: /import batch/i });
       const viewButton = screen.getByRole('button', { name: /view batches/i });
 
       expect(createButton).toBeDisabled();
-      expect(importButton).toBeDisabled();
       expect(viewButton).toBeDisabled();
     });
 
@@ -179,7 +169,6 @@ describe('QuickActions Component', () => {
       render(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
-          onImportBatch={mockOnImportBatch}
           onViewBatches={mockOnViewBatches}
         />
       );

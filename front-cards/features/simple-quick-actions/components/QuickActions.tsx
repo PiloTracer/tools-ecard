@@ -11,11 +11,11 @@
 
 import React from 'react';
 import { useProjects } from '@/features/simple-projects';
+import { UploadBatchComponent } from '@/features/batch-upload';
 import type { QuickActionsProps } from '../index';
 
 export function QuickActions({
   onCreateTemplate,
-  onImportBatch,
   onViewBatches,
   className = ''
 }: QuickActionsProps) {
@@ -28,12 +28,6 @@ export function QuickActions({
   const handleCreateTemplate = () => {
     if (!isDisabled && onCreateTemplate) {
       onCreateTemplate();
-    }
-  };
-
-  const handleImportBatch = () => {
-    if (!isDisabled && onImportBatch) {
-      onImportBatch();
     }
   };
 
@@ -114,33 +108,8 @@ export function QuickActions({
           </div>
         </button>
 
-        {/* Import Batch Button */}
-        <button
-          className={getButtonClasses()}
-          onClick={handleImportBatch}
-          disabled={isDisabled}
-          aria-label="Import Batch"
-          title={isDisabled ? "Select a project to import batches" : "Upload Excel or text data"}
-        >
-          <svg
-            className={getIconClasses()}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-            />
-          </svg>
-          <div className="text-left">
-            <p className={getTitleClasses()}>Import Batch</p>
-            <p className={getDescriptionClasses()}>Upload Excel or text data</p>
-          </div>
-        </button>
+        {/* Import Batch - Self-contained Upload Component */}
+        <UploadBatchComponent />
 
         {/* View Batches Button */}
         <button
