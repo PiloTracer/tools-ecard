@@ -29,9 +29,11 @@ class BatchService {
     return '';
   }
 
-  async uploadBatch(file: File): Promise<BatchUploadResponse> {
+  async uploadBatch(file: File, projectId: string, projectName: string): Promise<BatchUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('projectId', projectId);
+    formData.append('projectName', projectName);
 
     const response = await fetch(`${API_URL}/api/batches/upload`, {
       method: 'POST',

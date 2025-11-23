@@ -41,7 +41,7 @@ export function loadS3Config(): S3Config {
     accessKey: process.env.SEAWEEDFS_ACCESS_KEY || 'your_seaweedfs_access_key',
     secretKey: process.env.SEAWEEDFS_SECRET_KEY || 'your_seaweedfs_secret_key',
     region: process.env.SEAWEEDFS_REGION || 'us-east-1',
-    bucket: process.env.SEAWEEDFS_BUCKET || 'templates',
+    bucket: process.env.SEAWEEDFS_BUCKET || '',
     forcePathStyle: true,
     signatureVersion: 'v4',
     maxFileSize: Number(process.env.STORAGE_MAX_FILE_SIZE) || 104857600,

@@ -8,6 +8,8 @@ export class BatchRepository {
       data: {
         userId: data.userId,
         userEmail: data.userEmail,
+        projectId: data.projectId,
+        projectName: data.projectName,
         fileName: data.fileName,
         fileSize: data.fileSize,
         filePath: data.filePath,

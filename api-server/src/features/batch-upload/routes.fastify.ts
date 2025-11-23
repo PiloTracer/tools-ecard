@@ -31,10 +31,31 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
         );
       }
 
-      // Get the uploaded file
-      const data = await request.file();
+      // Get multipart data
+      const parts = request.parts();
+      let file: Express.Multer.File | null = null;
+      let projectId: string | null = null;
+      let projectName: string | null = null;
 
-      if (!data) {
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          const buffer = await part.toBuffer();
+          file = {
+            fieldname: part.fieldname,
+            originalname: part.filename,
+            encoding: part.encoding,
+            mimetype: part.mimetype,
+            size: buffer.length,
+            buffer: buffer,
+          } as Express.Multer.File;
+        } else if (part.fieldname === 'projectId') {
+          projectId = part.value as string;
+        } else if (part.fieldname === 'projectName') {
+          projectName = part.value as string;
+        }
+      }
+
+      if (!file) {
         throw new BatchUploadError(
           'No file provided',
           'NO_FILE',
@@ -42,16 +63,21 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
         );
       }
 
-      // Convert multipart file to Express-like format for compatibility
-      const buffer = await data.toBuffer();
-      const file = {
-        fieldname: data.fieldname,
-        originalname: data.filename,
-        encoding: data.encoding,
-        mimetype: data.mimetype,
-        size: buffer.length,
-        buffer: buffer,
-      } as Express.Multer.File;
+      if (!projectId) {
+        throw new BatchUploadError(
+          'Project ID is required',
+          'NO_PROJECT_ID',
+          400
+        );
+      }
+
+      if (!projectName) {
+        throw new BatchUploadError(
+          'Project name is required',
+          'NO_PROJECT_NAME',
+          400
+        );
+      }
 
       // Validate file
       const validation = uploadFileSchema.safeParse({ file });
@@ -66,6 +92,8 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
         file,
         userId: request.user.id,
         userEmail: request.user.email,
+        projectId,
+        projectName,
       });
 
       return reply.code(201).send(result);

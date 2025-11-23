@@ -103,21 +103,25 @@ describe('Batch Upload Feature', () => {
   describe('Storage Path Generation', () => {
     it('should generate correct SeaweedFS path', () => {
       const email = 'user@example.com';
+      const projectName = 'default';
       const filename = 'contacts.csv';
       const sanitizedEmail = sanitizeEmailForPath(email);
       const sanitizedFile = sanitizeFileName(filename);
+      const sanitizedProjectName = sanitizeEmailForPath(projectName);
 
-      const expectedPath = `buckets/files/batches/${sanitizedEmail}/${sanitizedFile}`;
-      expect(expectedPath).toBe('buckets/files/batches/user_at_example_com/contacts.csv');
+      const expectedPath = `batches/files/${sanitizedEmail}/${sanitizedProjectName}/${sanitizedFile}`;
+      expect(expectedPath).toBe('batches/files/user_at_example_com/default/contacts.csv');
     });
 
     it('should handle complex emails and filenames', () => {
       const email = 'john.doe+test@sub.domain.co.uk';
+      const projectName = 'My Project Name';
       const filename = 'My Contacts (2024).vcf';
       const sanitizedEmail = sanitizeEmailForPath(email);
       const sanitizedFile = sanitizeFileName(filename);
+      const sanitizedProjectName = sanitizeEmailForPath(projectName);
 
-      const path = `buckets/files/batches/${sanitizedEmail}/${sanitizedFile}`;
+      const path = `batches/files/${sanitizedEmail}/${sanitizedProjectName}/${sanitizedFile}`;
       expect(path).not.toContain('@');
       expect(path).not.toContain('(');
       expect(path).not.toContain(')');

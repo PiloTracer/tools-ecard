@@ -14,7 +14,7 @@ export class StorageService {
   constructor() {
     this.useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true';
     this.localStoragePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
-    this.bucket = process.env.SEAWEEDFS_BUCKET || 'templates';
+    this.bucket = process.env.SEAWEEDFS_BUCKET || '';
 
     if (!this.useLocalStorage) {
       this.initializeS3Client();
@@ -46,11 +46,23 @@ export class StorageService {
 
   async uploadBatchFile(
     file: Express.Multer.File,
-    userEmail: string
+    userEmail: string,
+    projectName: string
   ): Promise<SeaweedFSUploadResult> {
     const sanitizedEmail = sanitizeEmailForPath(userEmail);
+    const sanitizedProjectName = sanitizeEmailForPath(projectName); // Reuse same sanitization
     const sanitizedFileName = sanitizeFileName(file.originalname);
-    const filePath = `buckets/files/batches/${sanitizedEmail}/${sanitizedFileName}`;
+
+    // Add timestamp to filename for uniqueness (allows multiple uploads of same file)
+    const timestamp = Date.now();
+    const lastDotIndex = sanitizedFileName.lastIndexOf('.');
+    const fileExtension = lastDotIndex > 0 ? sanitizedFileName.substring(lastDotIndex) : '';
+    const fileBaseName = lastDotIndex > 0 ? sanitizedFileName.substring(0, lastDotIndex) : sanitizedFileName;
+    const uniqueFileName = `${fileBaseName}-${timestamp}${fileExtension}`;
+
+    // Path structure: batches/files/{username}/{projectName}/{filename-timestamp.ext}
+    // Note: Do NOT include 'buckets/' prefix - that's the bucket name in S3
+    const filePath = `batches/files/${sanitizedEmail}/${sanitizedProjectName}/${uniqueFileName}`;
 
     try {
       if (this.useLocalStorage) {

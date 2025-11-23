@@ -15,16 +15,18 @@ import { queueService } from './queueService';
 
 export class BatchUploadService {
   async uploadBatch(request: BatchUploadRequest): Promise<BatchUploadResponse> {
-    const { file, userId, userEmail } = request;
+    const { file, userId, userEmail, projectId, projectName } = request;
 
     try {
       // 1. Upload file to storage (SeaweedFS or local)
-      const uploadResult = await storageService.uploadBatchFile(file, userEmail);
+      const uploadResult = await storageService.uploadBatchFile(file, userEmail, projectName);
 
       // 2. Create batch record in database
       const batch = await batchRepository.create({
         userId,
         userEmail,
+        projectId,
+        projectName,
         fileName: file.originalname,
         fileSize: file.size,
         filePath: uploadResult.filePath,

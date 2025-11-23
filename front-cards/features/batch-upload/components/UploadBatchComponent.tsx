@@ -29,7 +29,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const [uploadedBatch, setUploadedBatch] = useState<BatchUploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { selectedProjectId, loading } = useProjects();
+  const { selectedProjectId, selectedProject, projects, loading } = useProjects();
 
   const isDisabled = !selectedProjectId || loading;
 
@@ -90,9 +90,23 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     try {
       // Import the service dynamically to avoid circular dependencies
       const { batchService } = await import('../services/batchService');
+      const { projectService } = await import('@/features/simple-projects');
+
+      // Get the current projects to ensure we have fresh data
+      const projectsData = await projectService.getProjects();
+
+      // Use the selected project ID or fall back to the first project
+      const projectId = selectedProjectId || projectsData.selectedProjectId || projectsData.projects[0]?.id;
+      const project = projectsData.projects.find(p => p.id === projectId);
+
+      if (!project) {
+        throw new Error('No project available. Please create or select a project.');
+      }
+
+      console.log('Uploading with project:', project.name, 'ID:', projectId);
 
       // Use real API to upload to SeaweedFS
-      const response = await batchService.uploadBatch(file);
+      const response = await batchService.uploadBatch(file, projectId, project.name);
 
       setUploadedBatch(response);
       setSelectedFile(null);

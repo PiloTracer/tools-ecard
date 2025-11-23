@@ -158,6 +158,8 @@ model Batch {
   id            String    @id @default(uuid())
   userId        String    @map("user_id")
   userEmail     String    @map("user_email")
+  projectId     String    @map("project_id")
+  projectName   String    @map("project_name")
   fileName      String    @map("file_name")
   fileSize      Int       @map("file_size")
   filePath      String    @map("file_path")
@@ -172,6 +174,8 @@ model Batch {
 
   @@index([userId])
   @@index([userEmail])
+  @@index([projectId])
+  @@index([projectName])
   @@index([status])
   @@index([createdAt])
   @@map("batches")

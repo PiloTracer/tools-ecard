@@ -5,6 +5,8 @@ export interface BatchUploadRequest {
   file: Express.Multer.File;
   userId: string;
   userEmail: string;
+  projectId: string;
+  projectName: string;
 }
 
 export interface BatchUploadResponse {
@@ -52,6 +54,8 @@ export interface BatchListItem {
 export interface BatchCreateData {
   userId: string;
   userEmail: string;
+  projectId: string;
+  projectName: string;
   fileName: string;
   fileSize: number;
   filePath: string;

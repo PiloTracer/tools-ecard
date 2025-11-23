@@ -118,8 +118,8 @@ class UnifiedTemplateStorageService {
       try {
         // Save to SeaweedFS (S3)
         const s3Service = getS3Service();
-        const bucketName = process.env.SEAWEEDFS_BUCKET || 'templates';
-        const s3Key = `vcards/${userId}/${templateId}/template.json`;
+        const bucketName = process.env.SEAWEEDFS_BUCKET || '';
+        const s3Key = `templates/vcards/${userId}/${templateId}/template.json`;
         console.log('[UnifiedTemplateStorage] S3 bucket:', bucketName, 'key:', s3Key);
 
         // Ensure bucket exists
@@ -340,7 +340,7 @@ class UnifiedTemplateStorageService {
 
     if (metadata.storageUrl.startsWith('s3://')) {
       try {
-        // Parse S3 URL: s3://bucketName/vcards/userId/templateId/template.json
+        // Parse S3 URL: s3://bucketName/templates/vcards/userId/templateId/template.json
         const s3UrlParts = metadata.storageUrl.replace('s3://', '').split('/');
         const bucketName = s3UrlParts[0];
         const s3Key = s3UrlParts.slice(1).join('/');
