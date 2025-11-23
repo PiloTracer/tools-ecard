@@ -669,7 +669,7 @@ class ResourceDeduplicationService {
   }
 
   /**
-   * Sanitize string for use in file paths
+   * Sanitize string for use in file paths (consistent with fallbackStorageService)
    */
   private sanitizeForPath(input: string): string {
     return input
@@ -677,7 +677,8 @@ class ResourceDeduplicationService {
       .replace(/@/g, '_at_')
       .replace(/\+/g, '')
       .replace(/\./g, '_')
-      .replace(/[^a-z0-9_-]/g, '');
+      .replace(/[^a-z0-9_-]/g, '')
+      .substring(0, 100);
   }
 }
 

@@ -49,7 +49,8 @@ class UnifiedTemplateStorageService {
       .replace(/@/g, '_at_')
       .replace(/\+/g, '')
       .replace(/\./g, '_')
-      .replace(/[^a-z0-9_]/g, '');
+      .replace(/[^a-z0-9_-]/g, '')
+      .substring(0, 100);
   }
 
   /**

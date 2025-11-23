@@ -67,12 +67,13 @@ export function sanitizeFileName(fileName: string): string {
     .substring(0, 255); // Limit filename length
 }
 
-// Sanitize email for use in directory path
+// Sanitize email for use in directory path (consistent with fallbackStorageService)
 export function sanitizeEmailForPath(email: string): string {
-  // Replace @ with _at_ and dots with _
   return email
     .toLowerCase()
-    .replace('@', '_at_')
+    .replace(/@/g, '_at_')
+    .replace(/\+/g, '')
     .replace(/\./g, '_')
-    .replace(/[^a-z0-9_-]/g, '');
+    .replace(/[^a-z0-9_-]/g, '')
+    .substring(0, 100);
 }
