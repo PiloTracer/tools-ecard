@@ -15,6 +15,7 @@ import { authMiddleware } from './core/middleware/authMiddleware';
 import { projectRoutes } from './features/simple-projects/routes';
 import { s3Routes, initializeS3Feature } from './features/s3-bucket';
 import { templateRoutes } from './features/template-textile';
+import { batchUploadRoutes as batchUploadRoutesFastify } from './features/batch-upload/routes.fastify';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
@@ -100,6 +101,9 @@ export async function buildApp() {
 
   // Register template-textile routes (already prefixed in route definitions)
   await app.register(templateRoutes);
+
+  // Register batch-upload routes
+  await app.register(batchUploadRoutesFastify, { prefix: '/api/batches' });
 
   // app.register(templateRoutes, { prefix: '/api/v1/templates' });
   // app.register(batchRoutes, { prefix: '/api/v1/batches' });

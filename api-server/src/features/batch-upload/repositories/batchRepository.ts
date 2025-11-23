@@ -1,4 +1,4 @@
-import { prisma } from '@/core/database/prisma-client';
+import { prisma } from '@/core/database/prisma';
 import { Batch, BatchStatus, Prisma } from '@prisma/client';
 import { BatchCreateData, BatchUpdateData, ListBatchesQuery } from '../types';
 
