@@ -41,6 +41,18 @@ export interface Template {
 
 class UnifiedTemplateStorageService {
   /**
+   * Sanitize email for use in storage paths
+   */
+  private sanitizeEmailForPath(email: string): string {
+    return email
+      .toLowerCase()
+      .replace(/@/g, '_at_')
+      .replace(/\+/g, '')
+      .replace(/\./g, '_')
+      .replace(/[^a-z0-9_]/g, '');
+  }
+
+  /**
    * Save a template with multi-mode storage support
    */
   async saveTemplate(
@@ -49,13 +61,17 @@ class UnifiedTemplateStorageService {
   ): Promise<TemplateMetadata> {
     console.log('[UnifiedTemplateStorage] saveTemplate called');
 
-    // Extract userId from authenticated request
+    // Extract userId and email from authenticated request
     const userId = (request as any).user?.id;
-    console.log('[UnifiedTemplateStorage] User ID:', userId);
+    const userEmail = (request as any).user?.email;
+    console.log('[UnifiedTemplateStorage] User ID:', userId, 'Email:', userEmail);
 
-    if (!userId) {
+    if (!userId || !userEmail) {
       throw new Error('User not authenticated');
     }
+
+    // Sanitize email for use in path (consistent with batch-upload)
+    const sanitizedEmail = this.sanitizeEmailForPath(userEmail);
 
     // Check if a template with this name already exists for this user
     let templateId: string;
@@ -91,6 +107,10 @@ class UnifiedTemplateStorageService {
     const resourceUrls: string[] = [];
     if (input.resources && input.resources.length > 0) {
       console.log('[UnifiedTemplateStorage] Processing', input.resources.length, 'resources');
+
+      // Get project name - use existing template's project or default
+      const projectName = existingTemplate?.projectName || 'Default Project';
+
       for (let i = 0; i < input.resources.length; i++) {
         const resource = input.resources[i];
         console.log('[UnifiedTemplateStorage] Resource', i, 'keys:', Object.keys(resource || {}));
@@ -105,7 +125,11 @@ class UnifiedTemplateStorageService {
           data: resource.data,
           type: resource.type,
           hash: resource.hash
-        }, userId);
+        }, userId, {
+          userEmail,
+          projectName,
+          templateName: input.name
+        });
         resourceUrls.push(resourceUrl);
       }
     }
@@ -118,8 +142,14 @@ class UnifiedTemplateStorageService {
       try {
         // Save to SeaweedFS (S3)
         const s3Service = getS3Service();
-        const bucketName = process.env.SEAWEEDFS_BUCKET || '';
-        const s3Key = `templates/vcards/${userId}/${templateId}/template.json`;
+        const bucketName = process.env.SEAWEEDFS_BUCKET || 'repositories';
+
+        // Get project name - use existing template's project or default
+        const projectName = existingTemplate?.projectName || 'Default Project';
+        const sanitizedProjectName = this.sanitizeEmailForPath(projectName);
+        const sanitizedTemplateName = this.sanitizeEmailForPath(input.name);
+
+        const s3Key = `templates/${sanitizedEmail}/${sanitizedProjectName}/${sanitizedTemplateName}/template.json`;
         console.log('[UnifiedTemplateStorage] S3 bucket:', bucketName, 'key:', s3Key);
 
         // Ensure bucket exists
@@ -157,20 +187,21 @@ class UnifiedTemplateStorageService {
     } else if (storageMode === 'fallback') {
       try {
         // Save to local fallback storage
+        const projectName = existingTemplate?.projectName || 'Default Project';
         const localPath = await fallbackStorageService.saveTemplate(
-          userId,
-          'default', // projectId
-          templateId,
+          userEmail,
+          projectName,
+          input.name,
           input.templateData
         );
         storageUrl = `fallback://${localPath}`;
       } catch (error) {
         console.error('Failed to save template to fallback storage:', error);
-        storageUrl = `local://${templateId}`;
+        storageUrl = `local://${input.name}`;
       }
     } else {
       // LOCAL_ONLY mode
-      storageUrl = `local://${templateId}`;
+      storageUrl = `local://${input.name}`;
     }
 
     // Save metadata to PostgreSQL (if available)
@@ -340,7 +371,7 @@ class UnifiedTemplateStorageService {
 
     if (metadata.storageUrl.startsWith('s3://')) {
       try {
-        // Parse S3 URL: s3://bucketName/templates/vcards/userId/templateId/template.json
+        // Parse S3 URL: s3://bucketName/templates/userId/templateId/template.json
         const s3UrlParts = metadata.storageUrl.replace('s3://', '').split('/');
         const bucketName = s3UrlParts[0];
         const s3Key = s3UrlParts.slice(1).join('/');
@@ -370,14 +401,28 @@ class UnifiedTemplateStorageService {
       }
     } else if (metadata.storageUrl.startsWith('fallback://')) {
       try {
-        // For fallback storage, use userId, projectId (default), and templateId
-        const projectId = 'default';
-        console.log('[UnifiedTemplateStorage] Loading from fallback storage:', metadata.userId, projectId, metadata.id);
+        // Parse fallback:// URL to extract path components
+        // Expected format: fallback://{basePath}/templates/{email}/{project}/{template}/template.json
+        const filePath = metadata.storageUrl.replace('fallback://', '');
+        const pathParts = filePath.split(/[/\\]/).filter(Boolean);
+
+        // Find the templates index
+        const templatesIndex = pathParts.findIndex(part => part === 'templates');
+
+        if (templatesIndex === -1 || pathParts.length < templatesIndex + 4) {
+          throw new Error('Invalid fallback URL format');
+        }
+
+        const userEmail = pathParts[templatesIndex + 1];
+        const projectName = pathParts[templatesIndex + 2];
+        const templateName = pathParts[templatesIndex + 3];
+
+        console.log('[UnifiedTemplateStorage] Loading from fallback storage:', userEmail, projectName, templateName);
 
         templateData = await fallbackStorageService.loadTemplate(
-          metadata.userId,
-          projectId,
-          metadata.id
+          userEmail,
+          projectName,
+          templateName
         );
 
         if (!templateData) {
@@ -528,9 +573,30 @@ class UnifiedTemplateStorageService {
     }
 
     // Delete from storage
-    if (metadata && (metadata.storageUrl.startsWith('s3://') || metadata.storageUrl.startsWith('fallback://'))) {
+    if (metadata) {
       try {
-        await fallbackStorageService.deleteTemplate(metadata.storageUrl);
+        if (metadata.storageUrl.startsWith('s3://')) {
+          // Delete from S3
+          const s3Service = getS3Service();
+          const match = metadata.storageUrl.match(/^s3:\/\/([^\/]+)\/(.+)$/);
+          if (match) {
+            const [, bucket, key] = match;
+            await s3Service.deleteObject(bucket, key);
+          }
+        } else if (metadata.storageUrl.startsWith('fallback://')) {
+          // Parse fallback URL to extract path components
+          const filePath = metadata.storageUrl.replace('fallback://', '');
+          const pathParts = filePath.split(/[/\\]/).filter(Boolean);
+          const templatesIndex = pathParts.findIndex(part => part === 'templates');
+
+          if (templatesIndex !== -1 && pathParts.length >= templatesIndex + 4) {
+            const userEmail = pathParts[templatesIndex + 1];
+            const projectName = pathParts[templatesIndex + 2];
+            const templateName = pathParts[templatesIndex + 3];
+
+            await fallbackStorageService.deleteTemplate(userEmail, projectName, templateName);
+          }
+        }
       } catch (error) {
         console.error('Failed to delete from storage:', error);
         // Continue with metadata deletion

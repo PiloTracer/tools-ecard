@@ -14,7 +14,7 @@ export class StorageService {
   constructor() {
     this.useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true';
     this.localStoragePath = process.env.LOCAL_STORAGE_PATH || '/app/uploads';
-    this.bucket = process.env.SEAWEEDFS_BUCKET || '';
+    this.bucket = process.env.SEAWEEDFS_BUCKET || 'repositories';
 
     if (!this.useLocalStorage) {
       this.initializeS3Client();
@@ -60,9 +60,9 @@ export class StorageService {
     const fileBaseName = lastDotIndex > 0 ? sanitizedFileName.substring(0, lastDotIndex) : sanitizedFileName;
     const uniqueFileName = `${fileBaseName}-${timestamp}${fileExtension}`;
 
-    // Path structure: batches/files/{username}/{projectName}/{filename-timestamp.ext}
+    // Path structure: batches/{sanitizedEmail}/{sanitizedProjectName}/{uniqueFileName}
     // Note: Do NOT include 'buckets/' prefix - that's the bucket name in S3
-    const filePath = `batches/files/${sanitizedEmail}/${sanitizedProjectName}/${uniqueFileName}`;
+    const filePath = `batches/${sanitizedEmail}/${sanitizedProjectName}/${uniqueFileName}`;
 
     try {
       if (this.useLocalStorage) {

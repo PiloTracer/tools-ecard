@@ -107,7 +107,13 @@ class ResourceManager {
   /**
    * Upload resources to server
    */
-  async uploadResources(resources: Resource[]): Promise<ProcessedResource[]> {
+  async uploadResources(
+    resources: Resource[],
+    context?: {
+      projectName?: string;
+      templateName?: string;
+    }
+  ): Promise<ProcessedResource[]> {
     const processed: ProcessedResource[] = [];
 
     // Group resources by hash to avoid duplicate uploads
@@ -148,8 +154,8 @@ class ResourceManager {
           continue;
         }
 
-        // Upload to server
-        const uploadPromise = this.uploadResource(resource);
+        // Upload to server with context
+        const uploadPromise = this.uploadResource(resource, context);
         this.pendingUploads.set(hash, uploadPromise);
 
         const url = await uploadPromise;
@@ -193,7 +199,13 @@ class ResourceManager {
   /**
    * Upload a single resource to the server
    */
-  private async uploadResource(resource: Resource): Promise<string> {
+  private async uploadResource(
+    resource: Resource,
+    context?: {
+      projectName?: string;
+      templateName?: string;
+    }
+  ): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/api/v1/template-textile/resources`, {
       method: 'POST',
       credentials: 'include',
@@ -205,7 +217,9 @@ class ResourceManager {
           data: resource.data,
           type: resource.type,
           hash: resource.hash
-        }]
+        }],
+        projectName: context?.projectName || 'Default Project',
+        templateName: context?.templateName || 'Untitled'
       })
     });
 
@@ -265,7 +279,13 @@ class ResourceManager {
   /**
    * Process template for saving (extract and upload resources)
    */
-  async processTemplateForSave(templateData: any): Promise<{
+  async processTemplateForSave(
+    templateData: any,
+    context?: {
+      projectName?: string;
+      templateName?: string;
+    }
+  ): Promise<{
     processedTemplate: any;
     resources: ProcessedResource[];
   }> {
@@ -279,8 +299,8 @@ class ResourceManager {
       };
     }
 
-    // Upload resources and get URLs
-    const processedResources = await this.uploadResources(resources);
+    // Upload resources and get URLs with context
+    const processedResources = await this.uploadResources(resources, context);
 
     // Create map of original data URL to new URL
     const resourceMap = new Map<string, string>();

@@ -74,8 +74,14 @@ class TemplateService {
   async saveTemplate(request: SaveTemplateRequest): Promise<TemplateMetadata> {
     const mode = await this.getStorageMode();
 
-    // Process template resources
-    const { processedTemplate, resources } = await resourceManager.processTemplateForSave(request.templateData);
+    // Process template resources with context
+    const { processedTemplate, resources } = await resourceManager.processTemplateForSave(
+      request.templateData,
+      {
+        projectName: 'Default Project', // TODO: Get actual project name from request
+        templateName: request.name
+      }
+    );
 
     // Prepare resource data for API
     const resourceData = resources.map(r => ({

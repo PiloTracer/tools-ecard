@@ -199,14 +199,16 @@ export class TemplateController {
   async uploadResources(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     try {
       const userId = (request as any).user?.id;
-      if (!userId) {
+      const userEmail = (request as any).user?.email;
+
+      if (!userId || !userEmail) {
         return reply.status(401).send({
           success: false,
           error: 'User not authenticated'
         });
       }
 
-      const { resources } = request.body as any;
+      const { resources, projectName, templateName } = request.body as any;
 
       if (!resources || !Array.isArray(resources)) {
         return reply.status(400).send({
@@ -215,7 +217,22 @@ export class TemplateController {
         });
       }
 
+      // Validate required context fields
+      if (!projectName || !templateName) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Invalid request: projectName and templateName are required'
+        });
+      }
+
       const processedResources = [];
+
+      // Build context with required fields
+      const context = {
+        userEmail,
+        projectName,
+        templateName
+      };
 
       for (const resource of resources) {
         if (!resource.data || !resource.type) {
@@ -226,7 +243,7 @@ export class TemplateController {
           data: resource.data,
           type: resource.type,
           hash: resource.hash
-        }, userId);
+        }, userId, context);
 
         processedResources.push({
           originalHash: resource.hash,

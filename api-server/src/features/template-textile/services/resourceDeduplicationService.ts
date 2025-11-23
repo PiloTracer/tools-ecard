@@ -39,7 +39,7 @@ export interface ResourceMetadata {
 }
 
 class ResourceDeduplicationService {
-  private readonly bucketName = process.env.SEAWEEDFS_BUCKET || '';
+  private readonly bucketName = process.env.SEAWEEDFS_BUCKET || 'repositories';
   private readonly maxResourceSize = 50 * 1024 * 1024; // 50MB
 
   /**
@@ -49,11 +49,23 @@ class ResourceDeduplicationService {
     data: string;
     type: string;
     hash?: string;
-  }, userId?: string): Promise<string> {
+  }, userId?: string, context?: {
+    userEmail?: string;
+    projectName?: string;
+    templateName?: string;
+  }): Promise<string> {
     // Validate input
     if (!input || !input.data) {
       throw new Error('Resource data is required');
     }
+
+    // Validate context - required for new path structure
+    if (!context?.userEmail || !context?.projectName || !context?.templateName) {
+      const error = new Error('Resource storage requires userEmail, projectName, and templateName context');
+      console.error('[ResourceDedup] storeResource error:', error.message, 'Context:', context);
+      throw error;
+    }
+
     // Decode base64 data to buffer
     const buffer = decodeBase64Data(input.data);
     console.log("[ResourceDedup] Buffer size:", buffer.length, "First bytes:", buffer[0]?.toString(16), buffer[1]?.toString(16), buffer[2]?.toString(16));
@@ -85,7 +97,7 @@ class ResourceDeduplicationService {
     };
 
     // Process using the main processResource method
-    const result = await this.processResource(resource, userId || 'system');
+    const result = await this.processResource(resource, userId || 'system', undefined, context);
 
     return result.url;
   }
@@ -96,7 +108,12 @@ class ResourceDeduplicationService {
   async processResource(
     resource: UploadedResource,
     userId: string,
-    templateId?: string
+    templateId?: string,
+    context?: {
+      userEmail?: string;
+      projectName?: string;
+      templateName?: string;
+    }
   ): Promise<ProcessedResource> {
     // Validate resource size
     if (resource.size > this.maxResourceSize) {
@@ -110,7 +127,38 @@ class ResourceDeduplicationService {
     const existing = await this.findExistingResource(hash);
 
     if (existing) {
-      // Resource already exists, increment reference count
+      // Check if existing resource uses old path format (with hash-based paths or separate resources directory)
+      const hasOldHashFormat = existing.storageUrl.match(/\/[a-f0-9]{2}\/[a-f0-9]{64}\//);
+      const hasOldResourcesDir = existing.storageUrl.includes('/resources/') && !existing.storageUrl.includes('/templates/');
+
+      if ((hasOldHashFormat || hasOldResourcesDir) && context?.userEmail && context?.projectName && context?.templateName) {
+        // Old format detected - migrate to new format
+        console.log('[ResourceDedup] Detected old path format, migrating to new format');
+
+        // Store with new path format
+        const mode = modeDetectionService.getCurrentMode();
+        const storageResult = await this.storeNewResource(resource, hash, userId, mode, context);
+
+        // Update database with new URL (if we have templateId)
+        if (templateId) {
+          try {
+            await resourceOperations.updateResourceUrl(existing.id, storageResult.url);
+          } catch (error) {
+            console.error('[ResourceDedup] Failed to update resource URL:', error);
+          }
+        }
+
+        return {
+          url: storageResult.url,
+          hash,
+          deduplicated: true,
+          storageMode: storageResult.storageMode,
+          size: resource.size,
+          mimeType: resource.mimeType
+        };
+      }
+
+      // Resource already exists with correct format, increment reference count
       await this.incrementReferenceCount(hash);
 
       // Link to template if provided
@@ -130,7 +178,7 @@ class ResourceDeduplicationService {
 
     // New resource, determine storage location based on mode
     const mode = modeDetectionService.getCurrentMode();
-    const storageResult = await this.storeNewResource(resource, hash, userId, mode);
+    const storageResult = await this.storeNewResource(resource, hash, userId, mode, context);
 
     // Record in PostgreSQL (only if we have a templateId)
     if (templateId) {
@@ -227,14 +275,19 @@ class ResourceDeduplicationService {
     resource: UploadedResource,
     hash: string,
     userId: string,
-    mode: StorageMode
+    mode: StorageMode,
+    context?: {
+      userEmail?: string;
+      projectName?: string;
+      templateName?: string;
+    }
   ): Promise<{ url: string; storageMode: string }> {
     if (mode === StorageMode.FULL) {
       // Store in SeaweedFS
-      return await this.storeInSeaweedFS(resource, hash, userId);
+      return await this.storeInSeaweedFS(resource, hash, userId, context);
     } else {
       // Store in fallback (.local-storage)
-      return await this.storeInFallback(resource, hash, userId);
+      return await this.storeInFallback(resource, hash, userId, context);
     }
   }
 
@@ -244,10 +297,25 @@ class ResourceDeduplicationService {
   private async storeInSeaweedFS(
     resource: UploadedResource,
     hash: string,
-    userId: string
+    userId: string,
+    context?: {
+      userEmail?: string;
+      projectName?: string;
+      templateName?: string;
+    }
   ): Promise<{ url: string; storageMode: string }> {
     const s3Service = getS3Service();
-    const s3Key = `resources/${userId}/${hash.substring(0, 2)}/${hash}/${resource.name}`;
+
+    // Context is required for proper path structure
+    if (!context?.userEmail || !context?.projectName || !context?.templateName) {
+      throw new Error('Resource storage requires userEmail, projectName, and templateName context');
+    }
+
+    // Build path - save resources in same directory as template.json
+    const sanitizedEmail = this.sanitizeForPath(context.userEmail);
+    const sanitizedProject = this.sanitizeForPath(context.projectName);
+    const sanitizedTemplate = this.sanitizeForPath(context.templateName);
+    const s3Key = `templates/${sanitizedEmail}/${sanitizedProject}/${sanitizedTemplate}/${resource.name}`;
 
     try {
       // Check if bucket exists
@@ -291,12 +359,25 @@ class ResourceDeduplicationService {
   private async storeInFallback(
     resource: UploadedResource,
     hash: string,
-    userId: string
+    userId: string,
+    context?: {
+      userEmail?: string;
+      projectName?: string;
+      templateName?: string;
+    }
   ): Promise<{ url: string; storageMode: string }> {
-    const path = await fallbackStorageService.saveResource(
-      userId,
+    // Context is required for proper path structure
+    if (!context?.userEmail || !context?.projectName || !context?.templateName) {
+      throw new Error('Resource storage requires userEmail, projectName, and templateName context');
+    }
+
+    // Save in same directory as template
+    const path = await fallbackStorageService.saveResourceWithTemplate(
+      context.userEmail,
+      context.projectName,
+      context.templateName,
+      resource.name,
       resource.buffer,
-      hash,
       {
         originalName: resource.name,
         mimeType: resource.mimeType
@@ -422,15 +503,24 @@ class ResourceDeduplicationService {
    */
   private async loadFromFallback(url: string, userId: string): Promise<Buffer | null> {
     try {
-      // Extract hash from path
-      const pathMatch = url.match(/([a-f0-9]{64})/);
+      // Parse file:// URL to extract path components
+      // Expected format: file://{basePath}/templates/{email}/{project}/{template}/{resourceName}
+      const filePath = url.replace('file://', '');
+      const pathParts = filePath.split(/[/\\]/).filter(Boolean);
 
-      if (!pathMatch) {
-        throw new Error('Could not extract hash from fallback URL');
+      // Find the templates index
+      const templatesIndex = pathParts.findIndex(part => part === 'templates');
+
+      if (templatesIndex === -1 || pathParts.length < templatesIndex + 5) {
+        throw new Error('Invalid fallback URL format');
       }
 
-      const hash = pathMatch[1];
-      return await fallbackStorageService.loadResource(userId, hash);
+      const userEmail = pathParts[templatesIndex + 1];
+      const projectName = pathParts[templatesIndex + 2];
+      const templateName = pathParts[templatesIndex + 3];
+      const resourceName = pathParts[templatesIndex + 4];
+
+      return await fallbackStorageService.loadResource(userEmail, projectName, templateName, resourceName);
     } catch (error) {
       console.error('Failed to load from fallback:', error);
       return null;
@@ -459,7 +549,7 @@ class ResourceDeduplicationService {
     if (metadata.storageUrl.startsWith('s3://')) {
       await this.deleteFromSeaweedFS(metadata.storageUrl);
     } else if (metadata.storageUrl.startsWith('file://')) {
-      await this.deleteFromFallback(hash, userId);
+      await this.deleteFromFallback(metadata.storageUrl);
     }
 
     // Remove from databases
@@ -489,9 +579,26 @@ class ResourceDeduplicationService {
   /**
    * Delete resource from fallback storage
    */
-  private async deleteFromFallback(hash: string, userId: string): Promise<void> {
+  private async deleteFromFallback(url: string): Promise<void> {
     try {
-      await fallbackStorageService.deleteResource(userId, hash);
+      // Parse file:// URL to extract path components
+      // Expected format: file://{basePath}/templates/{email}/{project}/{template}/{resourceName}
+      const filePath = url.replace('file://', '');
+      const pathParts = filePath.split(/[/\\]/).filter(Boolean);
+
+      // Find the templates index
+      const templatesIndex = pathParts.findIndex(part => part === 'templates');
+
+      if (templatesIndex === -1 || pathParts.length < templatesIndex + 5) {
+        throw new Error('Invalid fallback URL format');
+      }
+
+      const userEmail = pathParts[templatesIndex + 1];
+      const projectName = pathParts[templatesIndex + 2];
+      const templateName = pathParts[templatesIndex + 3];
+      const resourceName = pathParts[templatesIndex + 4];
+
+      await fallbackStorageService.deleteResource(userEmail, projectName, templateName, resourceName);
     } catch (error) {
       console.error('Failed to delete from fallback:', error);
     }
@@ -559,6 +666,18 @@ class ResourceDeduplicationService {
 
     // Default fallback
     return 'IMAGE';
+  }
+
+  /**
+   * Sanitize string for use in file paths
+   */
+  private sanitizeForPath(input: string): string {
+    return input
+      .toLowerCase()
+      .replace(/@/g, '_at_')
+      .replace(/\+/g, '')
+      .replace(/\./g, '_')
+      .replace(/[^a-z0-9_-]/g, '');
   }
 }
 

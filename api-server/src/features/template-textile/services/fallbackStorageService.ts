@@ -48,7 +48,7 @@ class FallbackStorageService {
   private async ensureDirectoryStructure(): Promise<void> {
     const directories = [
       this.basePath,
-      path.join(this.basePath, 'users'),
+      path.join(this.basePath, 'templates'),
       path.join(this.basePath, 'resources'),
       path.join(this.basePath, 'temp')
     ];
@@ -74,12 +74,12 @@ class FallbackStorageService {
    * Save template to local storage
    */
   async saveTemplate(
-    userId: string,
-    projectId: string,
-    templateId: string,
+    userEmail: string,
+    projectName: string,
+    templateName: string,
     template: any
   ): Promise<string> {
-    const templatePath = this.getTemplatePath(userId, projectId, templateId);
+    const templatePath = this.getTemplatePath(userEmail, projectName, templateName);
     const dir = path.dirname(templatePath);
 
     // Ensure directory exists
@@ -96,12 +96,12 @@ class FallbackStorageService {
    * Load template from local storage
    */
   async loadTemplate(
-    userId: string,
-    projectId: string,
-    templateId: string
+    userEmail: string,
+    projectName: string,
+    templateName: string
   ): Promise<any | null> {
     try {
-      const templatePath = this.getTemplatePath(userId, projectId, templateId);
+      const templatePath = this.getTemplatePath(userEmail, projectName, templateName);
       const data = await fs.readFile(templatePath, 'utf-8');
       return JSON.parse(data);
     } catch (error) {
@@ -113,12 +113,14 @@ class FallbackStorageService {
   }
 
   /**
-   * Save resource to local storage
+   * Save resource in the same directory as template
    */
-  async saveResource(
-    userId: string,
+  async saveResourceWithTemplate(
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string,
     resource: Buffer | Uint8Array,
-    hash: string,
     metadata?: {
       originalName?: string;
       mimeType?: string;
@@ -134,11 +136,19 @@ class FallbackStorageService {
       throw new Error(`MIME type ${metadata.mimeType} is not allowed`);
     }
 
-    const resourcePath = this.getResourcePath(userId, hash);
-    const dir = path.dirname(resourcePath);
+    // Get template directory path
+    const templateDir = path.join(
+      this.basePath,
+      'templates',
+      this.sanitizePath(userEmail),
+      this.sanitizePath(projectName),
+      this.sanitizePath(templateName)
+    );
+
+    const resourcePath = path.join(templateDir, resourceName);
 
     // Ensure directory exists
-    await fs.mkdir(dir, { recursive: true });
+    await fs.mkdir(templateDir, { recursive: true });
 
     // Write resource data
     await fs.writeFile(resourcePath, resource);
@@ -153,11 +163,62 @@ class FallbackStorageService {
   }
 
   /**
-   * Load resource from local storage
+   * Save resource to local storage (deprecated - kept for compatibility)
    */
-  async loadResource(userId: string, hash: string): Promise<Buffer | null> {
+  async saveResource(
+    userEmail: string,
+    resource: Buffer | Uint8Array,
+    resourceName: string,
+    metadata?: {
+      originalName?: string;
+      mimeType?: string;
+      projectName?: string;
+      templateName?: string;
+    }
+  ): Promise<string> {
+    // Validate size
+    if (resource.length > this.maxFileSize) {
+      throw new Error(`Resource exceeds maximum size of ${this.maxFileSize} bytes`);
+    }
+
+    // Validate mime type if provided
+    if (metadata?.mimeType && !this.allowedMimeTypes.has(metadata.mimeType)) {
+      throw new Error(`MIME type ${metadata.mimeType} is not allowed`);
+    }
+
+    // Context is required for proper path structure
+    if (!metadata?.projectName || !metadata?.templateName) {
+      throw new Error('Resource storage requires projectName and templateName in metadata');
+    }
+
+    return this.saveResourceWithTemplate(
+      userEmail,
+      metadata.projectName,
+      metadata.templateName,
+      resourceName,
+      resource,
+      metadata
+    );
+  }
+
+  /**
+   * Load resource from local storage (same directory as template)
+   */
+  async loadResource(
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string
+  ): Promise<Buffer | null> {
     try {
-      const resourcePath = this.getResourcePath(userId, hash);
+      const templateDir = path.join(
+        this.basePath,
+        'templates',
+        this.sanitizePath(userEmail),
+        this.sanitizePath(projectName),
+        this.sanitizePath(templateName)
+      );
+      const resourcePath = path.join(templateDir, resourceName);
       return await fs.readFile(resourcePath);
     } catch (error) {
       if ((error as any).code === 'ENOENT') {
@@ -171,11 +232,20 @@ class FallbackStorageService {
    * Get resource metadata
    */
   async getResourceMetadata(
-    userId: string,
-    hash: string
-  ): Promise<{ originalName?: string; mimeType?: string } | null> {
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string
+  ): Promise<{ originalName?: string; mimeType?: string; projectName?: string; templateName?: string } | null> {
     try {
-      const metadataPath = `${this.getResourcePath(userId, hash)}.meta`;
+      const templateDir = path.join(
+        this.basePath,
+        'templates',
+        this.sanitizePath(userEmail),
+        this.sanitizePath(projectName),
+        this.sanitizePath(templateName)
+      );
+      const metadataPath = path.join(templateDir, `${resourceName}.meta`);
       const data = await fs.readFile(metadataPath, 'utf-8');
       return JSON.parse(data);
     } catch {
@@ -187,11 +257,11 @@ class FallbackStorageService {
    * Delete template and its resources
    */
   async deleteTemplate(
-    userId: string,
-    projectId: string,
-    templateId: string
+    userEmail: string,
+    projectName: string,
+    templateName: string
   ): Promise<void> {
-    const templateDir = path.dirname(this.getTemplatePath(userId, projectId, templateId));
+    const templateDir = path.dirname(this.getTemplatePath(userEmail, projectName, templateName));
 
     try {
       // Remove template directory and all its contents
@@ -206,9 +276,21 @@ class FallbackStorageService {
   /**
    * Delete resource
    */
-  async deleteResource(userId: string, hash: string): Promise<void> {
-    const resourcePath = this.getResourcePath(userId, hash);
-    const metadataPath = `${resourcePath}.meta`;
+  async deleteResource(
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string
+  ): Promise<void> {
+    const templateDir = path.join(
+      this.basePath,
+      'templates',
+      this.sanitizePath(userEmail),
+      this.sanitizePath(projectName),
+      this.sanitizePath(templateName)
+    );
+    const resourcePath = path.join(templateDir, resourceName);
+    const metadataPath = path.join(templateDir, `${resourceName}.meta`);
 
     try {
       await fs.unlink(resourcePath);
@@ -284,9 +366,9 @@ class FallbackStorageService {
   }
 
   /**
-   * Calculate storage usage for a user
+   * Calculate storage usage for a user (by sanitized email)
    */
-  async calculateStorageUsage(userId: string): Promise<{
+  async calculateStorageUsage(userEmailOrId: string): Promise<{
     templates: number;
     resources: number;
     total: number;
@@ -296,27 +378,26 @@ class FallbackStorageService {
     let resourcesSize = 0;
     let fileCount = 0;
 
-    // Calculate templates size
-    const templates = await this.listTemplates(userId);
-    for (const template of templates) {
-      templatesSize += template.size;
-      fileCount++;
-    }
-
-    // Calculate resources size
-    const resourcesPath = path.join(this.basePath, 'resources', this.sanitizePath(userId));
+    // Calculate templates and resources size - all stored together in templates directory
+    // New structure: templates/{sanitizedEmail}/{project}/{template}/[template.json + resources]
+    const sanitizedUser = this.sanitizePath(userEmailOrId);
+    const userTemplatesPath = path.join(this.basePath, 'templates', sanitizedUser);
 
     try {
-      const resources = await this.walkDirectory(resourcesPath);
-      for (const file of resources) {
+      const files = await this.walkDirectory(userTemplatesPath);
+      for (const file of files) {
         const stats = await fs.stat(file);
         if (stats.isFile() && !file.endsWith('.meta')) {
-          resourcesSize += stats.size;
+          if (file.endsWith('template.json')) {
+            templatesSize += stats.size;
+          } else {
+            resourcesSize += stats.size;
+          }
           fileCount++;
         }
       }
     } catch {
-      // Resources directory might not exist
+      // Templates directory might not exist
     }
 
     return {
@@ -359,8 +440,20 @@ class FallbackStorageService {
   /**
    * Create a readable stream for a resource
    */
-  createReadStream(userId: string, hash: string): NodeJS.ReadableStream {
-    const resourcePath = this.getResourcePath(userId, hash);
+  createReadStream(
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string
+  ): NodeJS.ReadableStream {
+    const templateDir = path.join(
+      this.basePath,
+      'templates',
+      this.sanitizePath(userEmail),
+      this.sanitizePath(projectName),
+      this.sanitizePath(templateName)
+    );
+    const resourcePath = path.join(templateDir, resourceName);
     const fs = require('fs');
     return fs.createReadStream(resourcePath);
   }
@@ -369,15 +462,23 @@ class FallbackStorageService {
    * Create a writable stream for a resource
    */
   createWriteStream(
-    userId: string,
-    hash: string
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string
   ): NodeJS.WritableStream {
-    const resourcePath = this.getResourcePath(userId, hash);
-    const dir = path.dirname(resourcePath);
+    const templateDir = path.join(
+      this.basePath,
+      'templates',
+      this.sanitizePath(userEmail),
+      this.sanitizePath(projectName),
+      this.sanitizePath(templateName)
+    );
+    const resourcePath = path.join(templateDir, resourceName);
     const fs = require('fs');
 
     // Ensure directory exists synchronously
-    require('fs').mkdirSync(dir, { recursive: true });
+    require('fs').mkdirSync(templateDir, { recursive: true });
 
     return fs.createWriteStream(resourcePath);
   }
@@ -386,42 +487,31 @@ class FallbackStorageService {
    * Get template path
    */
   private getTemplatePath(
-    userId: string,
-    projectId: string,
-    templateId: string
+    userEmail: string,
+    projectName: string,
+    templateName: string
   ): string {
+    // Path structure: templates/{sanitizedEmail}/{sanitizedProject}/{sanitizedTemplate}/template.json
     return path.join(
       this.basePath,
-      'users',
-      this.sanitizePath(userId),
-      this.sanitizePath(projectId),
       'templates',
-      this.sanitizePath(templateId),
+      this.sanitizePath(userEmail),
+      this.sanitizePath(projectName),
+      this.sanitizePath(templateName),
       'template.json'
     );
   }
 
   /**
-   * Get resource path
-   */
-  private getResourcePath(userId: string, hash: string): string {
-    // Use first 2 chars of hash for directory sharding
-    const shard = hash.substring(0, 2);
-    return path.join(
-      this.basePath,
-      'resources',
-      this.sanitizePath(userId),
-      shard,
-      hash
-    );
-  }
-
-  /**
-   * Sanitize path component
+   * Sanitize path component (consistent with other services)
    */
   private sanitizePath(component: string): string {
     return component
-      .replace(/[^a-zA-Z0-9-_]/g, '')
+      .toLowerCase()
+      .replace(/@/g, '_at_')
+      .replace(/\+/g, '')
+      .replace(/\./g, '_')
+      .replace(/[^a-z0-9_-]/g, '')
       .substring(0, 100);
   }
 
@@ -465,11 +555,13 @@ class FallbackStorageService {
    * Verify resource integrity
    */
   async verifyResource(
-    userId: string,
-    hash: string,
+    userEmail: string,
+    projectName: string,
+    templateName: string,
+    resourceName: string,
     expectedHash?: string
   ): Promise<boolean> {
-    const content = await this.loadResource(userId, hash);
+    const content = await this.loadResource(userEmail, projectName, templateName, resourceName);
 
     if (!content) {
       return false;

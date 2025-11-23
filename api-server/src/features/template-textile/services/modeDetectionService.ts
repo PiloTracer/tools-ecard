@@ -157,9 +157,9 @@ class ModeDetectionService {
 
     try {
       const s3Service = getS3Service();
-      const bucketName = process.env.SEAWEEDFS_BUCKET || '';
+      const bucketName = process.env.SEAWEEDFS_BUCKET || 'repositories';
 
-      // Try to check if bucket exists (this is a lightweight operation)
+      // Try to check if bucket exists, create if it doesn't
       const exists = await Promise.race([
         s3Service.bucketExists(bucketName),
         new Promise<boolean>((_, reject) =>
@@ -167,10 +167,21 @@ class ModeDetectionService {
         )
       ]);
 
+      // If bucket doesn't exist, try to create it
+      if (!exists) {
+        try {
+          await s3Service.createBucket(bucketName);
+          console.log(`SeaweedFS bucket '${bucketName}' created successfully`);
+        } catch (createError) {
+          console.error(`Failed to create bucket '${bucketName}':`, createError);
+          return { available: false };
+        }
+      }
+
       const latency = Date.now() - startTime;
 
       return {
-        available: exists,
+        available: true,
         latency
       };
     } catch (error) {

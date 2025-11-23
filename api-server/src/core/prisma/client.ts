@@ -186,6 +186,16 @@ export const resourceOperations = {
   },
 
   /**
+   * Update resource storage URL (for migration)
+   */
+  async updateResourceUrl(resourceId: string, newUrl: string) {
+    return prisma.templateResource.update({
+      where: { id: resourceId },
+      data: { storageUrl: newUrl }
+    });
+  },
+
+  /**
    * Delete orphaned resources
    */
   async deleteOrphanedResources() {
