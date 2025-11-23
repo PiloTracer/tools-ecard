@@ -47,10 +47,10 @@ export class StorageService {
   async uploadBatchFile(
     file: Express.Multer.File,
     userEmail: string,
-    projectName: string
+    projectId: string
   ): Promise<SeaweedFSUploadResult> {
     const sanitizedEmail = sanitizeEmailForPath(userEmail);
-    const sanitizedProjectName = sanitizeEmailForPath(projectName); // Reuse same sanitization
+    const sanitizedProjectId = sanitizeEmailForPath(projectId); // Use project ID instead of name
     const sanitizedFileName = sanitizeFileName(file.originalname);
 
     // Add timestamp to filename for uniqueness (allows multiple uploads of same file)
@@ -60,9 +60,9 @@ export class StorageService {
     const fileBaseName = lastDotIndex > 0 ? sanitizedFileName.substring(0, lastDotIndex) : sanitizedFileName;
     const uniqueFileName = `${fileBaseName}-${timestamp}${fileExtension}`;
 
-    // Path structure: batches/{sanitizedEmail}/{sanitizedProjectName}/{uniqueFileName}
+    // Path structure: batches/{sanitizedEmail}/{sanitizedProjectId}/{uniqueFileName}
     // Note: Do NOT include 'buckets/' prefix - that's the bucket name in S3
-    const filePath = `batches/${sanitizedEmail}/${sanitizedProjectName}/${uniqueFileName}`;
+    const filePath = `batches/${sanitizedEmail}/${sanitizedProjectId}/${uniqueFileName}`;
 
     try {
       if (this.useLocalStorage) {

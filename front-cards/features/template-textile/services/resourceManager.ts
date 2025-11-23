@@ -218,8 +218,8 @@ class ResourceManager {
           type: resource.type,
           hash: resource.hash
         }],
-        projectName: context?.projectName || 'Default Project',
-        templateName: context?.templateName || 'Untitled'
+        projectName: context?.projectName || 'default',
+        templateName: context?.templateName || 'untitled'
       })
     });
 

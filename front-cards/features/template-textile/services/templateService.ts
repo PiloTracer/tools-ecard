@@ -78,7 +78,7 @@ class TemplateService {
     const { processedTemplate, resources } = await resourceManager.processTemplateForSave(
       request.templateData,
       {
-        projectName: 'Default Project', // TODO: Get actual project name from request
+        projectName: 'default', // Use project ID instead of name for consistency
         templateName: request.name
       }
     );

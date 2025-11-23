@@ -49,7 +49,6 @@ class FallbackStorageService {
     const directories = [
       this.basePath,
       path.join(this.basePath, 'templates'),
-      path.join(this.basePath, 'resources'),
       path.join(this.basePath, 'temp')
     ];
 

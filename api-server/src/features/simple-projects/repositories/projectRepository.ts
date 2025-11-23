@@ -138,34 +138,45 @@ export const projectRepository = {
       try {
         defaultProject = await prisma.project.create({
           data: {
+            id: 'default', // Use consistent ID to match projectOperations.getOrCreateDefaultProject
             userId,
-            name: 'default',
+            name: 'Default Project',
             isDefault: true
           }
         });
       } catch (error: any) {
         // If creation failed due to unique constraint (race condition), fetch it
         if (error.code === 'P2002') {
-          defaultProject = await prisma.project.findFirst({
-            where: {
-              userId,
-              OR: [
-                { isDefault: true },
-                { name: 'default' }
-              ]
-            }
+          // Try to find by the specific ID first
+          defaultProject = await prisma.project.findUnique({
+            where: { id: 'default' }
           });
 
-          // If found but not marked as default, update it
-          if (defaultProject && !defaultProject.isDefault) {
-            defaultProject = await prisma.project.update({
-              where: { id: defaultProject.id },
-              data: { isDefault: true }
+          // If found with the ID 'default', check if it belongs to this user
+          if (defaultProject) {
+            if (defaultProject.userId !== userId) {
+              // The 'default' ID is taken by another user, need to create with a different ID
+              defaultProject = await prisma.project.create({
+                data: {
+                  userId,
+                  name: 'Default Project',
+                  isDefault: true
+                }
+              });
+            }
+            // If it belongs to this user, just return it
+          } else {
+            // If not found by ID, search by userId and isDefault
+            defaultProject = await prisma.project.findFirst({
+              where: {
+                userId,
+                isDefault: true
+              }
             });
-          }
 
-          if (!defaultProject) {
-            throw error; // Re-throw if still not found
+            if (!defaultProject) {
+              throw error; // Re-throw if still not found
+            }
           }
         } else {
           throw error;

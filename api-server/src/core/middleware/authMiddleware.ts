@@ -56,10 +56,11 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
       // Populate request.user with authenticated user info
       // Use email as the primary ID for database operations
       request.user = {
-        id: userData.id?.toString() || userData.email, // Fallback to email if no ID
+        id: userData.email, // Always use email as ID for consistency
         email: userData.email,
         username: userData.username || userData.email,
         displayName: userData.displayName || userData.name || userData.username || userData.email,
+        oauthId: userData.id?.toString() // Store OAuth provider's ID separately if needed
       };
 
       console.log('[Auth] User authenticated:', {

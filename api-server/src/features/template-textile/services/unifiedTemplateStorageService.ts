@@ -80,7 +80,7 @@ class UnifiedTemplateStorageService {
     try {
       const templates = await templateOperations.listTemplates(userId);
       existingTemplate = templates.templates.find(
-        t => t.name === input.name && t.projectName === 'Default Project'
+        t => t.name === input.name && t.projectId === 'default'
       );
 
       if (existingTemplate) {
@@ -108,8 +108,8 @@ class UnifiedTemplateStorageService {
     if (input.resources && input.resources.length > 0) {
       console.log('[UnifiedTemplateStorage] Processing', input.resources.length, 'resources');
 
-      // Get project name - use existing template's project or default
-      const projectName = existingTemplate?.projectName || 'Default Project';
+      // Get project ID - use existing template's project or default
+      const projectId = existingTemplate?.projectId || 'default';
 
       for (let i = 0; i < input.resources.length; i++) {
         const resource = input.resources[i];
@@ -127,7 +127,7 @@ class UnifiedTemplateStorageService {
           hash: resource.hash
         }, userId, {
           userEmail,
-          projectName,
+          projectName: projectId, // Using project ID for path consistency
           templateName: input.name
         });
         resourceUrls.push(resourceUrl);
@@ -144,12 +144,12 @@ class UnifiedTemplateStorageService {
         const s3Service = getS3Service();
         const bucketName = process.env.SEAWEEDFS_BUCKET || 'repositories';
 
-        // Get project name - use existing template's project or default
-        const projectName = existingTemplate?.projectName || 'Default Project';
-        const sanitizedProjectName = this.sanitizeEmailForPath(projectName);
+        // Get project ID - use existing template's project or default
+        const projectId = existingTemplate?.projectId || 'default';
+        const sanitizedProjectId = this.sanitizeEmailForPath(projectId);
         const sanitizedTemplateName = this.sanitizeEmailForPath(input.name);
 
-        const s3Key = `templates/${sanitizedEmail}/${sanitizedProjectName}/${sanitizedTemplateName}/template.json`;
+        const s3Key = `templates/${sanitizedEmail}/${sanitizedProjectId}/${sanitizedTemplateName}/template.json`;
         console.log('[UnifiedTemplateStorage] S3 bucket:', bucketName, 'key:', s3Key);
 
         // Ensure bucket exists
@@ -187,10 +187,10 @@ class UnifiedTemplateStorageService {
     } else if (storageMode === 'fallback') {
       try {
         // Save to local fallback storage
-        const projectName = existingTemplate?.projectName || 'Default Project';
+        const projectId = existingTemplate?.projectId || 'default';
         const localPath = await fallbackStorageService.saveTemplate(
           userEmail,
-          projectName,
+          projectId,
           input.name,
           input.templateData
         );
@@ -219,7 +219,7 @@ class UnifiedTemplateStorageService {
           id: templateId,
           userId,
           projectId: 'default',
-          projectName: 'Default Project',
+          projectName: 'default', // Using project ID for consistency
           name: input.name,
           width: templateData.width || 1000,
           height: templateData.height || 600,

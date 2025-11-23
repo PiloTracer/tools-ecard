@@ -18,8 +18,8 @@ export class BatchUploadService {
     const { file, userId, userEmail, projectId, projectName } = request;
 
     try {
-      // 1. Upload file to storage (SeaweedFS or local)
-      const uploadResult = await storageService.uploadBatchFile(file, userEmail, projectName);
+      // 1. Upload file to storage (SeaweedFS or local) - use projectId for consistent paths
+      const uploadResult = await storageService.uploadBatchFile(file, userEmail, projectId);
 
       // 2. Create batch record in database
       const batch = await batchRepository.create({
