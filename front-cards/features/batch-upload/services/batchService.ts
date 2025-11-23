@@ -35,8 +35,9 @@ class BatchService {
 
     const response = await fetch(`${API_URL}/api/batches/upload`, {
       method: 'POST',
-      headers: this.getAuthHeaders(),
+      credentials: 'include', // Include cookies for auth
       body: formData,
+      // Don't set Content-Type header - browser will set it with boundary for multipart
     });
 
     if (!response.ok) {
@@ -49,8 +50,8 @@ class BatchService {
 
   async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {
     const response = await fetch(`${API_URL}/api/batches/${batchId}/status`, {
+      credentials: 'include', // Include cookies for auth
       headers: {
-        ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
       },
     });

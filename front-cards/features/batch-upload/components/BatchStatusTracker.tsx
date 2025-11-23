@@ -16,8 +16,8 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
 
   const fetchStatus = useCallback(async () => {
     try {
-      // Use mock for now during development
-      const response = await batchService.getBatchStatusMock(batchId);
+      // Use real API
+      const response = await batchService.getBatchStatus(batchId);
       setStatus(response);
       setError(null);
 

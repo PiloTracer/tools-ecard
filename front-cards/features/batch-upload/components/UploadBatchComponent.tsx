@@ -91,8 +91,8 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       // Import the service dynamically to avoid circular dependencies
       const { batchService } = await import('../services/batchService');
 
-      // Use mock for now during development
-      const response = await batchService.uploadBatchMock(file);
+      // Use real API to upload to SeaweedFS
+      const response = await batchService.uploadBatch(file);
 
       setUploadedBatch(response);
       setSelectedFile(null);
