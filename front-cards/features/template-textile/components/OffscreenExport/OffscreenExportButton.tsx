@@ -5,8 +5,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { exportTemplateById, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
+import { templateService } from '../../services/templateService';
 import type { ExportOptions } from '../../services/exportService';
 
 interface OffscreenExportButtonProps {
@@ -21,10 +22,29 @@ export function OffscreenExportButton({ templateId, templateName, className }: O
   const [exportStep, setExportStep] = useState('');
   const [showOptions, setShowOptions] = useState(false);
 
+  // Template dimensions for aspect ratio calculation
+  const [templateWidth, setTemplateWidth] = useState(1200);
+  const [templateHeight, setTemplateHeight] = useState(600);
+
   // Export options
   const [format, setFormat] = useState<'png' | 'jpg'>('png');
   const [quality, setQuality] = useState(0.9);
   const [width, setWidth] = useState(2400);
+
+  // Calculate height based on aspect ratio
+  const calculatedHeight = Math.round(width * templateHeight / templateWidth);
+
+  // Load template dimensions when modal opens
+  useEffect(() => {
+    if (showOptions) {
+      templateService.loadTemplate(templateId).then(loaded => {
+        setTemplateWidth(loaded.data.width || loaded.data.canvasWidth || 1200);
+        setTemplateHeight(loaded.data.height || loaded.data.canvasHeight || 600);
+      }).catch(err => {
+        console.error('Failed to load template dimensions:', err);
+      });
+    }
+  }, [showOptions, templateId]);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -102,11 +122,29 @@ export function OffscreenExportButton({ templateId, templateName, className }: O
                 </div>
               </div>
 
-              {/* Width */}
+              {/* Export Dimensions */}
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Export Width: {width}px
-                </label>
+                <label className="block text-sm font-medium mb-2">Export Dimensions</label>
+
+                {/* Dimensions Display */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{width}</div>
+                      <div className="text-xs text-gray-600">Width (px)</div>
+                    </div>
+                    <div className="text-gray-400 text-2xl">×</div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{calculatedHeight}</div>
+                      <div className="text-xs text-gray-600">Height (px)</div>
+                    </div>
+                  </div>
+                  <div className="text-center text-xs text-gray-500 mt-2">
+                    Aspect ratio: {(templateWidth / templateHeight).toFixed(2)}:1
+                  </div>
+                </div>
+
+                {/* Width Slider */}
                 <input
                   type="range"
                   min="600"
