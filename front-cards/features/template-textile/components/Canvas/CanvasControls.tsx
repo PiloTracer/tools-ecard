@@ -117,6 +117,8 @@ export function CanvasControls() {
     canvasWidth,
     canvasHeight,
     exportWidth,
+    elements,
+    updateElement,
     undo,
     redo,
     canUndo,
@@ -245,6 +247,31 @@ export function CanvasControls() {
 
   const handleExportPNG = async () => {
     if (!fabricCanvas) return;
+
+    // Auto-generate QR codes before export (if QR elements exist)
+    const qrElements = elements.filter(el => el.type === 'qr');
+    if (qrElements.length > 0) {
+      console.log('[Export PNG] Auto-generating vCard for QR codes...');
+
+      // Import dynamically to avoid circular dependency issues
+      const { generateVCardFromElements } = await import('../../services/vcardGenerator');
+      const vCardData = generateVCardFromElements(elements);
+
+      console.log('[Export PNG] Generated vCard:', vCardData.substring(0, 100) + '...');
+
+      // Update all QR elements with the vCard data
+      qrElements.forEach(qrEl => {
+        updateElement(qrEl.id, {
+          data: vCardData,
+          qrType: 'vcard'
+        });
+      });
+
+      console.log(`[Export PNG] Updated ${qrElements.length} QR code(s) with vCard data`);
+
+      // Wait for canvas to re-render with updated QR codes
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
 
     const scaleFactor = exportWidth / canvasWidth;
     console.log(`Exporting PNG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);
@@ -395,6 +422,31 @@ export function CanvasControls() {
 
   const handleExportJPG = async () => {
     if (!fabricCanvas) return;
+
+    // Auto-generate QR codes before export (if QR elements exist)
+    const qrElements = elements.filter(el => el.type === 'qr');
+    if (qrElements.length > 0) {
+      console.log('[Export JPG] Auto-generating vCard for QR codes...');
+
+      // Import dynamically to avoid circular dependency issues
+      const { generateVCardFromElements } = await import('../../services/vcardGenerator');
+      const vCardData = generateVCardFromElements(elements);
+
+      console.log('[Export JPG] Generated vCard:', vCardData.substring(0, 100) + '...');
+
+      // Update all QR elements with the vCard data
+      qrElements.forEach(qrEl => {
+        updateElement(qrEl.id, {
+          data: vCardData,
+          qrType: 'vcard'
+        });
+      });
+
+      console.log(`[Export JPG] Updated ${qrElements.length} QR code(s) with vCard data`);
+
+      // Wait for canvas to re-render with updated QR codes
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
 
     const scaleFactor = exportWidth / canvasWidth;
     console.log(`Exporting JPG: canvas ${canvasWidth}x${canvasHeight}, export width ${exportWidth}, multiplier ${scaleFactor}`);

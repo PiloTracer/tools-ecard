@@ -12,7 +12,8 @@ import * as fabric from 'fabric';
 import { templateService } from './templateService';
 import { recreateElements } from './canvasRenderer';
 import { replaceImagesWithHighRes } from '../utils/imageHighResReplacer';
-import type { Template } from '../types';
+import { generateVCardFromElements } from './vcardGenerator';
+import type { Template, QRElement } from '../types';
 
 export interface ExportOptions {
   format: 'png' | 'jpg';
@@ -62,11 +63,37 @@ export async function exportTemplate(
     onProgress
   } = options;
 
-  // Calculate dimensions
-  const canvasWidth = template.width || template.canvasWidth || 1200;
-  const canvasHeight = template.height || template.canvasHeight || 600;
+  // Auto-generate QR codes before export (if QR elements exist)
+  let templateToExport = template;
+  const qrElements = template.elements?.filter(el => el.type === 'qr') || [];
+  if (qrElements.length > 0) {
+    console.log('[Export] Auto-generating vCard for QR codes...');
+    const vCardData = generateVCardFromElements(template.elements || []);
+    console.log('[Export] Generated vCard:', vCardData.substring(0, 100) + '...');
 
-  const exportWidth = width || template.exportWidth || canvasWidth;
+    // Clone template and update QR elements
+    templateToExport = {
+      ...template,
+      elements: template.elements?.map(element => {
+        if (element.type === 'qr') {
+          return {
+            ...element,
+            data: vCardData,
+            qrType: 'vcard' as const,
+          } as QRElement;
+        }
+        return element;
+      }) || []
+    };
+
+    console.log(`[Export] Updated ${qrElements.length} QR code(s) with vCard data`);
+  }
+
+  // Calculate dimensions
+  const canvasWidth = templateToExport.width || templateToExport.canvasWidth || 1200;
+  const canvasHeight = templateToExport.height || templateToExport.canvasHeight || 600;
+
+  const exportWidth = width || templateToExport.exportWidth || canvasWidth;
   const exportHeight = height || Math.round(exportWidth * canvasHeight / canvasWidth);
   const multiplier = exportWidth / canvasWidth;
 
@@ -80,7 +107,7 @@ export async function exportTemplate(
   const offscreenCanvas = createOffscreenCanvas(
     canvasWidth,
     canvasHeight,
-    backgroundColor || template.backgroundColor || '#ffffff'
+    backgroundColor || templateToExport.backgroundColor || '#ffffff'
   );
 
   let blobUrls: string[] = [];
@@ -90,7 +117,7 @@ export async function exportTemplate(
     onProgress?.('Recreating elements', 0.3);
     blobUrls = await recreateElements(
       offscreenCanvas,
-      template.elements || [],
+      templateToExport.elements || [],
       {
         loadImages: true,
         onProgress: (current, total) => {

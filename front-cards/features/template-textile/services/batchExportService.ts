@@ -6,8 +6,9 @@
 import JSZip from 'jszip';
 import { exportTemplate } from './exportService';
 import type { ExportOptions, ExportResult } from './exportService';
-import type { Template, TemplateElement, TextElement } from '../types';
+import type { Template, TemplateElement, TextElement, QRElement } from '../types';
 import { apiClient } from '@/shared/lib/api-client';
+import { generateVCardFromRecord } from './vcardGenerator';
 
 /**
  * Batch record from API (ContactRecordFull type)
@@ -257,6 +258,28 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
 
     return element;
   });
+
+  // Auto-generate QR codes if QR elements exist
+  const qrElements = clonedTemplate.elements.filter(el => el.type === 'qr');
+  if (qrElements.length > 0) {
+    console.log('[BatchExport] Generating vCard for QR codes...');
+    const vCardData = generateVCardFromRecord(record);
+    console.log('[BatchExport] Generated vCard:', vCardData.substring(0, 100) + '...');
+
+    // Update all QR elements with the vCard data
+    clonedTemplate.elements = clonedTemplate.elements.map((element) => {
+      if (element.type === 'qr') {
+        return {
+          ...element,
+          data: vCardData,
+          qrType: 'vcard' as const,
+        } as QRElement;
+      }
+      return element;
+    });
+
+    console.log(`[BatchExport] Updated ${qrElements.length} QR code(s) with vCard data`);
+  }
 
   return clonedTemplate;
 }

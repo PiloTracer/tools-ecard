@@ -7,6 +7,7 @@ import { ImageProperties } from './ImageProperties';
 import { QRProperties } from './QRProperties';
 import { ShapeProperties } from './ShapeProperties';
 import { isTextElement, isImageElement, isQRElement, isShapeElement } from '../../types';
+import { generateVCardFromElements } from '../../services/vcardGenerator';
 
 export function PropertyPanel() {
   const { selectedElementId, fabricCanvas } = useCanvasStore();
@@ -37,148 +38,8 @@ export function PropertyPanel() {
       return;
     }
 
-    // Build a map of field values
-    const fieldValues: Record<string, string> = {};
-    fieldElements.forEach(el => {
-      const textEl = el as any;
-      fieldValues[textEl.fieldId] = textEl.text || '';
-    });
-
-    // Build vCard data with proper structure (vCard 3.0)
-    const vCardLines: string[] = ['BEGIN:VCARD', 'VERSION:3.0'];
-
-    // FN (Full Name) - required field
-    if (fieldValues.full_name) {
-      vCardLines.push(`FN:${fieldValues.full_name}`);
-    }
-
-    // N (Structured Name) - family;given;additional;prefix;suffix
-    if (fieldValues.first_name || fieldValues.last_name) {
-      const lastName = fieldValues.last_name || '';
-      const firstName = fieldValues.first_name || '';
-      vCardLines.push(`N:${lastName};${firstName};;;`);
-    }
-
-    // ORG (Organization) - using business_name or business_department
-    if (fieldValues.business_name) {
-      // If department exists, format as "Company;Department"
-      if (fieldValues.business_department) {
-        vCardLines.push(`ORG:${fieldValues.business_name};${fieldValues.business_department}`);
-      } else {
-        vCardLines.push(`ORG:${fieldValues.business_name}`);
-      }
-    }
-
-    // TITLE (Job Title)
-    if (fieldValues.business_title) {
-      vCardLines.push(`TITLE:${fieldValues.business_title}`);
-    }
-
-    // TEL (Phone numbers) - All specific fields from vcardFields.ts
-    if (fieldValues.work_phone) {
-      // Add extension if present
-      if (fieldValues.work_phone_ext) {
-        vCardLines.push(`TEL;TYPE=WORK,VOICE:${fieldValues.work_phone} ext ${fieldValues.work_phone_ext}`);
-      } else {
-        vCardLines.push(`TEL;TYPE=WORK,VOICE:${fieldValues.work_phone}`);
-      }
-    }
-    if (fieldValues.mobile_phone) {
-      vCardLines.push(`TEL;TYPE=CELL:${fieldValues.mobile_phone}`);
-    }
-
-    // EMAIL
-    if (fieldValues.email) {
-      vCardLines.push(`EMAIL;TYPE=INTERNET,WORK:${fieldValues.email}`);
-    }
-
-    // ADR (Work Address) - Using specific address_* fields
-    if (fieldValues.address_street || fieldValues.address_city || fieldValues.address_state ||
-        fieldValues.address_postal || fieldValues.address_country) {
-      const street = fieldValues.address_street || '';
-      const city = fieldValues.address_city || '';
-      const state = fieldValues.address_state || '';
-      const postal = fieldValues.address_postal || '';
-      const country = fieldValues.address_country || '';
-      vCardLines.push(`ADR;TYPE=WORK:;;${street};${city};${state};${postal};${country}`);
-    }
-
-    // Business Address (if different from main address)
-    if (fieldValues.business_address_street || fieldValues.business_address_city ||
-        fieldValues.business_address_state || fieldValues.business_address_postal ||
-        fieldValues.business_address_country) {
-      const street = fieldValues.business_address_street || '';
-      const city = fieldValues.business_address_city || '';
-      const state = fieldValues.business_address_state || '';
-      const postal = fieldValues.business_address_postal || '';
-      const country = fieldValues.business_address_country || '';
-      vCardLines.push(`ADR;TYPE=WORK:;;${street};${city};${state};${postal};${country}`);
-    }
-
-    // URL (Business website)
-    if (fieldValues.business_url) {
-      vCardLines.push(`URL;TYPE=WORK:${fieldValues.business_url}`);
-    }
-
-    // Personal URL
-    if (fieldValues.personal_url) {
-      vCardLines.push(`URL;TYPE=HOME:${fieldValues.personal_url}`);
-    }
-
-    // Social media profiles - LinkedIn
-    if (fieldValues.business_linkedin) {
-      // Normalize LinkedIn URL
-      let linkedinUrl = fieldValues.business_linkedin;
-      if (!linkedinUrl.startsWith('http')) {
-        linkedinUrl = linkedinUrl.startsWith('linkedin.com')
-          ? `https://${linkedinUrl}`
-          : `https://linkedin.com/in/${linkedinUrl}`;
-      }
-      vCardLines.push(`URL;TYPE=LinkedIn:${linkedinUrl}`);
-    }
-
-    // Social media - Instagram
-    if (fieldValues.social_instagram) {
-      const username = fieldValues.social_instagram.replace('@', '');
-      vCardLines.push(`URL;TYPE=Instagram:https://instagram.com/${username}`);
-    }
-
-    // Social media - Twitter (business and personal)
-    if (fieldValues.business_twitter) {
-      const username = fieldValues.business_twitter.replace('@', '');
-      vCardLines.push(`URL;TYPE=Twitter:https://twitter.com/${username}`);
-    } else if (fieldValues.social_twitter) {
-      const username = fieldValues.social_twitter.replace('@', '');
-      vCardLines.push(`URL;TYPE=Twitter:https://twitter.com/${username}`);
-    }
-
-    // Social media - Facebook
-    if (fieldValues.social_facebook) {
-      vCardLines.push(`URL;TYPE=Facebook:https://facebook.com/${fieldValues.social_facebook}`);
-    }
-
-    // BDAY (Birthday) - ISO 8601 format
-    if (fieldValues.personal_birthday) {
-      vCardLines.push(`BDAY:${fieldValues.personal_birthday}`);
-    }
-
-    // NOTE (Additional information)
-    const noteItems: string[] = [];
-
-    if (fieldValues.business_hours) {
-      noteItems.push(`Business Hours: ${fieldValues.business_hours}`);
-    }
-
-    if (fieldValues.personal_bio) {
-      noteItems.push(fieldValues.personal_bio);
-    }
-
-    if (noteItems.length > 0) {
-      vCardLines.push(`NOTE:${noteItems.join(' | ')}`);
-    }
-
-    vCardLines.push('END:VCARD');
-    const vCardData = vCardLines.join('\r\n'); // Use \r\n for proper vCard format
+    // Generate vCard using the service
+    const vCardData = generateVCardFromElements(elements);
 
     console.log('[QR Generation] Generated vCard:', vCardData);
 
