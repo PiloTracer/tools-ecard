@@ -83,6 +83,25 @@ class BatchParser:
             self.cassandra_session = cluster.connect(self.cassandra_keyspace)
             logger.info(f"✅ Cassandra connected to keyspace: {self.cassandra_keyspace}")
 
+            # Prepare the INSERT statement for contact_records
+            insert_cql = """
+                INSERT INTO contact_records (
+                    batch_record_id, batch_id, created_at, updated_at,
+                    full_name, first_name, last_name,
+                    work_phone, work_phone_ext, mobile_phone, email,
+                    address_street, address_city, address_state, address_postal, address_country,
+                    social_instagram, social_twitter, social_facebook,
+                    business_name, business_title, business_department, business_url, business_hours,
+                    business_address_street, business_address_city, business_address_state,
+                    business_address_postal, business_address_country,
+                    business_linkedin, business_twitter,
+                    personal_url, personal_bio, personal_birthday,
+                    extra
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            self.cassandra_prepared_stmt = self.cassandra_session.prepare(insert_cql)
+            logger.info("✅ Cassandra prepared statement created")
+
         except Exception as e:
             logger.error(f"❌ Database connection failed: {e}")
             raise
@@ -287,23 +306,7 @@ class BatchParser:
                 logger.error(f"Traceback:\n{traceback.format_exc()}")
                 raise
 
-            # 2. Insert into Cassandra (all vCard fields)
-            insert_cql = """
-                INSERT INTO contact_records (
-                    batch_record_id, batch_id, created_at, updated_at,
-                    full_name, first_name, last_name,
-                    work_phone, work_phone_ext, mobile_phone, email,
-                    address_street, address_city, address_state, address_postal, address_country,
-                    social_instagram, social_twitter, social_facebook,
-                    business_name, business_title, business_department, business_url, business_hours,
-                    business_address_street, business_address_city, business_address_state,
-                    business_address_postal, business_address_country,
-                    business_linkedin, business_twitter,
-                    personal_url, personal_bio, personal_birthday,
-                    extra
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-
+            # 2. Insert into Cassandra (all vCard fields) using prepared statement
             cassandra_values = (
                 uuid.UUID(batch_record_id),
                 uuid.UUID(self.batch_id),
@@ -343,15 +346,14 @@ class BatchParser:
             )
 
             logger.info("=" * 80)
-            logger.info("EXECUTING: Cassandra INSERT INTO contact_records")
-            logger.info(f"Statement placeholders: {insert_cql.count('%s')}")
+            logger.info("EXECUTING: Cassandra INSERT INTO contact_records (using prepared statement)")
             logger.info(f"Values count: {len(cassandra_values)}")
             logger.info(f"Values (first 10): {cassandra_values[:10]}")
             logger.info(f"Record data: {record}")
             logger.info("=" * 80)
 
             try:
-                self.cassandra_session.execute(insert_cql, cassandra_values)
+                self.cassandra_session.execute(self.cassandra_prepared_stmt, cassandra_values)
                 logger.info("✅ Cassandra INSERT executed successfully")
             except Exception as e:
                 logger.error(f"❌ Cassandra INSERT failed!")
