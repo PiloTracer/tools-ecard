@@ -1,6 +1,7 @@
 /**
  * Offscreen Export Button
  * Export templates without opening them using off-screen canvas rendering
+ * Supports both single template export and batch export with record data
  */
 
 'use client';
@@ -8,8 +9,11 @@
 import { useState, useEffect } from 'react';
 import { exportTemplateById, exportTemplate, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
 import { templateService } from '../../services/templateService';
+import { exportTemplateToBatch, downloadZip } from '../../services/batchExportService';
 import type { ExportOptions } from '../../services/exportService';
 import type { Template } from '../../types';
+import type { Batch } from '@/features/batch-view/types';
+import { batchViewService } from '@/features/batch-view/services/batchViewService';
 
 interface OffscreenExportButtonProps {
   templateId?: string;      // For loading from storage
@@ -24,6 +28,21 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStep, setExportStep] = useState('');
   const [showOptions, setShowOptions] = useState(false);
+
+  // Export mode: 'single' or 'batch'
+  const [exportMode, setExportMode] = useState<'single' | 'batch'>('single');
+
+  // Batch selection
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const [loadingBatches, setLoadingBatches] = useState(false);
+
+  // Batch export progress
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+
+  // Cancellation
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelRequested, setCancelRequested] = useState(false);
 
   // Template dimensions for aspect ratio calculation
   const [templateWidth, setTemplateWidth] = useState(1200);
@@ -56,7 +75,67 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     }
   }, [showOptions, templateId, template]);
 
+  // Load batches when modal opens in batch mode
+  useEffect(() => {
+    if (showOptions && exportMode === 'batch') {
+      loadBatches();
+    }
+  }, [showOptions, exportMode]);
+
+  const loadBatches = async () => {
+    setLoadingBatches(true);
+    setExportStep('');
+    try {
+      // Load all batches to see what's available
+      console.log('[OffscreenExport] Loading ALL batches (no filter)...');
+      const allBatchesResponse = await batchViewService.fetchBatches({
+        page: 1,
+        pageSize: 100,
+        filters: {}
+      });
+      console.log('[OffscreenExport] All batches response:', allBatchesResponse);
+      console.log('[OffscreenExport] Total batches found:', allBatchesResponse.batches?.length || 0);
+
+      if (allBatchesResponse.batches && allBatchesResponse.batches.length > 0) {
+        console.log('[OffscreenExport] Batch statuses:', allBatchesResponse.batches.map(b => ({
+          fileName: b.fileName,
+          status: b.status,
+          recordsCount: b.recordsCount
+        })));
+      }
+
+      // Filter to only LOADED batches (final successful status with parsed records)
+      console.log('[OffscreenExport] Filtering for LOADED batches...');
+      const loadedBatches = (allBatchesResponse.batches || []).filter(b => b.status === 'LOADED');
+      console.log('[OffscreenExport] LOADED batches:', loadedBatches.length);
+
+      setBatches(loadedBatches);
+
+      if (loadedBatches.length === 0) {
+        const totalBatches = allBatchesResponse.batches?.length || 0;
+        if (totalBatches > 0) {
+          setExportStep(`Found ${totalBatches} batch(es), but none are LOADED. Batches must be fully loaded before export.`);
+        } else {
+          setExportStep('No batches found. Upload a batch first.');
+        }
+      }
+    } catch (error) {
+      console.error('[OffscreenExport] Failed to load batches:', error);
+      setExportStep(`✗ Failed to load batches: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
   const handleExport = async () => {
+    if (exportMode === 'single') {
+      await handleSingleExport();
+    } else {
+      await handleBatchExport();
+    }
+  };
+
+  const handleSingleExport = async () => {
     setIsExporting(true);
     setExportProgress(0);
     setExportStep('Starting export...');
@@ -98,6 +177,85 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     }
   };
 
+  const handleBatchExport = async () => {
+    if (!selectedBatchId) {
+      setExportStep('✗ Please select a batch');
+      return;
+    }
+
+    if (!template && !templateId) {
+      setExportStep('✗ No template available');
+      return;
+    }
+
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportStep('Starting batch export...');
+    setCancelRequested(false);
+
+    try {
+      // Get template
+      const exportTemplate_data = template || (await templateService.loadTemplate(templateId!)).data;
+
+      // Export with batch data
+      const result = await exportTemplateToBatch(exportTemplate_data, selectedBatchId, {
+        format,
+        quality: format === 'jpg' ? quality : 1.0,
+        width,
+        onProgress: (current, total, status) => {
+          setBatchProgress({ current, total });
+          setExportStep(status);
+          setExportProgress(current / total);
+        },
+        onCancel: () => cancelRequested,
+      });
+
+      if (result.cancelled) {
+        setExportStep(`✗ Export cancelled (${result.successCount}/${result.totalRecords} completed)`);
+      } else {
+        // Download ZIP file
+        if (result.zipBlob) {
+          const zipFilename = `${result.batchName}_export.zip`;
+          downloadZip(result.zipBlob, zipFilename);
+
+          // Show success message
+          setExportStep(
+            `✓ Exported ${result.successCount}/${result.totalRecords} records` +
+            (result.failedCount > 0 ? ` (${result.failedCount} failed)` : '')
+          );
+
+          // Close modal after delay
+          setTimeout(() => {
+            setShowOptions(false);
+            setExportStep('');
+            setBatchProgress({ current: 0, total: 0 });
+          }, 3000);
+        }
+      }
+    } catch (error) {
+      console.error('Batch export failed:', error);
+      setExportStep(`✗ Batch export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+      setCancelRequested(false);
+    }
+  };
+
+  const handleCancelExport = () => {
+    if (isExporting) {
+      setShowCancelDialog(true);
+    }
+  };
+
+  const confirmCancel = (action: 'continue' | 'partial' | 'discard') => {
+    if (action === 'continue') {
+      setShowCancelDialog(false);
+    } else if (action === 'partial' || action === 'discard') {
+      setCancelRequested(true);
+      setShowCancelDialog(false);
+    }
+  };
+
   return (
     <>
       <button
@@ -112,23 +270,72 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
       {showOptions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Export Template</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Template</h3>
             <p className="text-sm text-gray-600 mb-4">{templateName}</p>
 
             <div className="space-y-4">
+              {/* Export Mode Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Export Mode</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setExportMode('single')}
+                    disabled={isExporting}
+                    className={`flex-1 px-4 py-2 rounded ${exportMode === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} disabled:opacity-50`}
+                  >
+                    Single
+                  </button>
+                  <button
+                    onClick={() => setExportMode('batch')}
+                    disabled={isExporting}
+                    className={`flex-1 px-4 py-2 rounded ${exportMode === 'batch' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} disabled:opacity-50`}
+                  >
+                    Batch
+                  </button>
+                </div>
+              </div>
+
+              {/* Batch Selection (only in batch mode) */}
+              {exportMode === 'batch' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Select Batch</label>
+                  {loadingBatches ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-sm text-gray-600">Loading batches...</span>
+                    </div>
+                  ) : batches.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-2">No batches available</p>
+                  ) : (
+                    <select
+                      value={selectedBatchId}
+                      onChange={(e) => setSelectedBatchId(e.target.value)}
+                      disabled={isExporting}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      <option value="">-- Select a batch --</option>
+                      {batches.map((batch) => (
+                        <option key={batch.id} value={batch.id}>
+                          {batch.fileName} ({new Date(batch.createdAt).toLocaleDateString()}) - {batch.recordsCount || 0} records
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
               {/* Format */}
               <div>
-                <label className="block text-sm font-medium mb-2">Format</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Format</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setFormat('png')}
-                    className={`px-4 py-2 rounded ${format === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+                    className={`px-4 py-2 rounded ${format === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}
                   >
                     PNG
                   </button>
                   <button
                     onClick={() => setFormat('jpg')}
-                    className={`px-4 py-2 rounded ${format === 'jpg' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+                    className={`px-4 py-2 rounded ${format === 'jpg' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}
                   >
                     JPG
                   </button>
@@ -137,7 +344,7 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
 
               {/* Export Dimensions */}
               <div>
-                <label className="block text-sm font-medium mb-2">Export Dimensions</label>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Export Dimensions</label>
 
                 {/* Dimensions Display */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
@@ -176,7 +383,7 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
               {/* Quality (JPG only) */}
               {format === 'jpg' && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
                     Quality: {Math.round(quality * 100)}%
                   </label>
                   <input
@@ -205,6 +412,11 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
                     />
                   </div>
                   <p className="text-sm text-gray-600">{exportStep}</p>
+                  {exportMode === 'batch' && batchProgress.total > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Progress: {batchProgress.current}/{batchProgress.total} records
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -217,17 +429,58 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
             <div className="flex gap-2 mt-6">
               <button
                 onClick={handleExport}
-                disabled={isExporting}
+                disabled={isExporting || (exportMode === 'batch' && !selectedBatchId)}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {isExporting ? 'Exporting...' : 'Export'}
+                {isExporting ? 'Exporting...' : exportMode === 'batch' ? 'Export Batch' : 'Export'}
               </button>
+              {isExporting && exportMode === 'batch' && (
+                <button
+                  onClick={handleCancelExport}
+                  className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 onClick={() => setShowOptions(false)}
                 disabled={isExporting}
                 className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
               >
-                Cancel
+                {isExporting ? 'Close' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancellation Dialog */}
+      {showCancelDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cancel Batch Export?</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              The batch export is in progress. What would you like to do?
+            </p>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => confirmCancel('continue')}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Continue Export
+              </button>
+              <button
+                onClick={() => confirmCancel('partial')}
+                className="w-full px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+              >
+                Cancel & Download Partial ZIP
+              </button>
+              <button
+                onClick={() => confirmCancel('discard')}
+                className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Cancel & Discard All
               </button>
             </div>
           </div>

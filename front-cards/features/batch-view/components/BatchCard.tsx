@@ -57,7 +57,7 @@ export const BatchCard: React.FC<BatchCardProps> = ({ batch, onDeleted }) => {
   };
 
   const getProgressPercentage = (): number | null => {
-    if (batch.recordsCount && batch.recordsProcessed !== null) {
+    if (batch.recordsCount && batch.recordsProcessed !== null && batch.recordsProcessed !== undefined) {
       return Math.round((batch.recordsProcessed / batch.recordsCount) * 100);
     }
     return null;
