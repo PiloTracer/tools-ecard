@@ -11,6 +11,7 @@ import uuid
 import argparse
 import logging
 import traceback
+import time
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from pathlib import Path
@@ -405,6 +406,9 @@ class BatchParser:
             # Update status to PARSING
             self.update_batch_status('PARSING')
 
+            # Allow UI to show PARSING status for at least 1 second
+            time.sleep(1)
+
             # Download file from storage
             logger.info(f"📥 Downloading file from storage: {self.file_path}")
             local_file_path = self.storage_client.download(self.file_path)
@@ -452,6 +456,9 @@ class BatchParser:
             )
 
             logger.info(f"✅ Successfully processed {records_processed}/{len(df)} records")
+
+            # Allow UI to show PARSED status for at least 1 second
+            time.sleep(1)
 
             # Update batch status to LOADED (100% complete, ready for use)
             self.update_batch_status(
