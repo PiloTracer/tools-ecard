@@ -64,6 +64,8 @@ export interface ShapeElement extends BaseElement {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  rx?: number; // Rounded corner radius X (for rectangles)
+  ry?: number; // Rounded corner radius Y (for rectangles)
 }
 
 export type TemplateElement = TextElement | ImageElement | QRElement | ShapeElement;
@@ -73,6 +75,11 @@ export interface Template {
   name: string;
   width: number;
   height: number;
+  canvasWidth?: number; // Alias for width (backward compatibility)
+  canvasHeight?: number; // Alias for height (backward compatibility)
+  exportWidth?: number; // Export resolution width
+  exportHeight?: number; // Export resolution height
+  backgroundColor?: string; // Canvas background color
   elements: TemplateElement[];
   createdAt: Date;
   updatedAt: Date;
