@@ -99,6 +99,7 @@ function BatchRecordsContent() {
       {/* Edit Modal */}
       {editingRecord && (
         <RecordEditModal
+          key={editingRecord.batchRecordId}
           record={editingRecord}
           batchId={batchId}
           isOpen={true}

@@ -17,6 +17,34 @@ interface RecordEditModalProps {
   onSuccess?: () => void;
 }
 
+// InputField component defined outside to prevent re-creation on each render
+const InputField: React.FC<{
+  label: string;
+  field: string;
+  value: string;
+  onChange: (field: string, value: string) => void;
+  error?: string;
+  type?: string;
+  placeholder?: string;
+}> = ({ label, field, value, onChange, error, type = 'text', placeholder = '' }) => (
+  <div>
+    <label htmlFor={field} className="block text-sm font-medium text-gray-700 mb-1">
+      {label}
+    </label>
+    <input
+      type={type}
+      id={field}
+      value={value}
+      onChange={(e) => onChange(field, e.target.value)}
+      placeholder={placeholder}
+      className={`block w-full px-3 py-2 border ${
+        error ? 'border-red-300' : 'border-gray-300'
+      } rounded-md shadow-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+    />
+    {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+  </div>
+);
+
 export const RecordEditModal: React.FC<RecordEditModalProps> = ({
   record,
   batchId,
@@ -29,43 +57,43 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
   const [formData, setFormData] = useState<RecordUpdateInput>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Initialize form data when record changes
+  // Initialize form data when modal opens or record changes
   useEffect(() => {
-    if (record) {
+    if (isOpen && record) {
       setFormData({
-        fullName: record.fullName || '',
-        firstName: record.firstName || '',
-        lastName: record.lastName || '',
-        workPhone: record.workPhone || '',
-        workPhoneExt: record.workPhoneExt || '',
-        mobilePhone: record.mobilePhone || '',
-        email: record.email || '',
-        addressStreet: record.addressStreet || '',
-        addressCity: record.addressCity || '',
-        addressState: record.addressState || '',
-        addressPostal: record.addressPostal || '',
-        addressCountry: record.addressCountry || '',
-        socialInstagram: record.socialInstagram || '',
-        socialTwitter: record.socialTwitter || '',
-        socialFacebook: record.socialFacebook || '',
-        businessName: record.businessName || '',
-        businessTitle: record.businessTitle || '',
-        businessDepartment: record.businessDepartment || '',
-        businessUrl: record.businessUrl || '',
-        businessHours: record.businessHours || '',
-        businessAddressStreet: record.businessAddressStreet || '',
-        businessAddressCity: record.businessAddressCity || '',
-        businessAddressState: record.businessAddressState || '',
-        businessAddressPostal: record.businessAddressPostal || '',
-        businessAddressCountry: record.businessAddressCountry || '',
-        businessLinkedin: record.businessLinkedin || '',
-        businessTwitter: record.businessTwitter || '',
-        personalUrl: record.personalUrl || '',
-        personalBio: record.personalBio || '',
-        personalBirthday: record.personalBirthday || '',
+        fullName: record.fullName ?? '',
+        firstName: record.firstName ?? '',
+        lastName: record.lastName ?? '',
+        workPhone: record.workPhone ?? '',
+        workPhoneExt: record.workPhoneExt ?? '',
+        mobilePhone: record.mobilePhone ?? '',
+        email: record.email ?? '',
+        addressStreet: record.addressStreet ?? '',
+        addressCity: record.addressCity ?? '',
+        addressState: record.addressState ?? '',
+        addressPostal: record.addressPostal ?? '',
+        addressCountry: record.addressCountry ?? '',
+        socialInstagram: record.socialInstagram ?? '',
+        socialTwitter: record.socialTwitter ?? '',
+        socialFacebook: record.socialFacebook ?? '',
+        businessName: record.businessName ?? '',
+        businessTitle: record.businessTitle ?? '',
+        businessDepartment: record.businessDepartment ?? '',
+        businessUrl: record.businessUrl ?? '',
+        businessHours: record.businessHours ?? '',
+        businessAddressStreet: record.businessAddressStreet ?? '',
+        businessAddressCity: record.businessAddressCity ?? '',
+        businessAddressState: record.businessAddressState ?? '',
+        businessAddressPostal: record.businessAddressPostal ?? '',
+        businessAddressCountry: record.businessAddressCountry ?? '',
+        businessLinkedin: record.businessLinkedin ?? '',
+        businessTwitter: record.businessTwitter ?? '',
+        personalUrl: record.personalUrl ?? '',
+        personalBio: record.personalBio ?? '',
+        personalBirthday: record.personalBirthday ?? '',
       });
     }
-  }, [record]);
+  }, [isOpen, record]);
 
   // Reset on success
   useEffect(() => {
@@ -140,7 +168,8 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
   if (!isOpen) return null;
 
-  const InputField = ({
+  // Wrapper to adapt new InputField to old usage pattern
+  const Field = ({
     label,
     field,
     type = 'text',
@@ -151,22 +180,15 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
     type?: string;
     placeholder?: string;
   }) => (
-    <div>
-      <label htmlFor={field} className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
-      <input
-        type={type}
-        id={field}
-        value={formData[field] || ''}
-        onChange={(e) => handleChange(field, e.target.value)}
-        placeholder={placeholder}
-        className={`block w-full px-3 py-2 border ${
-          errors[field] ? 'border-red-300' : 'border-gray-300'
-        } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-      />
-      {errors[field] && <p className="mt-1 text-xs text-red-600">{errors[field]}</p>}
-    </div>
+    <InputField
+      label={label}
+      field={field}
+      value={formData[field] || ''}
+      onChange={handleChange}
+      error={errors[field]}
+      type={type}
+      placeholder={placeholder}
+    />
   );
 
   return (
@@ -199,9 +221,9 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="Full Name" field="fullName" />
-              <InputField label="First Name" field="firstName" />
-              <InputField label="Last Name" field="lastName" />
+              <Field label="Full Name" field="fullName" />
+              <Field label="First Name" field="firstName" />
+              <Field label="Last Name" field="lastName" />
             </div>
           </div>
 
@@ -209,10 +231,10 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Contact Methods</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="Email" field="email" type="email" />
-              <InputField label="Work Phone" field="workPhone" type="tel" />
-              <InputField label="Work Phone Extension" field="workPhoneExt" />
-              <InputField label="Mobile Phone" field="mobilePhone" type="tel" />
+              <Field label="Email" field="email" type="email" />
+              <Field label="Work Phone" field="workPhone" type="tel" />
+              <Field label="Work Phone Extension" field="workPhoneExt" />
+              <Field label="Mobile Phone" field="mobilePhone" type="tel" />
             </div>
           </div>
 
@@ -221,12 +243,12 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <InputField label="Street" field="addressStreet" />
+                <Field label="Street" field="addressStreet" />
               </div>
-              <InputField label="City" field="addressCity" />
-              <InputField label="State/Province" field="addressState" />
-              <InputField label="Postal Code" field="addressPostal" />
-              <InputField label="Country" field="addressCountry" />
+              <Field label="City" field="addressCity" />
+              <Field label="State/Province" field="addressState" />
+              <Field label="Postal Code" field="addressPostal" />
+              <Field label="Country" field="addressCountry" />
             </div>
           </div>
 
@@ -234,12 +256,12 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Business Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="Company" field="businessName" />
-              <InputField label="Title" field="businessTitle" />
-              <InputField label="Department" field="businessDepartment" />
-              <InputField label="Business URL" field="businessUrl" type="url" />
+              <Field label="Company" field="businessName" />
+              <Field label="Title" field="businessTitle" />
+              <Field label="Department" field="businessDepartment" />
+              <Field label="Business URL" field="businessUrl" type="url" />
               <div className="md:col-span-2">
-                <InputField label="Business Hours" field="businessHours" />
+                <Field label="Business Hours" field="businessHours" />
               </div>
             </div>
           </div>
@@ -249,12 +271,12 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
             <h3 className="text-lg font-medium text-gray-900 mb-4">Business Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <InputField label="Street" field="businessAddressStreet" />
+                <Field label="Street" field="businessAddressStreet" />
               </div>
-              <InputField label="City" field="businessAddressCity" />
-              <InputField label="State/Province" field="businessAddressState" />
-              <InputField label="Postal Code" field="businessAddressPostal" />
-              <InputField label="Country" field="businessAddressCountry" />
+              <Field label="City" field="businessAddressCity" />
+              <Field label="State/Province" field="businessAddressState" />
+              <Field label="Postal Code" field="businessAddressPostal" />
+              <Field label="Country" field="businessAddressCountry" />
             </div>
           </div>
 
@@ -262,9 +284,9 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Social Profiles</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="Instagram" field="socialInstagram" placeholder="@username" />
-              <InputField label="Twitter" field="socialTwitter" placeholder="@username" />
-              <InputField label="Facebook" field="socialFacebook" />
+              <Field label="Instagram" field="socialInstagram" placeholder="@username" />
+              <Field label="Twitter" field="socialTwitter" placeholder="@username" />
+              <Field label="Facebook" field="socialFacebook" />
             </div>
           </div>
 
@@ -272,8 +294,8 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Professional Profiles</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="LinkedIn" field="businessLinkedin" placeholder="linkedin.com/in/username" />
-              <InputField label="Business Twitter" field="businessTwitter" placeholder="@company" />
+              <Field label="LinkedIn" field="businessLinkedin" placeholder="linkedin.com/in/username" />
+              <Field label="Business Twitter" field="businessTwitter" placeholder="@company" />
             </div>
           </div>
 
@@ -281,8 +303,8 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InputField label="Personal Website" field="personalUrl" type="url" />
-              <InputField label="Birthday" field="personalBirthday" type="date" />
+              <Field label="Personal Website" field="personalUrl" type="url" />
+              <Field label="Birthday" field="personalBirthday" type="date" />
               <div className="md:col-span-2">
                 <label htmlFor="personalBio" className="block text-sm font-medium text-gray-700 mb-1">
                   Bio
@@ -292,7 +314,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
                   value={formData.personalBio || ''}
                   onChange={(e) => handleChange('personalBio', e.target.value)}
                   rows={3}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
               </div>
             </div>
