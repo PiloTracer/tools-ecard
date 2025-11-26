@@ -169,6 +169,34 @@ class BatchParser:
                     logger.error(f"Traceback:\n{traceback.format_exc()}")
                     raise
 
+            elif status == 'LOADED':
+                stmt = """
+                    UPDATE batches
+                    SET status = %s,
+                        records_count = %s,
+                        records_processed = %s,
+                        updated_at = %s
+                    WHERE id = %s
+                """
+                values = (status, records_count, records_processed, datetime.now(), self.batch_id)
+
+                logger.info("=" * 80)
+                logger.info("EXECUTING: UPDATE LOADED")
+                logger.info(f"Statement placeholders: {stmt.count('%s')}")
+                logger.info(f"Values count: {len(values)}")
+                logger.info(f"Values: {values}")
+                logger.info("=" * 80)
+
+                try:
+                    cursor.execute(stmt, values)
+                    logger.info("✅ UPDATE LOADED executed successfully")
+                except Exception as e:
+                    logger.error(f"❌ UPDATE LOADED failed!")
+                    logger.error(f"Error type: {type(e).__name__}")
+                    logger.error(f"Error message: {str(e)}")
+                    logger.error(f"Traceback:\n{traceback.format_exc()}")
+                    raise
+
             elif status == 'ERROR':
                 stmt = """
                     UPDATE batches
