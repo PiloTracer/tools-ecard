@@ -160,12 +160,70 @@ export async function fetchBatchRecords(batchId: string): Promise<{ records: Bat
 }
 
 /**
+ * Field ID mapping: snake_case (template) -> camelCase (API)
+ * Maps vCard field IDs to BatchRecord property names
+ */
+const FIELD_ID_TO_PROPERTY_MAP: Record<string, string> = {
+  // Core fields
+  'full_name': 'fullName',
+  'first_name': 'firstName',
+  'last_name': 'lastName',
+
+  // Contact
+  'work_phone': 'workPhone',
+  'work_phone_ext': 'workPhoneExt',
+  'mobile_phone': 'mobilePhone',
+  'email': 'email',
+
+  // Address
+  'address_street': 'addressStreet',
+  'address_city': 'addressCity',
+  'address_state': 'addressState',
+  'address_postal': 'addressPostal',
+  'address_country': 'addressCountry',
+
+  // Social
+  'social_instagram': 'socialInstagram',
+  'social_twitter': 'socialTwitter',
+  'social_facebook': 'socialFacebook',
+
+  // Business
+  'business_name': 'businessName',
+  'business_title': 'businessTitle',
+  'business_department': 'businessDepartment',
+  'business_url': 'businessUrl',
+  'business_hours': 'businessHours',
+
+  // Business Address
+  'business_address_street': 'businessAddressStreet',
+  'business_address_city': 'businessAddressCity',
+  'business_address_state': 'businessAddressState',
+  'business_address_postal': 'businessAddressPostal',
+  'business_address_country': 'businessAddressCountry',
+
+  // Professional
+  'business_linkedin': 'businessLinkedin',
+  'business_twitter': 'businessTwitter',
+
+  // Personal
+  'personal_url': 'personalUrl',
+  'personal_bio': 'personalBio',
+  'personal_birthday': 'personalBirthday',
+};
+
+/**
  * Apply batch record data to template
  * Maps fieldId attributes to record values
  */
 export function applyRecordData(template: Template, record: BatchRecord): Template {
   // Deep clone template to avoid mutation
   const clonedTemplate = JSON.parse(JSON.stringify(template)) as Template;
+
+  console.log('[BatchExport] Applying record data:', {
+    recordId: record.batchRecordId,
+    fullName: record.fullName,
+    availableFields: Object.keys(record).filter(k => record[k as keyof BatchRecord] !== null)
+  });
 
   // Process all elements
   clonedTemplate.elements = clonedTemplate.elements.map((element) => {
@@ -174,8 +232,18 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
       const textElement = element as TextElement;
 
       if (textElement.fieldId) {
-        // Map fieldId to record value
-        const fieldValue = (record as any)[textElement.fieldId];
+        // Convert snake_case fieldId to camelCase property name
+        const propertyName = FIELD_ID_TO_PROPERTY_MAP[textElement.fieldId] || textElement.fieldId;
+
+        // Get value from record using the mapped property name
+        const fieldValue = (record as any)[propertyName];
+
+        console.log('[BatchExport] Field mapping:', {
+          fieldId: textElement.fieldId,
+          propertyName,
+          fieldValue,
+          originalText: textElement.text
+        });
 
         // Priority: record value > existing text > empty string
         const newText = fieldValue || textElement.text || '';
