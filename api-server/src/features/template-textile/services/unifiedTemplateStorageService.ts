@@ -253,7 +253,6 @@ class UnifiedTemplateStorageService {
                 type: resource.type,
                 storageUrl: resourceUrls[i],
                 storageMode,
-                size: decodeBase64Data(resource.data).length,
                 size: Buffer.from(resource.data.includes(',') ? resource.data.substring(resource.data.indexOf(',') + 1) : resource.data, 'base64').length,
                 mimeType: resource.data.match(/^data:([^;]+);/)?.[1] || 'application/octet-stream'
               });

@@ -74,22 +74,17 @@ class TemplateService {
   async saveTemplate(request: SaveTemplateRequest): Promise<TemplateMetadata> {
     const mode = await this.getStorageMode();
 
-    // Process template resources with context
-    const { processedTemplate, resources } = await resourceManager.processTemplateForSave(
-      request.templateData,
-      {
-        projectName: 'default', // Use project ID instead of name for consistency
-        templateName: request.name
-      }
-    );
+    // IMPORTANT: According to the feature documentation, images should be stored
+    // as full-resolution PNG data URLs in the template JSON, NOT as separate resources.
+    // The resource extraction/deduplication system is disabled for now.
+    // See: .claude/features/FEATURE-TEMPLATE-TEXTILE.md - "Storage: Full-resolution PNG data URLs stored in template JSON"
 
-    // Prepare resource data for API
-    const resourceData = resources.map(r => ({
-      type: r.type,
-      data: r.cached ? undefined : r.originalData, // Only send data if not cached
-      hash: r.hash,
-      url: r.url
-    }));
+    // Use the template data as-is (already contains rasterized PNG data URLs from CanvasControls)
+    const processedTemplate = request.templateData;
+    const resources: any[] = []; // No separate resources
+
+    // Prepare resource data for API (empty array)
+    const resourceData: any[] = [];
 
     if (mode === 'LOCAL_ONLY') {
       // Save only to local storage
