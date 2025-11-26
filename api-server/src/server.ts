@@ -7,6 +7,11 @@ import { appConfig } from './core/config';
 import { connectCassandra, disconnectCassandra } from './core/database/cassandra';
 import { disconnectRedis } from './core/database/redis';
 import { prisma } from './core/database/prisma';
+import { initCassandraSchema } from './core/cassandra/init';
+import { batchParsingWorker } from './features/batch-parsing';
+import { createLogger } from './core/utils/logger';
+
+const log = createLogger('Server');
 
 async function start() {
   try {
@@ -14,13 +19,20 @@ async function start() {
     const app = await buildApp();
 
     // Connect to databases
-    console.log('🔌 Connecting to databases...');
+    log.info('Connecting to databases');
 
     // Connect to PostgreSQL via Prisma
     await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL');
+    log.info('Connected to PostgreSQL');
+
+    // Initialize Cassandra schema (auto-creates if not exists)
+    await initCassandraSchema();
 
     await connectCassandra();
+
+    // Start batch parsing worker
+    log.info('Starting batch parsing worker');
+    await batchParsingWorker.start();
 
     // Start server
     await app.listen({
@@ -28,13 +40,18 @@ async function start() {
       host: '0.0.0.0',
     });
 
-    console.log(`🚀 API Server running on http://localhost:${appConfig.port}`);
-    console.log(`📊 Environment: ${appConfig.env}`);
-    console.log(`🏥 Health check: http://localhost:${appConfig.port}/health`);
+    log.info({
+      port: appConfig.port,
+      env: appConfig.env,
+      healthCheck: `http://localhost:${appConfig.port}/health`
+    }, 'API Server started');
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
-      console.log(`\n${signal} received, shutting down gracefully...`);
+      log.info({ signal }, 'Shutdown signal received, shutting down gracefully');
+
+      // Stop batch parsing worker
+      await batchParsingWorker.stop();
 
       // Close server
       await app.close();
@@ -44,7 +61,7 @@ async function start() {
       await disconnectCassandra();
       await disconnectRedis();
 
-      console.log('✅ Shutdown complete');
+      log.info('Shutdown complete');
       process.exit(0);
     };
 
@@ -52,7 +69,7 @@ async function start() {
     process.on('SIGINT', () => shutdown('SIGINT'));
 
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    log.error({ error }, 'Failed to start server');
     process.exit(1);
   }
 }

@@ -103,3 +103,4 @@
 **/bin/
 .db.misc/
 .misc/
+*.log

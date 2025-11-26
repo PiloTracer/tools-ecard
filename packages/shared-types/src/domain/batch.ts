@@ -1,24 +1,102 @@
 /**
  * Batch domain model
- * Represents a batch card generation job
+ * Represents a batch file upload and parsing job
  */
 
-export type BatchStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type ImportSource = 'excel' | 'text' | 'api';
+// Batch status matching Prisma schema
+export type BatchStatus = 'UPLOADED' | 'PARSING' | 'PARSED' | 'LOADED' | 'ERROR';
 
 export type Batch = {
   id: string;
   userId: string;
-  templateId: string;
-  name: string;
+  userEmail: string;
+  projectId: string;
+  projectName: string;
+  fileName: string;
+  fileSize: number;
+  filePath: string;
   status: BatchStatus;
-  totalRecords: number;
-  processedRecords: number;
-  failedRecords: number;
-  importSource: ImportSource;
+  errorMessage?: string | null;
+
+  // Parsing tracking fields
+  recordsCount?: number | null;
+  recordsProcessed?: number | null;
+  parsingStartedAt?: Date | null;
+  parsingCompletedAt?: Date | null;
+
+  processedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  completedAt?: Date;
+};
+
+// Searchable record in PostgreSQL (5 fields)
+export type BatchRecord = {
+  id: string;
+  batchId: string;
+  fullName?: string | null;
+  workPhone?: string | null;
+  mobilePhone?: string | null;
+  email?: string | null;
+  businessName?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// Complete contact record in Cassandra (all vCard fields)
+export type ContactRecord = {
+  batchRecordId: string;
+  batchId: string;
+  createdAt: Date;
+  updatedAt: Date;
+
+  // Core Contact Fields
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+
+  // Contact Methods
+  workPhone?: string | null;
+  workPhoneExt?: string | null;
+  mobilePhone?: string | null;
+  email?: string | null;
+
+  // Address
+  addressStreet?: string | null;
+  addressCity?: string | null;
+  addressState?: string | null;
+  addressPostal?: string | null;
+  addressCountry?: string | null;
+
+  // Social Profiles
+  socialInstagram?: string | null;
+  socialTwitter?: string | null;
+  socialFacebook?: string | null;
+
+  // Business Fields
+  businessName?: string | null;
+  businessTitle?: string | null;
+  businessDepartment?: string | null;
+  businessUrl?: string | null;
+  businessHours?: string | null;
+
+  // Business Address
+  businessAddressStreet?: string | null;
+  businessAddressCity?: string | null;
+  businessAddressState?: string | null;
+  businessAddressPostal?: string | null;
+  businessAddressCountry?: string | null;
+
+  // Professional Profiles
+  businessLinkedin?: string | null;
+  businessTwitter?: string | null;
+
+  // Personal Fields
+  personalUrl?: string | null;
+  personalBio?: string | null;
+  personalBirthday?: string | null;
+
+  // Extra fields for extensibility
+  extra?: Record<string, string>;
 };
 
 export type CanonicalStaff = {

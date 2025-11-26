@@ -31,6 +31,13 @@ services:
       CASSANDRA_RACK: ${CASSANDRA_RACK:-rack1}
       CASSANDRA_ENDPOINT_SNITCH: ${CASSANDRA_ENDPOINT_SNITCH:-GossipingPropertyFileSnitch}
       CASSANDRA_NUM_TOKENS: ${CASSANDRA_NUM_TOKENS:-256}
+      # JVM Memory Settings (Development - Conservative)
+      # Heap: 2GB main memory + 512MB young generation
+      # Default in cassandra:5.0 is ~10GB which causes OOM in development
+      MAX_HEAP_SIZE: ${CASSANDRA_MAX_HEAP_SIZE:-2G}
+      HEAP_NEWSIZE: ${CASSANDRA_HEAP_NEWSIZE:-512M}
+      # Limit direct memory to prevent OOM (default is 5G)
+      JVM_OPTS: ${CASSANDRA_JVM_OPTS:--XX:MaxDirectMemorySize=1G}
     ports:
       - "${CASSANDRA_NATIVE_PORT_HOST:-7042}:${CASSANDRA_PORT:-9042}"
       - "${CASSANDRA_THRIFT_PORT_HOST:-7160}:9160"
@@ -45,6 +52,11 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    # Memory limit: Heap (2G) + Direct (1G) + OS overhead (1G) = 4G total
+    # This prevents Docker OOM killer from terminating the container
+    mem_limit: 4g
+    # memswap_limit same as mem_limit = disable swap for this container
+    memswap_limit: 4g
 
   # Redis - Job queue and cache
   redis:
@@ -220,7 +232,8 @@ services:
       AUTH_RATE_LIMIT_REFRESH_MAX: ${AUTH_RATE_LIMIT_REFRESH_MAX:-20}
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-debug}
-      DEBUG: ${DEBUG:-*}
+      # Exclude Prisma and AuthMiddleware debug logs to reduce noise
+      DEBUG: ${DEBUG:-*,-prisma:*,-AuthMiddleware}
     networks:
       - ecards-network
     depends_on:
@@ -234,6 +247,11 @@ services:
         condition: service_completed_successfully
     command: npm run dev
     mem_limit: 512m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Render Worker - Background job processor
   render-worker:
@@ -301,9 +319,9 @@ services:
       bash -c '
       echo "Initializing Cassandra...";
       for script in /scripts/*.cql; do
-        if [ -f "$script" ]; then
-          echo "Running $script...";
-          cqlsh cassandra -f "$script" || { echo "Failed to run $script"; exit 1; };
+        if [ -f "$$script" ]; then
+          echo "Running $$script...";
+          cqlsh cassandra -f "$$script" || { echo "Failed to run $$script"; exit 1; };
         fi
       done;
       echo "Cassandra initialization complete!";

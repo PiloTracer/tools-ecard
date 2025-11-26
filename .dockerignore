@@ -182,3 +182,4 @@ SUBAGENTS/
 **/bin/
 .db.misc/
 .misc/
+*.log

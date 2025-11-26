@@ -166,11 +166,19 @@ model Batch {
   status        BatchStatus @default(UPLOADED)
   errorMessage  String?   @map("error_message")
   processedAt   DateTime? @map("processed_at")
+
+  // Parsing tracking fields
+  recordsCount       Int?      @map("records_count")
+  recordsProcessed   Int?      @map("records_processed")
+  parsingStartedAt   DateTime? @map("parsing_started_at")
+  parsingCompletedAt DateTime? @map("parsing_completed_at")
+
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  records BatchRecord[]
 
   @@index([userId])
   @@index([userEmail])
@@ -179,6 +187,36 @@ model Batch {
   @@index([status])
   @@index([createdAt])
   @@map("batches")
+}
+
+// BatchRecord - Searchable contact records in PostgreSQL
+// Links to complete contact data in Cassandra via batch_record_id
+// Field names strictly match front-cards/features/template-textile/utils/vcardFields.ts
+model BatchRecord {
+  id          String   @id @default(uuid())
+  batchId     String   @map("batch_id")
+
+  // 5 searchable fields from vcardFields.ts
+  fullName     String? @map("full_name")
+  workPhone    String? @map("work_phone")
+  mobilePhone  String? @map("mobile_phone")
+  email        String?
+  businessName String? @map("business_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([email])
+  @@index([fullName])
+  @@index([businessName])
+  @@index([workPhone])
+  @@index([mobilePhone])
+  @@index([createdAt])
+  @@map("batch_records")
 }
 
 // Batch status enumeration

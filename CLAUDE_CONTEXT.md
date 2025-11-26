@@ -1,7 +1,7 @@
 # E-Cards System - Claude Context
 
-**Last Updated:** 2025-01-14
-**Version:** 1.0.0
+**Last Updated:** 2025-01-25
+**Version:** 1.2.0
 
 ---
 
@@ -435,6 +435,9 @@ type RenderJob = {
 ### Databases
 - **PostgreSQL 16**: User data, templates, batches, jobs (ACID compliance)
 - **Cassandra 5**: Event logs, audit trails, time-series data
+  - **Note**: Materialized views disabled by default in Cassandra 5.0
+  - All schemas in `db/init-cassandra/` (single source of truth)
+  - Automated initialization via db-init service
 - **Redis 7**: Job queue, cache, session storage
 
 ### Storage
@@ -744,7 +747,7 @@ POSTGRES_PASSWORD=ecards_dev_password
 
 CASSANDRA_HOSTS=cassandra
 CASSANDRA_PORT=9042
-CASSANDRA_KEYSPACE=ecards_canonical
+CASSANDRA_KEYSPACE=ecards_canonical  # All schemas auto-created by db-init service
 CASSANDRA_DC=dc1
 
 REDIS_HOST=redis
@@ -874,18 +877,42 @@ RENDER_ENGINE=puppeteer # or 'node-canvas'
    - Custom port mappings (7xxx ports)
    - PostgreSQL, Cassandra, Redis containers
    - Database services running and healthy
+   - db-init service for automated Cassandra schema initialization
+
+7. **Database Schema Management** (as of 2025-01-25)
+   - Cassandra schemas consolidated in `db/init-cassandra/`
+   - Automated initialization via db-init service (no manual steps)
+   - Materialized views disabled (Cassandra 5.0 default)
+   - Project IDs auto-generated (UUID) - no hardcoded values
+   - See `.claude/fixes/` for recent fix documentation
 
 ### 🔧 Current Status
 
 **Database Services**: ✅ Running and Healthy
 - PostgreSQL: Healthy (port 7432)
-- Cassandra: Healthy (port 7042)
+- Cassandra: Healthy (port 7042) - **Schemas auto-initialized**
 - Redis: Healthy (port 7379)
 
+**Cassandra Schema Status** (Updated 2025-01-25):
+- ✅ Keyspace: `ecards_canonical` (created automatically)
+- ✅ All tables created by db-init service
+- ⚠️ Materialized views: Disabled (Cassandra 5.0 default)
+- ✅ Schema files: `db/init-cassandra/*.cql`
+- ✅ No manual initialization required
+
 **Application Services**: Ready for development
-- api-server: Build succeeded
+- api-server: Build succeeded (recent fixes applied)
 - front-cards: Ready
 - render-worker: Ready
+
+**Recent Fixes** (2025-01-25):
+- ✅ Fixed Cassandra schema initialization (materialized views disabled)
+- ✅ Fixed Prisma unique constraint error (removed hardcoded project IDs)
+- ✅ Consolidated all schemas to `db/init-cassandra/`
+- ✅ Implemented structured Pino logging (replaced 76+ console statements)
+- ✅ Configured log rotation (10MB max, 3 files)
+- 📋 See `.claude/fixes/` for detailed documentation
+- 📋 See `api-server/LOGGING.md` for logging documentation
 
 ### 🚀 Next Steps
 
@@ -994,6 +1021,57 @@ export function validateString(input: string | null | undefined): string {
   return input.trim().replace(/\s+/g, ' ');
 }
 ```
+
+### Logging Standards
+
+**CRITICAL**: All code MUST use structured Pino logging. **NEVER use console.log/error/warn/debug**.
+
+**Setup** (once per file):
+```typescript
+import { createLogger } from './core/utils/logger';
+
+const log = createLogger('ModuleName');
+```
+
+**Usage**:
+```typescript
+// ✅ Correct - Structured logging with context
+log.info({ userId, templateId }, 'Template saved successfully');
+log.error({ error, templateId }, 'Failed to save template');
+log.debug({ projectId, storageMode }, 'Processing template');
+
+// ❌ Wrong - Never use console
+console.log('Template saved:', templateId);  // NEVER DO THIS
+console.error('Failed:', error);              // NEVER DO THIS
+```
+
+**Log Levels** (use appropriately):
+- `trace`: Very detailed debugging (function entry/exit)
+- `debug`: Development diagnostics - NOT shown in production by default
+- `info`: Important application events (server started, template saved)
+- `warn`: Warning conditions (missing optional data, degraded mode)
+- `error`: Error conditions (failed operations, caught exceptions)
+- `fatal`: Critical errors causing shutdown
+
+**Best Practices**:
+1. **Always use structured context**: First parameter is object with data, second is message
+2. **Include relevant IDs**: userId, templateId, batchId, etc. for traceability
+3. **Log errors with error object**: `log.error({ error, context }, 'Message')`
+4. **Use appropriate levels**: Don't log routine operations at `info` level
+5. **Never log sensitive data**: passwords, tokens, API keys, PII
+6. **Create module-specific loggers**: One per file with meaningful module name
+
+**Environment Configuration**:
+```bash
+LOG_LEVEL=info    # Development: info, Production: warn
+DEBUG=*,-prisma:* # Exclude Prisma query logs (verbose)
+```
+
+**Log Rotation**: Configured in docker-compose.dev.yml (10MB max file size, 3 files retained)
+
+**Migration Status**: All core files migrated from console.log to Pino (2025-01-25)
+
+**See Also**: `api-server/LOGGING.md` for complete logging documentation
 
 ### Security Considerations
 
@@ -1119,6 +1197,7 @@ docker exec -it ecards-redis redis-cli
 - **Explicit TODOs** - `// TODO [OWNER]: [ACTION]`
 - **Mock markers** - `// MOCK: Description`
 - **Tests required** - Every feature module
+- **Structured logging** - Use Pino logger, NEVER console.log (see Logging Standards section)
 
 ---
 

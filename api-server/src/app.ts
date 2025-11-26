@@ -10,12 +10,17 @@ import multipart from '@fastify/multipart';
 import { appConfig } from './core/config';
 import { errorHandler } from './core/middleware/errorHandler';
 import { authMiddleware } from './core/middleware/authMiddleware';
+import { createLogger } from './core/utils/logger';
+
+const log = createLogger('App');
 
 // Feature routes
 import { projectRoutes } from './features/simple-projects/routes';
 import { s3Routes, initializeS3Feature } from './features/s3-bucket';
 import { templateRoutes } from './features/template-textile';
 import { batchUploadRoutes as batchUploadRoutesFastify } from './features/batch-upload/routes.fastify';
+import batchParsingRoutes from './features/batch-parsing/routes.fastify';
+import diagnosticRoutes from './features/batch-parsing/routes/diagnostics.fastify';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
@@ -42,7 +47,7 @@ export async function buildApp() {
         cb(null, true);
       } else if (appConfig.env === 'development') {
         // In development, be more permissive but log unexpected origins
-        console.warn(`CORS: Unexpected origin ${origin}`);
+        log.warn({ origin }, 'CORS: Unexpected origin');
         cb(null, true);
       } else {
         // In production, be strict
@@ -104,6 +109,12 @@ export async function buildApp() {
 
   // Register batch-upload routes
   await app.register(batchUploadRoutesFastify, { prefix: '/api/batches' });
+
+  // Register batch-parsing routes (record search and retrieval)
+  await app.register(batchParsingRoutes, { prefix: '/api/batch-records' });
+
+  // Register diagnostic routes (queue/worker monitoring)
+  await app.register(diagnosticRoutes, { prefix: '/api/diagnostics' });
 
   // app.register(templateRoutes, { prefix: '/api/v1/templates' });
   // app.register(batchRoutes, { prefix: '/api/v1/batches' });

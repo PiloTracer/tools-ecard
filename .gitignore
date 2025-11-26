@@ -166,3 +166,4 @@ SUBAGENTS/
 .claude/
 .db.misc/
 .misc/
+*.log

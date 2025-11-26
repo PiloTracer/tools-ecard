@@ -26,16 +26,33 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install Python and pip for batch parsing
+# Install libev for Cassandra driver Python 3.12 compatibility
+RUN apk add --no-cache \
+    python3 \
+    python3-dev \
+    py3-pip \
+    libev-dev \
+    gcc \
+    musl-dev
+
 # Copy package files
 COPY package.json ./
 
 # Install only production dependencies
 RUN npm install --omit=dev
 
+# Copy Python requirements and install dependencies
+COPY batch-parsing/requirements.txt ./batch-parsing/
+RUN pip3 install --no-cache-dir --break-system-packages -r ./batch-parsing/requirements.txt
+
 # Copy built application and Prisma schema
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copy Python batch-parsing scripts
+COPY --from=builder /app/batch-parsing ./batch-parsing
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \

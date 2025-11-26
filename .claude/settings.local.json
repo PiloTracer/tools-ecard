@@ -6,7 +6,16 @@
       "Bash(npm run dev:*)",
       "Bash(curl:*)",
       "Bash(docker logs:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(docker-compose:*)",
+      "Bash(netstat:*)",
+      "Bash(aws s3 ls:*)",
+      "Bash(chmod:*)",
+      "Bash(winpty docker exec -it ecards-api bash -c \"ls -la /app/batch-parsing/\")",
+      "Bash(docker exec:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

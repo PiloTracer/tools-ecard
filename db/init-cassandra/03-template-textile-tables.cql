@@ -69,7 +69,19 @@ CREATE INDEX IF NOT EXISTS idx_textile_metadata_user
 -- ============================================================
 -- Materialized Views (Optional - for optimized queries)
 -- ============================================================
+--
+-- NOTE: Materialized views are DISABLED by default in Cassandra 5.0
+-- They are commented out to allow schema initialization to succeed.
+--
+-- To enable materialized views:
+-- 1. Edit cassandra.yaml and set: materialized_views_enabled: true
+-- 2. Restart Cassandra
+-- 3. Uncomment the views below and run this script again
+--
+-- See: https://cassandra.apache.org/doc/latest/cassandra/cql/mv.html
+-- ============================================================
 
+/*
 -- View for recent events by user (last 30 days)
 CREATE MATERIALIZED VIEW IF NOT EXISTS textile_events_by_user AS
     SELECT user_id, template_id, event_id, event_type, event_timestamp, metadata
@@ -93,6 +105,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS textile_events_by_type AS
     PRIMARY KEY ((event_type), event_timestamp, template_id, event_id)
     WITH CLUSTERING ORDER BY (event_timestamp DESC, template_id ASC, event_id ASC)
     AND comment = 'Events organized by type for analytics and monitoring';
+*/
 
 -- ============================================================
 -- Sample Data (Optional - for testing)

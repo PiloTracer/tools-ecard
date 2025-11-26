@@ -11,7 +11,10 @@ import { appConfig } from '../config';
 
 const prismaClientSingleton = () => {
   return new PrismaClient({
-    log: appConfig.env === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Development: Only log errors and warnings (not queries)
+    // Production: Only log errors
+    // Queries are too verbose and flood the logs
+    log: appConfig.env === 'development' ? ['error', 'warn'] : ['error'],
   });
 };
 

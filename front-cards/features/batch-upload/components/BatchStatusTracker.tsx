@@ -49,13 +49,15 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
     fetchStatus();
 
     // Set up polling for status updates
+    // Increased from 3s to 5s to reduce server load and log spam
     const pollInterval = setInterval(() => {
       if (status && (status.status === BatchStatus.LOADED || status.status === BatchStatus.ERROR)) {
         // Stop polling if processing is complete
+        clearInterval(pollInterval);
         return;
       }
       fetchStatus();
-    }, 3000); // Poll every 3 seconds
+    }, 5000); // Poll every 5 seconds (reduced from 3s)
 
     return () => clearInterval(pollInterval);
   }, [fetchStatus, status]);

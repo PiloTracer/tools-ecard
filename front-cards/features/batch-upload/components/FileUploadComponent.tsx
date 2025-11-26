@@ -21,6 +21,7 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<FileValidationError | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   const validateFile = useCallback(
     (file: File): FileValidationError | null => {
@@ -71,13 +72,21 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
+
+    dragCounterRef.current++;
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true);
+    }
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -89,6 +98,9 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+
+      // Reset the drag counter and state
+      dragCounterRef.current = 0;
       setIsDragging(false);
 
       const files = e.dataTransfer.files;
@@ -180,7 +192,7 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
           disabled={isUploading}
         />
 
-        <div className="text-center">
+        <div className="text-center" style={{ pointerEvents: 'none' }}>
           {/* Upload Icon */}
           <svg
             className="mx-auto h-12 w-12 text-gray-400"

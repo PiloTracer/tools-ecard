@@ -1,12 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 import { cassandraClient } from '../../../core/cassandra/client';
-import { templateOperations, resourceOperations } from '../../../core/prisma/client';
+import { templateOperations, resourceOperations, projectOperations } from '../../../core/prisma/client';
 import { fallbackStorageService } from './fallbackStorageService';
 import { resourceDeduplicationService } from './resourceDeduplicationService';
 import { modeDetectionService, StorageMode } from './modeDetectionService';
 import { getS3Service } from '../../s3-bucket/services/s3Service';
 import type { Request } from 'express';
 import { decodeBase64Data } from '../utils/base64Helper';
+import { createLogger } from '../../../core/utils/logger';
+
+const log = createLogger('TemplateStorage');
 
 export interface TemplateMetadata {
   id: string;
@@ -60,12 +63,11 @@ class UnifiedTemplateStorageService {
     input: SaveTemplateInput,
     request: Request
   ): Promise<TemplateMetadata> {
-    console.log('[UnifiedTemplateStorage] saveTemplate called');
-
     // Extract userId and email from authenticated request
     const userId = (request as any).user?.id;
     const userEmail = (request as any).user?.email;
-    console.log('[UnifiedTemplateStorage] User ID:', userId, 'Email:', userEmail);
+
+    log.debug({ userId, userEmail, templateName: input.name }, 'Starting template save');
 
     if (!userId || !userEmail) {
       throw new Error('User not authenticated');
@@ -74,27 +76,31 @@ class UnifiedTemplateStorageService {
     // Sanitize email for use in path (consistent with batch-upload)
     const sanitizedEmail = this.sanitizeEmailForPath(userEmail);
 
-    // Check if a template with this name already exists for this user
+    // Get or create user's default project
+    const defaultProject = await projectOperations.getOrCreateDefaultProject(userId);
+    const projectId = defaultProject.id;
+
+    // Check if a template with this name already exists for this user in this project
     let templateId: string;
     let existingTemplate: any = null;
 
     try {
       const templates = await templateOperations.listTemplates(userId);
       existingTemplate = templates.templates.find(
-        t => t.name === input.name && t.projectId === 'default'
+        t => t.name === input.name && t.projectId === projectId
       );
 
       if (existingTemplate) {
         templateId = existingTemplate.id;
-        console.log('[UnifiedTemplateStorage] Updating existing template:', templateId);
+        log.debug({ templateId, projectId }, 'Updating existing template');
       } else {
         templateId = uuidv4();
-        console.log('[UnifiedTemplateStorage] Creating new template:', templateId);
+        log.debug({ templateId, projectId }, 'Creating new template');
       }
     } catch (error) {
       // If can't check, generate new ID
       templateId = uuidv4();
-      console.log('[UnifiedTemplateStorage] Template ID (fallback):', templateId);
+      log.debug({ templateId }, 'Using fallback template ID');
     }
 
     const timestamp = new Date();
@@ -102,23 +108,21 @@ class UnifiedTemplateStorageService {
     // Detect current storage mode
     const modeResult = await modeDetectionService.detectMode();
     const storageMode = modeResult.mode;
-    console.log('[UnifiedTemplateStorage] Storage mode:', storageMode);
+    log.debug({ storageMode }, 'Detected storage mode');
 
     // Process and deduplicate resources
     const resourceUrls: string[] = [];
     if (input.resources && input.resources.length > 0) {
-      console.log('[UnifiedTemplateStorage] Processing', input.resources.length, 'resources');
+      log.debug({ resourceCount: input.resources.length }, 'Processing resources');
 
-      // Get project ID - use existing template's project or default
-      const projectId = existingTemplate?.projectId || 'default';
+      // Note: projectId is already defined above from getOrCreateDefaultProject
 
       for (let i = 0; i < input.resources.length; i++) {
         const resource = input.resources[i];
-        console.log('[UnifiedTemplateStorage] Resource', i, 'keys:', Object.keys(resource || {}));
 
         // Skip if resource doesn't have data
         if (!resource || !resource.data) {
-          console.warn('[UnifiedTemplateStorage] Skipping resource', i, '- no data field');
+          log.warn({ resourceIndex: i }, 'Skipping resource - no data field');
           continue;
         }
 
@@ -139,31 +143,26 @@ class UnifiedTemplateStorageService {
     let storageUrl: string;
 
     if (storageMode === 'full') {
-      console.log('[UnifiedTemplateStorage] FULL mode - saving to SeaweedFS S3');
       try {
         // Save to SeaweedFS (S3)
         const s3Service = getS3Service();
         const bucketName = process.env.SEAWEEDFS_BUCKET || 'repositories';
 
-        // Get project ID - use existing template's project or default
-        const projectId = existingTemplate?.projectId || 'default';
+        // Note: projectId is already defined above from getOrCreateDefaultProject
         const sanitizedProjectId = this.sanitizeEmailForPath(projectId);
         const sanitizedTemplateName = this.sanitizeEmailForPath(input.name);
 
         const s3Key = `templates/${sanitizedEmail}/${sanitizedProjectId}/${sanitizedTemplateName}/template.json`;
-        console.log('[UnifiedTemplateStorage] S3 bucket:', bucketName, 'key:', s3Key);
 
         // Ensure bucket exists
         const bucketExists = await s3Service.bucketExists(bucketName);
-        console.log('[UnifiedTemplateStorage] Bucket exists:', bucketExists);
         if (!bucketExists) {
-          console.log('[UnifiedTemplateStorage] Creating bucket...');
+          log.debug({ bucketName }, 'Creating S3 bucket');
           await s3Service.createBucket(bucketName);
         }
 
-        console.log('[UnifiedTemplateStorage] Uploading to S3...');
         const templateJson = JSON.stringify(input.templateData);
-        console.log('[UnifiedTemplateStorage] Template JSON size:', templateJson.length, 'bytes');
+        log.debug({ bucketName, s3Key, sizeBytes: templateJson.length }, 'Uploading template to S3');
 
         await s3Service.putObject(
           bucketName,
@@ -179,16 +178,16 @@ class UnifiedTemplateStorageService {
           }
         );
 
-        console.log('[UnifiedTemplateStorage] ✓ Successfully uploaded to S3');
+        log.info({ templateId, s3Key }, 'Template saved to S3');
         storageUrl = `s3://${bucketName}/${s3Key}`;
       } catch (error) {
-        console.error('[UnifiedTemplateStorage] ✗ Failed to save template to SeaweedFS:', error);
+        log.error({ error, templateId }, 'Failed to save template to SeaweedFS');
         throw new Error('Storage service unavailable');
       }
     } else if (storageMode === 'fallback') {
       try {
         // Save to local fallback storage
-        const projectId = existingTemplate?.projectId || 'default';
+        // Note: projectId is already defined above from getOrCreateDefaultProject
         const localPath = await fallbackStorageService.saveTemplate(
           userEmail,
           projectId,
@@ -197,7 +196,7 @@ class UnifiedTemplateStorageService {
         );
         storageUrl = `fallback://${localPath}`;
       } catch (error) {
-        console.error('Failed to save template to fallback storage:', error);
+        log.error({ error, templateId }, 'Failed to save template to fallback storage');
         storageUrl = `local://${input.name}`;
       }
     } else {
@@ -208,10 +207,7 @@ class UnifiedTemplateStorageService {
     // Save metadata to PostgreSQL (if available)
     let metadata: TemplateMetadata;
 
-    console.log('[UnifiedTemplateStorage] Checking if should save to PostgreSQL, mode:', storageMode);
-
     if (storageMode === 'full' || storageMode === 'fallback') {
-      console.log('[UnifiedTemplateStorage] Mode is', storageMode, '- saving to PostgreSQL');
       try {
         const templateData = input.templateData || {};
         const version = existingTemplate ? (existingTemplate.version || 1) + 1 : 1;
@@ -219,8 +215,8 @@ class UnifiedTemplateStorageService {
         await templateOperations.upsertTemplate({
           id: templateId,
           userId,
-          projectId: 'default',
-          projectName: 'default', // Using project ID for consistency
+          projectId: projectId, // Use actual default project ID from getOrCreateDefaultProject
+          projectName: defaultProject.name, // Use actual default project name
           name: input.name,
           width: templateData.width || 1000,
           height: templateData.height || 600,
@@ -243,11 +239,10 @@ class UnifiedTemplateStorageService {
           createdAt: existingTemplate?.createdAt || timestamp,
           updatedAt: timestamp
         };
-        console.log('[UnifiedTemplateStorage] Successfully saved to PostgreSQL');
+        log.debug({ templateId, version }, 'Template metadata saved to PostgreSQL');
 
         // Now link resources to the template
         if (input.resources && input.resources.length > 0) {
-          console.log('[UnifiedTemplateStorage] Linking', input.resources.length, 'resources to template');
           for (let i = 0; i < input.resources.length; i++) {
             const resource = input.resources[i];
             try {
@@ -263,18 +258,18 @@ class UnifiedTemplateStorageService {
                 mimeType: resource.data.match(/^data:([^;]+);/)?.[1] || 'application/octet-stream'
               });
             } catch (error) {
-              console.error('[UnifiedTemplateStorage] Failed to link resource:', error);
+              log.error({ error, resourceIndex: i, templateId }, 'Failed to link resource');
               // Continue with other resources
             }
           }
-          console.log('[UnifiedTemplateStorage] Resources linked successfully');
+          log.debug({ resourceCount: input.resources.length, templateId }, 'Resources linked to template');
         }
       } catch (error) {
-        console.error('[UnifiedTemplateStorage] Failed to save metadata to PostgreSQL:', error);
+        log.error({ error, templateId }, 'Failed to save metadata to PostgreSQL');
         throw new Error('Database unavailable');
       }
     } else {
-      console.log('[UnifiedTemplateStorage] Mode is', storageMode, '- constructing metadata without DB (LOCAL_ONLY)');
+      log.debug({ storageMode }, 'LOCAL_ONLY mode - constructing metadata without DB');
       // In LOCAL_ONLY mode, construct metadata without DB
       metadata = {
         id: templateId,
@@ -291,7 +286,6 @@ class UnifiedTemplateStorageService {
 
     // Log event to Cassandra (if available)
     if (storageMode === 'full' || storageMode === 'fallback') {
-      console.log('[UnifiedTemplateStorage] Logging event to Cassandra');
       try {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),
@@ -306,7 +300,7 @@ class UnifiedTemplateStorageService {
           timestamp
         });
       } catch (error) {
-        console.error('Failed to log event to Cassandra:', error);
+        log.error({ error, templateId }, 'Failed to log event to Cassandra');
         // Non-critical, continue
       }
     }
@@ -354,7 +348,7 @@ class UnifiedTemplateStorageService {
           throw new Error('Unauthorized');
         }
       } catch (error) {
-        console.error('Failed to load metadata from PostgreSQL:', error);
+        log.error({ error, templateId }, 'Failed to load metadata from PostgreSQL');
         if (storageMode === 'full') {
           throw error;
         }
@@ -377,7 +371,7 @@ class UnifiedTemplateStorageService {
         const bucketName = s3UrlParts[0];
         const s3Key = s3UrlParts.slice(1).join('/');
 
-        console.log('[UnifiedTemplateStorage] Loading from S3:', bucketName, s3Key);
+        log.debug({ bucketName, s3Key, templateId }, 'Loading template from S3');
 
         const s3Service = getS3Service();
         const s3Result = await s3Service.getObject(bucketName, s3Key);
@@ -397,7 +391,7 @@ class UnifiedTemplateStorageService {
 
         templateData = JSON.parse(buffer.toString('utf-8'));
       } catch (error) {
-        console.error('Failed to load template from S3:', error);
+        log.error({ error, templateId }, 'Failed to load template from S3');
         throw new Error('Failed to load template data from S3');
       }
     } else if (metadata.storageUrl.startsWith('fallback://')) {
@@ -418,7 +412,7 @@ class UnifiedTemplateStorageService {
         const projectName = pathParts[templatesIndex + 2];
         const templateName = pathParts[templatesIndex + 3];
 
-        console.log('[UnifiedTemplateStorage] Loading from fallback storage:', userEmail, projectName, templateName);
+        log.debug({ userEmail, projectName, templateName, templateId }, 'Loading template from fallback storage');
 
         templateData = await fallbackStorageService.loadTemplate(
           userEmail,
@@ -430,7 +424,7 @@ class UnifiedTemplateStorageService {
           throw new Error('Template file not found in fallback storage');
         }
       } catch (error) {
-        console.error('Failed to load template from fallback storage:', error);
+        log.error({ error, templateId }, 'Failed to load template from fallback storage');
         throw new Error('Failed to load template data from fallback storage');
       }
     } else if (metadata.storageUrl.startsWith('local://')) {
@@ -444,7 +438,6 @@ class UnifiedTemplateStorageService {
     if (templateData && templateData.elements) {
       // Use public endpoint for browser access (not the Docker-internal endpoint)
       const apiEndpoint = process.env.API_PUBLIC_ENDPOINT || 'http://localhost:7400';
-      console.log('[UnifiedTemplateStorage] Converting S3 URLs, apiEndpoint:', apiEndpoint);
       templateData.elements = templateData.elements.map((element: any) => {
         if (element.type === 'image' && element.imageUrl && element.imageUrl.startsWith('s3://')) {
           // Convert s3://bucket/key to http://localhost:7400/api/v1/template-textile/resource/bucket/key
@@ -452,7 +445,7 @@ class UnifiedTemplateStorageService {
           const bucketName = s3UrlParts[0];
           const key = s3UrlParts.slice(1).join('/');
           const httpUrl = `${apiEndpoint}/api/v1/template-textile/resource/${bucketName}/${key}`;
-          console.log('[UnifiedTemplateStorage] Converting:', element.imageUrl, '->', httpUrl);
+          log.debug({ s3Url: element.imageUrl, httpUrl }, 'Converting S3 URL to HTTP');
           element.imageUrl = httpUrl;
         }
         return element;
@@ -471,7 +464,7 @@ class UnifiedTemplateStorageService {
           timestamp: new Date()
         });
       } catch (error) {
-        console.error('Failed to log event:', error);
+        log.error({ error, templateId }, 'Failed to log template access event');
         // Non-critical
       }
     }
@@ -513,7 +506,7 @@ class UnifiedTemplateStorageService {
           updatedAt: t.updatedAt
         }));
       } catch (error) {
-        console.error('Failed to list templates from PostgreSQL:', error);
+        log.error({ error, userId }, 'Failed to list templates from PostgreSQL');
         if (storageMode === 'full' || storageMode === 'fallback') {
           throw new Error('Database unavailable');
         }
@@ -521,7 +514,7 @@ class UnifiedTemplateStorageService {
     }
 
     // In FALLBACK or LOCAL_ONLY mode, return empty or cached list
-    console.warn('Operating in degraded mode, returning empty template list');
+    log.warn({ storageMode }, 'Operating in degraded mode, returning empty template list');
     return [];
   }
 
@@ -563,7 +556,7 @@ class UnifiedTemplateStorageService {
           throw new Error('Unauthorized');
         }
       } catch (error) {
-        console.error('Failed to load metadata:', error);
+        log.error({ error, templateId }, 'Failed to load metadata for deletion');
         if (storageMode === 'full' || storageMode === 'fallback') {
           throw error;
         }
@@ -583,6 +576,7 @@ class UnifiedTemplateStorageService {
           if (match) {
             const [, bucket, key] = match;
             await s3Service.deleteObject(bucket, key);
+            log.debug({ bucket, key, templateId }, 'Deleted template from S3');
           }
         } else if (metadata.storageUrl.startsWith('fallback://')) {
           // Parse fallback URL to extract path components
@@ -596,10 +590,11 @@ class UnifiedTemplateStorageService {
             const templateName = pathParts[templatesIndex + 3];
 
             await fallbackStorageService.deleteTemplate(userEmail, projectName, templateName);
+            log.debug({ templateId, templateName }, 'Deleted template from fallback storage');
           }
         }
       } catch (error) {
-        console.error('Failed to delete from storage:', error);
+        log.error({ error, templateId }, 'Failed to delete from storage');
         // Continue with metadata deletion
       }
     }
@@ -608,8 +603,9 @@ class UnifiedTemplateStorageService {
     if (storageMode === 'full' || storageMode === 'fallback') {
       try {
         await templateOperations.deleteTemplate(templateId, userId);
+        log.info({ templateId }, 'Template deleted');
       } catch (error) {
-        console.error('Failed to delete metadata:', error);
+        log.error({ error, templateId }, 'Failed to delete metadata');
         throw new Error('Failed to delete template');
       }
     }
@@ -626,7 +622,7 @@ class UnifiedTemplateStorageService {
           timestamp: new Date()
         });
       } catch (error) {
-        console.error('Failed to log deletion event:', error);
+        log.error({ error, templateId }, 'Failed to log deletion event');
         // Non-critical
       }
     }

@@ -29,6 +29,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const [uploadedBatch, setUploadedBatch] = useState<BatchUploadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragCounterRef = useRef(0);
   const { selectedProjectId, selectedProject, projects, loading } = useProjects();
 
   const isDisabled = !selectedProjectId || loading;
@@ -127,7 +128,11 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isDisabled) {
+
+    if (isDisabled) return;
+
+    dragCounterRef.current++;
+    if (dragCounterRef.current === 1) {
       setIsDragging(true);
     }
   }, [isDisabled]);
@@ -135,7 +140,11 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -147,6 +156,9 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+
+      // Reset the drag counter and state
+      dragCounterRef.current = 0;
       setIsDragging(false);
 
       if (isDisabled) return;
@@ -322,6 +334,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
           stroke="currentColor"
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
+          style={{ pointerEvents: 'none' }}
         >
           <path
             strokeLinecap="round"
@@ -330,7 +343,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
           />
         </svg>
-        <div className="text-left flex-1">
+        <div className="text-left flex-1" style={{ pointerEvents: 'none' }}>
           <p className={getTitleClasses()}>
             {isUploading ? 'Uploading...' : isDragging ? 'Drop file here' : 'Import Batch'}
           </p>
@@ -344,7 +357,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
           )}
         </div>
         {isUploading && (
-          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent" style={{ pointerEvents: 'none' }}></div>
         )}
       </div>
 

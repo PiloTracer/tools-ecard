@@ -6,6 +6,9 @@
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { userOperations, projectOperations } from '../prisma/client';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('AuthMiddleware');
 
 const OAUTH_CONFIG = {
   userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'http://epicdev.com/api/users/me',
@@ -63,11 +66,11 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
         oauthId: userData.id?.toString() // Store OAuth provider's ID separately if needed
       };
 
-      console.log('[Auth] User authenticated:', {
-        id: request.user.id,
+      log.debug({
+        userId: request.user.id,
         email: request.user.email,
-        username: request.user.username,
-      });
+        username: request.user.username
+      }, 'User authenticated');
 
       // Ensure user exists in database
       try {
@@ -81,15 +84,15 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
         // Ensure user has a default project
         await projectOperations.ensureDefaultProject(request.user.id);
       } catch (dbError) {
-        console.error('[Auth] Failed to sync user to database:', dbError);
+        log.error({ error: dbError, userId: request.user.id }, 'Failed to sync user to database');
         // Continue even if DB sync fails
       }
     } else {
-      console.warn('[Auth] Failed to fetch user info:', userResponse.status);
+      log.warn({ status: userResponse.status }, 'Failed to fetch user info - token may be expired or invalid');
       // Token might be expired or invalid - proceed without user
     }
   } catch (error) {
-    console.error('[Auth] Middleware error:', error);
+    log.error({ error }, 'Auth middleware error');
     // Don't fail the request if auth check fails - let it proceed
   }
 }

@@ -1,58 +1,37 @@
 # Database Setup Guide
 
-## The Issue
+**Last Updated:** 2025-01-25
 
-When starting the application, you may see this error:
+## ✅ Automated Setup (Current)
 
+**Good News!** Database initialization is now **fully automated** via the `db-init` service in docker-compose.
+
+When you run:
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+The system automatically:
+1. ✅ Starts Cassandra container
+2. ✅ Waits for Cassandra to be healthy
+3. ✅ Runs all schema scripts from `db/init-cassandra/*.cql`
+4. ✅ Creates keyspace `ecards_canonical` and all tables
+5. ✅ Allows api-server to start only after schemas are ready
+
+**No manual intervention required!**
+
+## ⚠️ Legacy Issue (Fixed as of 2025-01-25)
+
+**Old error you might have seen:**
 ```
 ❌ Failed to connect to Cassandra: ResponseError: Keyspace 'ecards_canonical' does not exist
 ```
 
-**Why this happens:**
-- The Cassandra container is running successfully
-- The application is trying to connect to keyspace `ecards_canonical`
-- The keyspace hasn't been created yet (initialization scripts need to be run)
+**This has been resolved** - schemas are now auto-created by db-init service before api-server starts.
 
-**Note:** Unlike PostgreSQL (which auto-creates the database from env vars), Cassandra requires explicit keyspace creation via CQL scripts.
+## Fresh Start (If Needed)
 
-## Quick Fix
-
-### Option 1: Run Initialization Script (Recommended)
-
-**Windows:**
-```bash
-scripts\init-cassandra.bat
-```
-
-**Linux/Mac:**
-```bash
-chmod +x scripts/init-cassandra.sh
-./scripts/init-cassandra.sh
-```
-
-**What this does:**
-1. Waits for Cassandra to be fully ready
-2. Executes the keyspace creation script
-3. Verifies the setup is complete
-
-### Option 2: Manual Initialization
-
-If the script doesn't work, run manually:
-
-```bash
-# Wait for Cassandra to be ready (may take 30-60 seconds)
-docker exec ecards-cassandra cqlsh -e "DESCRIBE KEYSPACES"
-
-# Create the keyspace
-docker exec ecards-cassandra cqlsh -f /docker-entrypoint-initdb.d/01-create-keyspace.cql
-
-# Verify keyspace was created
-docker exec ecards-cassandra cqlsh -e "DESCRIBE KEYSPACES" | grep ecards_canonical
-```
-
-### Option 3: Reset and Reinitialize
-
-If you want a completely fresh start:
+If you need to reset everything:
 
 ```bash
 # Stop all containers
@@ -61,19 +40,20 @@ docker-compose -f docker-compose.dev.yml down
 # Remove Cassandra volume (deletes all data!)
 docker volume rm tools-ecards_cassandra_data
 
-# Start Cassandra container
-docker-compose -f docker-compose.dev.yml up -d cassandra
-
-# Wait 60 seconds for Cassandra to fully start
-# (Important: Cassandra takes longer to start than other databases)
-
-# Run initialization script
-scripts\init-cassandra.bat   # Windows
-# OR
-./scripts/init-cassandra.sh  # Linux/Mac
-
-# Start remaining services
+# Start everything fresh (schemas auto-created)
 docker-compose -f docker-compose.dev.yml up -d
+
+# Watch initialization
+docker-compose -f docker-compose.dev.yml logs -f db-init
+
+# Expected output:
+# ✅ Initializing Cassandra...
+# ✅ Running /scripts/01-create-keyspace.cql...
+# ✅ Running /scripts/02-template-storage.cql...
+# ✅ Running /scripts/03-template-textile-tables.cql...
+# ✅ Running /scripts/05-batch-upload-tables.cql...
+# ✅ Running /scripts/06-contact-records.cql...
+# ✅ Cassandra initialization complete!
 ```
 
 ## Verification
@@ -120,18 +100,33 @@ EXIT;
 
 **Status:**
 - ✅ Container running
-- ✅ Keyspace creation script created (`db/init-cassandra/01-create-keyspace.cql`)
-- ⚠️ Keyspace not auto-created (requires manual initialization)
-- ⚠️ No tables yet (schemas marked as MOCK/TODO)
+- ✅ Keyspace auto-created by db-init service
+- ✅ All tables auto-created from `db/init-cassandra/*.cql`
+- ⚠️ Materialized views disabled (Cassandra 5.0 default)
+- ✅ Fully automated - no manual steps required
+
+**Schema Files** (executed in order):
+- `01-create-keyspace.cql` - Creates keyspace
+- `02-template-storage.cql` - Template & storage tables
+- `03-template-textile-tables.cql` - Textile feature tables
+- `05-batch-upload-tables.cql` - Batch upload tables
+- `06-contact-records.cql` - Contact records table
 
 **Configuration:**
 - Keyspace: `ecards_canonical`
 - Replication: `SimpleStrategy` with factor `1` (dev only)
 - Data Center: `dc1`
+- Materialized Views: Disabled (can be enabled if needed)
 
 **Connection:**
 - Host: `localhost` (from host) / `cassandra` (from containers)
 - Port: `7042` (host) / `9042` (internal)
+
+**Recent Updates (2025-01-25):**
+- ✅ Automated initialization via db-init service
+- ✅ Schema consolidation (single source of truth)
+- ✅ Materialized views commented out (Cassandra 5.0 limitation)
+- 📋 See `.claude/fixes/MATERIALIZED-VIEWS-FIX.md` for details
 
 ### Redis
 
@@ -151,27 +146,34 @@ When setting up the project from scratch:
 # 1. Copy environment file
 cp .env.dev.example .env
 
-# 2. Start all services
+# 2. Start all services (schemas auto-created!)
 docker-compose -f docker-compose.dev.yml up -d
 
-# 3. Wait for Cassandra to be ready (important!)
-#    This can take 30-60 seconds
-echo "Waiting for Cassandra..."
-sleep 60
+# 3. Watch initialization (optional)
+docker-compose -f docker-compose.dev.yml logs -f db-init
 
-# 4. Initialize Cassandra keyspace
-scripts\init-cassandra.bat   # Windows
-# OR
-./scripts/init-cassandra.sh  # Linux/Mac
-
-# 5. Verify services are healthy
+# 4. Verify services are healthy
 docker-compose -f docker-compose.dev.yml ps
 
-# 6. Check logs
-docker logs ecards-api       # Should see "✅ Connected to Cassandra"
-docker logs ecards-postgres  # Should show database ready
-docker logs ecards-cassandra # Should show keyspace exists
+# Expected: All services "Up" and healthy
+# - postgres (healthy)
+# - cassandra (healthy)
+# - redis (healthy)
+# - db-init (exited 0) ← This is normal, it runs once
+# - api-server (up)
+# - front-cards (up)
+# - render-worker (up)
+
+# 5. Check api-server logs
+docker logs ecards-api
+
+# Should see:
+# ✅ Connected to Cassandra cluster
+# ✅ Keyspace "ecards_canonical" exists
+# ✅ All critical tables verified
 ```
+
+**That's it!** No manual initialization needed.
 
 ## Troubleshooting
 
@@ -217,35 +219,52 @@ docker-compose -f docker-compose.dev.yml restart cassandra
 
 ### API Server Keeps Failing to Connect
 
-**Cause:** API server starts before Cassandra is ready
+**Cause:** API server starts before Cassandra schemas are created
 
 **Solution:**
-1. Make sure Cassandra is fully initialized first
-2. Then restart the API server:
-   ```bash
-   docker-compose -f docker-compose.dev.yml restart api-server
-   ```
+This should not happen anymore with db-init service. If it does:
 
-## Future Improvements
+```bash
+# Check db-init logs for errors
+docker-compose -f docker-compose.dev.yml logs db-init
 
-### Automated Initialization
+# If db-init failed, restart it
+docker-compose -f docker-compose.dev.yml restart db-init
 
-The init scripts are already in place at `db/init-cassandra/`. To make initialization automatic:
+# Wait for db-init to complete, then restart api-server
+docker-compose -f docker-compose.dev.yml restart api-server
+```
 
-1. **Option A:** Create a custom Cassandra Dockerfile with an initialization entrypoint
-2. **Option B:** Use Docker healthchecks and depends_on conditions
-3. **Option C:** Add initialization check to api-server startup
+### Materialized Views Error
 
-**Current approach:** Manual one-time initialization via script (simpler, explicit)
+**Error:** `Materialized views are disabled`
 
-### Schema Implementation
+**Cause:** Cassandra 5.0 has materialized views disabled by default
 
-Once domain models are defined:
+**Solution:** Already fixed! All materialized views are commented out in schema files.
+
+If you need to enable them:
+1. See `.claude/fixes/MATERIALIZED-VIEWS-FIX.md`
+2. Enable in Cassandra config
+3. Uncomment views in schema files
+
+## ✅ Automation Complete (2025-01-25)
+
+**Automated initialization is now implemented!**
+
+The db-init service uses:
+- ✅ Docker healthchecks (waits for Cassandra to be ready)
+- ✅ Dependency ordering (cassandra → db-init → api-server)
+- ✅ Automated script execution (all `.cql` files in `db/init-cassandra/`)
+
+**No manual steps required!**
+
+### Schema Updates
 
 **Cassandra Tables:**
-1. Add table definitions to `db/init-cassandra/02-create-tables.cql`
-2. Reset Cassandra volume to apply
-3. Or run the script manually with `cqlsh -f`
+1. Edit/add files in `db/init-cassandra/*.cql`
+2. Restart db-init: `docker-compose -f docker-compose.dev.yml restart db-init`
+3. Or full reset: `docker-compose down -v && docker-compose up -d`
 
 **PostgreSQL Tables:**
 1. Define models in `api-server/prisma/schema.prisma`
@@ -284,22 +303,32 @@ AND durable_writes = true;
 
 ## Summary
 
-✅ **What's Fixed:**
-- Created Cassandra keyspace initialization script
-- Created initialization helper scripts for Windows/Linux/Mac
-- Added PostgreSQL placeholder script
-- Documented complete setup workflow
+✅ **What's Working (Updated 2025-01-25):**
+- ✅ Fully automated Cassandra initialization via db-init service
+- ✅ All schemas created from `db/init-cassandra/*.cql`
+- ✅ Materialized views disabled (Cassandra 5.0 compatibility)
+- ✅ Project IDs auto-generated (no hardcoded values)
+- ✅ No manual initialization required
+- ✅ Docker dependency ordering (cassandra → db-init → api-server)
 
-⚠️ **What's Still TODO:**
-- Table schemas (Cassandra and PostgreSQL)
-- Domain model implementation
-- Automated initialization on container startup
-- Production-ready replication configuration
+⚠️ **Known Limitations:**
+- ⚠️ Materialized views disabled (can be enabled if needed)
+- ⚠️ Development replication factor: 1 (production should use 3+)
 
-📋 **Next Steps:**
-1. Run `scripts\init-cassandra.bat` (or `.sh` on Linux/Mac)
-2. Restart api-server: `docker-compose -f docker-compose.dev.yml restart api-server`
-3. Verify: `docker logs ecards-api` should show "✅ Connected to Cassandra"
+📋 **Quick Start:**
+```bash
+# That's it! Everything auto-initializes
+docker-compose -f docker-compose.dev.yml up -d
+
+# Verify
+docker-compose -f docker-compose.dev.yml logs db-init
+docker-compose -f docker-compose.dev.yml logs api-server | grep Cassandra
+```
+
+**For detailed fix documentation, see:**
+- `.claude/fixes/CASSANDRA-SCHEMA-CONSOLIDATION-SUMMARY.md`
+- `.claude/fixes/MATERIALIZED-VIEWS-FIX.md`
+- `.claude/fixes/PRISMA-UNIQUE-CONSTRAINT-FIX.md`
 
 ## Need Help?
 

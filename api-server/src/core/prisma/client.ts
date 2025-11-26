@@ -404,27 +404,55 @@ export const projectOperations = {
 
   /**
    * Get or create default project
+   * Uses Prisma upsert to handle race conditions atomically
    */
   async getOrCreateDefaultProject(userId: string) {
-    let project = await prisma.project.findFirst({
-      where: {
-        userId,
-        isDefault: true
-      }
-    });
-
-    if (!project) {
-      project = await prisma.project.create({
-        data: {
-          id: 'default', // Explicitly use 'default' as ID to match hardcoded value in template service
+    try {
+      // Use upsert to atomically create-or-get
+      // The unique constraint @@unique([userId, name]) ensures this is safe
+      const project = await prisma.project.upsert({
+        where: {
+          // Compound unique key: userId + name
+          userId_name: {
+            userId,
+            name: 'Default Project'
+          }
+        },
+        update: {
+          // If exists, ensure it's marked as default
+          isDefault: true
+        },
+        create: {
+          // If doesn't exist, create it
           userId,
           name: 'Default Project',
           isDefault: true
         }
       });
-    }
 
-    return project;
+      return project;
+    } catch (error: any) {
+      // Upsert should handle race conditions, but catch just in case
+      console.error('[ProjectOperations] Failed to get or create default project:', error);
+
+      // Fallback: try to find it
+      const existingProject = await prisma.project.findFirst({
+        where: {
+          userId,
+          OR: [
+            { isDefault: true },
+            { name: 'Default Project' }
+          ]
+        }
+      });
+
+      if (existingProject) {
+        return existingProject;
+      }
+
+      // Re-throw if we still can't find or create it
+      throw error;
+    }
   },
 
   /**

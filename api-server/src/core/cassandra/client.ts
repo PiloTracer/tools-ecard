@@ -5,6 +5,9 @@
 
 import { Client, types as CassandraTypes, auth } from 'cassandra-driver';
 import { v4 as uuidv4 } from 'uuid';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('CassandraClient');
 
 // Define storage modes enum
 export enum StorageMode {
@@ -144,9 +147,9 @@ class CassandraClient {
     try {
       await this.client.connect();
       this.isConnected = true;
-      console.log('Connected to Cassandra cluster');
+      log.info('Connected to Cassandra cluster');
     } catch (error) {
-      console.error('Failed to connect to Cassandra:', error);
+      log.error({ error }, 'Failed to connect to Cassandra');
       throw error;
     }
   }
@@ -159,9 +162,9 @@ class CassandraClient {
     try {
       await this.client.shutdown();
       this.isConnected = false;
-      console.log('Disconnected from Cassandra cluster');
+      log.info('Disconnected from Cassandra cluster');
     } catch (error) {
-      console.error('Error disconnecting from Cassandra:', error);
+      log.error({ error }, 'Error disconnecting from Cassandra');
     }
   }
 
@@ -535,7 +538,7 @@ class CassandraClient {
       const result = await this.client!.execute('SELECT now() FROM system.local');
       return result.rows.length > 0;
     } catch (error) {
-      console.error('Cassandra health check failed:', error);
+      log.error({ error }, 'Cassandra health check failed');
       return false;
     }
   }
