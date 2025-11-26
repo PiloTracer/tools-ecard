@@ -75,8 +75,8 @@ export const BatchCard: React.FC<BatchCardProps> = ({ batch, onDeleted }) => {
               {batch.fileName}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              {formatFileSize(batch.fileSize)} • {batch.recordCount || batch.recordsCount || 0}{' '}
-              record{batch.recordCount !== 1 ? 's' : ''}
+              {formatFileSize(batch.fileSize)} • {batch.recordsCount || 0}{' '}
+              record{batch.recordsCount !== 1 ? 's' : ''}
             </p>
           </div>
           <BatchStatusBadge status={batch.status} />
@@ -182,7 +182,7 @@ export const BatchCard: React.FC<BatchCardProps> = ({ batch, onDeleted }) => {
                 <h3 className="text-lg font-medium text-gray-900">Delete Batch</h3>
                 <p className="mt-2 text-sm text-gray-500">
                   Are you sure you want to delete "{batch.fileName}"? This will permanently delete{' '}
-                  {batch.recordCount || batch.recordsCount || 0} record(s). This action cannot be undone.
+                  {batch.recordsCount || 0} record(s). This action cannot be undone.
                 </p>
               </div>
             </div>

@@ -122,6 +122,10 @@ export class BatchUploadService {
       createdAt: batch.createdAt,
       updatedAt: batch.updatedAt,
       processedAt: batch.processedAt,
+      recordsCount: batch.recordsCount,
+      recordsProcessed: batch.recordsProcessed,
+      parsingStartedAt: batch.parsingStartedAt,
+      parsingCompletedAt: batch.parsingCompletedAt,
     }));
 
     return {

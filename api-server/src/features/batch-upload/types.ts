@@ -49,6 +49,10 @@ export interface BatchListItem {
   createdAt: Date;
   updatedAt: Date;
   processedAt?: Date | null;
+  recordsCount?: number | null;
+  recordsProcessed?: number | null;
+  parsingStartedAt?: Date | null;
+  parsingCompletedAt?: Date | null;
 }
 
 export interface BatchCreateData {

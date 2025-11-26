@@ -42,9 +42,9 @@ export function useBatches(options: UseBatchesOptions = {}) {
 
   // Auto-refresh if any batch is in PARSING status
   useEffect(() => {
-    if (!autoRefreshParsing || !data?.data?.batches) return;
+    if (!autoRefreshParsing || !data?.batches) return;
 
-    const hasParsingBatches = data.data.batches.some(
+    const hasParsingBatches = data.batches.some(
       (batch) => batch.status === 'PARSING'
     );
 
@@ -58,8 +58,13 @@ export function useBatches(options: UseBatchesOptions = {}) {
   }, [data, autoRefreshParsing, refetch]);
 
   return {
-    batches: data?.data?.batches || [],
-    pagination: data?.data?.pagination,
+    batches: data?.batches || [],
+    pagination: data ? {
+      total: data.total,
+      page: data.page,
+      pageSize: data.limit,
+      totalPages: Math.ceil(data.total / data.limit),
+    } : undefined,
     isLoading,
     isError,
     error,
