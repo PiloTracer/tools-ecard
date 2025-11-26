@@ -6,17 +6,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { exportTemplateById, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
+import { exportTemplateById, exportTemplate, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
 import { templateService } from '../../services/templateService';
 import type { ExportOptions } from '../../services/exportService';
+import type { Template } from '../../types';
 
 interface OffscreenExportButtonProps {
-  templateId: string;
+  templateId?: string;      // For loading from storage
+  template?: Template;      // For exporting already-loaded template (skips storage load)
   templateName: string;
   className?: string;
+  buttonLabel?: string; // Custom button label (default: "Export")
 }
 
-export function OffscreenExportButton({ templateId, templateName, className }: OffscreenExportButtonProps) {
+export function OffscreenExportButton({ templateId, template, templateName, className, buttonLabel = 'Export' }: OffscreenExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStep, setExportStep] = useState('');
@@ -37,14 +40,21 @@ export function OffscreenExportButton({ templateId, templateName, className }: O
   // Load template dimensions when modal opens
   useEffect(() => {
     if (showOptions) {
-      templateService.loadTemplate(templateId).then(loaded => {
-        setTemplateWidth(loaded.data.width || loaded.data.canvasWidth || 1200);
-        setTemplateHeight(loaded.data.height || loaded.data.canvasHeight || 600);
-      }).catch(err => {
-        console.error('Failed to load template dimensions:', err);
-      });
+      if (template) {
+        // Use provided template object (already loaded)
+        setTemplateWidth(template.width || template.canvasWidth || 1200);
+        setTemplateHeight(template.height || template.canvasHeight || 600);
+      } else if (templateId) {
+        // Load from storage
+        templateService.loadTemplate(templateId).then(loaded => {
+          setTemplateWidth(loaded.data.width || loaded.data.canvasWidth || 1200);
+          setTemplateHeight(loaded.data.height || loaded.data.canvasHeight || 600);
+        }).catch(err => {
+          console.error('Failed to load template dimensions:', err);
+        });
+      }
     }
-  }, [showOptions, templateId]);
+  }, [showOptions, templateId, template]);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -62,7 +72,10 @@ export function OffscreenExportButton({ templateId, templateName, className }: O
         }
       };
 
-      const result = await exportTemplateById(templateId, options);
+      // Use provided template object or load from storage
+      const result = template
+        ? await exportTemplate(template, options)
+        : await exportTemplateById(templateId!, options);
 
       // Download the exported image
       const filename = `${templateName.replace(/[^a-z0-9]/gi, '_')}.${result.format}`;
@@ -91,9 +104,9 @@ export function OffscreenExportButton({ templateId, templateName, className }: O
         onClick={() => setShowOptions(true)}
         className={className || 'px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm'}
         disabled={isExporting}
-        title="Export template without opening"
+        title="Export template"
       >
-        {isExporting ? `${Math.round(exportProgress * 100)}%` : 'Export'}
+        {isExporting ? `${Math.round(exportProgress * 100)}%` : buttonLabel}
       </button>
 
       {showOptions && (

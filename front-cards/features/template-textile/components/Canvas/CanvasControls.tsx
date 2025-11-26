@@ -7,6 +7,7 @@ import { useTemplateStore } from '../../stores/templateStore';
 import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
 import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
+import { OffscreenExportButton } from '../OffscreenExport/OffscreenExportButton';
 import { templateService } from '../../services/templateService';
 import type { Template, ImageElement } from '../../types';
 
@@ -698,6 +699,16 @@ export function CanvasControls() {
             </svg>
             Close
           </button>
+
+          {/* Batch Export Button */}
+          {currentTemplate && currentTemplateName && (
+            <OffscreenExportButton
+              template={currentTemplate}
+              templateName={currentTemplateName}
+              className="flex items-center gap-2 rounded border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              buttonLabel="Batch Export"
+            />
+          )}
 
           {/* Quick Save (Ctrl+S) */}
           {currentTemplateName && (
