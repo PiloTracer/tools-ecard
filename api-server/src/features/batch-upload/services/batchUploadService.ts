@@ -77,16 +77,16 @@ export class BatchUploadService {
     let progress = 0;
     switch (batch.status) {
       case BatchStatus.UPLOADED:
-        progress = 10;
+        progress = 20;  // File uploaded to storage
         break;
       case BatchStatus.PARSING:
-        progress = 50;
+        progress = 40;  // Python parser processing
         break;
       case BatchStatus.PARSED:
-        progress = 80;
+        progress = 80;  // Records inserted into databases
         break;
       case BatchStatus.LOADED:
-        progress = 100;
+        progress = 100; // Fully loaded and ready for use
         break;
       case BatchStatus.ERROR:
         progress = 0;

@@ -424,6 +424,15 @@ class BatchParser:
             )
 
             logger.info(f"✅ Successfully processed {records_processed}/{len(df)} records")
+
+            # Update batch status to LOADED (100% complete, ready for use)
+            self.update_batch_status(
+                'LOADED',
+                records_count=len(df),
+                records_processed=records_processed
+            )
+
+            logger.info(f"🎉 Batch fully loaded and ready for use")
             return {
                 'success': True,
                 'records_total': len(df),

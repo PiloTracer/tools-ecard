@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { BatchStatusTrackerProps, BatchStatus, BatchStatusResponse } from '../types';
 import { batchService } from '../services/batchService';
 
@@ -13,6 +13,7 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
   const [status, setStatus] = useState<BatchStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -22,11 +23,21 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
       setError(null);
 
       // Check if processing is complete
-      if (response.status === BatchStatus.LOADED) {
+      if (response.status === BatchStatus.PARSED || response.status === BatchStatus.LOADED) {
+        // Stop polling
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
         if (onComplete) {
           onComplete(response);
         }
       } else if (response.status === BatchStatus.ERROR) {
+        // Stop polling on error
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
         const error = new Error(response.errorMessage || 'Batch processing failed');
         setError(error.message);
         if (onError) {
@@ -48,19 +59,19 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
     // Initial fetch
     fetchStatus();
 
-    // Set up polling for status updates
-    // Increased from 3s to 5s to reduce server load and log spam
-    const pollInterval = setInterval(() => {
-      if (status && (status.status === BatchStatus.LOADED || status.status === BatchStatus.ERROR)) {
-        // Stop polling if processing is complete
-        clearInterval(pollInterval);
-        return;
-      }
+    // Set up polling for status updates (only once on mount)
+    intervalRef.current = setInterval(() => {
       fetchStatus();
-    }, 5000); // Poll every 5 seconds (reduced from 3s)
+    }, 5000); // Poll every 5 seconds
 
-    return () => clearInterval(pollInterval);
-  }, [fetchStatus, status]);
+    return () => {
+      // Cleanup interval on unmount
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [fetchStatus]); // Only depends on fetchStatus, not status
 
   const getStatusColor = (status: BatchStatus): string => {
     switch (status) {
