@@ -42,7 +42,7 @@ class StorageClient:
                 config=Config(signature_version='s3v4'),
                 region_name='us-east-1'  # SeaweedFS doesn't care about region
             )
-            self.bucket_name = os.getenv('SEAWEEDFS_BUCKET', 'files')
+            self.bucket_name = os.getenv('SEAWEEDFS_BUCKET', 'repositories')
             logger.info(f"Initialized SeaweedFS client: endpoint={os.getenv('SEAWEEDFS_ENDPOINT')}, bucket={self.bucket_name}")
         else:
             self.s3_client = None

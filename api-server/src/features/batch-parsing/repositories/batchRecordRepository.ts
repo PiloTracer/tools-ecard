@@ -233,6 +233,220 @@ export class BatchRecordRepository {
       },
     });
   }
+
+  /**
+   * Update record in both PostgreSQL and Cassandra
+   * Syncs searchable fields to PostgreSQL and all fields to Cassandra
+   */
+  async updateRecord(
+    recordId: string,
+    updates: Partial<ContactRecordFull>,
+    userId: string
+  ): Promise<ContactRecordFull> {
+    try {
+      // 1. Verify ownership via batch
+      const existingRecord = await prisma.batchRecord.findUnique({
+        where: { id: recordId },
+        include: { batch: true },
+      });
+
+      if (!existingRecord) {
+        throw new Error('Record not found');
+      }
+
+      if (existingRecord.batch.userId !== userId) {
+        throw new Error('Unauthorized: User does not own this record');
+      }
+
+      // 2. Extract searchable fields for PostgreSQL (5 fields only)
+      const searchableUpdates: any = {};
+      if (updates.fullName !== undefined) searchableUpdates.fullName = updates.fullName;
+      if (updates.workPhone !== undefined) searchableUpdates.workPhone = updates.workPhone;
+      if (updates.mobilePhone !== undefined) searchableUpdates.mobilePhone = updates.mobilePhone;
+      if (updates.email !== undefined) searchableUpdates.email = updates.email;
+      if (updates.businessName !== undefined) searchableUpdates.businessName = updates.businessName;
+
+      // 3. Update PostgreSQL (searchable subset)
+      const pgUpdatePromise = prisma.batchRecord.update({
+        where: { id: recordId },
+        data: searchableUpdates,
+      });
+
+      // 4. Update Cassandra (all fields)
+      await cassandraClient.connect();
+
+      // Build dynamic CQL UPDATE statement based on provided fields
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+
+      const fieldMap: Record<string, string> = {
+        fullName: 'full_name',
+        firstName: 'first_name',
+        lastName: 'last_name',
+        workPhone: 'work_phone',
+        workPhoneExt: 'work_phone_ext',
+        mobilePhone: 'mobile_phone',
+        email: 'email',
+        addressStreet: 'address_street',
+        addressCity: 'address_city',
+        addressState: 'address_state',
+        addressPostal: 'address_postal',
+        addressCountry: 'address_country',
+        socialInstagram: 'social_instagram',
+        socialTwitter: 'social_twitter',
+        socialFacebook: 'social_facebook',
+        businessName: 'business_name',
+        businessTitle: 'business_title',
+        businessDepartment: 'business_department',
+        businessUrl: 'business_url',
+        businessHours: 'business_hours',
+        businessAddressStreet: 'business_address_street',
+        businessAddressCity: 'business_address_city',
+        businessAddressState: 'business_address_state',
+        businessAddressPostal: 'business_address_postal',
+        businessAddressCountry: 'business_address_country',
+        businessLinkedin: 'business_linkedin',
+        businessTwitter: 'business_twitter',
+        personalUrl: 'personal_url',
+        personalBio: 'personal_bio',
+        personalBirthday: 'personal_birthday',
+      };
+
+      // Add updated_at timestamp
+      updateFields.push('updated_at = ?');
+      updateValues.push(new Date());
+
+      // Build update fields dynamically
+      for (const [key, cassandraField] of Object.entries(fieldMap)) {
+        if (updates[key as keyof ContactRecordFull] !== undefined) {
+          updateFields.push(`${cassandraField} = ?`);
+          updateValues.push(updates[key as keyof ContactRecordFull]);
+        }
+      }
+
+      // Handle extra field if provided
+      if (updates.extra !== undefined) {
+        updateFields.push('extra = ?');
+        updateValues.push(updates.extra);
+      }
+
+      // Add recordId for WHERE clause
+      updateValues.push(CassandraTypes.Uuid.fromString(recordId));
+
+      const cassandraUpdateQuery = `
+        UPDATE contact_records
+        SET ${updateFields.join(', ')}
+        WHERE batch_record_id = ?
+      `;
+
+      const cassandraUpdatePromise = cassandraClient['client']!.execute(
+        cassandraUpdateQuery,
+        updateValues,
+        { prepare: true }
+      );
+
+      // 5. Execute both updates in parallel
+      await Promise.all([pgUpdatePromise, cassandraUpdatePromise]);
+
+      // 6. Fetch and return updated record
+      const updatedRecord = await this.getFullContactRecord(recordId);
+      if (!updatedRecord) {
+        throw new Error('Failed to retrieve updated record');
+      }
+
+      return updatedRecord;
+    } catch (error) {
+      console.error('Error updating record:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete record from both PostgreSQL and Cassandra
+   */
+  async deleteRecord(recordId: string, userId: string): Promise<void> {
+    try {
+      // 1. Verify ownership
+      const existingRecord = await prisma.batchRecord.findUnique({
+        where: { id: recordId },
+        include: { batch: true },
+      });
+
+      if (!existingRecord) {
+        throw new Error('Record not found');
+      }
+
+      if (existingRecord.batch.userId !== userId) {
+        throw new Error('Unauthorized: User does not own this record');
+      }
+
+      const batchId = existingRecord.batchId;
+
+      // 2. Delete from Cassandra first (no foreign key constraints)
+      await cassandraClient.connect();
+      const cassandraDeleteQuery = `DELETE FROM contact_records WHERE batch_record_id = ?`;
+      await cassandraClient['client']!.execute(
+        cassandraDeleteQuery,
+        [CassandraTypes.Uuid.fromString(recordId)],
+        { prepare: true }
+      );
+
+      // 3. Delete from PostgreSQL (CASCADE safe)
+      await prisma.batchRecord.delete({
+        where: { id: recordId },
+      });
+
+      // 4. Update batch record count
+      const remainingCount = await this.getRecordCountByBatchId(batchId);
+      await prisma.batch.update({
+        where: { id: batchId },
+        data: { recordsCount: remainingCount },
+      });
+
+      console.log(`Successfully deleted record ${recordId}`);
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get full records for a batch with all Cassandra data
+   * Useful for batch-records view page
+   */
+  async getFullRecordsForBatch(
+    batchId: string,
+    userId: string,
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<{ records: ContactRecordFull[]; total: number }> {
+    try {
+      // 1. Verify user owns batch
+      const batch = await prisma.batch.findFirst({
+        where: { id: batchId, userId },
+      });
+
+      if (!batch) {
+        throw new Error('Batch not found or access denied');
+      }
+
+      // 2. Get PostgreSQL records (for pagination and total count)
+      const { records: pgRecords, total } = await this.getRecordsByBatchId(batchId, limit, offset);
+
+      // 3. Fetch full Cassandra data for each record
+      const fullRecords = await Promise.all(
+        pgRecords.map((pgRecord) => this.getFullContactRecord(pgRecord.id))
+      );
+
+      return {
+        records: fullRecords.filter((r): r is ContactRecordFull => r !== null),
+        total,
+      };
+    } catch (error) {
+      console.error('Error getting full records for batch:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

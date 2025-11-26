@@ -245,7 +245,7 @@ function DashboardContent() {
         {/* Quick Actions */}
         <QuickActions
           onCreateTemplate={() => router.push('/template-textile')}
-          onViewBatches={() => console.log('View Batches clicked')}
+          onViewBatches={() => router.push('/batches')}
         />
 
         {/* Success Message */}

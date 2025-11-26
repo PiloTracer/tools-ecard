@@ -21,6 +21,7 @@ import { templateRoutes } from './features/template-textile';
 import { batchUploadRoutes as batchUploadRoutesFastify } from './features/batch-upload/routes.fastify';
 import batchParsingRoutes from './features/batch-parsing/routes.fastify';
 import diagnosticRoutes from './features/batch-parsing/routes/diagnostics.fastify';
+import batchRecordRoutes from './features/batch-records/routes.fastify';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
@@ -107,11 +108,16 @@ export async function buildApp() {
   // Register template-textile routes (already prefixed in route definitions)
   await app.register(templateRoutes);
 
-  // Register batch-upload routes
+  // Register batch-upload routes (includes list, upload, status, delete, stats)
   await app.register(batchUploadRoutesFastify, { prefix: '/api/batches' });
 
   // Register batch-parsing routes (record search and retrieval)
   await app.register(batchParsingRoutes, { prefix: '/api/batch-records' });
+
+  // Register batch-records routes (view and edit records for a batch)
+  app.register(async (fastify) => {
+    fastify.register(batchRecordRoutes, { prefix: '/:batchId/records' });
+  }, { prefix: '/api/batches' });
 
   // Register diagnostic routes (queue/worker monitoring)
   await app.register(diagnosticRoutes, { prefix: '/api/diagnostics' });
