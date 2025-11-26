@@ -52,6 +52,7 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
   const [format, setFormat] = useState<'png' | 'jpg'>('png');
   const [quality, setQuality] = useState(0.9);
   const [width, setWidth] = useState(2400);
+  const [transparentBackground, setTransparentBackground] = useState(false);
 
   // Calculate height based on aspect ratio
   const calculatedHeight = Math.round(width * templateHeight / templateWidth);
@@ -145,6 +146,7 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
+        backgroundColor: transparentBackground ? undefined : 'white',
         onProgress: (step, progress) => {
           setExportStep(step);
           setExportProgress(progress);
@@ -202,6 +204,7 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
+        backgroundColor: transparentBackground ? undefined : 'white',
         onProgress: (current, total, status) => {
           setBatchProgress({ current, total });
           setExportStep(status);
@@ -342,26 +345,52 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
                 </div>
               </div>
 
-              {/* Export Dimensions */}
+              {/* Export Dimensions and Transparency */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Export Dimensions</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-900">Export Dimensions</label>
+
+                  {/* Transparency Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-sm text-gray-700">Transparent</span>
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={transparentBackground}
+                        onChange={(e) => setTransparentBackground(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                    </div>
+                  </label>
+                </div>
 
                 {/* Dimensions Display */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                <div className={`border rounded-lg p-3 mb-3 ${transparentBackground ? 'bg-gray-50 border-gray-300' : 'bg-blue-50 border-blue-200'}`}>
                   <div className="flex items-center justify-center gap-2">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{width}</div>
+                      <div className={`text-2xl font-bold ${transparentBackground ? 'text-gray-700' : 'text-blue-600'}`}>{width}</div>
                       <div className="text-xs text-gray-600">Width (px)</div>
                     </div>
                     <div className="text-gray-400 text-2xl">×</div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{calculatedHeight}</div>
+                      <div className={`text-2xl font-bold ${transparentBackground ? 'text-gray-700' : 'text-blue-600'}`}>{calculatedHeight}</div>
                       <div className="text-xs text-gray-600">Height (px)</div>
                     </div>
                   </div>
                   <div className="text-center text-xs text-gray-500 mt-2">
                     Aspect ratio: {(templateWidth / templateHeight).toFixed(2)}:1
                   </div>
+                  {!transparentBackground && (
+                    <div className="text-center text-xs text-gray-600 mt-1">
+                      Background: White
+                    </div>
+                  )}
+                  {transparentBackground && (
+                    <div className="text-center text-xs text-gray-600 mt-1">
+                      Background: Transparent
+                    </div>
+                  )}
                 </div>
 
                 {/* Width Slider */}
