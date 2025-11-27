@@ -34,6 +34,7 @@ class FontService {
 
   /**
    * Fetch available fonts for the current user
+   * Falls back to global fonts if authentication fails
    */
   async listFonts(scope: 'global' | 'user' | 'all' = 'all'): Promise<Font[]> {
     try {
@@ -42,8 +43,25 @@ class FontService {
       );
       this.cachedFonts = response.fonts;
       return response.fonts;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[FontService] Error listing fonts:', error);
+
+      // If authentication failed and we were trying to get user fonts,
+      // fall back to global fonts only
+      if (error.message?.includes('Unauthorized') && scope !== 'global') {
+        console.warn('[FontService] Auth failed, falling back to global fonts only');
+        try {
+          const response = await apiClient.get<{ fonts: Font[] }>(
+            `/api/v1/fonts?scope=global`
+          );
+          this.cachedFonts = response.fonts;
+          return response.fonts;
+        } catch (fallbackError) {
+          console.error('[FontService] Fallback to global fonts also failed:', fallbackError);
+        }
+      }
+
+      // Return empty array if all attempts fail
       return [];
     }
   }

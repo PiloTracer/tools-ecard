@@ -225,6 +225,13 @@ class TemplateService {
           const result = await response.json();
           const template = result.data as LoadedTemplate;
 
+          // Normalize storageMode in metadata
+          if (template.metadata) {
+            template.metadata.storageMode = typeof template.metadata.storageMode === 'string'
+              ? template.metadata.storageMode
+              : (template.metadata.storageMode as any)?.mode || 'FALLBACK';
+          }
+
           // Cache locally for offline access
           await browserStorageService.cacheTemplate({
             id: template.id,
@@ -304,7 +311,13 @@ class TemplateService {
 
       if (response.ok) {
         const result = await response.json();
-        const templates = result.data as TemplateMetadata[];
+        const templates = (result.data as TemplateMetadata[]).map(t => ({
+          ...t,
+          // Normalize storageMode: if it's an object with a 'mode' property, extract it
+          storageMode: typeof t.storageMode === 'string'
+            ? t.storageMode
+            : (t.storageMode as any)?.mode || 'FALLBACK'
+        }));
 
         // Merge with local templates
         const localTemplates = await browserStorageService.listTemplates();

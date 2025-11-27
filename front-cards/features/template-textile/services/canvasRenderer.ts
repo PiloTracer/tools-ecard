@@ -98,6 +98,10 @@ function createTextElement(element: TextElement): fabric.Object {
   // Check if multi-color text
   const hasMultipleColors = element.colors && element.colors.length > 1;
 
+  // Ensure fontSize is valid (not NaN or undefined)
+  const fontSize = isNaN(element.fontSize) ? 16 : (element.fontSize || 16);
+  const strokeWidth = isNaN(element.strokeWidth ?? 0) ? 0 : (element.strokeWidth ?? 0);
+
   if (hasMultipleColors) {
     // Use multi-color text group
     return createMultiColorText(element);
@@ -106,14 +110,14 @@ function createTextElement(element: TextElement): fabric.Object {
     return new fabric.IText(element.text || 'Text', {
       left: element.x,
       top: element.y,
-      fontSize: element.fontSize,
-      fontFamily: element.fontFamily,
+      fontSize: fontSize,
+      fontFamily: element.fontFamily || 'Arial',
       fill: element.color || element.colors?.[0] || '#000000',
       fontWeight: element.fontWeight || 'normal',
       fontStyle: element.fontStyle || 'normal',
       underline: element.underline || false,
       stroke: element.stroke || '',
-      strokeWidth: element.strokeWidth || 0,
+      strokeWidth: strokeWidth,
       textAlign: element.textAlign || 'left',
       angle: element.rotation || 0,
       opacity: element.opacity || 1,
@@ -147,6 +151,10 @@ async function createImageElement(
   }
 
   loadingImages.add(element.id);
+
+  // Ensure dimensions are valid (not NaN or undefined)
+  const width = isNaN(element.width) ? 100 : element.width;
+  const height = isNaN(element.height) ? 100 : element.height;
 
   try {
     // Convert to blob URL to avoid CORS tainting
@@ -195,8 +203,8 @@ async function createImageElement(
     });
 
     // Calculate scale to fit box while keeping full resolution
-    const scaleX = element.width / fullResWidth;
-    const scaleY = element.height / fullResHeight;
+    const scaleX = width / fullResWidth;
+    const scaleY = height / fullResHeight;
 
     fabricImg.set({
       scaleX: scaleX,
@@ -219,11 +227,15 @@ async function createImageElement(
  * Create placeholder for image (when loading fails or loadImages=false)
  */
 function createImagePlaceholder(element: ImageElement): fabric.Object {
+  // Ensure dimensions are valid (not NaN or undefined)
+  const width = isNaN(element.width) ? 100 : element.width;
+  const height = isNaN(element.height) ? 100 : element.height;
+
   return new fabric.Rect({
     left: element.x,
     top: element.y,
-    width: element.width,
-    height: element.height,
+    width: width,
+    height: height,
     fill: '#334155',
     stroke: '#64748b',
     strokeWidth: 2,
@@ -241,12 +253,17 @@ function createImagePlaceholder(element: ImageElement): fabric.Object {
  * Create shape element
  */
 function createShapeElement(element: ShapeElement): fabric.Object {
+  // Ensure dimensions are valid (not NaN or undefined)
+  const width = isNaN(element.width) ? 100 : element.width;
+  const height = isNaN(element.height) ? 100 : element.height;
+  const strokeWidth = isNaN(element.strokeWidth ?? 2) ? 2 : (element.strokeWidth ?? 2);
+
   const baseProps = {
     left: element.x,
     top: element.y,
     fill: element.fill || '#3b82f6',
     stroke: element.stroke || '#1e40af',
-    strokeWidth: element.strokeWidth || 2,
+    strokeWidth: strokeWidth,
     angle: element.rotation || 0,
     opacity: element.opacity || 1,
     selectable: true,
@@ -260,14 +277,14 @@ function createShapeElement(element: ShapeElement): fabric.Object {
     case 'rectangle':
       return new fabric.Rect({
         ...baseProps,
-        width: element.width || 100,
-        height: element.height || 100,
+        width: width,
+        height: height,
         rx: element.rx || 0,
         ry: element.ry || 0,
       });
 
     case 'circle':
-      const radius = Math.min(element.width || 100, element.height || 100) / 2;
+      const radius = Math.min(width, height) / 2;
       return new fabric.Circle({
         ...baseProps,
         radius: radius,
@@ -276,16 +293,16 @@ function createShapeElement(element: ShapeElement): fabric.Object {
     case 'ellipse':
       return new fabric.Ellipse({
         ...baseProps,
-        rx: (element.width || 100) / 2,
-        ry: (element.height || 100) / 2,
+        rx: width / 2,
+        ry: height / 2,
       });
 
     case 'line':
-      const x2 = element.x + (element.width || 100);
-      const y2 = element.y + (element.height || 0);
+      const x2 = element.x + width;
+      const y2 = element.y + height;
       return new fabric.Line([element.x, element.y, x2, y2], {
         stroke: element.stroke || '#1e40af',
-        strokeWidth: element.strokeWidth || 2,
+        strokeWidth: strokeWidth,
         angle: element.rotation || 0,
         opacity: element.opacity || 1,
         selectable: true,
@@ -299,8 +316,8 @@ function createShapeElement(element: ShapeElement): fabric.Object {
       // Default to rectangle
       return new fabric.Rect({
         ...baseProps,
-        width: element.width || 100,
-        height: element.height || 100,
+        width: width,
+        height: height,
       });
   }
 }
@@ -310,8 +327,10 @@ function createShapeElement(element: ShapeElement): fabric.Object {
  */
 async function createQRElement(element: QRElement): Promise<fabric.Object> {
   // Use width/height if available, fallback to size for backward compatibility
-  const qrWidth = element.width || element.size;
-  const qrHeight = element.height || element.size;
+  // Ensure size is valid (not NaN or undefined)
+  const size = isNaN(element.size) ? 100 : element.size;
+  const qrWidth = isNaN(element.width ?? size) ? size : (element.width ?? size);
+  const qrHeight = isNaN(element.height ?? size) ? size : (element.height ?? size);
 
   try {
     // Generate QR code data URL

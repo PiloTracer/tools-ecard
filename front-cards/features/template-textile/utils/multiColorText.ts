@@ -87,6 +87,11 @@ function getSpaceWidth(fontFamily: string, fontSize: number): number {
  * Updates an existing multi-color text group with new properties
  */
 export function updateMultiColorText(group: fabric.Group, element: TextElement): void {
+  // CRITICAL: Save current position from Fabric object BEFORE any modifications
+  // The canvas is the source of truth for position during normal operations
+  const currentLeft = group.left;
+  const currentTop = group.top;
+
   // Remove all existing objects from the group
   const items = group.getObjects();
   items.forEach(item => group.remove(item));
@@ -122,8 +127,11 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
     currentX += textObj.width! + spaceWidth;
   });
 
-  // Update group properties
+  // Update group properties INCLUDING position (restore saved position)
+  // Position must be restored because removing/adding children can reset it
   group.set({
+    left: currentLeft,
+    top: currentTop,
     angle: element.rotation || 0,
     opacity: element.opacity || 1,
     excludeFromExport: element.excludeFromExport || false,

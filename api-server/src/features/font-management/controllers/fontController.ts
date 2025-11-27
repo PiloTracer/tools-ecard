@@ -30,14 +30,12 @@ interface GetFontFileQuerystring {
 export class FontController {
   /**
    * GET /api/v1/fonts
-   * List fonts available to the authenticated user
+   * List fonts available to the user (authentication optional)
+   * - Authenticated users: Can see global + their custom fonts
+   * - Unauthenticated users: Can only see global fonts
    */
   async listFonts(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {
     try {
-      if (!request.user) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
-
       const query = request.query as ListFontsQuerystring;
       const scope = query.scope || 'all';
 
@@ -49,6 +47,14 @@ export class FontController {
 
       let fonts;
 
+      // If user is not authenticated, only return global fonts
+      if (!request.user) {
+        console.log('[FontController] Unauthenticated request - returning global fonts only');
+        fonts = await fontService.listGlobalFonts(filters);
+        return reply.code(200).send({ fonts });
+      }
+
+      // User is authenticated - return fonts based on scope
       if (scope === 'global') {
         fonts = await fontService.listGlobalFonts(filters);
       } else if (scope === 'user') {

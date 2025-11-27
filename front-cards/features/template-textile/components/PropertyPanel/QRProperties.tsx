@@ -44,7 +44,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Size</label>
         <input
           type="number"
-          value={element.size}
+          value={isNaN(element.size) ? 100 : element.size}
           onChange={(e) => {
             const newSize = parseInt(e.target.value) || 100;
             handleChange({ size: newSize, width: newSize, height: newSize, originalWidth: newSize, originalHeight: newSize });

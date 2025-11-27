@@ -21,7 +21,7 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
           <label className="mb-1 block text-sm font-medium text-gray-700">Width</label>
           <input
             type="number"
-            value={element.width}
+            value={isNaN(element.width) ? 100 : element.width}
             onChange={(e) => handleChange({ width: parseInt(e.target.value) || 10 })}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={element.shapeType === 'line' ? 10 : element.shapeType === 'circle' ? 10 : 10}
@@ -32,7 +32,7 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
             <label className="mb-1 block text-sm font-medium text-gray-700">Height</label>
             <input
               type="number"
-              value={element.height}
+              value={isNaN(element.height) ? 100 : element.height}
               onChange={(e) => handleChange({ height: parseInt(e.target.value) || 10 })}
               className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
               min={10}
@@ -67,7 +67,7 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Width</label>
         <input
           type="number"
-          value={element.strokeWidth || 1}
+          value={isNaN(element.strokeWidth ?? 1) ? 1 : (element.strokeWidth ?? 1)}
           onChange={(e) => handleChange({ strokeWidth: parseInt(e.target.value) || 0 })}
           className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={0}

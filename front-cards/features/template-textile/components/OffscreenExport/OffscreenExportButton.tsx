@@ -208,7 +208,7 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
         quality: format === 'jpg' ? quality : 1.0,
         width,
         backgroundColor: finalBackgroundColor,
-        onProgress: (current, total, status) => {
+        onProgress: (current: number, total: number, status: string) => {
           setBatchProgress({ current, total });
           setExportStep(status);
           setExportProgress(current / total);

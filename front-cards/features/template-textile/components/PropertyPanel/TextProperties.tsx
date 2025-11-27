@@ -55,7 +55,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Font Size</label>
         <input
           type="number"
-          value={element.fontSize}
+          value={element.fontSize || 16}
           onChange={(e) => handleChange({ fontSize: parseInt(e.target.value) || 12 })}
           className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={8}
@@ -223,7 +223,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Width</label>
         <input
           type="number"
-          value={element.strokeWidth || 0}
+          value={isNaN(element.strokeWidth ?? 0) ? 0 : (element.strokeWidth ?? 0)}
           onChange={(e) => handleChange({ strokeWidth: parseInt(e.target.value) || 0 })}
           className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           min={0}

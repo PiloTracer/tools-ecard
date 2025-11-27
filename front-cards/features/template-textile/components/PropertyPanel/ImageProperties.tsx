@@ -197,7 +197,7 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
           <label className="mb-1 block text-sm font-medium text-gray-700">Width</label>
           <input
             type="number"
-            value={element.width}
+            value={isNaN(element.width) ? 100 : element.width}
             onChange={(e) => handleChange({ width: parseInt(e.target.value) || 100 })}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={10}
@@ -207,7 +207,7 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
           <label className="mb-1 block text-sm font-medium text-gray-700">Height</label>
           <input
             type="number"
-            value={element.height}
+            value={isNaN(element.height) ? 100 : element.height}
             onChange={(e) => handleChange({ height: parseInt(e.target.value) || 100 })}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             min={10}

@@ -17,7 +17,6 @@ export function DesignCanvas() {
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
   const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
-  const lastModifiedFromCanvas = useRef<Map<string, number>>(new Map()); // elementId -> timestamp of last canvas modification
 
   // Panning state
   const [isPanning, setIsPanning] = useState(false);
@@ -161,8 +160,6 @@ export function DesignCanvas() {
       }
 
       processingModification.current.add(elementId);
-      // Record the timestamp of this canvas modification
-      lastModifiedFromCanvas.current.set(elementId, Date.now());
       console.log(`=== object:modified event for element ${elementId} ===`);
       console.log('Current scale:', { scaleX: target.scaleX, scaleY: target.scaleY, width: target.width, height: target.height });
 
@@ -401,6 +398,11 @@ export function DesignCanvas() {
           return;
         }
 
+        // CRITICAL FIX: Skip if currently being modified to prevent disappearance
+        if (processingModification.current.has(element.id)) {
+          return;
+        }
+
         if (existingFabricObj && imgEl.imageUrl) {
           // Check if this is a placeholder (Rect) but now has an imageUrl - recreate as actual image
           // OR if URL changed
@@ -427,15 +429,25 @@ export function DesignCanvas() {
               // Update the multi-color group
               updateMultiColorText(fabricObj as fabric.Group, textEl);
             } else if (shouldUseMultiColor(textEl)) {
-              // Need to replace single-color text with multi-color group
-              canvas.remove(fabricObj);
-              fabricObjectsMap.current.delete(element.id);
-              addedElementIds.current.delete(element.id);
+              // CRITICAL FIX: Don't convert to multi-color while object is being modified
+              // This would cause the object to disappear during drag/resize
+              if (!processingModification.current.has(element.id)) {
+                // Need to replace single-color text with multi-color group
+                // Preserve current position from Fabric object (canvas is source of truth)
+                const currentLeft = fabricObj.left || textEl.x;
+                const currentTop = fabricObj.top || textEl.y;
 
-              const newMultiColorText = createMultiColorText(textEl);
-              canvas.add(newMultiColorText);
-              fabricObjectsMap.current.set(element.id, newMultiColorText);
-              addedElementIds.current.add(element.id);
+                canvas.remove(fabricObj);
+                fabricObjectsMap.current.delete(element.id);
+                addedElementIds.current.delete(element.id);
+
+                // Create new multi-color text with current canvas position
+                const textElWithCurrentPos = { ...textEl, x: currentLeft, y: currentTop };
+                const newMultiColorText = createMultiColorText(textElWithCurrentPos);
+                canvas.add(newMultiColorText);
+                fabricObjectsMap.current.set(element.id, newMultiColorText);
+                addedElementIds.current.add(element.id);
+              }
             } else {
               // Update standard single-color text
               if (fabricObj.text !== textEl.text) fabricObj.set({ text: textEl.text });
@@ -539,27 +551,29 @@ export function DesignCanvas() {
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
           // For images, update scale if box dimensions changed
-          if (element.type === 'image' && element.width !== undefined && element.height !== undefined) {
+          // CRITICAL FIX: Skip during modifications to prevent interference with user actions
+          if (element.type === 'image' && element.width !== undefined && element.height !== undefined && !processingModification.current.has(element.id)) {
             const imgEl = element as ImageElement;
             const currentDisplayWidth = (fabricObj.width || 1) * (fabricObj.scaleX || 1);
             const currentDisplayHeight = (fabricObj.height || 1) * (fabricObj.scaleY || 1);
             const widthDiff = Math.abs(currentDisplayWidth - imgEl.width);
             const heightDiff = Math.abs(currentDisplayHeight - imgEl.height);
 
-            console.log(`[IMAGE-SYNC] Checking ${element.id}:`, {
-              fabricWidth: fabricObj.width,
-              fabricHeight: fabricObj.height,
-              fabricScaleX: fabricObj.scaleX,
-              fabricScaleY: fabricObj.scaleY,
-              currentDisplayWidth,
-              currentDisplayHeight,
-              targetWidth: imgEl.width,
-              targetHeight: imgEl.height,
-              widthDiff,
-              heightDiff
-            });
-
+            // Only log when there's a significant difference to reduce noise
             if (widthDiff > 1 || heightDiff > 1) {
+              console.log(`[IMAGE-SYNC] Checking ${element.id}:`, {
+                fabricWidth: fabricObj.width,
+                fabricHeight: fabricObj.height,
+                fabricScaleX: fabricObj.scaleX,
+                fabricScaleY: fabricObj.scaleY,
+                currentDisplayWidth,
+                currentDisplayHeight,
+                targetWidth: imgEl.width,
+                targetHeight: imgEl.height,
+                widthDiff,
+                heightDiff
+              });
+
               // Box dimensions changed - update scale to fit new box
               const newScaleX = imgEl.width / (fabricObj.width || imgEl.width);
               const newScaleY = imgEl.height / (fabricObj.height || imgEl.height);
@@ -573,10 +587,15 @@ export function DesignCanvas() {
             }
           }
 
-          // Position sync strategy: Canvas is the source of truth EXCEPT for undo/redo
+          // Position sync strategy:
+          // 1. Normal operations (dragging, moving): Canvas is ALWAYS source of truth - NEVER sync from store
+          // 2. Undo/Redo operations: Store is source of truth - ALWAYS sync from store to canvas
+          // 3. Property changes (color, size, etc.): Don't touch position at all
+
           // Check if this is an undo/redo operation (timestamp changed recently)
           const isUndoRedo = lastUndoRedoTimestamp !== lastKnownUndoRedoTimestamp.current;
 
+          // Only sync position during undo/redo operations
           if (isUndoRedo && !processingModification.current.has(element.id)) {
             // Undo/Redo: Force sync position from store to canvas
             const positionDiffX = Math.abs((fabricObj.left || 0) - element.x);
@@ -588,7 +607,7 @@ export function DesignCanvas() {
               fabricObj.setCoords();
             }
           }
-          // Otherwise: DO NOT sync position - canvas is source of truth during normal operations
+          // For all other cases: DO NOT sync position - canvas owns the position during normal operations
 
           // Update lock state - locked objects are selectable but not movable/resizable
           const isLocked = element.locked || false;
@@ -629,12 +648,13 @@ export function DesignCanvas() {
     }
 
     // Regenerate QR codes when data OR size changes
+    // CRITICAL FIX: Skip regeneration during active modifications to prevent object disappearance
     elements.forEach(element => {
       if (element.type === 'qr') {
         const qrEl = element as QRElement;
         const fabricObj = fabricObjectsMap.current.get(element.id);
 
-        if (fabricObj) {
+        if (fabricObj && !processingModification.current.has(element.id)) {
           const currentQRData = (fabricObj as any)._qrData;
           const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
           const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);

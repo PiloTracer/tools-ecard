@@ -139,7 +139,9 @@ export function OpenTemplateModal({
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-gray-500">
-                            Mode: {template.storageMode}
+                            Mode: {typeof template.storageMode === 'string'
+                              ? template.storageMode
+                              : (template.storageMode as any)?.mode || 'UNKNOWN'}
                           </span>
                           <span className="text-xs text-gray-400">•</span>
                           <span className="text-xs text-gray-500">
