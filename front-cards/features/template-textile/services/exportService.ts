@@ -152,21 +152,25 @@ export async function exportTemplate(
     offscreenCanvas.sendObjectToBack(backgroundRect); // Ensure it's at the back
     console.log('[Export] Background rectangle added. Canvas objects:', offscreenCanvas.getObjects().length);
 
-    // Step 3: Replace images with high-res versions
+    // Step 3: Fit text objects within safe area (30px padding)
+    onProgress?.('Fitting text to safe area', 0.72);
+    fitTextToSafeArea(offscreenCanvas, 30);
+
+    // Step 4: Replace images with high-res versions
     onProgress?.('Preparing high-resolution images', 0.75);
     await replaceImagesWithHighRes(offscreenCanvas, template.elements || []);
 
-    // Step 4: Remove excludeFromExport objects
+    // Step 5: Remove excludeFromExport objects
     removeExcludedObjects(offscreenCanvas);
 
-    // Step 5: CRITICAL - Render canvas before export
+    // Step 6: CRITICAL - Render canvas before export
     onProgress?.('Rendering canvas', 0.85);
     console.log('[Export] Objects on canvas before render:', offscreenCanvas.getObjects().length);
     console.log('[Export] Canvas backgroundColor:', offscreenCanvas.backgroundColor);
     console.log('[Export] First object (should be background):', offscreenCanvas.getObjects()[0]?.type, (offscreenCanvas.getObjects()[0] as any)?.fill);
     offscreenCanvas.renderAll();
 
-    // Step 6: Export
+    // Step 7: Export
     onProgress?.('Exporting image', 0.9);
     const fabricFormat = format === 'jpg' ? 'jpeg' : 'png';
     console.log('[Export] Exporting to format:', fabricFormat, 'with multiplier:', multiplier);
@@ -317,6 +321,124 @@ function removeExcludedObjects(canvas: fabric.Canvas): void {
   const objects = canvas.getObjects();
   const excludedObjects = objects.filter((obj: any) => obj.excludeFromExport === true);
   excludedObjects.forEach(obj => canvas.remove(obj));
+}
+
+/**
+ * Fit text objects within safe area (30px padding from canvas edges)
+ * Uses uniform scaling to maintain aspect ratio and readability
+ */
+function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
+  const canvasWidth = canvas.width || 1200;
+  const canvasHeight = canvas.height || 600;
+  const safeLeft = padding;
+  const safeTop = padding;
+  const safeRight = canvasWidth - padding;
+  const safeBottom = canvasHeight - padding;
+
+  console.log('[SafeArea] Canvas size:', canvasWidth, 'x', canvasHeight);
+  console.log('[SafeArea] Safe area:', { left: safeLeft, top: safeTop, right: safeRight, bottom: safeBottom });
+
+  const objects = canvas.getObjects();
+  let adjustedCount = 0;
+
+  objects.forEach((obj: any) => {
+    // Only process text objects
+    if (obj.type !== 'text' && obj.type !== 'textbox' && obj.type !== 'i-text') {
+      return;
+    }
+
+    // Skip background rectangles
+    if (obj.isBackgroundRect) {
+      return;
+    }
+
+    // Get bounding box in absolute coordinates
+    const bounds = obj.getBoundingRect(true);
+
+    // Check if text exceeds safe area
+    const exceedsLeft = bounds.left < safeLeft;
+    const exceedsTop = bounds.top < safeTop;
+    const exceedsRight = (bounds.left + bounds.width) > safeRight;
+    const exceedsBottom = (bounds.top + bounds.height) > safeBottom;
+
+    if (exceedsLeft || exceedsTop || exceedsRight || exceedsBottom) {
+      console.log('[SafeArea] Text exceeds safe area:', {
+        text: obj.text?.substring(0, 50),
+        bounds,
+        exceedsLeft,
+        exceedsTop,
+        exceedsRight,
+        exceedsBottom
+      });
+
+      // Calculate how much to scale down to fit
+      let scaleFactorX = 1.0;
+      let scaleFactorY = 1.0;
+
+      // If exceeds right, calculate how much to shrink width
+      if (exceedsRight) {
+        const overhang = (bounds.left + bounds.width) - safeRight;
+        const neededWidth = bounds.width - overhang;
+        scaleFactorX = neededWidth / bounds.width;
+        console.log('[SafeArea] Right overhang:', overhang, 'scaleFactorX:', scaleFactorX);
+      }
+
+      // If exceeds left, need to fit from safe left
+      if (exceedsLeft) {
+        const availableFromSafeLeft = safeRight - safeLeft;
+        scaleFactorX = Math.min(scaleFactorX, availableFromSafeLeft / bounds.width);
+        console.log('[SafeArea] Left overhang, scaleFactorX:', scaleFactorX);
+      }
+
+      // If exceeds bottom, calculate how much to shrink height
+      if (exceedsBottom) {
+        const overhang = (bounds.top + bounds.height) - safeBottom;
+        const neededHeight = bounds.height - overhang;
+        scaleFactorY = neededHeight / bounds.height;
+        console.log('[SafeArea] Bottom overhang:', overhang, 'scaleFactorY:', scaleFactorY);
+      }
+
+      // If exceeds top, need to fit from safe top
+      if (exceedsTop) {
+        const availableFromSafeTop = safeBottom - safeTop;
+        scaleFactorY = Math.min(scaleFactorY, availableFromSafeTop / bounds.height);
+        console.log('[SafeArea] Top overhang, scaleFactorY:', scaleFactorY);
+      }
+
+      // Use UNIFORM scaling - take the smaller of the two factors
+      const uniformScale = Math.min(scaleFactorX, scaleFactorY);
+
+      // Never scale up (max 1.0), and don't go below 50% (min 0.5)
+      const MIN_SCALE = 0.5;
+      const MAX_SCALE = 1.0;
+      const finalScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, uniformScale));
+
+      // Get current scale
+      const currentScaleX = obj.scaleX || 1;
+      const currentScaleY = obj.scaleY || 1;
+
+      // Apply uniform scale to maintain aspect ratio
+      obj.scaleX = currentScaleX * finalScale;
+      obj.scaleY = currentScaleY * finalScale;
+
+      console.log('[SafeArea] Scaled text uniformly:', {
+        text: obj.text?.substring(0, 50),
+        currentScale: { x: currentScaleX, y: currentScaleY },
+        uniformScale,
+        finalScale,
+        newScale: { x: obj.scaleX, y: obj.scaleY }
+      });
+
+      adjustedCount++;
+    }
+  });
+
+  if (adjustedCount > 0) {
+    console.log(`[SafeArea] Adjusted ${adjustedCount} text object(s) to fit within safe area`);
+    canvas.renderAll();
+  } else {
+    console.log('[SafeArea] All text objects already fit within safe area');
+  }
 }
 
 /**
