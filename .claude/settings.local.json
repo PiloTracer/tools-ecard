@@ -16,7 +16,11 @@
       "Bash(cat:*)",
       "Bash(python3:*)",
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(docker restart:*)",
+      "Bash(winpty docker exec -it ecards-api sh -c \"ls -la /app/node_modules/ | grep axios\")",
+      "Bash(docker volume:*)",
+      "Bash(docker ps:*)"
     ],
     "deny": [],
     "ask": []

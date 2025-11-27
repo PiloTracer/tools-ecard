@@ -3,6 +3,7 @@
 import { useTemplateStore } from '../../stores/templateStore';
 import type { TextElement } from '../../types';
 import { LineMetadataProperties } from './LineMetadataProperties';
+import { FontSelector } from './FontSelector';
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -64,17 +65,10 @@ export function TextProperties({ element }: TextPropertiesProps) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Font Family</label>
-        <select
+        <FontSelector
           value={element.fontFamily}
-          onChange={(e) => handleChange({ fontFamily: e.target.value })}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
-        >
-          <option value="Arial">Arial</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Verdana">Verdana</option>
-        </select>
+          onChange={(fontFamily) => handleChange({ fontFamily })}
+        />
       </div>
 
       {/* Per-Word Color Management */}

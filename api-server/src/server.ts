@@ -9,6 +9,7 @@ import { disconnectRedis } from './core/database/redis';
 import { prisma } from './core/database/prisma';
 import { initCassandraSchema } from './core/cassandra/init';
 import { batchParsingWorker } from './features/batch-parsing';
+import { loadGoogleFonts } from './features/font-management/startup/loadGoogleFonts';
 import { createLogger } from './core/utils/logger';
 
 const log = createLogger('Server');
@@ -45,6 +46,11 @@ async function start() {
       env: appConfig.env,
       healthCheck: `http://localhost:${appConfig.port}/health`
     }, 'API Server started');
+
+    // Load Google Fonts in background (don't block startup)
+    loadGoogleFonts().catch(err => {
+      log.error({ error: err }, 'Failed to load Google Fonts');
+    });
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
