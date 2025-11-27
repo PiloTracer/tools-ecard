@@ -119,6 +119,7 @@ export function CanvasControls() {
     exportWidth,
     elements,
     updateElement,
+    updateBackgroundColor,
     undo,
     redo,
     canUndo,
@@ -128,6 +129,13 @@ export function CanvasControls() {
     loadTemplate,
     createTemplate
   } = useTemplateStore();
+
+  // Sync background color from template to canvas store on template load
+  useEffect(() => {
+    if (currentTemplate?.backgroundColor) {
+      setBackgroundColor(currentTemplate.backgroundColor);
+    }
+  }, [currentTemplate?.id]); // Only run when template changes (by ID)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -865,7 +873,11 @@ export function CanvasControls() {
         <input
           type="color"
           value={backgroundColor}
-          onChange={(e) => setBackgroundColor(e.target.value)}
+          onChange={(e) => {
+            const newColor = e.target.value;
+            setBackgroundColor(newColor); // Update canvas visual
+            updateBackgroundColor(newColor); // Save to template
+          }}
           className="h-8 w-16 rounded border border-slate-600 cursor-pointer"
           title="Canvas Background Color"
         />

@@ -29,6 +29,7 @@ interface TemplateState {
   createTemplate: (name: string, width: number, height: number) => void;
   loadTemplate: (template: Template) => void;
   updateTemplateName: (name: string) => void;
+  updateBackgroundColor: (backgroundColor: string) => void;
   setCanvasDimensions: (width: number, height: number) => void;
   setExportWidth: (width: number) => void;
   setSaveMetadata: (projectName: string, templateName: string) => void;
@@ -84,6 +85,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       name,
       width,
       height,
+      backgroundColor: '#ffffff', // Default white background
       elements: [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -127,6 +129,18 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       currentTemplate: {
         ...state.currentTemplate,
         name,
+        updatedAt: new Date(),
+      },
+      hasUnsavedChanges: true
+    };
+  }),
+
+  updateBackgroundColor: (backgroundColor) => set((state) => {
+    if (!state.currentTemplate) return state;
+    return {
+      currentTemplate: {
+        ...state.currentTemplate,
+        backgroundColor,
         updatedAt: new Date(),
       },
       hasUnsavedChanges: true

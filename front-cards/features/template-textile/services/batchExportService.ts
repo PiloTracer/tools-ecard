@@ -386,6 +386,16 @@ export async function exportTemplateToBatch(
         // Apply record data to template
         const populatedTemplate = applyRecordData(template, record);
 
+        // Debug: Log backgroundColor option
+        if (i === 0) {
+          console.log('[BatchExport] Export options for first record:', {
+            backgroundColor: options.backgroundColor,
+            format: options.format,
+            width: options.width,
+            height: options.height
+          });
+        }
+
         // Export to PNG
         const result: ExportResult = await exportTemplate(populatedTemplate, {
           format: options.format || 'png',

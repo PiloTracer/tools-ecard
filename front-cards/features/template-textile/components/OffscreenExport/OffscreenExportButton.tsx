@@ -142,21 +142,22 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     setExportStep('Starting export...');
 
     try {
+      // Get template data
+      const exportTemplate_data = template || (await templateService.loadTemplate(templateId!)).data;
+
       const options: ExportOptions = {
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
-        backgroundColor: transparentBackground ? undefined : 'white',
+        backgroundColor: transparentBackground ? undefined : (exportTemplate_data.backgroundColor || '#ffffff'),
         onProgress: (step, progress) => {
           setExportStep(step);
           setExportProgress(progress);
         }
       };
 
-      // Use provided template object or load from storage
-      const result = template
-        ? await exportTemplate(template, options)
-        : await exportTemplateById(templateId!, options);
+      // Export
+      const result = await exportTemplate(exportTemplate_data, options);
 
       // Download the exported image
       const filename = `${templateName.replace(/[^a-z0-9]/gi, '_')}.${result.format}`;
@@ -199,19 +200,31 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
       // Get template
       const exportTemplate_data = template || (await templateService.loadTemplate(templateId!)).data;
 
-      // Export with batch data
-      const result = await exportTemplateToBatch(exportTemplate_data, selectedBatchId, {
+      // CRITICAL: Use template's backgroundColor, not hardcoded 'white'
+      const finalBackgroundColor = transparentBackground ? undefined : (exportTemplate_data.backgroundColor || '#ffffff');
+
+      const batchExportOptions = {
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
-        backgroundColor: transparentBackground ? undefined : 'white',
+        backgroundColor: finalBackgroundColor,
         onProgress: (current, total, status) => {
           setBatchProgress({ current, total });
           setExportStep(status);
           setExportProgress(current / total);
         },
         onCancel: () => cancelRequested,
+      };
+
+      console.log('[OffscreenExport] Batch export options:', {
+        transparentBackground,
+        templateBackgroundColor: exportTemplate_data.backgroundColor,
+        finalBackgroundColor: finalBackgroundColor,
+        willBeUsed: finalBackgroundColor
       });
+
+      // Export with batch data
+      const result = await exportTemplateToBatch(exportTemplate_data, selectedBatchId, batchExportOptions);
 
       if (result.cancelled) {
         setExportStep(`✗ Export cancelled (${result.successCount}/${result.totalRecords} completed)`);

@@ -104,16 +104,22 @@ export async function exportTemplate(
 
   // Step 1: Create off-screen canvas
   onProgress?.('Creating canvas', 0.2);
+  const finalBackgroundColor = backgroundColor || templateToExport.backgroundColor || '#ffffff';
+  console.log('[Export] backgroundColor values:', {
+    provided: backgroundColor,
+    templateBg: templateToExport.backgroundColor,
+    final: finalBackgroundColor
+  });
   const offscreenCanvas = createOffscreenCanvas(
     canvasWidth,
     canvasHeight,
-    backgroundColor || templateToExport.backgroundColor || '#ffffff'
+    finalBackgroundColor
   );
 
   let blobUrls: string[] = [];
 
   try {
-    // Step 2: Recreate elements
+    // Step 2: Recreate elements (this clears the canvas, so background must be added AFTER)
     onProgress?.('Recreating elements', 0.3);
     blobUrls = await recreateElements(
       offscreenCanvas,
@@ -127,6 +133,25 @@ export async function exportTemplate(
       }
     );
 
+    // Step 2.5: Add background rectangle AFTER recreateElements (which clears canvas)
+    onProgress?.('Adding background', 0.7);
+    console.log('[Export] Creating background rectangle with color:', finalBackgroundColor);
+    const backgroundRect = new fabric.Rect({
+      left: 0,
+      top: 0,
+      width: canvasWidth,
+      height: canvasHeight,
+      fill: finalBackgroundColor,
+      selectable: false,
+      evented: false,
+      strokeWidth: 0,
+    });
+    (backgroundRect as any).isBackgroundRect = true; // Mark for identification
+    (backgroundRect as any).excludeFromExport = false; // NEVER exclude background
+    offscreenCanvas.add(backgroundRect);
+    offscreenCanvas.sendObjectToBack(backgroundRect); // Ensure it's at the back
+    console.log('[Export] Background rectangle added. Canvas objects:', offscreenCanvas.getObjects().length);
+
     // Step 3: Replace images with high-res versions
     onProgress?.('Preparing high-resolution images', 0.75);
     await replaceImagesWithHighRes(offscreenCanvas, template.elements || []);
@@ -134,14 +159,23 @@ export async function exportTemplate(
     // Step 4: Remove excludeFromExport objects
     removeExcludedObjects(offscreenCanvas);
 
-    // Step 5: Export
+    // Step 5: CRITICAL - Render canvas before export
+    onProgress?.('Rendering canvas', 0.85);
+    console.log('[Export] Objects on canvas before render:', offscreenCanvas.getObjects().length);
+    console.log('[Export] Canvas backgroundColor:', offscreenCanvas.backgroundColor);
+    console.log('[Export] First object (should be background):', offscreenCanvas.getObjects()[0]?.type, (offscreenCanvas.getObjects()[0] as any)?.fill);
+    offscreenCanvas.renderAll();
+
+    // Step 6: Export
     onProgress?.('Exporting image', 0.9);
     const fabricFormat = format === 'jpg' ? 'jpeg' : 'png';
+    console.log('[Export] Exporting to format:', fabricFormat, 'with multiplier:', multiplier);
     const dataUrl = offscreenCanvas.toDataURL({
       format: fabricFormat,
       quality: format === 'jpg' ? quality : 1.0,
       multiplier: multiplier
     });
+    console.log('[Export] Export complete. Data URL length:', dataUrl.length);
 
     // Clean up blob URLs
     blobUrls.forEach(url => {
@@ -215,6 +249,8 @@ function createOffscreenCanvas(
   height: number,
   backgroundColor: string
 ): fabric.Canvas {
+  console.log('[createOffscreenCanvas] Creating canvas with backgroundColor:', backgroundColor);
+
   // Create invisible canvas element
   const canvasElement = document.createElement('canvas');
   canvasElement.width = width;
@@ -227,6 +263,15 @@ function createOffscreenCanvas(
   // Append to body (required for Fabric.js to work properly)
   document.body.appendChild(canvasElement);
 
+  // IMPORTANT: Fill canvas with background color BEFORE creating Fabric canvas
+  // This ensures PNG exports have the correct background
+  const ctx = canvasElement.getContext('2d');
+  if (ctx) {
+    console.log('[createOffscreenCanvas] Painting raw canvas with color:', backgroundColor);
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, width, height);
+  }
+
   // Create Fabric canvas
   const fabricCanvas = new fabric.Canvas(canvasElement, {
     width,
@@ -237,6 +282,10 @@ function createOffscreenCanvas(
     selection: false,          // Performance: no selection overlay
     interactive: false         // Performance: no interactivity
   });
+
+  // Double-check: explicitly set background color after creation
+  fabricCanvas.backgroundColor = backgroundColor;
+  console.log('[createOffscreenCanvas] Fabric canvas created. backgroundColor:', fabricCanvas.backgroundColor);
 
   return fabricCanvas;
 }
