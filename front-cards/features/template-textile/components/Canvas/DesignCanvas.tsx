@@ -24,6 +24,12 @@ export function DesignCanvas() {
   const panStartPoint = useRef<{ x: number; y: number } | null>(null);
   const viewportTransform = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Alt+Click cycling state for overlapping objects
+  const lastClickPosition = useRef<{ x: number; y: number } | null>(null);
+  const cycleIndex = useRef<number>(0);
+  const objectsAtLastClick = useRef<fabric.Object[]>([]);
+  const [cycleInfo, setCycleInfo] = useState<{ current: number; total: number } | null>(null);
+
   const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
   const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement, exportWidth, lastUndoRedoTimestamp } = useTemplateStore();
   const copiedElement = useRef<TemplateElement | null>(null);
@@ -364,6 +370,31 @@ export function DesignCanvas() {
       setIsReady(false);
     };
   }, [width, height]); // ONLY width and height
+
+  // Helper function: Find all selectable objects at a specific point
+  const getObjectsAtPoint = (canvas: fabric.Canvas, pointer: fabric.Point): fabric.Object[] => {
+    const allObjects = canvas.getObjects();
+
+    // Filter objects that:
+    // 1. Are not grid lines
+    // 2. Are selectable
+    // 3. Contain the pointer
+    // 4. Have an elementId (are actual template elements)
+    const objectsAtPoint = allObjects.filter((obj: any) => {
+      if (obj.isGrid) return false;
+      if (!obj.selectable) return false;
+      if (!obj.elementId) return false;
+
+      // Use containsPoint to check if pointer is within object bounds
+      return obj.containsPoint(pointer);
+    });
+
+    // Sort by z-index (reverse order - top to bottom)
+    // Objects later in the array are on top
+    return objectsAtPoint.reverse();
+  };
+
+  // REMOVED: Separate Alt+Click useEffect - now merged with panning handler below
 
   // 2) Sync elements to canvas
   useEffect(() => {
@@ -1041,7 +1072,7 @@ export function DesignCanvas() {
     console.log(`[ZOOM] Applied zoom: ${zoom}`);
   }, [zoom, isReady]);
 
-  // 8.5) Spacebar panning functionality
+  // 8.5) Unified mouse:down handler - Alt+Click cycling AND Spacebar panning
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
     if (!canvas || !isReady) return;
@@ -1083,16 +1114,151 @@ export function DesignCanvas() {
       }
     };
 
+    // UNIFIED mouse:down handler - handles BOTH Alt+Click cycling AND Space key panning
     const handleMouseDown = (e: fabric.TEvent) => {
-      if (isSpacePressed && e.e instanceof MouseEvent) {
+      const mouseEvent = e.e as MouseEvent;
+
+      // ====================================================================
+      // PRIORITY 1: Alt+Click cycling for overlapping objects
+      // ====================================================================
+      if (mouseEvent.altKey) {
+        console.log('[ALT+CLICK] mouse:down event fired', { altKey: mouseEvent.altKey });
+        console.log('[ALT+CLICK] Alt key detected, proceeding with cycling logic');
+
+        // CRITICAL: Prevent Fabric.js from handling this click
+        // We need to prevent both the native event AND tell Fabric to ignore this
+        e.e.preventDefault();
+        e.e.stopPropagation();
+
+        // Disable default selection temporarily
+        const originalSelection = canvas.selection;
+        canvas.selection = false;
+
+        // Get click position in canvas coordinates
+        const pointer = canvas.getPointer(e.e);
+        console.log('[ALT+CLICK] Click position:', pointer);
+
+        // Find all objects at this point
+        const objectsAtPoint = getObjectsAtPoint(canvas, pointer);
+        console.log('[ALT+CLICK] Objects found at point:', objectsAtPoint.length, objectsAtPoint.map((o: any) => o.elementId));
+
+        if (objectsAtPoint.length === 0) {
+          // No objects at click point - clear selection
+          console.log('[ALT+CLICK] No objects found, clearing selection');
+          canvas.discardActiveObject();
+          canvas.renderAll();
+          setSelectedElement(null);
+          lastClickPosition.current = null;
+          cycleIndex.current = 0;
+          objectsAtLastClick.current = [];
+          setCycleInfo(null);
+          // Restore selection state
+          canvas.selection = originalSelection;
+          return; // Stop here - Alt takes priority
+        }
+
+        if (objectsAtPoint.length === 1) {
+          // Only one object - select it
+          console.log('[ALT+CLICK] Only one object found, selecting it:', (objectsAtPoint[0] as any).elementId);
+          canvas.setActiveObject(objectsAtPoint[0]);
+          canvas.renderAll();
+          const elementId = (objectsAtPoint[0] as any).elementId;
+          if (elementId) setSelectedElement(elementId);
+          lastClickPosition.current = null;
+          cycleIndex.current = 0;
+          objectsAtLastClick.current = [];
+          setCycleInfo(null);
+          // Restore selection state
+          canvas.selection = originalSelection;
+          return; // Stop here - Alt takes priority
+        }
+
+        // Multiple objects at this point - cycle through them
+        console.log('[ALT+CLICK] Multiple objects found, starting cycling logic');
+        const POSITION_THRESHOLD = 5; // pixels - consider clicks within 5px as "same location"
+
+        let isSameLocation = false;
+        if (lastClickPosition.current) {
+          const dx = Math.abs(pointer.x - lastClickPosition.current.x);
+          const dy = Math.abs(pointer.y - lastClickPosition.current.y);
+          isSameLocation = dx <= POSITION_THRESHOLD && dy <= POSITION_THRESHOLD;
+          console.log('[ALT+CLICK] Checking same location:', { dx, dy, isSameLocation });
+        }
+
+        if (!isSameLocation) {
+          // Different location - reset cycle
+          console.log('[ALT+CLICK] New location, resetting cycle');
+          lastClickPosition.current = { x: pointer.x, y: pointer.y };
+          cycleIndex.current = 0;
+          objectsAtLastClick.current = objectsAtPoint;
+        } else {
+          // Same location - advance cycle
+          const oldIndex = cycleIndex.current;
+          cycleIndex.current = (cycleIndex.current + 1) % objectsAtLastClick.current.length;
+          console.log('[ALT+CLICK] Same location, advancing cycle:', { oldIndex, newIndex: cycleIndex.current });
+        }
+
+        // Select the object at current cycle index
+        const objectToSelect = objectsAtLastClick.current[cycleIndex.current];
+        console.log('[ALT+CLICK] Selecting object at index:', cycleIndex.current, 'elementId:', (objectToSelect as any)?.elementId);
+
+        if (objectToSelect) {
+          canvas.setActiveObject(objectToSelect);
+          canvas.renderAll();
+
+          const elementId = (objectToSelect as any).elementId;
+          if (elementId) {
+            setSelectedElement(elementId);
+
+            // Show visual feedback
+            setCycleInfo({
+              current: cycleIndex.current + 1,
+              total: objectsAtLastClick.current.length
+            });
+
+            // Auto-hide feedback after 1.5 seconds
+            setTimeout(() => {
+              setCycleInfo(null);
+            }, 1500);
+
+            // Log cycling info for user feedback
+            console.log(`[ALT+CLICK] Successfully selected: ${cycleIndex.current + 1}/${objectsAtLastClick.current.length} objects at this location`);
+          } else {
+            console.warn('[ALT+CLICK] Object has no elementId!');
+          }
+        } else {
+          console.error('[ALT+CLICK] No object to select at index:', cycleIndex.current);
+        }
+
+        // Restore selection state
+        canvas.selection = originalSelection;
+        return; // Stop here - Alt takes priority, don't process panning
+      }
+
+      // Reset Alt+Click cycling state when Alt is not pressed
+      lastClickPosition.current = null;
+      cycleIndex.current = 0;
+      objectsAtLastClick.current = [];
+      setCycleInfo(null);
+
+      // ====================================================================
+      // PRIORITY 2: Space key panning
+      // ====================================================================
+      if (isSpacePressed && mouseEvent instanceof MouseEvent) {
         setIsPanning(true);
         panStartPoint.current = {
-          x: e.e.clientX,
-          y: e.e.clientY
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY
         };
         canvas.defaultCursor = 'grabbing';
         canvas.hoverCursor = 'grabbing';
+        return; // Stop here - panning handled
       }
+
+      // ====================================================================
+      // DEFAULT: Allow normal Fabric.js selection behavior
+      // ====================================================================
+      // No special handling needed - Fabric.js will handle normally
     };
 
     const handleMouseMove = (e: fabric.TEvent) => {
@@ -1149,7 +1315,7 @@ export function DesignCanvas() {
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
-  }, [isReady, isSpacePressed, isPanning]);
+  }, [isReady, setSelectedElement, isSpacePressed, isPanning]);
 
   // 9) Handle keyboard shortcuts
   useEffect(() => {
@@ -1616,6 +1782,12 @@ export function DesignCanvas() {
         {isSpacePressed && (
           <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg pointer-events-none">
             Panning Mode (Hold Space + Drag)
+          </div>
+        )}
+        {/* Visual indicator for Alt+Click cycling */}
+        {cycleInfo && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none animate-fade-in">
+            Object {cycleInfo.current} of {cycleInfo.total}
           </div>
         )}
       </div>
