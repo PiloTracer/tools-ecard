@@ -94,7 +94,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       currentTemplate: template,
       elements: [],
       canvasWidth: width,
-      canvasHeight: height
+      canvasHeight: height,
+      history: [[]],
+      historyIndex: 0,
     });
   },
 
@@ -103,7 +105,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       currentTemplate: template,
       elements: template.elements,
       canvasWidth: template.width,
-      canvasHeight: template.height
+      canvasHeight: template.height,
+      history: [JSON.parse(JSON.stringify(template.elements))],
+      historyIndex: 0,
     });
   },
 
