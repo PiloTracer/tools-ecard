@@ -9,6 +9,7 @@ import type { ExportOptions, ExportResult } from './exportService';
 import type { Template, TemplateElement, TextElement, QRElement } from '../types';
 import { apiClient } from '@/shared/lib/api-client';
 import { generateVCardFromRecord } from './vcardGenerator';
+import { createOriginalPositionMap, applyLineCompaction, type PositionMap } from './lineCompactionService';
 
 /**
  * Batch record from API (ContactRecordFull type)
@@ -363,6 +364,10 @@ export async function exportTemplateToBatch(
       throw new Error('No records found in batch');
     }
 
+    // Create original position map ONCE for line compaction
+    // This stores original element positions to use when moving lines
+    const originalPositionMap = createOriginalPositionMap(template);
+
     // Step 2: Process records in chunks
     const sanitizedBatchName = sanitizeFilename(batchName.replace(/\.(vcf|csv)$/i, ''));
 
@@ -386,6 +391,9 @@ export async function exportTemplateToBatch(
         // Apply record data to template
         const populatedTemplate = applyRecordData(template, record);
 
+        // Apply line compaction (removes empty lines and moves remaining lines up)
+        const compactedTemplate = applyLineCompaction(populatedTemplate, originalPositionMap);
+
         // Debug: Log backgroundColor option
         if (i === 0) {
           console.log('[BatchExport] Export options for first record:', {
@@ -397,7 +405,7 @@ export async function exportTemplateToBatch(
         }
 
         // Export to PNG
-        const result: ExportResult = await exportTemplate(populatedTemplate, {
+        const result: ExportResult = await exportTemplate(compactedTemplate, {
           format: options.format || 'png',
           quality: options.quality,
           width: options.width,
