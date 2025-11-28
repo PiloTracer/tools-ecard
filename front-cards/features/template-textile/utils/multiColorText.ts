@@ -134,15 +134,23 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
     top: currentTop,
     angle: element.rotation || 0,
     opacity: element.opacity || 1,
+    scaleX: 1, // CRITICAL: Ensure scale is always 1 after updating text
+    scaleY: 1, // CRITICAL: Ensure scale is always 1 after updating text
     excludeFromExport: element.excludeFromExport || false,
   });
 
   // Update stored metadata
   (group as any).originalElement = element;
 
-  // Trigger re-render
+  // CRITICAL FIX: Trigger internal layout recalculation
+  // This ensures the bounding box matches the actual content after changes
   group.setCoords();
-  group.canvas?.renderAll();
+
+  // Force Fabric to recalculate the group's bounding box and control positions
+  // This fixes the detached handles issue when scaling
+  if (group.canvas) {
+    group.canvas.renderAll();
+  }
 }
 
 /**

@@ -16,7 +16,9 @@ export function DesignCanvas() {
   const addedElementIds = useRef<Set<string>>(new Set());
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
+  const activelyInteracting = useRef<Set<string>>(new Set()); // Track which elements are being actively manipulated (scaling, moving, rotating)
   const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
+  const [globalSyncLock, setGlobalSyncLock] = useState(false); // NUCLEAR: Global lock to prevent ALL sync operations during ANY interaction
 
   // Panning state
   const [isPanning, setIsPanning] = useState(false);
@@ -151,6 +153,41 @@ export function DesignCanvas() {
       }
     });
 
+    // Track when user starts interacting with an object (scaling, moving, rotating)
+    // NUCLEAR PROTECTION: Set global sync lock to prevent ALL modifications during interaction
+    canvas.on('object:scaling', (e: any) => {
+      const target = e.target;
+      if (!target) return;
+      const elementId = (target as any).elementId;
+      if (elementId) {
+        activelyInteracting.current.add(elementId);
+        setGlobalSyncLock(true); // LOCK ALL SYNC
+        console.log(`[INTERACTION] Started scaling ${elementId} - GLOBAL SYNC LOCKED`);
+      }
+    });
+
+    canvas.on('object:moving', (e: any) => {
+      const target = e.target;
+      if (!target) return;
+      const elementId = (target as any).elementId;
+      if (elementId) {
+        activelyInteracting.current.add(elementId);
+        setGlobalSyncLock(true); // LOCK ALL SYNC
+        console.log(`[INTERACTION] Started moving ${elementId} - GLOBAL SYNC LOCKED`);
+      }
+    });
+
+    canvas.on('object:rotating', (e: any) => {
+      const target = e.target;
+      if (!target) return;
+      const elementId = (target as any).elementId;
+      if (elementId) {
+        activelyInteracting.current.add(elementId);
+        setGlobalSyncLock(true); // LOCK ALL SYNC
+        console.log(`[INTERACTION] Started rotating ${elementId} - GLOBAL SYNC LOCKED`);
+      }
+    });
+
     // Modification events
     canvas.on('object:modified', (e: any) => {
       const target = e.target;
@@ -169,10 +206,15 @@ export function DesignCanvas() {
       console.log(`=== object:modified event for element ${elementId} ===`);
       console.log('Current scale:', { scaleX: target.scaleX, scaleY: target.scaleY, width: target.width, height: target.height });
 
-      // Clear the flag after a short delay
+      // CRITICAL FIX: Keep the lock active for 300ms after modification ends
+      // This prevents the sync effect from running DURING the interaction
+      // which was causing ghost text and detached handles during scaling
       setTimeout(() => {
         processingModification.current.delete(elementId);
-      }, 100);
+        activelyInteracting.current.delete(elementId);
+        setGlobalSyncLock(false);
+        console.log(`[INTERACTION] Cleared modification flags and unlocked sync for ${elementId}`);
+      }, 300); // 300ms delay - long enough to prevent sync during interaction, short enough to not block updates
 
       // Get fresh elements from store to avoid stale closure
       const currentElements = useTemplateStore.getState().elements;
@@ -189,6 +231,7 @@ export function DesignCanvas() {
       };
 
       console.log(`[MODIFY] Element ${elementId} type=${element.type}, has width=${element.width !== undefined}, has height=${element.height !== undefined}`);
+      console.log(`[MODIFY] Target type=${target.type}, isMultiColorText=${!!(target as any).isMultiColorText}`);
 
       // Handle size updates for text (fontSize) vs others (width/height)
       // Only update size if object was actually scaled (scaleX/scaleY changed from 1)
@@ -196,10 +239,53 @@ export function DesignCanvas() {
         const scaleY = target.scaleY || 1;
         // Only update fontSize if text was scaled (not just moved)
         if (Math.abs(scaleY - 1) > 0.01) {
-          const newFontSize = Math.round(target.fontSize * scaleY);
-          (updates as Partial<TextElement>).fontSize = newFontSize;
-          // Reset scale to 1 after applying to fontSize
-          target.set({ scaleX: 1, scaleY: 1 });
+          // Check if this is a multi-color text group
+          const isMultiColorGroup = (target as any).isMultiColorText || target.type === 'Group';
+          console.log(`[MODIFY] isMultiColorGroup=${isMultiColorGroup}, target.type=${target.type}`);
+
+          if (isMultiColorGroup) {
+            // For multi-color text groups: calculate new fontSize from scale
+            // Groups contain Text objects, so we need to look at the first child to get fontSize
+            const group = target as fabric.Group;
+            const groupChildren = group.getObjects();
+            const firstTextObj = groupChildren[0] as fabric.Text;
+
+            // CRITICAL: Check if we have valid children before accessing fontSize
+            if (firstTextObj && firstTextObj.fontSize) {
+              const currentFontSize = firstTextObj.fontSize;
+              const newFontSize = Math.round(currentFontSize * scaleY);
+              (updates as Partial<TextElement>).fontSize = newFontSize;
+
+              console.log(`[TEXT-SCALE] Multi-color group scaled: old fontSize=${currentFontSize}, new fontSize=${newFontSize}, scaleY=${scaleY}`);
+            } else {
+              // Fallback: use element's fontSize from store
+              const currentFontSize = element.fontSize;
+              const newFontSize = Math.round(currentFontSize * scaleY);
+              (updates as Partial<TextElement>).fontSize = newFontSize;
+
+              console.log(`[TEXT-SCALE] Multi-color group scaled (fallback): old fontSize=${currentFontSize}, new fontSize=${newFontSize}, scaleY=${scaleY}`);
+            }
+
+            // CRITICAL FIX: Don't just reset scale - we need to completely recreate the group
+            // Mark this element for recreation with the new fontSize
+            // The sync effect will handle recreation when fontSize changes
+            // For now, just let the scale remain - it will be fixed when group is recreated
+          } else {
+            // For single-color text: apply scale to fontSize
+            const newFontSize = Math.round(target.fontSize * scaleY);
+            (updates as Partial<TextElement>).fontSize = newFontSize;
+
+            console.log(`[TEXT-SCALE] Single-color text scaled: old fontSize=${target.fontSize}, new fontSize=${newFontSize}, scaleY=${scaleY}`);
+
+            // CRITICAL FIX: Reset scale AND update coordinates to prevent detached handles
+            target.set({
+              scaleX: 1,
+              scaleY: 1,
+              fontSize: newFontSize // Apply new fontSize immediately
+            });
+            // Force coordinate recalculation to fix bounding box
+            target.setCoords();
+          }
         }
       } else if (element.type === 'qr' || (element.width !== undefined && element.height !== undefined)) {
         // For QR elements OR elements with width/height defined
@@ -218,8 +304,10 @@ export function DesignCanvas() {
               updates.width = newRadius * 2;
               updates.height = newRadius * 2;
               console.log(`Circle scaled: radius ${currentRadius} -> ${newRadius}, width ${updates.width}`);
-              // Update the Fabric object's radius immediately
-              target.set({ radius: newRadius });
+              // Update the Fabric object's radius immediately and reset scale
+              target.set({ radius: newRadius, scaleX: 1, scaleY: 1 });
+              // Force coordinate recalculation
+              target.setCoords();
             } else if (shapeEl.shapeType === 'ellipse') {
               // For ellipses, calculate width/height from rx/ry
               const currentRx = target.rx || element.width / 2;
@@ -229,12 +317,17 @@ export function DesignCanvas() {
               updates.width = newRx * 2;
               updates.height = newRy * 2;
               console.log(`Ellipse scaled: rx ${currentRx} -> ${newRx}, ry ${currentRy} -> ${newRy}`);
-              // Update the Fabric object's rx/ry immediately
-              target.set({ rx: newRx, ry: newRy });
+              // Update the Fabric object's rx/ry immediately and reset scale
+              target.set({ rx: newRx, ry: newRy, scaleX: 1, scaleY: 1 });
+              // Force coordinate recalculation
+              target.setCoords();
             } else {
               // Other shapes use width/height directly
               updates.width = Math.round((target.width || element.width) * scaleX);
               updates.height = Math.round((target.height || element.height) * scaleY);
+              // Reset scale and update coordinates
+              target.set({ scaleX: 1, scaleY: 1 });
+              target.setCoords();
             }
           } else {
             // Non-shape elements use width/height directly
@@ -292,6 +385,8 @@ export function DesignCanvas() {
               (updates as any).size = newWidth; // QR codes are square, use width as size
               // Reset scale to 1 after applying to width/height
               target.set({ scaleX: 1, scaleY: 1 });
+              // Force coordinate recalculation
+              target.setCoords();
             } else {
               // Non-image, non-QR elements: apply scale to dimensions and reset scale
               const elementAny = element as any;
@@ -302,11 +397,12 @@ export function DesignCanvas() {
               updates.height = newHeight;
               // Reset scale to 1 after applying to width/height
               target.set({ scaleX: 1, scaleY: 1 });
+              // Force coordinate recalculation
+              target.setCoords();
             }
           }
 
-          // Scale is already reset above for each element type
-          target.setCoords();
+          // Force final render to update display
           canvas.renderAll();
         }
       }
@@ -351,6 +447,14 @@ export function DesignCanvas() {
           if (elementId) {
             e.preventDefault();
 
+            // SAFETY CHECK: Don't remove if actively interacting
+            if (activelyInteracting.current.has(elementId) || globalSyncLock) {
+              console.warn(`[DELETE-KEY] BLOCKED deletion of ${elementId} - actively interacting or sync locked`);
+              return;
+            }
+
+            console.log(`[REMOVE] Delete key pressed for element ${elementId}`);
+            console.trace('[REMOVE] Stack trace for delete key removal:'); // STACK TRACE
             canvas.remove(activeObject);
             removeElement(elementId);
             addedElementIds.current.delete(elementId);
@@ -401,6 +505,14 @@ export function DesignCanvas() {
     const canvas = fabricCanvasRef.current;
     if (!canvas || !isReady) return;
 
+    // CRITICAL: Early return if global sync is locked (during user interactions)
+    // This prevents the sync effect from running AT ALL during scaling/moving/rotating
+    if (globalSyncLock) {
+      console.log('[SYNC] BLOCKED - Global sync lock is active, skipping entire sync');
+      canvas.renderAll(); // Keep rendering what's already on canvas
+      return;
+    }
+
     // Preserve the active object to prevent deselection during property updates
     const activeObject = canvas.getActiveObject();
     const activeElementId = activeObject ? (activeObject as any).elementId : null;
@@ -429,8 +541,9 @@ export function DesignCanvas() {
           return;
         }
 
-        // CRITICAL FIX: Skip if currently being modified to prevent disappearance
-        if (processingModification.current.has(element.id)) {
+        // CRITICAL FIX: Skip if currently being modified OR actively interacting to prevent disappearance
+        if (processingModification.current.has(element.id) || activelyInteracting.current.has(element.id) || globalSyncLock) {
+          console.log(`[IMAGE-RECREATE] BLOCKED for ${element.id} - being modified or interacting or global sync locked`);
           return;
         }
 
@@ -455,19 +568,67 @@ export function DesignCanvas() {
           if (element.type === 'text') {
             const textEl = element as TextElement;
 
-            // Check if this is a multi-color text group
-            if ((fabricObj as any).isMultiColorText) {
-              // Update the multi-color group
-              updateMultiColorText(fabricObj as fabric.Group, textEl);
-            } else if (shouldUseMultiColor(textEl)) {
-              // CRITICAL FIX: Don't convert to multi-color while object is being modified
+            // CRITICAL PROTECTION: Check if fabricObj is ALREADY a multi-color group
+            // Must check BOTH the flag AND the type to prevent re-conversion
+            const isAlreadyMultiColor = (fabricObj as any).isMultiColorText || fabricObj.type === 'Group';
+            const needsMultiColor = shouldUseMultiColor(textEl);
+
+            console.log(`[TEXT-CHECK] Element ${element.id}: isAlreadyMultiColor=${isAlreadyMultiColor}, needsMultiColor=${needsMultiColor}, fabricType=${fabricObj.type}, hasFlag=${!!(fabricObj as any).isMultiColorText}`);
+
+            if (isAlreadyMultiColor) {
+              console.log(`[TEXT-UPDATE] Updating existing multi-color group ${element.id}`);
+
+              // Check if fontSize changed significantly - if so, recreate the group
+              const groupChildren = (fabricObj as fabric.Group).getObjects();
+              const firstTextObj = groupChildren[0] as fabric.Text;
+              const currentFontSize = firstTextObj?.fontSize || textEl.fontSize;
+              const fontSizeChanged = Math.abs(currentFontSize - textEl.fontSize) > 0.5;
+
+              // Also check if scale is not 1 (group was scaled and needs reset)
+              const isScaled = Math.abs((fabricObj.scaleX || 1) - 1) > 0.01 || Math.abs((fabricObj.scaleY || 1) - 1) > 0.01;
+
+              if ((fontSizeChanged || isScaled) && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
+                console.log(`[TEXT-RECREATE] Recreating multi-color group ${element.id} - fontSize changed: ${fontSizeChanged}, isScaled: ${isScaled}`);
+
+                // Preserve current position and rotation from Fabric object (canvas is source of truth)
+                const currentLeft = fabricObj.left || textEl.x;
+                const currentTop = fabricObj.top || textEl.y;
+                const currentAngle = fabricObj.angle || textEl.rotation || 0;
+
+                console.log(`[REMOVE] Removing multi-color group ${element.id} for recreation`);
+                canvas.remove(fabricObj);
+                fabricObjectsMap.current.delete(element.id);
+
+                // Create new multi-color text with current canvas position and updated fontSize
+                const textElWithCurrentPos = { ...textEl, x: currentLeft, y: currentTop, rotation: currentAngle };
+                const newMultiColorText = createMultiColorText(textElWithCurrentPos);
+                canvas.add(newMultiColorText);
+                fabricObjectsMap.current.set(element.id, newMultiColorText);
+
+                // Restore selection if this was the selected element
+                if (selectedElementId === element.id) {
+                  canvas.setActiveObject(newMultiColorText);
+                }
+              } else {
+                // Update the existing multi-color group (for text/color changes only)
+                updateMultiColorText(fabricObj as fabric.Group, textEl);
+              }
+            } else if (needsMultiColor) {
+              // Need to convert single-color text to multi-color group
+              // CRITICAL FIX: Don't convert to multi-color while object is being modified OR actively interacting
               // This would cause the object to disappear during drag/resize
-              if (!processingModification.current.has(element.id)) {
+              const isBeingModified = processingModification.current.has(element.id);
+              const isBeingInteracted = activelyInteracting.current.has(element.id);
+
+              if (!isBeingModified && !isBeingInteracted && !globalSyncLock) {
+                console.log(`[TEXT-CONVERSION] Converting single-color to multi-color for ${element.id}`);
                 // Need to replace single-color text with multi-color group
                 // Preserve current position from Fabric object (canvas is source of truth)
                 const currentLeft = fabricObj.left || textEl.x;
                 const currentTop = fabricObj.top || textEl.y;
 
+                console.log(`[REMOVE] Removing text object ${element.id} for multi-color conversion`);
+                console.trace('[REMOVE] Stack trace for text removal:'); // STACK TRACE
                 canvas.remove(fabricObj);
                 fabricObjectsMap.current.delete(element.id);
                 addedElementIds.current.delete(element.id);
@@ -478,6 +639,8 @@ export function DesignCanvas() {
                 canvas.add(newMultiColorText);
                 fabricObjectsMap.current.set(element.id, newMultiColorText);
                 addedElementIds.current.add(element.id);
+              } else {
+                console.log(`[TEXT-CONVERSION] BLOCKED conversion for ${element.id} - being modified:${isBeingModified} or interacting:${isBeingInteracted} or globalLock:${globalSyncLock}`);
               }
             } else {
               // Update standard single-color text
@@ -582,8 +745,9 @@ export function DesignCanvas() {
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
           // For images, update scale if box dimensions changed
-          // CRITICAL FIX: Skip during modifications to prevent interference with user actions
-          if (element.type === 'image' && element.width !== undefined && element.height !== undefined && !processingModification.current.has(element.id)) {
+          // CRITICAL FIX: Skip during modifications OR active interaction to prevent interference with user actions
+          if (element.type === 'image' && element.width !== undefined && element.height !== undefined &&
+              !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
             const imgEl = element as ImageElement;
             const currentDisplayWidth = (fabricObj.width || 1) * (fabricObj.scaleX || 1);
             const currentDisplayHeight = (fabricObj.height || 1) * (fabricObj.scaleY || 1);
@@ -626,8 +790,8 @@ export function DesignCanvas() {
           // Check if this is an undo/redo operation (timestamp changed recently)
           const isUndoRedo = lastUndoRedoTimestamp !== lastKnownUndoRedoTimestamp.current;
 
-          // Only sync position during undo/redo operations
-          if (isUndoRedo && !processingModification.current.has(element.id)) {
+          // Only sync position during undo/redo operations AND not during active interaction
+          if (isUndoRedo && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
             // Undo/Redo: Force sync position from store to canvas
             const positionDiffX = Math.abs((fabricObj.left || 0) - element.x);
             const positionDiffY = Math.abs((fabricObj.top || 0) - element.y);
@@ -671,6 +835,13 @@ export function DesignCanvas() {
       elementIdsToRemove.forEach(elementId => {
         const fabricObj = fabricObjectsMap.current.get(elementId);
         if (fabricObj) {
+          // SAFETY CHECK: Don't remove if actively interacting (shouldn't happen, but extra safety)
+          if (activelyInteracting.current.has(elementId) || globalSyncLock) {
+            console.warn(`[REMOVE] BLOCKED removal of ${elementId} - actively interacting or sync locked`);
+            return;
+          }
+          console.log(`[REMOVE] Removing element ${elementId} from canvas - element no longer in store`);
+          console.trace('[REMOVE] Stack trace for element removal:'); // STACK TRACE
           canvas.remove(fabricObj);
           fabricObjectsMap.current.delete(elementId);
           addedElementIds.current.delete(elementId);
@@ -679,13 +850,13 @@ export function DesignCanvas() {
     }
 
     // Regenerate QR codes when data OR size changes
-    // CRITICAL FIX: Skip regeneration during active modifications to prevent object disappearance
+    // CRITICAL FIX: Skip regeneration during active modifications OR interaction to prevent object disappearance
     elements.forEach(element => {
       if (element.type === 'qr') {
         const qrEl = element as QRElement;
         const fabricObj = fabricObjectsMap.current.get(element.id);
 
-        if (fabricObj && !processingModification.current.has(element.id)) {
+        if (fabricObj && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
           const currentQRData = (fabricObj as any)._qrData;
           const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
           const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
@@ -748,6 +919,8 @@ export function DesignCanvas() {
                   (qrImage as any)._qrData = qrEl.data;
 
                   // Replace old QR with new one
+                  console.log(`[REMOVE] Removing old QR object ${element.id} for regeneration`);
+                  console.trace('[REMOVE] Stack trace for QR regeneration:'); // STACK TRACE
                   canvas.remove(fabricObj);
                   canvas.add(qrImage);
                   fabricObjectsMap.current.set(element.id, qrImage);
@@ -861,6 +1034,8 @@ export function DesignCanvas() {
             (fabricImg as any).elementId = imgEl.id;
             (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
 
+            console.log(`[REMOVE] Removing old image object ${imgEl.id} for recreation`);
+            console.trace('[REMOVE] Stack trace for image recreation:'); // STACK TRACE
             console.log('Replacing placeholder with image');
             canvas.remove(oldFabricObj);
             canvas.add(fabricImg);
@@ -1661,6 +1836,8 @@ export function DesignCanvas() {
               // Replace placeholder with actual QR code
               const placeholder = fabricObjectsMap.current.get(element.id);
               if (placeholder && canvas) {
+                console.log(`[REMOVE] Removing QR placeholder ${element.id} for actual QR code`);
+                console.trace('[REMOVE] Stack trace for QR placeholder replacement:'); // STACK TRACE
                 canvas.remove(placeholder);
                 canvas.add(qrImage);
                 fabricObjectsMap.current.set(element.id, qrImage);

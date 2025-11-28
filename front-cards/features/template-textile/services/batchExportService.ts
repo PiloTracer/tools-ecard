@@ -246,8 +246,8 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
           originalText: textElement.text
         });
 
-        // Priority: record value > existing text > empty string
-        const newText = fieldValue || textElement.text || '';
+        // Priority: record value > empty string (if no value, clear the field)
+        const newText = fieldValue || '';
 
         return {
           ...textElement,

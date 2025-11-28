@@ -107,7 +107,7 @@ function createTextElement(element: TextElement): fabric.Object {
     return createMultiColorText(element);
   } else {
     // Standard single-color text
-    return new fabric.IText(element.text || 'Text', {
+    return new fabric.IText(element.text ?? 'Text', {
       left: element.x,
       top: element.y,
       fontSize: fontSize,
