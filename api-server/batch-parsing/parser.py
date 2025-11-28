@@ -50,13 +50,17 @@ class BatchParser:
         postgres_url: str,
         cassandra_hosts: List[str],
         cassandra_keyspace: str = 'ecards',
-        storage_mode: str = 'seaweedfs'
+        storage_mode: str = 'seaweedfs',
+        work_phone_prefix: Optional[str] = None,
+        default_country_code: Optional[str] = None
     ):
         self.batch_id = batch_id
         self.file_path = file_path
         self.postgres_url = postgres_url
         self.cassandra_hosts = cassandra_hosts
         self.cassandra_keyspace = cassandra_keyspace
+        self.work_phone_prefix = work_phone_prefix
+        self.default_country_code = default_country_code
 
         # Initialize components
         self.normalizer = DataNormalizer()
@@ -278,11 +282,20 @@ class BatchParser:
                 mapped["last_name"] = parsed_name["last_name"]
                 mapped["full_name"] = parsed_name["full_name"]
 
-        # Normalize phones
+        # Normalize phones with project-specific configuration
         if mapped.get("mobile_phone"):
-            mapped["mobile_phone"] = self.normalizer.normalize_phone(mapped["mobile_phone"])
+            mapped["mobile_phone"] = self.normalizer.normalize_phone(
+                mapped["mobile_phone"],
+                phone_type="mobile",
+                default_country_code=self.default_country_code
+            )
         if mapped.get("work_phone"):
-            mapped["work_phone"] = self.normalizer.normalize_phone(mapped["work_phone"])
+            mapped["work_phone"] = self.normalizer.normalize_phone(
+                mapped["work_phone"],
+                phone_type="work",
+                work_phone_prefix=self.work_phone_prefix,
+                default_country_code=self.default_country_code
+            )
 
         return mapped
 
@@ -505,6 +518,9 @@ def main():
     parser.add_argument('--cassandra-keyspace', default='ecards', help='Cassandra keyspace')
     parser.add_argument('--storage-mode', default='seaweedfs', choices=['seaweedfs', 'local'], help='Storage mode')
     parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
+    # Phone formatting configuration
+    parser.add_argument('--work-phone-prefix', help='Prefix for 4-digit work phone numbers (e.g., "2222")')
+    parser.add_argument('--default-country-code', help='Default country code for 8-digit numbers (e.g., "+(506)")')
 
     args = parser.parse_args()
 
@@ -521,7 +537,9 @@ def main():
         postgres_url=args.postgres_url,
         cassandra_hosts=cassandra_hosts,
         cassandra_keyspace=args.cassandra_keyspace,
-        storage_mode=args.storage_mode
+        storage_mode=args.storage_mode,
+        work_phone_prefix=args.work_phone_prefix,
+        default_country_code=args.default_country_code
     )
 
     try:

@@ -10,15 +10,20 @@
 import { useAuth } from '@/features/auth';
 import { ProtectedRoute } from '@/features/auth';
 import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
-import { ProjectSelector, useProjects } from '@/features/simple-projects';
+import { ProjectSelector, ProjectSettings, ProjectsProvider, useProjects } from '@/features/simple-projects';
 import { QuickActions } from '@/features/simple-quick-actions';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-function DashboardContent() {
+function DashboardInner() {
   const { user, logout } = useAuth();
-  const { ensureDefaultProject } = useProjects();
+  const { ensureDefaultProject, selectedProjectId } = useProjects();
   const router = useRouter();
+
+  // Log when selectedProjectId changes
+  useEffect(() => {
+    console.log('[DashboardContent] selectedProjectId changed to:', selectedProjectId);
+  }, [selectedProjectId]);
 
   // Ensure user has a default project on first login
   useEffect(() => {
@@ -237,9 +242,10 @@ function DashboardContent() {
           )}
         </div>
 
-        {/* Project Selector - Positioned right above Quick Actions */}
+        {/* Project Selector & Settings - Positioned right above Quick Actions */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <ProjectSelector />
+          <ProjectSettings key={selectedProjectId || 'no-project'} />
         </div>
 
         {/* Quick Actions */}
@@ -275,6 +281,14 @@ function DashboardContent() {
         </div>
       </main>
     </div>
+  );
+}
+
+function DashboardContent() {
+  return (
+    <ProjectsProvider>
+      <DashboardInner />
+    </ProjectsProvider>
   );
 }
 

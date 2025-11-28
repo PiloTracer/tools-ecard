@@ -37,6 +37,10 @@ model Project {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Phone formatting configuration for batch parsing
+  workPhonePrefix     String? @map("work_phone_prefix")    // e.g., "2222" for Costa Rica landlines
+  defaultCountryCode  String? @map("default_country_code") // e.g., "+(506)" for Costa Rica
+
   // Relations
   user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   selectedBy        UserProjectSelection[]

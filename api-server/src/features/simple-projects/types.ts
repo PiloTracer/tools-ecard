@@ -7,6 +7,8 @@ export interface Project {
   userId: string;
   name: string;
   isDefault: boolean;
+  workPhonePrefix: string | null;
+  defaultCountryCode: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +25,11 @@ export interface CreateProjectDto {
 
 export interface UpdateSelectedProjectDto {
   projectId: string;
+}
+
+export interface UpdateProjectDto {
+  workPhonePrefix?: string | null;
+  defaultCountryCode?: string | null;
 }
 
 export interface ProjectWithSelection extends Project {

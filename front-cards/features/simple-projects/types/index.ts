@@ -6,6 +6,8 @@ export interface Project {
   id: string;
   name: string;
   isDefault: boolean;
+  workPhonePrefix?: string | null;
+  defaultCountryCode?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +23,11 @@ export interface CreateProjectRequest {
 
 export interface UpdateSelectedProjectRequest {
   projectId: string;
+}
+
+export interface UpdateProjectRequest {
+  workPhonePrefix?: string | null;
+  defaultCountryCode?: string | null;
 }
 
 export interface SelectedProjectResponse {

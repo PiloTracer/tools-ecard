@@ -7,6 +7,7 @@ import { appConfig } from './core/config';
 import { connectCassandra, disconnectCassandra } from './core/database/cassandra';
 import { disconnectRedis } from './core/database/redis';
 import { prisma } from './core/database/prisma';
+import { initializeDatabase } from './core/database/init';
 import { initCassandraSchema } from './core/cassandra/init';
 import { batchParsingWorker } from './features/batch-parsing';
 import { loadGoogleFonts } from './features/font-management/startup/loadGoogleFonts';
@@ -19,11 +20,14 @@ async function start() {
     // Build Fastify app
     const app = await buildApp();
 
+    // Initialize database (runs migrations and creates tables if needed)
+    log.info('Initializing database');
+    await initializeDatabase();
+
     // Connect to databases
     log.info('Connecting to databases');
 
-    // Connect to PostgreSQL via Prisma
-    await prisma.$connect();
+    // Connect to PostgreSQL via Prisma (already connected in initializeDatabase)
     log.info('Connected to PostgreSQL');
 
     // Initialize Cassandra schema (auto-creates if not exists)

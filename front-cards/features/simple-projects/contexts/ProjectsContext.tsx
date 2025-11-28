@@ -1,27 +1,35 @@
-/**
- * useProjects Hook - Project management logic
- */
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { projectService } from '../services/projectService';
 import type { Project, ProjectsResponse, UpdateProjectRequest } from '../types';
 
 const SELECTED_PROJECT_KEY = 'ecards_selected_project';
 
-export function useProjects() {
+interface ProjectsContextType {
+  projects: Project[];
+  selectedProjectId: string | null;
+  selectedProject: Project | undefined;
+  loading: boolean;
+  error: string | null;
+  createProject: (name: string) => Promise<Project | null>;
+  selectProject: (projectId: string) => Promise<void>;
+  updateProject: (projectId: string, data: UpdateProjectRequest) => Promise<Project | null>;
+  reloadProjects: () => Promise<void>;
+  ensureDefaultProject: () => Promise<void>;
+}
+
+const ProjectsContext = createContext<ProjectsContextType | undefined>(undefined);
+
+export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load projects on mount
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
   // Sync selected project with localStorage
   useEffect(() => {
-    console.log('[useProjects] selectedProjectId state changed to:', selectedProjectId);
+    console.log('[ProjectsContext] selectedProjectId changed to:', selectedProjectId);
     if (selectedProjectId) {
       localStorage.setItem(SELECTED_PROJECT_KEY, selectedProjectId);
     }
@@ -35,21 +43,16 @@ export function useProjects() {
       const response = await projectService.getProjects();
       setProjects(response.projects);
 
-      // Check localStorage for previously selected project
       const storedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
 
       if (storedProjectId && response.projects.find(p => p.id === storedProjectId)) {
-        // Use stored selection if valid
         setSelectedProjectId(storedProjectId);
-        // Update backend if different
         if (response.selectedProjectId !== storedProjectId) {
           await projectService.updateSelectedProject({ projectId: storedProjectId });
         }
       } else if (response.selectedProjectId) {
-        // Use backend selection
         setSelectedProjectId(response.selectedProjectId);
       } else if (response.projects.length > 0) {
-        // Default to first project (should be default project)
         const defaultProject = response.projects.find(p => p.isDefault) || response.projects[0];
         setSelectedProjectId(defaultProject.id);
         await projectService.updateSelectedProject({ projectId: defaultProject.id });
@@ -61,18 +64,17 @@ export function useProjects() {
     }
   }, []);
 
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
   const createProject = useCallback(async (name: string): Promise<Project | null> => {
     try {
       setError(null);
       const newProject = await projectService.createProject({ name });
-
-      // Add to local state
       setProjects(prev => [...prev, newProject]);
-
-      // Auto-select new project
       setSelectedProjectId(newProject.id);
       await projectService.updateSelectedProject({ projectId: newProject.id });
-
       return newProject;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
@@ -81,25 +83,32 @@ export function useProjects() {
   }, []);
 
   const selectProject = useCallback(async (projectId: string) => {
-    console.log('[useProjects.selectProject] CALLED with projectId:', projectId);
+    console.log('[ProjectsContext.selectProject] CALLED with:', projectId);
     try {
       setError(null);
-
-      // Update local state immediately for responsiveness
-      console.log('[useProjects.selectProject] Setting selectedProjectId to:', projectId);
+      console.log('[ProjectsContext.selectProject] Setting state to:', projectId);
       setSelectedProjectId(projectId);
-
-      // Sync with backend
       await projectService.updateSelectedProject({ projectId });
-      console.log('[useProjects.selectProject] Backend sync complete');
+      console.log('[ProjectsContext.selectProject] Complete');
     } catch (err) {
-      console.error('[useProjects.selectProject] ERROR:', err);
+      console.error('[ProjectsContext.selectProject] ERROR:', err);
       setError(err instanceof Error ? err.message : 'Failed to select project');
-      // Revert on error
       const storedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
       if (storedProjectId) {
         setSelectedProjectId(storedProjectId);
       }
+    }
+  }, []);
+
+  const updateProject = useCallback(async (projectId: string, data: UpdateProjectRequest): Promise<Project | null> => {
+    try {
+      setError(null);
+      const updatedProject = await projectService.updateProject(projectId, data);
+      setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
+      return updatedProject;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update project');
+      return null;
     }
   }, []);
 
@@ -112,33 +121,30 @@ export function useProjects() {
     }
   }, [loadProjects]);
 
-  const updateProject = useCallback(async (projectId: string, data: UpdateProjectRequest): Promise<Project | null> => {
-    try {
-      setError(null);
-      const updatedProject = await projectService.updateProject(projectId, data);
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
 
-      // Update local state
-      setProjects(prev => prev.map(p =>
-        p.id === projectId ? updatedProject : p
-      ));
+  return (
+    <ProjectsContext.Provider value={{
+      projects,
+      selectedProjectId,
+      selectedProject,
+      loading,
+      error,
+      createProject,
+      selectProject,
+      updateProject,
+      reloadProjects: loadProjects,
+      ensureDefaultProject
+    }}>
+      {children}
+    </ProjectsContext.Provider>
+  );
+}
 
-      return updatedProject;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update project');
-      return null;
-    }
-  }, []);
-
-  return {
-    projects,
-    selectedProjectId,
-    selectedProject: projects.find(p => p.id === selectedProjectId),
-    loading,
-    error,
-    createProject,
-    selectProject,
-    updateProject,
-    reloadProjects: loadProjects,
-    ensureDefaultProject
-  };
+export function useProjects() {
+  const context = useContext(ProjectsContext);
+  if (!context) {
+    throw new Error('useProjects must be used within ProjectsProvider');
+  }
+  return context;
 }

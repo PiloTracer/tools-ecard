@@ -15,6 +15,8 @@ export interface BatchParsingOptions {
   batchId: string;
   filePath: string;
   verbose?: boolean;
+  workPhonePrefix?: string;      // e.g., "2222" for Costa Rica landlines
+  defaultCountryCode?: string;   // e.g., "+(506)" for Costa Rica
 }
 
 export interface BatchParsingResult {
@@ -52,7 +54,7 @@ export class BatchParsingService {
    * Spawns a child process and waits for completion
    */
   async parseBatch(options: BatchParsingOptions): Promise<BatchParsingResult> {
-    const { batchId, filePath, verbose = false } = options;
+    const { batchId, filePath, verbose = false, workPhonePrefix, defaultCountryCode } = options;
 
     return new Promise((resolve, reject) => {
       // Determine storage mode from environment
@@ -67,6 +69,14 @@ export class BatchParsingService {
         '--cassandra-keyspace', this.cassandraKeyspace,
         '--storage-mode', storageMode
       ];
+
+      // Add phone formatting configuration if provided
+      if (workPhonePrefix) {
+        args.push('--work-phone-prefix', workPhonePrefix);
+      }
+      if (defaultCountryCode) {
+        args.push('--default-country-code', defaultCountryCode);
+      }
 
       if (verbose) {
         args.push('--verbose');

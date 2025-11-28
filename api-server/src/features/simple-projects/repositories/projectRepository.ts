@@ -1,5 +1,5 @@
 import { prisma } from '@/core/database/prisma';
-import type { Project, UserProjectSelection } from '../types';
+import type { Project, UserProjectSelection, UpdateProjectDto } from '../types';
 
 export const projectRepository = {
   /**
@@ -11,7 +11,17 @@ export const projectRepository = {
       orderBy: [
         { isDefault: 'desc' },
         { createdAt: 'asc' }
-      ]
+      ],
+      select: {
+        id: true,
+        userId: true,
+        name: true,
+        isDefault: true,
+        workPhonePrefix: true,
+        defaultCountryCode: true,
+        createdAt: true,
+        updatedAt: true
+      }
     });
     return projects;
   },
@@ -24,6 +34,16 @@ export const projectRepository = {
       where: {
         id: projectId,
         userId
+      },
+      select: {
+        id: true,
+        userId: true,
+        name: true,
+        isDefault: true,
+        workPhonePrefix: true,
+        defaultCountryCode: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
     return project;
@@ -185,5 +205,19 @@ export const projectRepository = {
     }
 
     return defaultProject;
+  },
+
+  /**
+   * Update project settings
+   */
+  async update(projectId: string, data: UpdateProjectDto): Promise<Project> {
+    const project = await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        workPhonePrefix: data.workPhonePrefix,
+        defaultCountryCode: data.defaultCountryCode
+      }
+    });
+    return project;
   }
 };

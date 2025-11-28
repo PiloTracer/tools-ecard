@@ -3,6 +3,7 @@
  */
 
 export { ProjectSelector } from './components/ProjectSelector';
-export { useProjects } from './hooks/useProjects';
+export { ProjectSettings } from './components/ProjectSettings';
+export { ProjectsProvider, useProjects } from './contexts/ProjectsContext';
 export { projectService } from './services/projectService';
-export type { Project, ProjectsResponse, CreateProjectRequest, UpdateSelectedProjectRequest } from './types';
+export type { Project, ProjectsResponse, CreateProjectRequest, UpdateSelectedProjectRequest, UpdateProjectRequest } from './types';

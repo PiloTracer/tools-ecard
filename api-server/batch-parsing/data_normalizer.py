@@ -121,8 +121,30 @@ class DataNormalizer:
 
         return formatted
 
-    def normalize_phone(self, phone_raw: Any) -> str:
-        """Normalize phone numbers to E.164 format or Costa Rica 8-digit format"""
+    def normalize_phone(
+        self,
+        phone_raw: Any,
+        phone_type: str = "other",
+        work_phone_prefix: str = None,
+        default_country_code: str = None
+    ) -> str:
+        """
+        Normalize phone numbers for Costa Rica with project-specific configuration
+
+        Args:
+            phone_raw: Raw phone number input
+            phone_type: "work", "mobile", or "other"
+            work_phone_prefix: Prefix for 4-digit work phones (e.g., "2222")
+            default_country_code: Default country code for 8-digit numbers (e.g., "+(506)")
+
+        Rules:
+            1. Any number starting with "+" → preserve completely unchanged
+            2. For work_phone with exactly 4 digits → apply work_phone_prefix if provided
+            3. Numbers with 1-3 digits → treated as extension (returned as-is)
+            4. Numbers with exactly 8 digits (after prefix) and no "+" → apply default_country_code
+            5. Numbers with != 8 digits → left unchanged (unknown country)
+            6. Final format for Costa Rica: "+(506) XXXX-XXXX"
+        """
         if pd.isna(phone_raw) or str(phone_raw).strip() == "":
             return ""
 
@@ -130,26 +152,35 @@ class DataNormalizer:
         if raw_str.lower() in ["nan", "none", "null"]:
             return ""
 
-        # Remove all non-digit characters to check length
+        # Rule 1: Preserve E.164 formatted numbers completely unchanged
+        if raw_str.startswith("+"):
+            return raw_str
+
+        # Extract digits only for logic checks
         digits = "".join(filter(str.isdigit, raw_str))
 
-        # Special Rule for Costa Rica (8 digits) -> XXXX-XXXX
-        if len(digits) == 8:
-            return f"{digits[:4]}-{digits[4:]}"
+        # Rule 3: 1-3 digits are extensions, return as-is
+        if len(digits) <= 3:
+            return digits
 
-        try:
-            # Attempt to parse with phonenumbers library
-            parsed = phonenumbers.parse(raw_str, "US")
-            if not phonenumbers.is_valid_number(parsed):
-                if not raw_str.startswith("+"):
-                    parsed = phonenumbers.parse("+" + raw_str, "US")
+        # Rule 2: Apply work phone prefix for exactly 4 digits (work_phone only)
+        if phone_type == "work" and len(digits) == 4 and work_phone_prefix:
+            # Apply prefix
+            digits = work_phone_prefix + digits
 
-            if phonenumbers.is_valid_number(parsed):
-                return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-            else:
-                return raw_str
-        except Exception:
+        # Rule 5: If not exactly 8 digits, leave unchanged (unknown country)
+        if len(digits) != 8:
             return raw_str
+
+        # At this point, we have exactly 8 digits
+        # Rule 4: Apply default country code if provided
+        if default_country_code:
+            # Format: "+(506) XXXX-XXXX"
+            formatted = f"{default_country_code} {digits[:4]}-{digits[4:]}"
+            return formatted
+        else:
+            # No country code configured, use simple format: "XXXX-XXXX"
+            return f"{digits[:4]}-{digits[4:]}"
 
     def parse_name(self, full_name: str) -> Dict[str, str]:
         """

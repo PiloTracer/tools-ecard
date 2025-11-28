@@ -1,5 +1,5 @@
 import { projectRepository } from '../repositories/projectRepository';
-import type { Project, ProjectWithSelection, CreateProjectDto, UpdateSelectedProjectDto } from '../types';
+import type { Project, ProjectWithSelection, CreateProjectDto, UpdateSelectedProjectDto, UpdateProjectDto } from '../types';
 
 export const projectService = {
   /**
@@ -134,5 +134,20 @@ export const projectService = {
     }
 
     return defaultProject;
+  },
+
+  /**
+   * Update project settings (phone prefixes)
+   */
+  async updateProject(userId: string, projectId: string, data: UpdateProjectDto): Promise<Project> {
+    // Verify the project exists and belongs to the user
+    const project = await projectRepository.findById(projectId, userId);
+
+    if (!project) {
+      throw new Error('Project not found or user not authorized');
+    }
+
+    // Update the project
+    return await projectRepository.update(projectId, data);
   }
 };

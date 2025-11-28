@@ -7,6 +7,7 @@ import type {
   ProjectsResponse,
   CreateProjectRequest,
   UpdateSelectedProjectRequest,
+  UpdateProjectRequest,
   SelectedProjectResponse
 } from '../types';
 
@@ -70,7 +71,9 @@ class ProjectService {
    * Get all projects for the current user
    */
   async getProjects(): Promise<ProjectsResponse> {
-    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects`);
+    const response = await this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects`);
+    console.log('[ProjectService.getProjects] Response with phone fields:', response);
+    return response;
   }
 
   /**
@@ -107,6 +110,16 @@ class ProjectService {
     return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects/ensure-default`, {
       method: 'POST',
       body: JSON.stringify({}),
+    });
+  }
+
+  /**
+   * Update project settings (phone prefixes)
+   */
+  async updateProject(projectId: string, data: UpdateProjectRequest): Promise<Project> {
+    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   }
 }

@@ -60,7 +60,7 @@ export class BatchParsingWorkerService {
     queue.process('parse-batch', 1, async (job) => {
       console.log(`📋 Processing batch parsing job ${job.id}...`);
 
-      const { batchId, filePath, userEmail } = job.data;
+      const { batchId, filePath, userEmail, workPhonePrefix, defaultCountryCode } = job.data;
 
       try {
         // Update job progress
@@ -70,7 +70,9 @@ export class BatchParsingWorkerService {
         const result = await batchParsingService.parseBatch({
           batchId,
           filePath,
-          verbose: false
+          verbose: false,
+          workPhonePrefix,
+          defaultCountryCode,
         });
 
         await job.progress(90);

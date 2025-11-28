@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execAsync = promisify(exec);
 const prisma = new PrismaClient();
 
 /**
@@ -14,15 +17,24 @@ export async function initializeDatabase(): Promise<void> {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
-    // Run any pending migrations in production
-    // In development, schema is synced via prisma db push
-    if (process.env.NODE_ENV === 'production') {
-      console.log('📦 Running database migrations...');
-      // Migrations would be applied via deployment scripts
-    } else {
-      // In development, sync schema without migrations
-      console.log('🔧 Syncing database schema (development mode)...');
-      // Schema will be synced via prisma db push in docker startup
+    // Run migrations automatically on startup
+    // This applies all pending migrations and creates tables if they don't exist
+    console.log('📦 Deploying database migrations...');
+
+    try {
+      const { stdout, stderr } = await execAsync('npx prisma migrate deploy', {
+        cwd: '/app',
+        env: { ...process.env }
+      });
+
+      if (stdout) console.log(stdout);
+      if (stderr) console.error(stderr);
+
+      console.log('✅ Database migrations deployed successfully');
+    } catch (migrationError: any) {
+      console.error('⚠️  Migration deployment failed:', migrationError.message);
+      // Continue startup even if migrations fail (tables might already exist)
+      console.log('ℹ️  Continuing startup - tables may already exist');
     }
 
     console.log('✅ Database initialization complete');

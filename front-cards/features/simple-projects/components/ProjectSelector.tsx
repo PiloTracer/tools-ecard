@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useProjects } from '../hooks/useProjects';
+import { useProjects } from '../contexts/ProjectsContext';
 
 export function ProjectSelector() {
   const {
@@ -19,9 +19,11 @@ export function ProjectSelector() {
 
   const handleSelectProject = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const projectId = e.target.value;
+    console.log('[ProjectSelector.handleSelectProject] User selected projectId:', projectId);
     if (projectId === 'create-new') {
       setIsCreating(true);
     } else {
+      console.log('[ProjectSelector.handleSelectProject] Calling selectProject with:', projectId);
       selectProject(projectId);
     }
   };

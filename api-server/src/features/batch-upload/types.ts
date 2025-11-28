@@ -82,6 +82,9 @@ export interface BatchProcessingJob {
   batchId: string;
   filePath: string;
   userEmail: string;
+  // Phone formatting configuration from project settings
+  workPhonePrefix?: string;      // e.g., "2222" for Costa Rica landlines
+  defaultCountryCode?: string;   // e.g., "+(506)" for Costa Rica
 }
 
 export class BatchUploadError extends Error {

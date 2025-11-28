@@ -52,4 +52,25 @@ export async function projectRoutes(app: FastifyInstance, opts: FastifyPluginOpt
   app.post('/ensure-default', {
     handler: projectController.ensureDefaultProject
   });
+
+  // PATCH /api/projects/:id - Update project settings
+  app.patch('/:id', {
+    schema: {
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { type: 'string', format: 'uuid' }
+        }
+      },
+      body: {
+        type: 'object',
+        properties: {
+          workPhonePrefix: { type: 'string', nullable: true },
+          defaultCountryCode: { type: 'string', nullable: true }
+        }
+      }
+    },
+    handler: projectController.updateProject
+  });
 }

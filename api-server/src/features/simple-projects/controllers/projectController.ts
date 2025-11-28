@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { projectService } from '../services/projectService';
-import type { CreateProjectDto, UpdateSelectedProjectDto } from '../types';
+import type { CreateProjectDto, UpdateSelectedProjectDto, UpdateProjectDto } from '../types';
 
 // Extended Request type with user
 interface AuthenticatedRequest extends FastifyRequest {
@@ -25,16 +25,22 @@ export const projectController = {
 
       const result = await projectService.getUserProjects(userId);
 
-      return reply.send({
+      const response = {
         projects: result.projects.map(p => ({
           id: p.id,
           name: p.name,
           isDefault: p.isDefault,
+          workPhonePrefix: p.workPhonePrefix,
+          defaultCountryCode: p.defaultCountryCode,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString()
         })),
         selectedProjectId: result.selectedProjectId
-      });
+      };
+
+      console.log('[getProjects] Returning response:', JSON.stringify(response, null, 2));
+
+      return reply.send(response);
     } catch (error) {
       return reply.status(500).send({ error: 'Failed to fetch projects' });
     }
@@ -134,6 +140,39 @@ export const projectController = {
     } catch (error: any) {
       console.error('[ensureDefaultProject] Error:', error);
       return reply.status(500).send({ error: error.message || 'Failed to ensure default project' });
+    }
+  },
+
+  /**
+   * PATCH /api/projects/:id
+   * Update project settings (phone prefixes)
+   */
+  async updateProject(request: FastifyRequest<{ Params: { id: string }; Body: UpdateProjectDto }>, reply: FastifyReply) {
+    try {
+      const userId = (request as AuthenticatedRequest).user?.email || 'guest@example.com';
+      const projectId = request.params.id;
+      const data = request.body;
+
+      const project = await projectService.updateProject(userId, projectId, data);
+
+      const response = {
+        id: project.id,
+        name: project.name,
+        isDefault: project.isDefault,
+        workPhonePrefix: project.workPhonePrefix,
+        defaultCountryCode: project.defaultCountryCode,
+        createdAt: project.createdAt.toISOString(),
+        updatedAt: project.updatedAt.toISOString()
+      };
+
+      console.log('[updateProject] Updated project:', JSON.stringify(response, null, 2));
+
+      return reply.send(response);
+    } catch (error: any) {
+      if (error.message?.includes('not found') || error.message?.includes('not authorized')) {
+        return reply.status(404).send({ error: error.message });
+      }
+      return reply.status(500).send({ error: 'Failed to update project' });
     }
   }
 };

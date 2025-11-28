@@ -12,16 +12,26 @@ import {
 import { batchRepository } from '../repositories/batchRepository';
 import { storageService } from './storageService';
 import { queueService } from './queueService';
+import { prisma } from '../../../core/database/prisma';
 
 export class BatchUploadService {
   async uploadBatch(request: BatchUploadRequest): Promise<BatchUploadResponse> {
     const { file, userId, userEmail, projectId, projectName } = request;
 
     try {
-      // 1. Upload file to storage (SeaweedFS or local) - use projectId for consistent paths
+      // 1. Fetch project configuration for phone formatting
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: {
+          workPhonePrefix: true,
+          defaultCountryCode: true,
+        },
+      });
+
+      // 2. Upload file to storage (SeaweedFS or local) - use projectId for consistent paths
       const uploadResult = await storageService.uploadBatchFile(file, userEmail, projectId);
 
-      // 2. Create batch record in database
+      // 3. Create batch record in database
       const batch = await batchRepository.create({
         userId,
         userEmail,
@@ -33,11 +43,13 @@ export class BatchUploadService {
         status: BatchStatus.UPLOADED,
       });
 
-      // 3. Enqueue async job for batch parsing
+      // 4. Enqueue async job for batch parsing with phone config
       const job: BatchProcessingJob = {
         batchId: batch.id,
         filePath: uploadResult.filePath,
         userEmail,
+        workPhonePrefix: project?.workPhonePrefix ?? undefined,
+        defaultCountryCode: project?.defaultCountryCode ?? undefined,
       };
 
       await queueService.enqueueBatchParsing(job);
@@ -173,14 +185,25 @@ export class BatchUploadService {
       );
     }
 
+    // Fetch project configuration for phone formatting
+    const project = await prisma.project.findUnique({
+      where: { id: batch.projectId },
+      select: {
+        workPhonePrefix: true,
+        defaultCountryCode: true,
+      },
+    });
+
     // Update status to UPLOADED
     await batchRepository.updateStatus(batch.id, BatchStatus.UPLOADED);
 
-    // Re-enqueue for processing
+    // Re-enqueue for processing with phone config
     const job: BatchProcessingJob = {
       batchId: batch.id,
       filePath: batch.filePath,
       userEmail: batch.userEmail,
+      workPhonePrefix: project?.workPhonePrefix ?? undefined,
+      defaultCountryCode: project?.defaultCountryCode ?? undefined,
     };
 
     await queueService.enqueueBatchParsing(job);
