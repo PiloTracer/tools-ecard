@@ -1,7 +1,7 @@
 'use client';
 
 import * as fabric from 'fabric';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
@@ -94,6 +94,9 @@ export function CanvasControls() {
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // File input ref for importing templates
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     zoom,
@@ -647,8 +650,88 @@ export function CanvasControls() {
     URL.revokeObjectURL(url);
   };
 
+  /**
+   * Import template from JSON file
+   * Validates structure and loads template into the canvas
+   */
+  const handleImportJSON = async (file: File) => {
+    try {
+      console.log('[Import] Starting template import from file:', file.name);
+
+      // Read file contents
+      const text = await file.text();
+      const importedData = JSON.parse(text);
+
+      console.log('[Import] Parsed JSON data:', importedData);
+
+      // Validate required fields
+      if (!importedData.name || !importedData.width || !importedData.height || !Array.isArray(importedData.elements)) {
+        throw new Error('Invalid template file: missing required fields (name, width, height, or elements)');
+      }
+
+      // Convert date strings back to Date objects if they exist
+      const createdAt = importedData.createdAt ? new Date(importedData.createdAt) : new Date();
+      const updatedAt = new Date(); // Always set to current time on import
+
+      // Generate new ID and timestamps for the imported template
+      const newTemplate: Template = {
+        ...importedData,
+        id: crypto.randomUUID(),
+        createdAt,
+        updatedAt,
+      };
+
+      console.log('[Import] Created new template with ID:', newTemplate.id);
+
+      // Clear current canvas
+      if (fabricCanvas) {
+        fabricCanvas.clear();
+        fabricCanvas.backgroundColor = newTemplate.backgroundColor || '#ffffff';
+        console.log('[Import] Cleared canvas and set background color:', newTemplate.backgroundColor);
+      }
+
+      // Load template into store (this will trigger canvas re-render)
+      loadTemplate(newTemplate);
+
+      // Update save metadata
+      setSaveMetadata('Default Project', newTemplate.name);
+      markAsSaved();
+
+      console.log('[Import] Template imported successfully:', newTemplate.name);
+      alert(`Template "${newTemplate.name}" imported successfully!`);
+    } catch (error) {
+      console.error('[Import] Failed to import template:', error);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Unknown error';
+      if (error instanceof SyntaxError) {
+        errorMessage = 'Invalid JSON format';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      alert(`Failed to import template: ${errorMessage}`);
+    }
+  };
+
   return (
     <>
+      {/* Hidden File Input for Template Import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            await handleImportJSON(file);
+            // Reset input to allow importing the same file again
+            e.target.value = '';
+          }
+        }}
+      />
+
       {/* Save Modal */}
       <SaveTemplateModal
         isOpen={showSaveModal}
@@ -746,6 +829,18 @@ export function CanvasControls() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
             </svg>
             Open
+          </button>
+
+          {/* Import Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600"
+            title="Import Template from File"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Import
           </button>
 
           {/* Close Button */}
@@ -907,12 +1002,16 @@ export function CanvasControls() {
         >
           SVG
         </button>
+        {/* Download Button */}
         <button
           onClick={handleExportJSON}
-          className="rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
-          title="Export as JSON"
+          className="flex items-center gap-2 rounded border border-green-600 bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
+          title="Download Template to File"
         >
-          JSON
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download
         </button>
       </div>
     </div>
