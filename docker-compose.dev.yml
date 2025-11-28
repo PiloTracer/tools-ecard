@@ -32,10 +32,10 @@ services:
       CASSANDRA_ENDPOINT_SNITCH: ${CASSANDRA_ENDPOINT_SNITCH:-GossipingPropertyFileSnitch}
       CASSANDRA_NUM_TOKENS: ${CASSANDRA_NUM_TOKENS:-256}
       # JVM Memory Settings (Development - Conservative)
-      # Heap: 2GB main memory + 512MB young generation
+      # Heap: 2GB (G1 GC auto-manages young generation, no need for HEAP_NEWSIZE)
       # Default in cassandra:5.0 is ~10GB which causes OOM in development
       MAX_HEAP_SIZE: ${CASSANDRA_MAX_HEAP_SIZE:-2G}
-      HEAP_NEWSIZE: ${CASSANDRA_HEAP_NEWSIZE:-512M}
+      # HEAP_NEWSIZE removed - incompatible with G1 GC in Cassandra 5.0
       # Limit direct memory to prevent OOM (default is 5G)
       JVM_OPTS: ${CASSANDRA_JVM_OPTS:--XX:MaxDirectMemorySize=1G}
     ports:
@@ -232,8 +232,9 @@ services:
       AUTH_RATE_LIMIT_REFRESH_MAX: ${AUTH_RATE_LIMIT_REFRESH_MAX:-20}
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-debug}
-      # Exclude Prisma and AuthMiddleware debug logs to reduce noise
-      DEBUG: ${DEBUG:-*,-prisma:*,-AuthMiddleware}
+      # Exclude Prisma, AuthMiddleware, and axios debug logs to reduce noise
+      DEBUG: ${DEBUG:-*,-prisma:*,-AuthMiddleware,-axios:*,-follow-redirects}
+      # Disable axios verbose logging
     networks:
       - ecards-network
     depends_on:
