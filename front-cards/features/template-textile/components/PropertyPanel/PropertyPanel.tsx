@@ -212,9 +212,33 @@ export function PropertyPanel() {
       top: newY
     });
 
+    // For images, update scale to match new dimensions
+    if (selectedElement.type === 'image' && (newWidth !== undefined || newHeight !== undefined)) {
+      const targetWidth = newWidth !== undefined ? newWidth : selectedElement.width;
+      const targetHeight = newHeight !== undefined ? newHeight : selectedElement.height;
+
+      const newScaleX = targetWidth / (fabricObj.width || targetWidth);
+      const newScaleY = targetHeight / (fabricObj.height || targetHeight);
+
+      console.log(`[COVER/CONTAIN] Updating image scale:`, {
+        targetWidth,
+        targetHeight,
+        fabricWidth: fabricObj.width,
+        fabricHeight: fabricObj.height,
+        newScaleX,
+        newScaleY
+      });
+
+      fabricObj.set({
+        scaleX: newScaleX,
+        scaleY: newScaleY
+      });
+      fabricObj.setCoords();
+      fabricCanvas.renderAll();
+    }
+
     // For width/height changes:
     // - QR codes: Don't update Fabric directly, let the QR regeneration logic handle it
-    // - Images: Don't update Fabric directly, let the image recreation logic handle it
     // - Other elements (text, shapes): Update Fabric directly
     if (selectedElement.type !== 'qr' && selectedElement.type !== 'image') {
       if (newWidth !== undefined && newWidth !== selectedElement.width) {

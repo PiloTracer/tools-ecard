@@ -19,6 +19,7 @@ export function DesignCanvas() {
   const processingModification = useRef<Set<string>>(new Set()); // Track which elements are being processed
   const activelyInteracting = useRef<Set<string>>(new Set()); // Track which elements are being actively manipulated (scaling, moving, rotating)
   const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
+  const systemUpdating = useRef<Set<string>>(new Set()); // Track when SYSTEM is updating fabric objects (not user) - prevents object:modified from firing
   const [globalSyncLock, setGlobalSyncLock] = useState(false); // NUCLEAR: Global lock to prevent ALL sync operations during ANY interaction
 
   // Panning state
@@ -196,6 +197,14 @@ export function DesignCanvas() {
 
       const elementId = (target as any).elementId;
       if (!elementId) return;
+
+      // CRITICAL: Skip if system is updating (not user action)
+      // This prevents Lock/No-output/z-order/etc from triggering resize calculations
+      if (systemUpdating.current.has(elementId)) {
+        console.log(`[SYSTEM-UPDATE] Skipping object:modified for ${elementId} - system update, not user action`);
+        systemUpdating.current.delete(elementId);
+        return;
+      }
 
       // Prevent double-processing of the same modification
       if (processingModification.current.has(elementId)) {
@@ -580,6 +589,9 @@ export function DesignCanvas() {
       if (addedElementIds.current.has(element.id)) {
         const fabricObj = fabricObjectsMap.current.get(element.id);
         if (fabricObj) {
+          // CRITICAL: Mark this element as being updated by SYSTEM (not user)
+          // This prevents ALL fabricObj.set() calls in this sync block from triggering object:modified handler
+          systemUpdating.current.add(element.id);
           // Update text properties
           if (element.type === 'text') {
             const textEl = element as TextElement;
@@ -760,43 +772,11 @@ export function DesignCanvas() {
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
-          // For images, update scale if box dimensions changed
-          // CRITICAL FIX: Skip during modifications OR active interaction to prevent interference with user actions
-          if (element.type === 'image' && element.width !== undefined && element.height !== undefined &&
-              !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
-            const imgEl = element as ImageElement;
-            const currentDisplayWidth = (fabricObj.width || 1) * (fabricObj.scaleX || 1);
-            const currentDisplayHeight = (fabricObj.height || 1) * (fabricObj.scaleY || 1);
-            const widthDiff = Math.abs(currentDisplayWidth - imgEl.width);
-            const heightDiff = Math.abs(currentDisplayHeight - imgEl.height);
-
-            // Only log when there's a significant difference to reduce noise
-            if (widthDiff > 1 || heightDiff > 1) {
-              console.log(`[IMAGE-SYNC] Checking ${element.id}:`, {
-                fabricWidth: fabricObj.width,
-                fabricHeight: fabricObj.height,
-                fabricScaleX: fabricObj.scaleX,
-                fabricScaleY: fabricObj.scaleY,
-                currentDisplayWidth,
-                currentDisplayHeight,
-                targetWidth: imgEl.width,
-                targetHeight: imgEl.height,
-                widthDiff,
-                heightDiff
-              });
-
-              // Box dimensions changed - update scale to fit new box
-              const newScaleX = imgEl.width / (fabricObj.width || imgEl.width);
-              const newScaleY = imgEl.height / (fabricObj.height || imgEl.height);
-              console.log(`[IMAGE-SYNC] Updating scale for ${element.id}: ${newScaleX}x${newScaleY}`);
-              fabricObj.set({
-                scaleX: newScaleX,
-                scaleY: newScaleY,
-              });
-              fabricObj.setCoords();
-              canvas.renderAll();
-            }
-          }
+          // IMAGE-SYNC PERMANENTLY REMOVED
+          // This block was forcing image scale corrections on every store update,
+          // preventing users from scaling images to any size they want.
+          // Cover/Contain buttons work by updating stored width/height,
+          // which then triggers object:modified when user clicks them.
 
           // Position sync strategy:
           // 1. Normal operations (dragging, moving): Canvas is ALWAYS source of truth - NEVER sync from store
@@ -837,11 +817,17 @@ export function DesignCanvas() {
             });
           }
 
-          // Update excludeFromExport state
+          // Update excludeFromExport state (No-output toggle)
           const shouldExclude = element.excludeFromExport || false;
           if (fabricObj.excludeFromExport !== shouldExclude) {
             fabricObj.set({ excludeFromExport: shouldExclude });
           }
+
+          // Clear the system update flag AFTER any synchronous events have fired
+          // Use setTimeout to ensure this runs after fabricObj.set() events
+          setTimeout(() => {
+            systemUpdating.current.delete(element.id);
+          }, 0);
         }
       }
     });
