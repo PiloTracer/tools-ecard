@@ -1582,6 +1582,49 @@ export function DesignCanvas() {
         useTemplateStore.getState().addElement(duplicate);
       }
 
+      // Tab - cycle through canvas elements (only when no input is focused)
+      if (e.key === 'Tab') {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement?.tagName === 'INPUT' ||
+                               activeElement?.tagName === 'TEXTAREA' ||
+                               activeElement?.tagName === 'SELECT' ||
+                               activeElement?.hasAttribute('contenteditable');
+
+        if (!isInputFocused) {
+          e.preventDefault();
+
+          const canvasObjects = canvas.getObjects().filter(obj =>
+            obj.selectable && obj.evented && !(obj as any).excludeFromExport
+          );
+
+          if (canvasObjects.length === 0) return;
+
+          let nextIndex = 0;
+
+          if (activeObject) {
+            const currentIndex = canvasObjects.indexOf(activeObject);
+            if (currentIndex !== -1) {
+              // Shift+Tab goes backward, Tab goes forward
+              nextIndex = e.shiftKey
+                ? (currentIndex - 1 + canvasObjects.length) % canvasObjects.length
+                : (currentIndex + 1) % canvasObjects.length;
+            }
+          }
+
+          const nextObject = canvasObjects[nextIndex];
+          if (nextObject) {
+            canvas.setActiveObject(nextObject);
+            canvas.renderAll();
+
+            // Update selected element in store
+            const elementId = (nextObject as any).elementId;
+            if (elementId) {
+              setSelectedElement(elementId);
+            }
+          }
+        }
+      }
+
       // Arrow keys - nudge element
       if (activeObject && selectedElementId) {
         const nudgeAmount = e.shiftKey ? 10 : 1;

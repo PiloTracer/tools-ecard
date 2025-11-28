@@ -337,15 +337,49 @@ export function PropertyPanel() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">X</label>
-                  <div className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium">
-                    {Math.round(selectedElement.x)}
-                  </div>
+                  <input
+                    type="number"
+                    value={Math.round(selectedElement.x)}
+                    onChange={(e) => {
+                      const newX = parseFloat(e.target.value) || 0;
+                      updateElement(selectedElementId!, { x: newX });
+
+                      // Update Fabric.js object immediately
+                      if (fabricCanvas) {
+                        const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+                        if (fabricObj) {
+                          fabricObj.set({ left: newX });
+                          fabricObj.setCoords();
+                          fabricCanvas.renderAll();
+                        }
+                      }
+                    }}
+                    disabled={selectedElement.locked}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">Y</label>
-                  <div className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium">
-                    {Math.round(selectedElement.y)}
-                  </div>
+                  <input
+                    type="number"
+                    value={Math.round(selectedElement.y)}
+                    onChange={(e) => {
+                      const newY = parseFloat(e.target.value) || 0;
+                      updateElement(selectedElementId!, { y: newY });
+
+                      // Update Fabric.js object immediately
+                      if (fabricCanvas) {
+                        const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+                        if (fabricObj) {
+                          fabricObj.set({ top: newY });
+                          fabricObj.setCoords();
+                          fabricCanvas.renderAll();
+                        }
+                      }
+                    }}
+                    disabled={selectedElement.locked}
+                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  />
                 </div>
               </div>
             </div>
@@ -353,8 +387,28 @@ export function PropertyPanel() {
             {/* Rotation */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Rotation</h3>
-              <div className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium">
-                {Math.round(selectedElement.rotation || 0)}°
+              <div className="relative">
+                <input
+                  type="number"
+                  value={Math.round(selectedElement.rotation || 0)}
+                  onChange={(e) => {
+                    const newRotation = parseFloat(e.target.value) || 0;
+                    updateElement(selectedElementId!, { rotation: newRotation });
+
+                    // Update Fabric.js object immediately
+                    if (fabricCanvas) {
+                      const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+                      if (fabricObj) {
+                        fabricObj.set({ angle: newRotation });
+                        fabricObj.setCoords();
+                        fabricCanvas.renderAll();
+                      }
+                    }
+                  }}
+                  disabled={selectedElement.locked}
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">°</span>
               </div>
             </div>
 
