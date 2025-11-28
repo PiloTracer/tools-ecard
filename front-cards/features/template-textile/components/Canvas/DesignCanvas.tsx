@@ -12,6 +12,7 @@ export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const addedElementIds = useRef<Set<string>>(new Set());
   const fabricObjectsMap = useRef<Map<string, any>>(new Map()); // elementId -> fabric object
@@ -474,6 +475,21 @@ export function DesignCanvas() {
       setIsReady(false);
     };
   }, [width, height]); // ONLY width and height
+
+  // Apply zoom to Fabric.js canvas
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+
+    // Set Fabric.js zoom level
+    canvas.setZoom(zoom);
+
+    // Update canvas dimensions to match zoom
+    canvas.setWidth(width * zoom);
+    canvas.setHeight(height * zoom);
+
+    canvas.renderAll();
+  }, [zoom, width, height]);
 
   // Helper function: Find all selectable objects at a specific point
   const getObjectsAtPoint = (canvas: fabric.Canvas, pointer: fabric.Point): fabric.Object[] => {
@@ -1419,11 +1435,17 @@ export function DesignCanvas() {
       // ====================================================================
       // PRIORITY 2: Space key panning
       // ====================================================================
-      if (isSpacePressed && mouseEvent instanceof MouseEvent) {
+      if (isSpacePressed && mouseEvent instanceof MouseEvent && scrollContainerRef.current) {
+        e.e.preventDefault(); // Prevent text selection during pan
         setIsPanning(true);
         panStartPoint.current = {
           x: mouseEvent.clientX,
           y: mouseEvent.clientY
+        };
+        // Save initial scroll position
+        viewportTransform.current = {
+          x: scrollContainerRef.current.scrollLeft,
+          y: scrollContainerRef.current.scrollTop
         };
         canvas.defaultCursor = 'grabbing';
         canvas.hoverCursor = 'grabbing';
@@ -1437,32 +1459,25 @@ export function DesignCanvas() {
     };
 
     const handleMouseMove = (e: fabric.TEvent) => {
-      if (isPanning && panStartPoint.current && e.e instanceof MouseEvent) {
+      if (isPanning && panStartPoint.current && e.e instanceof MouseEvent && scrollContainerRef.current) {
         const deltaX = e.e.clientX - panStartPoint.current.x;
         const deltaY = e.e.clientY - panStartPoint.current.y;
 
-        // Update viewport transform
-        const vpt = canvas.viewportTransform;
-        if (vpt) {
-          vpt[4] = viewportTransform.current.x + deltaX;
-          vpt[5] = viewportTransform.current.y + deltaY;
-          canvas.requestRenderAll();
-        }
+        // Scroll the container instead of moving viewport
+        scrollContainerRef.current.scrollLeft = viewportTransform.current.x - deltaX;
+        scrollContainerRef.current.scrollTop = viewportTransform.current.y - deltaY;
       }
     };
 
     const handleMouseUp = (e: fabric.TEvent) => {
-      if (isPanning && panStartPoint.current) {
+      if (isPanning && panStartPoint.current && scrollContainerRef.current) {
         setIsPanning(false);
 
-        // Save the new viewport position
-        const vpt = canvas.viewportTransform;
-        if (vpt) {
-          viewportTransform.current = {
-            x: vpt[4],
-            y: vpt[5]
-          };
-        }
+        // Save the new scroll position
+        viewportTransform.current = {
+          x: scrollContainerRef.current.scrollLeft,
+          y: scrollContainerRef.current.scrollTop
+        };
 
         panStartPoint.current = null;
 
@@ -1943,30 +1958,44 @@ export function DesignCanvas() {
   };
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-slate-700 p-8">
+    <div
+      ref={scrollContainerRef}
+      className="flex-1 bg-slate-700 overflow-auto relative"
+      style={{
+        minHeight: 0,
+        minWidth: 0,
+      }}
+    >
       <div
-        ref={containerRef}
-        className="shadow-2xl rounded-sm relative"
         style={{
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)',
-          cursor: isSpacePressed ? (isPanning ? 'grabbing' : 'grab') : 'default'
+          padding: '40px',
+          minWidth: 'fit-content',
+          minHeight: 'fit-content',
         }}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
       >
-        <canvas ref={canvasRef} />
-        {/* Visual indicator when space is pressed */}
-        {isSpacePressed && (
-          <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg pointer-events-none">
-            Panning Mode (Hold Space + Drag)
-          </div>
-        )}
-        {/* Visual indicator for Alt+Click cycling */}
-        {cycleInfo && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none animate-fade-in">
-            Object {cycleInfo.current} of {cycleInfo.total}
-          </div>
-        )}
+        <div
+          ref={containerRef}
+          className="relative"
+          style={{
+            cursor: isSpacePressed ? (isPanning ? 'grabbing' : 'grab') : 'default',
+          }}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          <canvas ref={canvasRef} />
+          {/* Visual indicator when space is pressed */}
+          {isSpacePressed && (
+            <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg pointer-events-none">
+              Panning Mode (Hold Space + Drag)
+            </div>
+          )}
+          {/* Visual indicator for Alt+Click cycling */}
+          {cycleInfo && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none animate-fade-in">
+              Object {cycleInfo.current} of {cycleInfo.total}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

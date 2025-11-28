@@ -24,19 +24,19 @@ export function TemplateDesigner() {
   return (
     <div className="flex h-screen w-full bg-slate-600">
       {/* Left Toolbox */}
-      <div className="w-64 border-r border-slate-700 shadow-lg bg-white">
+      <div className="w-64 flex-shrink-0 border-r border-slate-700 shadow-lg bg-white">
         <ElementToolbox />
       </div>
 
       {/* Center Canvas Area */}
-      <div className="flex flex-1 flex-col bg-slate-700">
+      <div className="flex flex-1 flex-col bg-slate-700 min-w-0">
         <CanvasSettings />
         <CanvasControls />
         <DesignCanvas />
       </div>
 
       {/* Right Property Panel */}
-      <div className="w-80 border-l border-slate-700 shadow-lg bg-white">
+      <div className="w-80 flex-shrink-0 border-l border-slate-700 shadow-lg bg-white">
         <PropertyPanel />
       </div>
     </div>
