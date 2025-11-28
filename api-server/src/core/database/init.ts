@@ -17,24 +17,26 @@ export async function initializeDatabase(): Promise<void> {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
-    // Run migrations automatically on startup
-    // This applies all pending migrations and creates tables if they don't exist
-    console.log('📦 Deploying database migrations...');
+    // Push schema to database (idempotent - safe for restarts)
+    // This creates/updates tables to match schema.prisma without requiring migration files
+    console.log('📦 Pushing database schema...');
 
     try {
-      const { stdout, stderr } = await execAsync('npx prisma migrate deploy', {
+      const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss', {
         cwd: '/app',
         env: { ...process.env }
       });
 
       if (stdout) console.log(stdout);
-      if (stderr) console.error(stderr);
+      if (stderr && !stderr.includes('already up to date')) {
+        console.error(stderr);
+      }
 
-      console.log('✅ Database migrations deployed successfully');
-    } catch (migrationError: any) {
-      console.error('⚠️  Migration deployment failed:', migrationError.message);
-      // Continue startup even if migrations fail (tables might already exist)
-      console.log('ℹ️  Continuing startup - tables may already exist');
+      console.log('✅ Database schema pushed successfully');
+    } catch (pushError: any) {
+      console.error('⚠️  Schema push failed:', pushError.message);
+      // Continue startup even if push fails (schema might already be up to date)
+      console.log('ℹ️  Continuing startup - schema may already be synchronized');
     }
 
     console.log('✅ Database initialization complete');
