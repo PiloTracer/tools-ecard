@@ -84,6 +84,41 @@ class DataNormalizer:
             'de', 'del', 'la', 'los', 'las', 'y', 'von', 'van', 'di', 'da', 'dos', 'angeles'
         }
 
+    def smart_title_case(self, text: str) -> str:
+        """
+        Apply smart title case that keeps articles and prepositions lowercase
+        Similar to Chicago Manual of Style or AP Stylebook
+
+        Articles kept lowercase: de, del, la, las, los, y, a, an, the, of, and, or, in, on, at, to, for, with
+        Always capitalize first and last word regardless
+        """
+        # Common Spanish and English articles/prepositions to keep lowercase
+        lowercase_words = {
+            # Spanish
+            'de', 'del', 'la', 'las', 'los', 'y', 'el', 'un', 'una', 'unos', 'unas',
+            'en', 'con', 'sin', 'por', 'para', 'desde', 'hasta',
+            # English
+            'a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'at', 'to', 'for',
+            'with', 'from', 'by', 'as', 'is', 'was', 'are', 'were'
+        }
+
+        words = text.split()
+        if not words:
+            return text
+
+        result = []
+        for i, word in enumerate(words):
+            # Always capitalize first and last word
+            if i == 0 or i == len(words) - 1:
+                result.append(word.capitalize())
+            # Keep articles/prepositions lowercase if they're in the middle
+            elif word.lower() in lowercase_words:
+                result.append(word.lower())
+            else:
+                result.append(word.capitalize())
+
+        return ' '.join(result)
+
     def format_field(self, key: str, value: Any) -> str:
         """Format field value according to field-specific rules"""
         if pd.isna(value) or str(value).strip() == "":
@@ -100,9 +135,36 @@ class DataNormalizer:
                    "social_instagram", "social_twitter", "social_facebook"]:
             return text.lower()
 
-        # Rule 3: For all other fields, apply Title Case
+        # Fields that need smart title case (keep articles lowercase)
+        smart_title_fields = [
+            "address_street", "address_city", "address_state", "address_country",
+            "business_title", "business_department",
+            "business_address_street", "business_address_city",
+            "business_address_state", "business_address_country"
+        ]
+
+        if key in smart_title_fields:
+            # Preserve text inside parentheses
+            parentheses_content = {}
+
+            def preserve_parens(match):
+                placeholder = f"__PAREN_{len(parentheses_content)}__"
+                parentheses_content[placeholder] = match.group(0)
+                return placeholder
+
+            text_with_placeholders = re.sub(r'\([^)]+\)', preserve_parens, text)
+
+            # Apply smart title case
+            formatted = self.smart_title_case(text_with_placeholders)
+
+            # Restore parentheses content with original casing
+            for placeholder, original in parentheses_content.items():
+                formatted = formatted.replace(placeholder, original)
+
+            return formatted
+
+        # Rule 3: For all other fields, apply regular Title Case
         # BUT preserve text inside parentheses
-        # Find all text in parentheses and temporarily replace
         parentheses_content = {}
 
         def preserve_parens(match):
