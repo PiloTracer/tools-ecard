@@ -14,6 +14,9 @@ export function createMultiColorText(element: TextElement): fabric.Group {
   let currentX = 0;
   const spaceWidth = getSpaceWidth(element.fontFamily, element.fontSize);
 
+  // CRITICAL: Convert 'bold' to 700 to prevent double-bold with custom fonts
+  const fontWeight = element.fontWeight === 'bold' ? 700 : (element.fontWeight === 'normal' ? 400 : element.fontWeight || 400);
+
   // Create a text object for each word with its corresponding color
   words.forEach((word, index) => {
     // Determine which color to use (last color applies to remaining words)
@@ -26,7 +29,7 @@ export function createMultiColorText(element: TextElement): fabric.Group {
       fontSize: element.fontSize,
       fontFamily: element.fontFamily,
       fill: color,
-      fontWeight: element.fontWeight || 'normal',
+      fontWeight: fontWeight,
       fontStyle: element.fontStyle || 'normal',
       underline: element.underline || false,
       stroke: element.stroke || '',
@@ -103,6 +106,9 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
   let currentX = 0;
   const spaceWidth = getSpaceWidth(element.fontFamily, element.fontSize);
 
+  // CRITICAL: Convert 'bold' to 700 to prevent double-bold with custom fonts
+  const fontWeight = element.fontWeight === 'bold' ? 700 : (element.fontWeight === 'normal' ? 400 : element.fontWeight || 400);
+
   words.forEach((word, index) => {
     const colorIndex = Math.min(index, colors.length - 1);
     const color = colors[colorIndex];
@@ -113,7 +119,7 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
       fontSize: element.fontSize,
       fontFamily: element.fontFamily,
       fill: color,
-      fontWeight: element.fontWeight || 'normal',
+      fontWeight: fontWeight,
       fontStyle: element.fontStyle || 'normal',
       underline: element.underline || false,
       stroke: element.stroke || '',

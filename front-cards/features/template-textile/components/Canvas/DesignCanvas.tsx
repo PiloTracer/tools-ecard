@@ -733,7 +733,10 @@ export function DesignCanvas() {
               if (fabricObj.fill !== textColor) fabricObj.set({ fill: textColor });
 
               if (fabricObj.textAlign !== textEl.textAlign) fabricObj.set({ textAlign: textEl.textAlign });
-              if (fabricObj.fontWeight !== textEl.fontWeight) fabricObj.set({ fontWeight: textEl.fontWeight || 'normal' });
+
+              // CRITICAL: Convert 'bold' to 700 to prevent double-bold with custom fonts
+              const fontWeight = textEl.fontWeight === 'bold' ? 700 : (textEl.fontWeight === 'normal' ? 400 : textEl.fontWeight || 400);
+              if (fabricObj.fontWeight !== fontWeight) fabricObj.set({ fontWeight: fontWeight });
               if (fabricObj.fontStyle !== textEl.fontStyle) fabricObj.set({ fontStyle: textEl.fontStyle || 'normal' });
               if (fabricObj.underline !== textEl.underline) fabricObj.set({ underline: textEl.underline || false });
               if (fabricObj.stroke !== textEl.stroke) fabricObj.set({ stroke: textEl.stroke || '' });
@@ -1715,13 +1718,17 @@ export function DesignCanvas() {
           fabricObject = createMultiColorText(textEl);
         } else {
           // Use standard single-color text
+          // CRITICAL: Convert 'bold' to numeric 700 to prevent double-bold
+          // When fontWeight is 'bold', Fabric applies synthetic bold on top of the font file
+          const fontWeight = textEl.fontWeight === 'bold' ? 700 : (textEl.fontWeight === 'normal' ? 400 : textEl.fontWeight || 400);
+
           fabricObject = new fabric.IText(textEl.text || 'Text', {
             left: textEl.x,
             top: textEl.y,
             fontSize: textEl.fontSize,
             fontFamily: textEl.fontFamily,
             fill: textEl.color || textEl.colors?.[0] || '#000000',
-            fontWeight: textEl.fontWeight || 'normal',
+            fontWeight: fontWeight,
             fontStyle: textEl.fontStyle || 'normal',
             underline: textEl.underline || false,
             stroke: textEl.stroke || '',

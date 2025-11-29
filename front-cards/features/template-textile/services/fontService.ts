@@ -91,6 +91,14 @@ class FontService {
         font-style: ${font.fontStyle};
         font-display: swap;
       }
+
+      /* CRITICAL: Prevent browser from applying synthetic bold/italic */
+      /* This ensures we only use the actual font file, not browser-generated weight */
+      .canvas-container * {
+        font-synthesis: none;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
     `;
     document.head.appendChild(style);
 

@@ -27,7 +27,7 @@ interface TemplateState {
 
   // Actions
   createTemplate: (name: string, width: number, height: number) => void;
-  loadTemplate: (template: Template) => void;
+  loadTemplate: (template: Template) => Promise<void>;
   updateTemplateName: (name: string) => void;
   updateBackgroundColor: (backgroundColor: string) => void;
   setCanvasDimensions: (width: number, height: number) => void;
@@ -100,7 +100,59 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     });
   },
 
-  loadTemplate: (template) => {
+  loadTemplate: async (template) => {
+    // CRITICAL: Preload all fonts used in the template BEFORE rendering
+    // This prevents double-bold issue where browser falls back to system font
+    const { fontService } = await import('../services/fontService');
+    const fontsToLoad = new Set<string>();
+
+    // Extract unique font families and their required variants from text elements
+    template.elements.forEach((element) => {
+      if (element.type === 'text') {
+        // Determine which variant to load based on fontWeight and fontStyle
+        const variant =
+          element.fontWeight === 'bold' && element.fontStyle === 'italic' ? 'bold-italic' :
+          element.fontWeight === 'bold' ? 'bold' :
+          element.fontStyle === 'italic' ? 'italic' :
+          'regular';
+
+        const fontKey = `${element.fontFamily}:${variant}`;
+        fontsToLoad.add(fontKey);
+      }
+    });
+
+    // Ensure font cache is populated
+    let cachedFonts = fontService.getCachedFonts();
+    if (cachedFonts.length === 0) {
+      console.log('[TemplateStore] Font cache empty, fetching fonts...');
+      await fontService.listFonts('all');
+      cachedFonts = fontService.getCachedFonts();
+    }
+
+    // Load all required fonts in parallel
+    const loadPromises = Array.from(fontsToLoad).map(async (fontKey) => {
+      const [fontFamily, variant] = fontKey.split(':');
+
+      // Find the font in cached fonts
+      const font = cachedFonts.find(
+        f => f.fontFamily === fontFamily && f.fontVariant === variant
+      );
+
+      if (font) {
+        try {
+          await fontService.loadFont(font);
+          console.log(`[TemplateStore] Preloaded font: ${fontFamily} (${variant})`);
+        } catch (error) {
+          console.error(`[TemplateStore] Failed to preload font ${fontFamily} (${variant}):`, error);
+        }
+      } else {
+        console.warn(`[TemplateStore] Font not found in cache: ${fontFamily} (${variant})`);
+      }
+    });
+
+    // Wait for all fonts to load before setting template state
+    await Promise.all(loadPromises);
+
     set({
       currentTemplate: template,
       elements: template.elements,

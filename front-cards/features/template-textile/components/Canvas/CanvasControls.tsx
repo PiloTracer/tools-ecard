@@ -210,7 +210,8 @@ export function CanvasControls() {
       }
 
       // Load template into store (this will trigger canvas re-render)
-      loadTemplate(loadedTemplate.data);
+      // CRITICAL: Await font preloading before rendering
+      await loadTemplate(loadedTemplate.data);
 
       // Update save metadata
       setSaveMetadata(
