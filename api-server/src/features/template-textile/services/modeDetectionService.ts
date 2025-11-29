@@ -9,6 +9,10 @@ import fetch from 'node-fetch';
 import { cassandraClient, StorageMode } from '../../../core/cassandra/client';
 import { checkDatabaseHealth } from '../../../core/prisma/client';
 import { getS3Service } from '../../s3-bucket/services/s3Service';
+import { createLogger } from '../../../core/utils/logger';
+
+const log = createLogger('ModeDetectionService');
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000'; // Well-known system UUID
 
 export interface ModeDetectionResult {
   mode: StorageMode;
@@ -256,7 +260,7 @@ class ModeDetectionService {
   private async logModeChange(fromMode: StorageMode, toMode: StorageMode, errors: string[]): Promise<void> {
     try {
       await cassandraClient.logModeTransition({
-        userId: 'system', // System-level transition
+        userId: SYSTEM_USER_ID, // System-level transition (well-known UUID)
         fromMode,
         toMode,
         trigger: 'auto',
@@ -266,7 +270,12 @@ class ModeDetectionService {
         errorDetails: errors.length > 0 ? JSON.stringify(errors) : undefined
       });
     } catch (error) {
-      console.error('Failed to log mode transition:', error);
+      log.error({
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        fromMode,
+        toMode
+      }, 'Failed to log mode transition');
     }
   }
 

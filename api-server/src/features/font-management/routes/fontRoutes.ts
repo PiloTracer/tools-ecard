@@ -8,13 +8,17 @@ import { fontController } from '../controllers/fontController';
 import { authMiddleware } from '../../../core/middleware/authMiddleware';
 
 const fontRoutes: FastifyPluginAsync = async (fastify) => {
-  // Public endpoints (no authentication required)
-  // Font files need to be public for @font-face CSS to work
-  fastify.get('/api/v1/fonts/:fontId/file', fontController.getFontFile.bind(fontController));
+  // Font file endpoint with optional authentication
+  // Public for @font-face CSS, but auth-aware for user fonts
+  fastify.get('/api/v1/fonts/:fontId/file', {
+    preHandler: authMiddleware, // Optional auth - populates request.user if token exists
+  }, fontController.getFontFile.bind(fontController));
 
   // List fonts - public endpoint (returns global fonts for unauthenticated users)
   // Authentication is optional - authenticated users see their custom fonts too
-  fastify.get('/api/v1/fonts', fontController.listFonts.bind(fontController));
+  fastify.get('/api/v1/fonts', {
+    preHandler: authMiddleware, // Optional auth - populates request.user if token exists
+  }, fontController.listFonts.bind(fontController));
 
   // Protected endpoints (require authentication)
   fastify.addHook('preHandler', authMiddleware);

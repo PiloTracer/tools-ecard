@@ -45,6 +45,8 @@ export interface ImageElement extends BaseElement {
   height: number;
   imageUrl: string;
   scaleMode?: 'fill' | 'fit' | 'stretch';
+  scaleX?: number; // Exact scale factor for X axis (preserves precision on save/load)
+  scaleY?: number; // Exact scale factor for Y axis (preserves precision on save/load)
 }
 
 export interface QRElement extends BaseElement {

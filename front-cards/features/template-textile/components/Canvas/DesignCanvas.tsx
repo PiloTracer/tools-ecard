@@ -364,6 +364,11 @@ export function DesignCanvas() {
                 updates.width = newWidth;
                 updates.height = newHeight;
 
+                // CRITICAL: Save exact scale values to preserve precision on save/load
+                // This prevents rounding errors when recalculating scale from dimensions
+                (updates as Partial<ImageElement>).scaleX = scaleX;
+                (updates as Partial<ImageElement>).scaleY = scaleY;
+
                 // DON'T reset scale - it will be reset to 1 when image is recreated
               }
             } else if (element.type === 'qr') {
@@ -1749,16 +1754,28 @@ export function DesignCanvas() {
 
             console.log('[IMAGE-LOAD] Fabric image dimensions:', fabricImg.width, 'x', fabricImg.height);
 
-            // Calculate scale to fit the box while keeping full resolution
-            const scaleX = imgEl.width / fullResWidth;
-            const scaleY = imgEl.height / fullResHeight;
+            // Use saved scale values if available (preserves exact positioning)
+            // Otherwise calculate scale from dimensions (for backward compatibility)
+            let scaleX: number;
+            let scaleY: number;
+
+            if (imgEl.scaleX !== undefined && imgEl.scaleY !== undefined) {
+              // EXACT scale values saved in template - use them directly
+              scaleX = imgEl.scaleX;
+              scaleY = imgEl.scaleY;
+              console.log('[IMAGE-LOAD] Using saved exact scale values:', scaleX, 'x', scaleY);
+            } else {
+              // LEGACY: Calculate scale from width/height (may introduce rounding errors)
+              scaleX = imgEl.width / fullResWidth;
+              scaleY = imgEl.height / fullResHeight;
+              console.log('[IMAGE-LOAD] Calculated scale from dimensions:', scaleX, 'x', scaleY);
+            }
 
             fabricImg.set({
               scaleX: scaleX,
               scaleY: scaleY,
             });
 
-            console.log('[IMAGE-LOAD] Calculated scale:', scaleX, 'x', scaleY);
             console.log('[IMAGE-LOAD] Final display size:', (fabricImg.width * scaleX), 'x', (fabricImg.height * scaleY));
             console.log('[IMAGE-LOAD] ==========================================');
 
@@ -1770,10 +1787,24 @@ export function DesignCanvas() {
 
             loadingImages.current.delete(element.id);
 
+            // CRITICAL: Save exact scale values to store immediately after image loads
+            // This ensures scale is preserved on save/load even if user never resizes
+            console.log('[IMAGE-LOAD] Saving exact scale values to store:', { scaleX, scaleY });
+            const currentElements = useTemplateStore.getState().elements;
+            const elementIndex = currentElements.findIndex(el => el.id === element.id);
+            if (elementIndex !== -1 && currentElements[elementIndex].type === 'image') {
+              const updatedElement = {
+                ...currentElements[elementIndex],
+                scaleX,
+                scaleY
+              } as ImageElement;
+              const newElements = [...currentElements];
+              newElements[elementIndex] = updatedElement;
+              useTemplateStore.setState({ elements: newElements });
+            }
+
             // Force z-order sync after image loads to ensure correct layering
             console.log('[IMAGE-LOAD] Image loaded, triggering z-order sync');
-            const currentElements = useTemplateStore.getState().elements;
-            useTemplateStore.setState({ elements: [...currentElements] });
 
             // Clean up blob URL
             if (blobUrl) {

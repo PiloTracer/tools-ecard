@@ -9,6 +9,7 @@ import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
 import { OffscreenExportButton } from '../OffscreenExport/OffscreenExportButton';
 import { templateService } from '../../services/templateService';
+import { templatePackageService } from '../../services/templatePackageService';
 import type { Template, ImageElement } from '../../types';
 
 /**
@@ -638,48 +639,70 @@ export function CanvasControls() {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportJSON = () => {
+  const handleExportJSON = async () => {
     if (!currentTemplate) return;
-    const json = JSON.stringify(currentTemplate, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `${currentTemplate.name || 'template'}.json`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
+
+    try {
+      console.log('[Export] Starting complete package export...');
+
+      // Export as complete ZIP package with all resources
+      const zipBlob = await templatePackageService.exportPackage(currentTemplate);
+
+      // Download ZIP file
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.download = `${currentTemplate.name || 'template'}.zip`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      console.log('[Export] Package downloaded successfully');
+    } catch (error) {
+      console.error('[Export] Failed to export package:', error);
+      alert(`Failed to export template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   /**
-   * Import template from JSON file
-   * Validates structure and loads template into the canvas
+   * Import template from JSON or ZIP file
+   * Handles both legacy JSON format and new ZIP package format
    */
   const handleImportJSON = async (file: File) => {
     try {
       console.log('[Import] Starting template import from file:', file.name);
 
-      // Read file contents
-      const text = await file.text();
-      const importedData = JSON.parse(text);
+      let newTemplate: Template;
 
-      console.log('[Import] Parsed JSON data:', importedData);
+      // Check file type
+      if (file.name.endsWith('.zip')) {
+        // New ZIP package format - includes all resources
+        console.log('[Import] Detected ZIP package format');
+        newTemplate = await templatePackageService.importPackage(file);
+      } else {
+        // Legacy JSON format - JSON only, no resources
+        console.log('[Import] Detected legacy JSON format');
+        const text = await file.text();
+        const importedData = JSON.parse(text);
 
-      // Validate required fields
-      if (!importedData.name || !importedData.width || !importedData.height || !Array.isArray(importedData.elements)) {
-        throw new Error('Invalid template file: missing required fields (name, width, height, or elements)');
+        console.log('[Import] Parsed JSON data:', importedData);
+
+        // Validate required fields
+        if (!importedData.name || !importedData.width || !importedData.height || !Array.isArray(importedData.elements)) {
+          throw new Error('Invalid template file: missing required fields (name, width, height, or elements)');
+        }
+
+        // Convert date strings back to Date objects if they exist
+        const createdAt = importedData.createdAt ? new Date(importedData.createdAt) : new Date();
+        const updatedAt = new Date(); // Always set to current time on import
+
+        // Generate new ID and timestamps for the imported template
+        newTemplate = {
+          ...importedData,
+          id: crypto.randomUUID(),
+          createdAt,
+          updatedAt,
+        };
       }
-
-      // Convert date strings back to Date objects if they exist
-      const createdAt = importedData.createdAt ? new Date(importedData.createdAt) : new Date();
-      const updatedAt = new Date(); // Always set to current time on import
-
-      // Generate new ID and timestamps for the imported template
-      const newTemplate: Template = {
-        ...importedData,
-        id: crypto.randomUUID(),
-        createdAt,
-        updatedAt,
-      };
 
       console.log('[Import] Created new template with ID:', newTemplate.id);
 
@@ -720,7 +743,7 @@ export function CanvasControls() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".json"
+        accept=".json,.zip"
         style={{ display: 'none' }}
         onChange={async (e) => {
           const file = e.target.files?.[0];

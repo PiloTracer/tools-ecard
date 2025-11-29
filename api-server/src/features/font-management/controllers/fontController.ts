@@ -205,8 +205,9 @@ export class FontController {
   /**
    * GET /api/v1/fonts/:fontId/file
    * Get font file (public endpoint for @font-face CSS)
+   * Authentication is optional - if authenticated, can access user fonts
    */
-  async getFontFile(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  async getFontFile(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {
     try {
       const { fontId } = request.params as { fontId: string };
       const query = request.query as GetFontFileQuerystring;
@@ -215,11 +216,14 @@ export class FontController {
         return reply.code(400).send({ error: 'Font ID is required' });
       }
 
-      // Get font file
-      const fontBuffer = await fontService.getFontFile(fontId, query.userId);
+      // If user is authenticated, use their ID. Otherwise, use query param or undefined
+      const userId = request.user?.id || query.userId;
 
-      // Determine content type from font metadata
-      const font = await fontService.getFontById(fontId, query.userId);
+      // Get font file
+      const fontBuffer = await fontService.getFontFile(fontId, userId);
+
+      // Determine content type from font metadata (use same userId)
+      const font = await fontService.getFontById(fontId, userId);
       if (!font) {
         return reply.code(404).send({ error: 'Font not found' });
       }
@@ -228,7 +232,12 @@ export class FontController {
       const contentType = this.getContentType(font.seaweedfsFid);
       reply.header('Content-Type', contentType);
       reply.header('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-      reply.header('Access-Control-Allow-Origin', '*'); // Allow CORS for @font-face
+
+      // CORS: Allow specific origin when credentials are included
+      // Cannot use wildcard '*' with credentials
+      const origin = request.headers.origin || '*';
+      reply.header('Access-Control-Allow-Origin', origin);
+      reply.header('Access-Control-Allow-Credentials', 'true');
 
       reply.code(200).send(fontBuffer);
     } catch (error) {

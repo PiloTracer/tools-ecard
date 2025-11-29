@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid';
 import { cassandraClient } from '../../../core/cassandra/client';
 import { templateOperations, resourceOperations, projectOperations } from '../../../core/prisma/client';
 import { fallbackStorageService } from './fallbackStorageService';
@@ -10,6 +10,18 @@ import { decodeBase64Data } from '../utils/base64Helper';
 import { createLogger } from '../../../core/utils/logger';
 
 const log = createLogger('TemplateStorage');
+
+// Namespace UUID for generating user UUIDs from email addresses
+// This is a well-known UUID that we use as a namespace for email-based UUIDs
+const EMAIL_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+/**
+ * Generate a deterministic UUID v5 from an email address
+ * This allows us to convert email addresses to valid UUIDs for Cassandra
+ */
+function emailToUuid(email: string): string {
+  return uuidv5(email.toLowerCase(), EMAIL_NAMESPACE);
+}
 
 export interface TemplateMetadata {
   id: string;
@@ -289,17 +301,24 @@ class UnifiedTemplateStorageService {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),
           templateId,
-          userId,
+          userId: emailToUuid(userEmail), // Convert email to UUID for Cassandra
           eventType: 'TEMPLATE_CREATED',
-          eventData: {
+          eventData: JSON.stringify({
             name: input.name,
             storageMode,
-            resourceCount: resourceUrls.length
-          },
+            resourceCount: resourceUrls.length,
+            userEmail // Keep email in event data for reference
+          }),
           timestamp
         });
       } catch (error) {
-        log.error({ error, templateId }, 'Failed to log event to Cassandra');
+        log.error({
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          templateId,
+          userId,
+          userEmail
+        }, 'Failed to log event to Cassandra');
         // Non-critical, continue
       }
     }
@@ -311,9 +330,10 @@ class UnifiedTemplateStorageService {
    * Load a template by ID
    */
   async loadTemplate(templateId: string, request: Request): Promise<Template> {
-    // Extract userId for authorization
+    // Extract userId and email for authorization
     const userId = (request as any).user?.id;
-    if (!userId) {
+    const userEmail = (request as any).user?.email;
+    if (!userId || !userEmail) {
       throw new Error('User not authenticated');
     }
 
@@ -457,13 +477,21 @@ class UnifiedTemplateStorageService {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),
           templateId,
-          userId,
+          userId: emailToUuid(userEmail), // Convert email to UUID for Cassandra
           eventType: 'TEMPLATE_LOADED',
-          eventData: {},
+          eventData: JSON.stringify({
+            userEmail // Keep email in event data for reference
+          }),
           timestamp: new Date()
         });
       } catch (error) {
-        log.error({ error, templateId }, 'Failed to log template access event');
+        log.error({
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          templateId,
+          userId,
+          userEmail
+        }, 'Failed to log template access event');
         // Non-critical
       }
     }
@@ -522,7 +550,8 @@ class UnifiedTemplateStorageService {
    */
   async deleteTemplate(templateId: string, request: Request): Promise<void> {
     const userId = (request as any).user?.id;
-    if (!userId) {
+    const userEmail = (request as any).user?.email;
+    if (!userId || !userEmail) {
       throw new Error('User not authenticated');
     }
 
@@ -615,13 +644,21 @@ class UnifiedTemplateStorageService {
         await cassandraClient.logTemplateEvent({
           eventId: uuidv4(),
           templateId,
-          userId,
+          userId: emailToUuid(userEmail), // Convert email to UUID for Cassandra
           eventType: 'TEMPLATE_DELETED',
-          eventData: {},
+          eventData: JSON.stringify({
+            userEmail // Keep email in event data for reference
+          }),
           timestamp: new Date()
         });
       } catch (error) {
-        log.error({ error, templateId }, 'Failed to log deletion event');
+        log.error({
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          templateId,
+          userId,
+          userEmail
+        }, 'Failed to log deletion event');
         // Non-critical
       }
     }
