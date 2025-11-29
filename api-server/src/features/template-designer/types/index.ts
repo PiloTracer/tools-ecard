@@ -1,4 +1,4 @@
-// Backend type definitions for template-designer feature
+// Backend type definitions for template-textile feature
 
 export interface Template {
   id: string;

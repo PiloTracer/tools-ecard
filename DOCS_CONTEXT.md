@@ -69,7 +69,7 @@ A modern, browser-based designer application that enables users to create card t
 ┌─────────────────────────────────────────────────────────────────┐
 │                         front-cards                             │
 │               (Next.js 16 Web App - Public Facing)              │
-│  Features: auth, template-designer, batch-import,               │
+│  Features: auth, template-textile, batch-import,               │
 │            batch-management, name-parser, user-profile          │
 └─────────────────────────────────────────────────────────────────┘
                               ▲
@@ -358,7 +358,7 @@ type RenderJob = {
 |---------|----------|--------|-------------|
 | **auto-auth** | HIGH | Planned | OAuth 2.0 + PKCE integration with external auth service |
 | **database-setup** | HIGH | Planned | Prisma schema, migrations, seed data |
-| **template-designer** | HIGH | Planned | Visual canvas editor for card layouts |
+| **template-textile** | HIGH | Planned | Visual canvas editor for card layouts |
 | **batch-import** | HIGH | Planned | Excel/text parsing with field mapping |
 | **render-worker** | HIGH | Planned | Background card rendering engine |
 | **batch-management** | MEDIUM | Planned | List, preview, download batches |

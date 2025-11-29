@@ -1,4 +1,4 @@
-// Public exports for template-designer feature
+// Public exports for template-textile feature
 
 export { templateRoutes } from './routes/templateRoutes';
 export { templateService } from './services/templateService';

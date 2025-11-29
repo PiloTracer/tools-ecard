@@ -40,7 +40,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:7400
 /app                    # Next.js App Router pages
 /features               # Feature modules
   /auth                 # Authentication
-  /template-designer    # Template editor
+  /template-textile    # Template editor
   /batch-import         # Data import
   /batch-management     # Batch viewing
 /shared                 # Shared components and utilities
