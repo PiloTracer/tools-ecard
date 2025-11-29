@@ -342,7 +342,7 @@ try {
 - [AWS SDK v3 Documentation](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/)
 - [SeaweedFS S3 API](https://github.com/seaweedfs/seaweedfs/wiki/Amazon-S3-API)
 - [Fastify Multipart Plugin](https://github.com/fastify/fastify-multipart)
-- [E-Cards Project Documentation](../../../../../../CLAUDE_CONTEXT.md)
+- [E-Cards Project Documentation](../../../../../../DOCS_CONTEXT.md)
 
 ## ✨ Success!
 

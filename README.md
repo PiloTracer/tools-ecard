@@ -34,7 +34,7 @@ docker-compose -f docker-compose.dev.yml up
 ├── render-worker/           # Background job processor
 ├── db/                      # Database initialization scripts
 ├── docker-compose.dev.yml   # Local development environment
-├── CLAUDE_CONTEXT.md               # Project overview (concise)
+├── DOCS_CONTEXT.md               # Project overview (concise)
 ├── ARCHITECTURE.md          # Feature-centered architecture
 └── README.md                # This file - quickstart guide
 ```
@@ -48,7 +48,7 @@ docker-compose -f docker-compose.dev.yml up
 3. Load only what you need - see `.claude/features/` for detailed specs
 
 **Minimal context approach:**
-- `/CLAUDE_CONTEXT.md` = Project overview (always start here)
+- `/DOCS_CONTEXT.md` = Project overview (always start here)
 - `.claude/features/{name}.md` = Feature details (load on-demand)
 - `.claude/features/feature-order.md` = Implementation sequence
 
@@ -114,7 +114,7 @@ Every feature is self-contained with:
 
 ## Documentation
 
-- **[CLAUDE_CONTEXT.md](./CLAUDE_CONTEXT.md)** - Comprehensive project documentation
+- **[DOCS_CONTEXT.md](./DOCS_CONTEXT.md)** - Comprehensive project documentation
   - System overview and business context
   - Complete architecture diagrams
   - Domain models and data flows
@@ -313,7 +313,7 @@ MIT - See LICENSE file for details
 ## Support
 
 - **Issues**: Report bugs and request features via GitHub issues
-- **Documentation**: See CLAUDE_CONTEXT.md and ARCHITECTURE.md
+- **Documentation**: See DOCS_CONTEXT.md and ARCHITECTURE.md
 - **Session Starters**: Use .claude/SESSION_STARTERS.md for quick context
 
 ---
