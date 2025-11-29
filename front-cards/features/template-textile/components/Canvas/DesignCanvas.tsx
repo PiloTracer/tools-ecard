@@ -165,6 +165,54 @@ export function DesignCanvas() {
         activelyInteracting.current.add(elementId);
         setGlobalSyncLock(true); // LOCK ALL SYNC
         console.log(`[INTERACTION] Started scaling ${elementId} - GLOBAL SYNC LOCKED`);
+
+        // CRITICAL: Update dimensions in REAL-TIME during scaling
+        // This ensures width/height are always accurate, even if mouse leaves canvas
+        const currentElements = useTemplateStore.getState().elements;
+        const element = currentElements.find(el => el.id === elementId);
+        if (!element) return;
+
+        const scaleX = target.scaleX || 1;
+        const scaleY = target.scaleY || 1;
+
+        // Calculate real-time dimensions
+        if (element.type === 'image') {
+          const newWidth = Math.round((target.width || element.width) * scaleX);
+          const newHeight = Math.round((target.height || element.height) * scaleY);
+
+          console.log(`[SCALING] Real-time update: ${elementId} -> ${newWidth}x${newHeight}`);
+
+          // Update store immediately
+          updateElement(elementId, {
+            width: newWidth,
+            height: newHeight,
+            scaleX,
+            scaleY
+          });
+        } else if (element.type === 'shape') {
+          // Handle shapes similarly
+          const shapeEl = element as any;
+          if (shapeEl.shapeType === 'circle') {
+            const currentRadius = target.radius || element.width / 2;
+            const newRadius = Math.round(currentRadius * scaleX);
+            const newWidth = newRadius * 2;
+            updateElement(elementId, { width: newWidth, height: newWidth });
+          } else if (shapeEl.shapeType === 'ellipse') {
+            const currentRx = target.rx || element.width / 2;
+            const currentRy = target.ry || element.height / 2;
+            const newRx = Math.round(currentRx * scaleX);
+            const newRy = Math.round(currentRy * scaleY);
+            updateElement(elementId, { width: newRx * 2, height: newRy * 2 });
+          } else {
+            const newWidth = Math.round((target.width || element.width) * scaleX);
+            const newHeight = Math.round((target.height || element.height) * scaleY);
+            updateElement(elementId, { width: newWidth, height: newHeight });
+          }
+        } else if (element.width !== undefined && element.height !== undefined) {
+          const newWidth = Math.round((target.width || element.width) * scaleX);
+          const newHeight = Math.round((target.height || element.height) * scaleY);
+          updateElement(elementId, { width: newWidth, height: newHeight });
+        }
       }
     });
 
@@ -344,33 +392,32 @@ export function DesignCanvas() {
 
             // For image elements, calculate the NEW display dimensions
             if (element.type === 'image') {
-              // Only update if scale changed (user is actively resizing)
-              if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
-                // Simple: image stored at logical size with scale=1
-                const newWidth = Math.round((target.width || element.width) * scaleX);
-                const newHeight = Math.round((target.height || element.height) * scaleY);
+              // CRITICAL: ALWAYS calculate and save current dimensions
+              // Even if scale hasn't changed, the width/height might be out of sync
+              const newWidth = Math.round((target.width || element.width) * scaleX);
+              const newHeight = Math.round((target.height || element.height) * scaleY);
 
-                console.log('Image resize:', {
-                  oldWidth: element.width,
-                  oldHeight: element.height,
-                  targetWidth: target.width,
-                  targetHeight: target.height,
-                  scaleX,
-                  scaleY,
-                  newWidth,
-                  newHeight
-                });
+              console.log('Image dimensions update:', {
+                oldWidth: element.width,
+                oldHeight: element.height,
+                targetWidth: target.width,
+                targetHeight: target.height,
+                scaleX,
+                scaleY,
+                newWidth,
+                newHeight
+              });
 
-                updates.width = newWidth;
-                updates.height = newHeight;
+              // ALWAYS update width/height to ensure they're in sync with actual display size
+              updates.width = newWidth;
+              updates.height = newHeight;
 
-                // CRITICAL: Save exact scale values to preserve precision on save/load
-                // This prevents rounding errors when recalculating scale from dimensions
-                (updates as Partial<ImageElement>).scaleX = scaleX;
-                (updates as Partial<ImageElement>).scaleY = scaleY;
+              // CRITICAL: Save exact scale values to preserve precision on save/load
+              // This prevents rounding errors when recalculating scale from dimensions
+              (updates as Partial<ImageElement>).scaleX = scaleX;
+              (updates as Partial<ImageElement>).scaleY = scaleY;
 
-                // DON'T reset scale - it will be reset to 1 when image is recreated
-              }
+              // DON'T reset scale - it will be reset to 1 when image is recreated
             } else if (element.type === 'qr') {
               // QR code elements: update size property along with width/height
               // Use size as fallback if width/height not defined (for backward compatibility)

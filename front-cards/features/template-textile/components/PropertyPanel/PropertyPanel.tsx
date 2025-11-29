@@ -408,6 +408,137 @@ export function PropertyPanel() {
               </div>
             </div>
 
+            {/* Size */}
+            {(selectedElement.width !== undefined || selectedElement.height !== undefined) && (
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-gray-700">Size</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedElement.width !== undefined && (
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-600">Width</label>
+                      <input
+                        type="number"
+                        value={Math.round(selectedElement.width)}
+                        onChange={(e) => {
+                          const newWidth = parseFloat(e.target.value) || 1;
+
+                          // Update Fabric.js object immediately
+                          if (fabricCanvas) {
+                            const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+                            if (fabricObj) {
+                              if (selectedElement.type === 'image') {
+                                // For images, calculate new scale to match the width
+                                const newScaleX = newWidth / (fabricObj.width || newWidth);
+                                const newScaleY = fabricObj.scaleY || 1; // Keep Y scale
+                                fabricObj.set({ scaleX: newScaleX });
+                                fabricObj.setCoords();
+                                fabricCanvas.renderAll();
+                                // Update store with both width and scale
+                                updateElement(selectedElementId!, { width: newWidth, scaleX: newScaleX });
+                              } else if (selectedElement.type === 'shape') {
+                                const shapeEl = selectedElement as any;
+                                if (shapeEl.shapeType === 'circle') {
+                                  // For circles, update radius
+                                  const newRadius = newWidth / 2;
+                                  fabricObj.set({ radius: newRadius, scaleX: 1, scaleY: 1 });
+                                  fabricObj.setCoords();
+                                  fabricCanvas.renderAll();
+                                  updateElement(selectedElementId!, { width: newWidth, height: newWidth });
+                                } else if (shapeEl.shapeType === 'ellipse') {
+                                  // For ellipses, update rx
+                                  const newRx = newWidth / 2;
+                                  const currentRy = fabricObj.ry * (fabricObj.scaleY || 1);
+                                  fabricObj.set({ rx: newRx, scaleX: 1, scaleY: 1 });
+                                  fabricObj.setCoords();
+                                  fabricCanvas.renderAll();
+                                  updateElement(selectedElementId!, { width: newWidth });
+                                } else {
+                                  // Other shapes
+                                  fabricObj.set({ width: newWidth, scaleX: 1 });
+                                  fabricObj.setCoords();
+                                  fabricCanvas.renderAll();
+                                  updateElement(selectedElementId!, { width: newWidth });
+                                }
+                              } else {
+                                // For other elements, set width directly
+                                fabricObj.set({ width: newWidth, scaleX: 1 });
+                                fabricObj.setCoords();
+                                fabricCanvas.renderAll();
+                                updateElement(selectedElementId!, { width: newWidth });
+                              }
+                            }
+                          }
+                        }}
+                        disabled={selectedElement.locked}
+                        className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  )}
+                  {selectedElement.height !== undefined && (
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-600">Height</label>
+                      <input
+                        type="number"
+                        value={Math.round(selectedElement.height)}
+                        onChange={(e) => {
+                          const newHeight = parseFloat(e.target.value) || 1;
+
+                          // Update Fabric.js object immediately
+                          if (fabricCanvas) {
+                            const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
+                            if (fabricObj) {
+                              if (selectedElement.type === 'image') {
+                                // For images, calculate new scale to match the height
+                                const newScaleX = fabricObj.scaleX || 1; // Keep X scale
+                                const newScaleY = newHeight / (fabricObj.height || newHeight);
+                                fabricObj.set({ scaleY: newScaleY });
+                                fabricObj.setCoords();
+                                fabricCanvas.renderAll();
+                                // Update store with both height and scale
+                                updateElement(selectedElementId!, { height: newHeight, scaleY: newScaleY });
+                              } else if (selectedElement.type === 'shape') {
+                                const shapeEl = selectedElement as any;
+                                if (shapeEl.shapeType === 'circle') {
+                                  // For circles, height affects radius
+                                  const newRadius = newHeight / 2;
+                                  fabricObj.set({ radius: newRadius, scaleX: 1, scaleY: 1 });
+                                  fabricObj.setCoords();
+                                  fabricCanvas.renderAll();
+                                  updateElement(selectedElementId!, { width: newHeight, height: newHeight });
+                                } else if (shapeEl.shapeType === 'ellipse') {
+                                  // For ellipses, update ry
+                                  const newRy = newHeight / 2;
+                                  const currentRx = fabricObj.rx * (fabricObj.scaleX || 1);
+                                  fabricObj.set({ ry: newRy, scaleX: 1, scaleY: 1 });
+                                  fabricObj.setCoords();
+                                  fabricCanvas.renderAll();
+                                  updateElement(selectedElementId!, { height: newHeight });
+                                } else {
+                                  // Other shapes
+                                  fabricObj.set({ height: newHeight, scaleY: 1 });
+                                  fabricObj.setCoords();
+                                  fabricCanvas.renderAll();
+                                  updateElement(selectedElementId!, { height: newHeight });
+                                }
+                              } else {
+                                // For other elements, set height directly
+                                fabricObj.set({ height: newHeight, scaleY: 1 });
+                                fabricObj.setCoords();
+                                fabricCanvas.renderAll();
+                                updateElement(selectedElementId!, { height: newHeight });
+                              }
+                            }
+                          }
+                        }}
+                        disabled={selectedElement.locked}
+                        className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Rotation */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Rotation</h3>

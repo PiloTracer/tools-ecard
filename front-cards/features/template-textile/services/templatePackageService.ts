@@ -316,10 +316,13 @@ export class TemplatePackageService {
       if (element.type === 'image') {
         const imgMeta = metadata.images.find(img => img.elementId === element.id);
         if (imgMeta) {
+          // Use relative path in ZIP instead of base64 data URL
+          // This drastically reduces template.json size
+          const { imageUrl, ...rest } = element as ImageElement;
           return {
-            ...element,
-            imageUrl: imgMeta.filename, // Relative path in ZIP
-            _originalUrl: imgMeta.originalUrl // Keep original for reference
+            ...rest,
+            type: 'image' as const,
+            imageUrl: imgMeta.filename // Relative path in ZIP (e.g., "images/image-1.png")
           };
         }
       }
