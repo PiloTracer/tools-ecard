@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecards_dev_password}
     ports:
-      - "${POSTGRES_HOST_PORT:-7432}:${POSTGRES_PORT:-5432}"
+      - "0.0.0.0:${POSTGRES_HOST_PORT:-7432}:${POSTGRES_PORT:-5432}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init-postgres:/docker-entrypoint-initdb.d
@@ -39,8 +39,8 @@ services:
       # Limit direct memory to prevent OOM (default is 5G)
       JVM_OPTS: ${CASSANDRA_JVM_OPTS:--XX:MaxDirectMemorySize=1G}
     ports:
-      - "${CASSANDRA_NATIVE_PORT_HOST:-7042}:${CASSANDRA_PORT:-9042}"
-      - "${CASSANDRA_THRIFT_PORT_HOST:-7160}:9160"
+      - "0.0.0.0:${CASSANDRA_NATIVE_PORT_HOST:-7042}:${CASSANDRA_PORT:-9042}"
+      - "0.0.0.0:${CASSANDRA_THRIFT_PORT_HOST:-7160}:9160"
     volumes:
       - cassandra_data:/var/lib/cassandra
       - ./db/init-cassandra:/docker-entrypoint-initdb.d
@@ -63,7 +63,7 @@ services:
     image: redis:7-alpine
     container_name: ecards-redis
     ports:
-      - "${REDIS_HOST_PORT:-7379}:${REDIS_PORT:-6379}"
+      - "0.0.0.0:${REDIS_HOST_PORT:-7379}:${REDIS_PORT:-6379}"
     volumes:
       - redis_data:/data
     networks:
@@ -83,7 +83,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: ecards-frontend
     ports:
-      - "${FRONTEND_HOST_PORT:-7300}:${FRONTEND_PORT:-3000}"
+      - "0.0.0.0:${FRONTEND_HOST_PORT:-7300}:${FRONTEND_PORT:-3000}"
     volumes:
       - ./front-cards:/app
       - /app/node_modules
@@ -127,7 +127,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: ecards-api
     ports:
-      - "${API_PORT:-7400}:${API_INTERNAL_PORT:-4000}"
+      - "0.0.0.0:${API_PORT:-7400}:${API_INTERNAL_PORT:-4000}"
     volumes:
       - ./api-server:/app
       - /app/node_modules

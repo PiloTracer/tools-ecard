@@ -4,7 +4,7 @@
 echo "🚀 Starting development environment..."
 
 # Start containers
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 echo ""
 echo "⏳ Waiting for services to be ready..."
@@ -32,5 +32,5 @@ echo "  API Server:  http://localhost:7400"
 echo "  PostgreSQL:  localhost:7432"
 echo "  Cassandra:   localhost:7042"
 echo ""
-echo "To stop: docker-compose -f docker-compose.dev.yml down"
-echo "To reset (⚠️ deletes data): docker-compose -f docker-compose.dev.yml down -v"
+echo "To stop: docker compose -f docker-compose.dev.yml down"
+echo "To reset (⚠️ deletes data): docker compose -f docker-compose.dev.yml down -v"

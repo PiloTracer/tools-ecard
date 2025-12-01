@@ -12,13 +12,13 @@ echo "  3. Auto-initialize Cassandra schema via db-init service"
 echo "  4. Start application services (front-cards, api-server, render-worker)"
 echo ""
 
-# Start all services - docker-compose handles initialization order via depends_on
+# Start all services - docker compose handles initialization order via depends_on
 echo "Starting containers..."
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 echo ""
 echo "⏳ Services are starting in background..."
-echo "   You can monitor progress with: docker-compose -f docker-compose.dev.yml logs -f"
+echo "   You can monitor progress with: docker compose -f docker-compose.dev.yml logs -f"
 echo ""
 echo "⏳ Waiting for all services to be ready (this may take 1-2 minutes)..."
 echo ""
@@ -32,10 +32,10 @@ while ! curl -s http://localhost:7400/health > /dev/null 2>&1; do
     echo "⚠️  Timeout waiting for API server to be ready"
     echo ""
     echo "Check service status:"
-    docker-compose -f docker-compose.dev.yml ps
+    docker compose -f docker-compose.dev.yml ps
     echo ""
     echo "Check logs for errors:"
-    echo "  docker-compose -f docker-compose.dev.yml logs api-server"
+    echo "  docker compose -f docker-compose.dev.yml logs api-server"
     exit 1
   fi
 
