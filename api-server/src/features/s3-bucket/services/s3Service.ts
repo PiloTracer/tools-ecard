@@ -34,6 +34,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
 import { loadS3Config, type S3Config } from '../config/s3Config';
+import { createLogger, serializeError } from '../../../core/utils/logger';
+
+const slog = createLogger('S3Service');
 import {
   type IS3Service,
   type ObjectMetadata,
@@ -79,7 +82,7 @@ export class S3Service implements IS3Service {
       disableHostPrefix: true,
     });
 
-    console.log(`S3 Service initialized with endpoint: ${this.config.endpoint}`);
+    slog.debug({ endpoint: this.config.endpoint }, 'S3 client initialized');
   }
 
   // ============================================================================
@@ -245,11 +248,11 @@ export class S3Service implements IS3Service {
       });
 
       await this.client.send(command);
-      console.log(`Bucket created: ${bucket}`);
+      slog.info({ bucket }, 'S3 bucket created');
     } catch (error: any) {
       // Ignore error if bucket already exists
       if (error.name === 'BucketAlreadyExists' || error.name === 'BucketAlreadyOwnedByYou') {
-        console.log(`Bucket already exists: ${bucket}`);
+        slog.debug({ bucket }, 'S3 bucket already exists');
         return;
       }
       throw this.handleError(error, 'createBucket');
@@ -285,7 +288,7 @@ export class S3Service implements IS3Service {
       });
 
       await this.client.send(command);
-      console.log(`Bucket deleted: ${bucket}`);
+      slog.info({ bucket }, 'S3 bucket deleted');
     } catch (error) {
       throw this.handleError(error, 'deleteBucket');
     }
@@ -543,34 +546,35 @@ export class S3Service implements IS3Service {
   // Error Handling
   // ============================================================================
 
-  private handleError(error: any, operation: string): Error {
-    console.error(`S3 operation failed: ${operation}`, error);
+  private handleError(error: unknown, operation: string): Error {
+    slog.warn({ operation, err: serializeError(error) }, 'S3 operation failed');
 
     // Handle specific S3 errors
-    if (error.name === 'NoSuchBucket') {
-      return new BucketNotFoundError(error.Bucket || 'unknown');
+    const err = error as { name?: string; Bucket?: string; Key?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    if (err.name === 'NoSuchBucket') {
+      return new BucketNotFoundError(err.Bucket || 'unknown');
     }
-    if (error.name === 'NoSuchKey') {
-      return new ObjectNotFoundError(error.Bucket || 'unknown', error.Key || 'unknown');
+    if (err.name === 'NoSuchKey') {
+      return new ObjectNotFoundError(err.Bucket || 'unknown', err.Key || 'unknown');
     }
-    if (error.name === 'AccessDenied') {
-      return new AccessDeniedError(error.message);
+    if (err.name === 'AccessDenied') {
+      return new AccessDeniedError(err.message || 'Access denied');
     }
-    if (error.name === 'InvalidRequest') {
-      return new InvalidRequestError(error.message);
+    if (err.name === 'InvalidRequest') {
+      return new InvalidRequestError(err.message || 'Invalid request');
     }
 
     // Handle AWS SDK errors
-    if (error.$metadata) {
+    if (err.$metadata) {
       return new S3Error(
-        error.message || `S3 operation failed: ${operation}`,
-        error.name || 'UnknownError',
-        error.$metadata.httpStatusCode
+        err.message || `S3 operation failed: ${operation}`,
+        err.name || 'UnknownError',
+        err.$metadata.httpStatusCode
       );
     }
 
     // Return original error if not an S3 error
-    return error;
+    return error as Error;
   }
 }
 
@@ -590,12 +594,12 @@ export function getS3Service(): IS3Service {
     const forceLocalStorage = process.env.USE_LOCAL_STORAGE === 'true';
 
     if (forceLocalStorage) {
-      console.log('USE_LOCAL_STORAGE=true, forcing local storage');
+      slog.info('USE_LOCAL_STORAGE=true, using local storage');
       s3Service = new LocalStorageService();
       isUsingLocalStorage = true;
     } else {
       // Always try S3Service first (even in development)
-      console.log('Initializing S3Service...');
+      slog.debug('Initializing S3Service');
       s3Service = new S3Service();
       isUsingLocalStorage = false;
     }

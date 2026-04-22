@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { cassandraClient } from '../../../core/cassandra/client';
 import { S3Service } from '../../s3-bucket/services/s3Service';
-import { createLogger } from '../../../core/utils/logger';
+import { createLogger, serializeError } from '../../../core/utils/logger';
 import type {
   Font,
   FontUploadRequest,
@@ -35,7 +35,7 @@ export class FontService {
   constructor() {
     this.s3Service = new S3Service();
     this.ensureBucketExists().catch(err => {
-      log.error({ error: err }, 'Failed to create fonts bucket');
+      log.error({ err: serializeError(err) }, 'Failed to create fonts bucket');
     });
   }
 
@@ -52,7 +52,7 @@ export class FontService {
         await this.s3Service.createBucket(FONTS_BUCKET);
       }
     } catch (error) {
-      log.error({ error }, 'Error ensuring bucket exists');
+      log.error({ err: serializeError(error) }, 'Error ensuring bucket exists');
       throw error;
     }
   }
@@ -91,7 +91,7 @@ export class FontService {
 
       return fonts;
     } catch (error) {
-      log.error({ error }, 'Error listing global fonts');
+      log.error({ err: serializeError(error) }, 'Error listing global fonts');
       throw error;
     }
   }
@@ -150,7 +150,10 @@ export class FontService {
 
           log.debug({ fontName: font.fontName }, 'Loaded font variant');
         } catch (error) {
-          log.warn({ variant: variant.variant, error }, 'Failed to load font variant');
+          log.warn(
+            { variant: variant.variant, err: serializeError(error) },
+            'Failed to load font variant'
+          );
           // Continue with next variant
         }
       }
@@ -158,7 +161,7 @@ export class FontService {
       log.info({ fontFamily, variantsLoaded: loadedFonts.length }, 'Google Font family loaded');
       return loadedFonts;
     } catch (error) {
-      log.error({ fontFamily, error }, 'Error loading Google Font family');
+      log.error({ fontFamily, err: serializeError(error) }, 'Error loading Google Font family');
       throw error;
     }
   }
@@ -178,7 +181,7 @@ export class FontService {
 
       return result.rows.length > 0;
     } catch (error) {
-      log.error({ fontFamily, error }, 'Error checking font existence');
+      log.error({ fontFamily, err: serializeError(error) }, 'Error checking font existence');
       return false;
     }
   }
@@ -217,7 +220,7 @@ export class FontService {
 
       return fonts;
     } catch (error) {
-      log.error({ userId, error }, 'Error listing user fonts');
+      log.error({ userId, err: serializeError(error) }, 'Error listing user fonts');
       throw error;
     }
   }
@@ -232,7 +235,7 @@ export class FontService {
 
       return [...globalFonts, ...userFonts];
     } catch (error) {
-      log.error({ userId, error }, 'Error listing available fonts');
+      log.error({ userId, err: serializeError(error) }, 'Error listing available fonts');
       throw error;
     }
   }
@@ -271,7 +274,7 @@ export class FontService {
       log.info({ userId, fontId: font.fontId, fontName: request.fontName }, 'User font uploaded');
       return font;
     } catch (error) {
-      log.error({ userId, error }, 'Error uploading user font');
+      log.error({ userId, err: serializeError(error) }, 'Error uploading user font');
       throw error;
     }
   }
@@ -309,7 +312,7 @@ export class FontService {
 
       log.info({ userId, fontId }, 'User font deleted');
     } catch (error) {
-      log.error({ userId, fontId, error }, 'Error deleting user font');
+      log.error({ userId, fontId, err: serializeError(error) }, 'Error deleting user font');
       throw error;
     }
   }
@@ -349,7 +352,7 @@ export class FontService {
 
       return null;
     } catch (error) {
-      log.error({ fontId, userId, error }, 'Error getting font by ID');
+      log.error({ fontId, userId, err: serializeError(error) }, 'Error getting font by ID');
       return null;
     }
   }
@@ -377,7 +380,7 @@ export class FontService {
 
       return Buffer.concat(chunks);
     } catch (error) {
-      log.error({ fontId, userId, error }, 'Error getting font file');
+      log.error({ fontId, userId, err: serializeError(error) }, 'Error getting font file');
       throw error;
     }
   }
@@ -389,7 +392,7 @@ export class FontService {
     try {
       await this.s3Service.deleteObject(FONTS_BUCKET, seaweedfsFid);
     } catch (error) {
-      log.error({ seaweedfsFid, error }, 'Error deleting font file');
+      log.error({ seaweedfsFid, err: serializeError(error) }, 'Error deleting font file');
       throw error;
     }
   }
@@ -410,7 +413,7 @@ export class FontService {
 
       return Buffer.from(response.data);
     } catch (error) {
-      log.error({ url, error }, 'Error downloading font file');
+      log.error({ url, err: serializeError(error) }, 'Error downloading font file');
       throw error;
     }
   }
@@ -436,7 +439,7 @@ export class FontService {
         size: buffer.length,
       };
     } catch (error) {
-      log.error({ fileName, error }, 'Error uploading to SeaweedFS');
+      log.error({ fileName, err: serializeError(error) }, 'Error uploading to SeaweedFS');
       throw error;
     }
   }
@@ -506,7 +509,7 @@ export class FontService {
 
       return variants;
     } catch (error) {
-      log.error({ fontFamily, error }, 'Error parsing Google Fonts CSS');
+      log.error({ fontFamily, err: serializeError(error) }, 'Error parsing Google Fonts CSS');
       throw error;
     }
   }
@@ -550,7 +553,7 @@ export class FontService {
         { prepare: true }
       );
     } catch (error) {
-      log.error({ fontId: font.fontId, error }, 'Error saving font metadata');
+      log.error({ fontId: font.fontId, err: serializeError(error) }, 'Error saving font metadata');
       throw error;
     }
   }

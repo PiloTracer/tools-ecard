@@ -60,14 +60,14 @@ This document defines the optimal order for implementing E-Cards features based 
 - Backend: OAuth token exchange, user verification service
 - User/UserSession database tables
 - Protected route middleware
-- Integration with epicdev.com/app (OAuth) and epicdev.com/admin (API)
+- Integration with dev.aiepic.app/app (OAuth) and dev.aiepic.app/admin (API)
 
 **Dependencies:**
 - Database schema (User, UserSession tables)
 - External systems must implement OAuth server and Admin API
 
 **Blockers:**
-- Waiting for OAuth client registration from epicdev.com team
+- Waiting for OAuth client registration from dev.aiepic.app team
 - Need API key for Admin API access
 
 ---
@@ -403,15 +403,15 @@ Infrastructure Setup (Week 1)
 1. **Render Worker** - Most complex, requires InDesign replication
    - **Mitigation:** Start early, incremental testing, parallel C# porting
 
-2. **External System Integration** - Dependency on epicdev.com teams
+2. **External System Integration** - Dependency on dev.aiepic.app teams
    - **Mitigation:** Mock endpoints for development, clear API contracts
 
 3. **LLM Provider Reliability** - API outages, rate limits
    - **Mitigation:** Multi-provider fallback, "as-is" fallback
 
 ### External Dependencies
-- **epicdev.com/app team**: OAuth server implementation (needed Week 3)
-- **epicdev.com/admin team**: Admin API implementation (needed Week 3)
+- **dev.aiepic.app/app team**: OAuth server implementation (needed Week 3)
+- **dev.aiepic.app/admin team**: Admin API implementation (needed Week 3)
 - **SeaweedFS admin**: Access credentials (needed Week 5)
 - **LLM providers**: API keys (needed Week 10)
 
@@ -478,7 +478,7 @@ Infrastructure Setup (Week 1)
 ## Next Steps
 
 1. **Now → Week 2**: Implement Database Schema
-2. **Week 3**: Coordinate with epicdev.com teams on OAuth/Admin API
+2. **Week 3**: Coordinate with dev.aiepic.app teams on OAuth/Admin API
 3. **Week 5**: Obtain SeaweedFS credentials
 4. **Week 8**: Secure LLM API keys
 5. **Week 12**: MVP deployment to staging

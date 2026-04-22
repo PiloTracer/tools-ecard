@@ -13,7 +13,7 @@ import * as crypto from 'crypto';
 // OAuth configuration from environment variables
 const OAUTH_CONFIG = {
   clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'ecards_app_dev',
-  authorizationEndpoint: process.env.NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT || 'http://epicdev.com/oauth/authorize',
+  authorizationEndpoint: process.env.NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT || 'http://dev.aiepic.app/oauth/authorize',
   redirectUri: process.env.OAUTH_REDIRECT_URI?.split(',')[0] || 'http://localhost:7300/oauth/complete',
   scopes: (process.env.OAUTH_SCOPES || 'profile email subscription').split(' '),
   pkceMethod: 'S256',

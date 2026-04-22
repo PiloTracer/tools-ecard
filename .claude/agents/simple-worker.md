@@ -185,8 +185,8 @@ psql -h localhost -p 5432 -U postgres
 cqlsh localhost 9042
 
 # Access services
-Public app: http://epicdev.com/app/
-Admin app: http://epicdev.com/admin/
+Public app: http://dev.aiepic.app/app/
+Admin app: http://dev.aiepic.app/admin/
 ```
 
 ## Communication Guidelines

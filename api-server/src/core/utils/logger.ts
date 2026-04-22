@@ -44,6 +44,28 @@ export const createLogger = (module: string) => {
   return logger.child({ module });
 };
 
+/** Safe fields for logs — never pass raw axios/AWS errors to Pino (huge/circular). */
+export function serializeError(err: unknown): Record<string, unknown> {
+  if (err instanceof Error) {
+    const nodeErr = err as NodeJS.ErrnoException;
+    return {
+      name: err.name,
+      message: err.message,
+      code: nodeErr.code,
+    };
+  }
+  if (err && typeof err === 'object') {
+    const e = err as Record<string, unknown> & { $metadata?: { httpStatusCode?: number } };
+    return {
+      name: typeof e.name === 'string' ? e.name : undefined,
+      message: typeof e.message === 'string' ? e.message : String(err),
+      code: typeof e.code === 'string' ? e.code : undefined,
+      statusCode: e.$metadata?.httpStatusCode,
+    };
+  }
+  return { message: String(err) };
+}
+
 /**
  * Log levels guide:
  * - trace (5): Very detailed debugging (e.g., function entry/exit)

@@ -2,6 +2,8 @@
  * API Server entry point
  */
 
+import './debugEnv';
+
 import { buildApp } from './app';
 import { appConfig } from './core/config';
 import { connectCassandra, disconnectCassandra } from './core/database/cassandra';

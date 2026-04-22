@@ -217,6 +217,15 @@ JWT_EXPIRY=7d
 
 > See `.env.dev.example` for the complete list (Cassandra, Redis, worker settings, feature flags, etc.).
 
+### Local OAuth host (`dev.aiepic.app`)
+
+OAuth and dashboard URLs default to **`http://dev.aiepic.app`**. On your workstation, map that name to loopback so the browser and local services resolve it correctly:
+
+- Add **`127.0.0.1 dev.aiepic.app`** (and optionally **`::1 dev.aiepic.app`**) to your OS hosts file.
+- **`docker-compose.dev.yml`** already adds **`dev.aiepic.app:host-gateway`** (and **`host.docker.internal:host-gateway`**) for `front-cards` and `api-server` so containers reach the same host.
+
+Details: **`DOCS_TECH_STACK.md`** → section *Local DNS (`dev.aiepic.app`)*.
+
 ### LLM Provider Setup (Optional)
 
 For intelligent name parsing, configure at least one LLM provider:

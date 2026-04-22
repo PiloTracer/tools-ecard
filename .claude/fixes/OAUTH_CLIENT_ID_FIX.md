@@ -137,7 +137,7 @@ Open browser DevTools and watch for:
 ```
 Generating OAuth authorization URL...
 Client ID: ecards_app_dev
-Full authorization URL: http://epicdev.com/oauth/authorize?...&client_id=ecards_app_dev...
+Full authorization URL: http://dev.aiepic.app/oauth/authorize?...&client_id=ecards_app_dev...
 ```
 
 ### 4. Check Backend Logs During Token Exchange
@@ -213,7 +213,7 @@ According to OAuth 2.0 spec:
 
 This is why the OAuth authorization URL includes the client_id in the query string (visible to users):
 ```
-https://epicdev.com/oauth/authorize?client_id=ecards_app_dev&...
+https://dev.aiepic.app/oauth/authorize?client_id=ecards_app_dev&...
 ```
 
 ---

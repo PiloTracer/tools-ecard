@@ -56,7 +56,7 @@ const tokenResponse = await fetch(OAUTH_CONFIG.tokenEndpoint, {
 ### Before (JSON Format):
 ```http
 POST /oauth/token HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Content-Type: application/json
 
 {
@@ -71,7 +71,7 @@ Content-Type: application/json
 ### After (Form-Encoded Format):
 ```http
 POST /oauth/token HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=authorization_code&code=abc123...&client_id=ecards_app_dev&client_secret=secret123&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback
@@ -100,7 +100,7 @@ docker-compose -f docker-compose.dev.yml restart front-cards
 === Token Exchange API Started ===
 Flow type: Pre-Initiated OAuth (no PKCE)
 Exchanging code for token with OAuth server...
-Token endpoint: http://epicdev.com/oauth/token
+Token endpoint: http://dev.aiepic.app/oauth/token
 Token exchange response status: 200  ← Should be 200, not 500
 ✓ Token exchange successful!
 ✓ User info fetched successfully!

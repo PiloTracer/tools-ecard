@@ -2,7 +2,7 @@
 
 **Date:** 2025-01-16
 **Issue:** OAuth token exchange timeout (Connect Timeout Error)
-**Root Cause:** Docker containers unable to resolve `epicdev.com` to host machine
+**Root Cause:** Docker containers unable to resolve `dev.aiepic.app` to host machine
 **Solution:** Added `extra_hosts` configuration to docker-compose.yml
 
 ---
@@ -24,8 +24,8 @@ code: 'UND_ERR_CONNECT_TIMEOUT'
 2. User is redirected to `http://localhost:7300/oauth/complete?code=xxx&state=yyy`
 3. Frontend calls `/api/auth/exchange-token` API route
 4. Backend API route (running inside Docker container) tries to exchange code with OAuth server
-5. **Backend makes request to `http://epicdev.com/oauth/token`**
-6. **Container cannot resolve `epicdev.com` correctly**
+5. **Backend makes request to `http://dev.aiepic.app/oauth/token`**
+6. **Container cannot resolve `dev.aiepic.app` correctly**
 7. Request times out after 10 seconds
 
 ---
@@ -36,15 +36,15 @@ code: 'UND_ERR_CONNECT_TIMEOUT'
 
 On the Windows host machine, the hosts file contains:
 ```
-127.0.0.1 epicdev.com
+127.0.0.1 dev.aiepic.app
 ```
 
 This means:
-- Browser on host can access `http://epicdev.com` ✅
-- Applications on host can access `http://epicdev.com` ✅
-- **Docker containers CANNOT access `http://epicdev.com`** ❌
+- Browser on host can access `http://dev.aiepic.app` ✅
+- Applications on host can access `http://dev.aiepic.app` ✅
+- **Docker containers CANNOT access `http://dev.aiepic.app`** ❌
 
-### Why Docker Containers Can't Access epicdev.com
+### Why Docker Containers Can't Access dev.aiepic.app
 
 Docker containers run in an isolated network namespace with their own:
 - Network stack
@@ -53,8 +53,8 @@ Docker containers run in an isolated network namespace with their own:
 
 By default, containers do NOT have access to the host's hosts file mappings.
 
-When the backend API route (running in Docker) tried to fetch `http://epicdev.com/oauth/token`:
-1. Container's DNS resolver tried to look up `epicdev.com`
+When the backend API route (running in Docker) tried to fetch `http://dev.aiepic.app/oauth/token`:
+1. Container's DNS resolver tried to look up `dev.aiepic.app`
 2. DNS lookup failed or returned incorrect IP
 3. Connection attempt timed out
 
@@ -85,7 +85,7 @@ Added `extra_hosts` to both `front-cards` and `api-server` services:
       dockerfile: Dockerfile.dev
     container_name: ecards-frontend
     extra_hosts:
-      - "epicdev.com:host-gateway"  # Maps epicdev.com to host machine
+      - "dev.aiepic.app:host-gateway"  # Maps dev.aiepic.app to host machine
     environment:
       # ... rest of config
 ```
@@ -97,23 +97,23 @@ Added `extra_hosts` to both `front-cards` and `api-server` services:
       dockerfile: Dockerfile.dev
     container_name: ecards-api
     extra_hosts:
-      - "epicdev.com:host-gateway"  # Maps epicdev.com to host machine
+      - "dev.aiepic.app:host-gateway"  # Maps dev.aiepic.app to host machine
     environment:
       # ... rest of config
 ```
 
 #### 2. Updated `.env.dev.example`
 
-Changed backend OAuth endpoints to use `epicdev.com` (now that containers can resolve it):
+Changed backend OAuth endpoints to use `dev.aiepic.app` (now that containers can resolve it):
 
 ```bash
 # Backend OAuth Configuration (server-side only)
-# NOTE: With extra_hosts in docker-compose.yml, epicdev.com resolves to host machine inside containers
+# NOTE: With extra_hosts in docker-compose.yml, dev.aiepic.app resolves to host machine inside containers
 OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
-OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
-OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
-OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
+OAUTH_AUTHORIZATION_ENDPOINT=http://dev.aiepic.app/oauth/authorize
+OAUTH_TOKEN_ENDPOINT=http://dev.aiepic.app/oauth/token
+OAUTH_USER_INFO_ENDPOINT=http://dev.aiepic.app/api/users/me
 OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 ```
@@ -124,17 +124,17 @@ OAUTH_SCOPES=profile email subscription
 
 ### Network Flow After Fix
 
-1. **Container tries to access `http://epicdev.com/oauth/token`**
+1. **Container tries to access `http://dev.aiepic.app/oauth/token`**
 2. **Docker injects host mapping:** Container's `/etc/hosts` now contains:
    ```
-   <host-gateway-ip>  epicdev.com
+   <host-gateway-ip>  dev.aiepic.app
    ```
-   (e.g., `192.168.65.2 epicdev.com` on Docker Desktop)
+   (e.g., `192.168.65.2 dev.aiepic.app` on Docker Desktop)
 3. **Container makes HTTP request to host machine**
 4. **Host machine receives request**
-5. **Host machine resolves `epicdev.com` using its hosts file:**
+5. **Host machine resolves `dev.aiepic.app` using its hosts file:**
    ```
-   127.0.0.1 epicdev.com
+   127.0.0.1 dev.aiepic.app
    ```
 6. **Request reaches local OAuth server at `http://127.0.0.1`** ✅
 7. **OAuth server responds with access token** ✅
@@ -148,10 +148,10 @@ OAUTH_SCOPES=profile email subscription
 │                                                                  │
 │  API Route: /api/auth/exchange-token                           │
 │  ↓                                                               │
-│  fetch('http://epicdev.com/oauth/token')                       │
+│  fetch('http://dev.aiepic.app/oauth/token')                       │
 │  ↓                                                               │
-│  Container resolves epicdev.com using injected /etc/hosts      │
-│  → epicdev.com = <host-gateway-ip>  (from extra_hosts)         │
+│  Container resolves dev.aiepic.app using injected /etc/hosts      │
+│  → dev.aiepic.app = <host-gateway-ip>  (from extra_hosts)         │
 │                                                                  │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP request to host
@@ -160,10 +160,10 @@ OAUTH_SCOPES=profile email subscription
 │  Host Machine (Windows)                                         │
 │  ──────────────────────────────────────────────────────────────│
 │                                                                  │
-│  Receives request for epicdev.com                              │
+│  Receives request for dev.aiepic.app                              │
 │  ↓                                                               │
-│  Host resolves epicdev.com using Windows hosts file            │
-│  → epicdev.com = 127.0.0.1                                     │
+│  Host resolves dev.aiepic.app using Windows hosts file            │
+│  → dev.aiepic.app = 127.0.0.1                                     │
 │  ↓                                                               │
 │  Request reaches local OAuth server                             │
 │  ↓                                                               │
@@ -184,9 +184,9 @@ Ensure your `.env` file matches `.env.dev.example`:
 # Backend OAuth Configuration (server-side only)
 OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
-OAUTH_AUTHORIZATION_ENDPOINT=http://epicdev.com/oauth/authorize
-OAUTH_TOKEN_ENDPOINT=http://epicdev.com/oauth/token
-OAUTH_USER_INFO_ENDPOINT=http://epicdev.com/api/users/me
+OAUTH_AUTHORIZATION_ENDPOINT=http://dev.aiepic.app/oauth/authorize
+OAUTH_TOKEN_ENDPOINT=http://dev.aiepic.app/oauth/token
+OAUTH_USER_INFO_ENDPOINT=http://dev.aiepic.app/api/users/me
 OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 ```
@@ -218,7 +218,7 @@ docker exec ecards-frontend cat /etc/hosts
 # 127.0.0.1       localhost
 # ::1             localhost ip6-localhost ip6-loopback
 # ...
-# 192.168.65.2    epicdev.com    # <-- This line should be present
+# 192.168.65.2    dev.aiepic.app    # <-- This line should be present
 ```
 
 ### 4. Test Network Connectivity
@@ -227,7 +227,7 @@ Test that the container can reach the host's OAuth server:
 
 ```bash
 # Test HTTP connectivity
-docker exec ecards-frontend wget -O- http://epicdev.com 2>&1 || docker exec ecards-frontend curl -v http://epicdev.com 2>&1
+docker exec ecards-frontend wget -O- http://dev.aiepic.app 2>&1 || docker exec ecards-frontend curl -v http://dev.aiepic.app 2>&1
 
 # Should get HTTP response (even if 404 Not Found)
 # The important part is that it connects (no timeout)
@@ -250,7 +250,7 @@ docker logs ecards-frontend -f
 === Token Exchange API Started ===
 Flow type: Pre-Initiated OAuth (no PKCE)
 Exchanging code for token with OAuth server...
-Token endpoint: http://epicdev.com/oauth/token
+Token endpoint: http://dev.aiepic.app/oauth/token
 Token exchange response status: 200
 ✓ Token exchange successful!
 ✓ User info fetched successfully!
@@ -269,10 +269,10 @@ Token exchange response status: 200
    ```bash
    docker inspect ecards-frontend | grep -A5 ExtraHosts
    ```
-3. Check that epicdev.com OAuth server is running on host machine:
+3. Check that dev.aiepic.app OAuth server is running on host machine:
    ```bash
    # On host machine
-   curl http://epicdev.com/oauth/token
+   curl http://dev.aiepic.app/oauth/token
    # or
    curl http://127.0.0.1/oauth/token
    ```
@@ -286,7 +286,7 @@ docker exec ecards-frontend cat /etc/hosts
 
 Should contain:
 ```
-<some-ip>  epicdev.com
+<some-ip>  dev.aiepic.app
 ```
 
 If missing, ensure:
@@ -305,7 +305,7 @@ If missing, ensure:
 
 ## Production Considerations
 
-In production, you would NOT use `epicdev.com` or hosts file mappings. Instead:
+In production, you would NOT use `dev.aiepic.app` or hosts file mappings. Instead:
 
 1. **Use real domain names** with proper DNS
 2. **OAuth server URL** would be a real public URL like `https://auth.yourcompany.com`
@@ -325,15 +325,15 @@ OAUTH_USER_INFO_ENDPOINT=https://auth.yourcompany.com/api/users/me
 
 ### What Was Wrong
 
-Docker containers couldn't resolve `epicdev.com` to the host machine, causing OAuth token exchange to timeout.
+Docker containers couldn't resolve `dev.aiepic.app` to the host machine, causing OAuth token exchange to timeout.
 
 ### What We Fixed
 
-Added `extra_hosts` configuration to docker-compose.yml, mapping `epicdev.com` to the host machine's IP address.
+Added `extra_hosts` configuration to docker-compose.yml, mapping `dev.aiepic.app` to the host machine's IP address.
 
 ### Result
 
-✅ Containers can now access `http://epicdev.com/*` URLs
+✅ Containers can now access `http://dev.aiepic.app/*` URLs
 ✅ OAuth token exchange succeeds
 ✅ Pre-initiated OAuth flows work
 ✅ Manual login flows work
@@ -344,7 +344,7 @@ Added `extra_hosts` configuration to docker-compose.yml, mapping `epicdev.com` t
 **Status:** ✅ Fixed
 **Files Modified:**
 - `docker-compose.dev.yml` (added extra_hosts to front-cards and api-server)
-- `.env.dev.example` (updated backend OAuth endpoints to use epicdev.com)
+- `.env.dev.example` (updated backend OAuth endpoints to use dev.aiepic.app)
 
 **Action Required:**
 1. Update your `.env` file to match `.env.dev.example`

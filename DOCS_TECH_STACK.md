@@ -111,7 +111,7 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 **Purpose:** OAuth 2.0 and user APIs used **as a client** by this app (this repo is not the auth server).
 
-**Typical dev wiring:** `epicdev.com` resolvable to the host via `/etc/hosts` and `extra_hosts` in `docker-compose.dev.yml` (see [README.md](./README.md) and env examples).
+**Typical dev wiring:** `http://dev.aiepic.app` points at services running on your **host** (Tools dashboard / OAuth, etc.). See **Local DNS (dev.aiepic.app)** below.
 
 **Endpoints (environment-specific):** authorization, token, and userinfo URLs come from `OAUTH_*` and `NEXT_PUBLIC_OAUTH_*` variables — do not hardcode in code without checking config.
 
@@ -150,12 +150,25 @@ Quick reference guide for the E-Cards application stack, organized by service.
 - Nodemon (hot reload)
 - ESLint + Prettier
 
-### DNS Resolution
+### Local DNS (`dev.aiepic.app`)
 
-**Special Configuration:**
-- `extra_hosts: epicdev.com:host-gateway` in Docker Compose
-- Allows containers to resolve `epicdev.com` to host machine
-- Enables OAuth server communication from within containers
+**On your computer (browser + native tools):** map the hostname to loopback so `http://dev.aiepic.app/...` hits whatever is listening on the host (e.g. port 80/443 for your auth stack).
+
+**Linux / macOS** — edit `/etc/hosts` (needs admin):
+
+```text
+127.0.0.1 dev.aiepic.app
+::1 dev.aiepic.app
+```
+
+**Windows** — edit `C:\Windows\System32\drivers\etc\hosts` as Administrator, same two lines.
+
+**Inside Docker** (`front-cards`, `api-server`): `docker-compose.dev.yml` sets:
+
+- `extra_hosts: dev.aiepic.app:host-gateway` — containers resolve `dev.aiepic.app` to the host gateway (same machine as your browser’s `127.0.0.1` mapping).
+- `extra_hosts: host.docker.internal:host-gateway` — so URLs like `http://host.docker.internal:8333` (SeaweedFS, etc.) work on **Linux** where that name is not built in.
+
+After changing hosts or compose, restart containers: `docker compose -f docker-compose.dev.yml up -d`.
 
 ---
 
@@ -203,12 +216,12 @@ Quick reference guide for the E-Cards application stack, organized by service.
 ### External APIs
 
 **API Server → OAuth Server:**
-- HTTP (http://epicdev.com/oauth/token)
-- Uses `extra_hosts` for DNS resolution
+- HTTP (`http://dev.aiepic.app/oauth/token`, etc.)
+- Uses `extra_hosts` so the container reaches the host where the OAuth service runs
 
 **Frontend → OAuth Server:**
-- Browser redirects (http://epicdev.com/oauth/authorize)
-- Server-side token exchange (http://epicdev.com/oauth/token)
+- Browser redirects (`http://dev.aiepic.app/oauth/authorize`, …) — resolved via your OS **hosts** file
+- Server-side token exchange from Next API routes uses the same hostnames + `extra_hosts`
 
 ---
 

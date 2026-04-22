@@ -89,7 +89,9 @@ services:
       - /app/node_modules
       - /app/.next
     extra_hosts:
-      - "epicdev.com:host-gateway"  # Maps epicdev.com to host machine (resolves to 127.0.0.1 via hosts file)
+      # Local dev: add "127.0.0.1 dev.aiepic.app" on the host (see DOCS_TECH_STACK.md)
+      - "dev.aiepic.app:host-gateway"
+      - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       # API & WebSocket
@@ -98,18 +100,18 @@ services:
       # OAuth Configuration (Frontend - browser-accessible, requires NEXT_PUBLIC_ prefix)
       # NOTE: Must use same OAUTH_CLIENT_ID value as backend (ecards_app_dev)
       NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:-ecards_app_dev}
-      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
-      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
-      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
-      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-http://epicdev.com/app}
-      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-http://epicdev.com/app/features/user-subscription}
+      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-http://dev.aiepic.app/oauth/authorize}
+      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-http://dev.aiepic.app/oauth/token}
+      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
+      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-http://dev.aiepic.app/app}
+      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-http://dev.aiepic.app/app/features/user-subscription}
       # OAuth Configuration (Backend - for API routes in front-cards/app/api/auth/*)
-      # NOTE: Backend runs in Docker container, must use host.docker.internal to reach host machine
+      # Server-side OAuth calls use dev.aiepic.app (mapped to host via extra_hosts)
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
-      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://host.docker.internal/oauth/authorize}
-      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://host.docker.internal/oauth/token}
-      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://host.docker.internal/api/users/me}
+      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://dev.aiepic.app/oauth/authorize}
+      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://dev.aiepic.app/oauth/token}
+      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
       OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
     networks:
@@ -132,7 +134,9 @@ services:
       - ./api-server:/app
       - /app/node_modules
     extra_hosts:
-      - "epicdev.com:host-gateway"  # Maps epicdev.com to host machine (resolves to 127.0.0.1 via hosts file)
+      # Local dev: add "127.0.0.1 dev.aiepic.app" on the host (see DOCS_TECH_STACK.md)
+      - "dev.aiepic.app:host-gateway"
+      - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       API_PORT: ${API_PORT:-7400}
@@ -193,21 +197,21 @@ services:
       SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET}
       SEAWEEDFS_REGION: ${SEAWEEDFS_REGION:-us-east-1}
       # External services (Remote Auth & User Management API)
-      EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://epicdev.com/app}
-      EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://epicdev.com/admin/ws}
-      EXTERNAL_USER_API: ${EXTERNAL_USER_API:-http://epicdev.com/admin/api}
+      EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://dev.aiepic.app/app}
+      EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://dev.aiepic.app/admin/ws}
+      EXTERNAL_USER_API: ${EXTERNAL_USER_API:-http://dev.aiepic.app/admin/api}
       # OAuth 2.0 Configuration (Backend - for token exchange)
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
-      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://epicdev.com/oauth/authorize}
-      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://epicdev.com/oauth/token}
-      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://epicdev.com/api/users/me}
+      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://dev.aiepic.app/oauth/authorize}
+      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://dev.aiepic.app/oauth/token}
+      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
       OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
       # Application Identity
       APPLICATION_ID: ${APPLICATION_ID}
       EXTERNAL_API_KEY: ${EXTERNAL_API_KEY}
-      USER_SUBSCRIPTION_URL: ${USER_SUBSCRIPTION_URL:-http://epicdev.com/app/features/user-subscription}
+      USER_SUBSCRIPTION_URL: ${USER_SUBSCRIPTION_URL:-http://dev.aiepic.app/app/features/user-subscription}
       # Token Security
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
       # Session Cookie Configuration
@@ -233,7 +237,7 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       # Exclude Prisma, AuthMiddleware, and axios debug logs to reduce noise
-      DEBUG: ${DEBUG:-*,-prisma:*,-AuthMiddleware,-axios:*,-follow-redirects}
+      DEBUG: ${DEBUG:-*,-prisma:*,-AuthMiddleware,-axios,-axios:*,-follow-redirects}
       # Disable axios verbose logging
     networks:
       - ecards-network

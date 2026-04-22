@@ -16,8 +16,8 @@ import type { OAuthTokenResponse, User } from '@/shared/types/auth';
 const OAUTH_CONFIG = {
   clientId: process.env.OAUTH_CLIENT_ID || 'ecards_app_dev',
   clientSecret: process.env.OAUTH_CLIENT_SECRET,
-  tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT || 'http://epicdev.com/oauth/token',
-  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'http://epicdev.com/api/users/me',
+  tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT || 'http://dev.aiepic.app/oauth/token',
+  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'http://dev.aiepic.app/api/users/me',
   redirectUri: process.env.OAUTH_REDIRECT_URI?.split(',')[0] || 'http://localhost:7300/oauth/complete',
 };
 

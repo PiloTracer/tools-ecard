@@ -26,12 +26,12 @@
 
 The E-Cards auto-auth feature requires integration with **two remote applications**:
 
-1. **User Application** (`http://epicdev.com/app`)
+1. **User Application** (`http://dev.aiepic.app/app`)
    - User-facing application where users are already authenticated
    - Initiates E-Cards access via button/link
    - Hosts OAuth 2.0 authorization server
 
-2. **Admin API** (`http://epicdev.com/admin`)
+2. **Admin API** (`http://dev.aiepic.app/admin`)
    - Backend API for administrative operations
    - Provides user verification, subscription data, rate limits
    - Handles backend-to-backend authentication
@@ -43,14 +43,14 @@ The E-Cards auto-auth feature requires integration with **two remote application
 │         E-Cards Application (localhost:7300)                │
 │                                                             │
 │  Frontend:                                                  │
-│  - Receives OAuth redirect from epicdev.com/app            │
+│  - Receives OAuth redirect from dev.aiepic.app/app            │
 │  - Handles callback with authorization code                │
 │                                                             │
 │  Backend:                                                   │
-│  - Exchanges code for tokens (→ epicdev.com/app/oauth)     │
-│  - Fetches user data (→ epicdev.com/admin/api)             │
-│  - Validates subscription (→ epicdev.com/admin/api)        │
-│  - Checks rate limits (→ epicdev.com/admin/api)            │
+│  - Exchanges code for tokens (→ dev.aiepic.app/app/oauth)     │
+│  - Fetches user data (→ dev.aiepic.app/admin/api)             │
+│  - Validates subscription (→ dev.aiepic.app/admin/api)        │
+│  - Checks rate limits (→ dev.aiepic.app/admin/api)            │
 └─────────────────────────────────────────────────────────────┘
                            ▲         │
                            │         │
@@ -58,10 +58,10 @@ The E-Cards auto-auth feature requires integration with **two remote application
         (user browser)     │         │ (backend-to-backend)
                            │         ▼
 ┌──────────────────────────┴──────────────────────────────────┐
-│              Remote Applications (epicdev.com)              │
+│              Remote Applications (dev.aiepic.app)              │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │  User App (epicdev.com/app)                         │   │
+│  │  User App (dev.aiepic.app/app)                         │   │
 │  │  - User dashboard with "E-Cards" button             │   │
 │  │  - OAuth 2.0 Authorization Server                   │   │
 │  │    • /oauth/authorize (user consent)                │   │
@@ -70,7 +70,7 @@ The E-Cards auto-auth feature requires integration with **two remote application
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │  Admin API (epicdev.com/admin)                      │   │
+│  │  Admin API (dev.aiepic.app/admin)                      │   │
 │  │  - Backend API for E-Cards integration              │   │
 │  │    • GET /api/users/:userId (profile)               │   │
 │  │    • GET /api/users/:userId/subscription            │   │
@@ -85,7 +85,7 @@ The E-Cards auto-auth feature requires integration with **two remote application
 
 ## Remote Applications
 
-### 1. User Application (epicdev.com/app)
+### 1. User Application (dev.aiepic.app/app)
 
 **Purpose:** User-facing application where users perform daily tasks
 
@@ -98,7 +98,7 @@ The E-Cards auto-auth feature requires integration with **two remote application
 
 **URL Structure:**
 ```
-Base URL: http://epicdev.com/app (or http://epicdev.com/app in production)
+Base URL: http://dev.aiepic.app/app (or http://dev.aiepic.app/app in production)
 
 User-facing:
   /                          # User dashboard
@@ -111,7 +111,7 @@ API endpoints:
   /.well-known/openid-configuration  # OAuth discovery document
 ```
 
-### 2. Admin API (epicdev.com/admin)
+### 2. Admin API (dev.aiepic.app/admin)
 
 **Purpose:** Backend API for administrative and integration operations
 
@@ -124,7 +124,7 @@ API endpoints:
 
 **URL Structure:**
 ```
-Base URL: http://epicdev.com/admin (or http://epicdev.com/admin in production)
+Base URL: http://dev.aiepic.app/admin (or http://dev.aiepic.app/admin in production)
 
 API endpoints:
   /api/users/:userId                    # User profile
@@ -146,7 +146,7 @@ WebSocket:
 
 #### 1. User Initiates E-Cards Access (User App)
 
-**Location:** `http://epicdev.com/app` (User Dashboard)
+**Location:** `http://dev.aiepic.app/app` (User Dashboard)
 
 **Implementation:**
 ```html
@@ -183,7 +183,7 @@ function openECards() {
 
 **Request to User App:**
 ```
-GET http://epicdev.com/app/oauth/authorize?
+GET http://dev.aiepic.app/app/oauth/authorize?
   client_id=ecards_app
   &redirect_uri=http://localhost:7300/oauth/complete
   &response_type=code
@@ -200,7 +200,7 @@ GET http://epicdev.com/app/oauth/authorize?
 
 #### 3. OAuth Consent Screen (User App)
 
-**Location:** `http://epicdev.com/app/oauth/authorize` (if consent needed)
+**Location:** `http://dev.aiepic.app/app/oauth/authorize` (if consent needed)
 
 **UI Requirements:**
 ```html
@@ -261,12 +261,12 @@ function deny() {
 
 #### 4. Token Exchange (User App OAuth Server)
 
-**Endpoint:** `POST http://epicdev.com/app/oauth/token`
+**Endpoint:** `POST http://dev.aiepic.app/app/oauth/token`
 
 **E-Cards Request:**
 ```http
 POST /oauth/token HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=authorization_code
@@ -300,7 +300,7 @@ Content-Type: application/json
   "roles": ["user"],             // User roles (optional)
   "iat": 1630000000,             // Issued at timestamp
   "exp": 1630003600,             // Expiry timestamp (1 hour)
-  "iss": "http://epicdev.com",   // Issuer (User App URL)
+  "iss": "http://dev.aiepic.app",   // Issuer (User App URL)
   "aud": "ecards_app"            // Audience (E-Cards client ID)
 }
 ```
@@ -469,10 +469,10 @@ HTTP/1.1 200 OK
 **Response:**
 ```json
 {
-  "issuer": "http://epicdev.com",
-  "authorization_endpoint": "http://epicdev.com/app/oauth/authorize",
-  "token_endpoint": "http://epicdev.com/app/oauth/token",
-  "jwks_uri": "http://epicdev.com/app/.well-known/jwks.json",
+  "issuer": "http://dev.aiepic.app",
+  "authorization_endpoint": "http://dev.aiepic.app/app/oauth/authorize",
+  "token_endpoint": "http://dev.aiepic.app/app/oauth/token",
+  "jwks_uri": "http://dev.aiepic.app/app/.well-known/jwks.json",
   "response_types_supported": ["code"],
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "token_endpoint_auth_methods_supported": ["client_secret_post"],
@@ -491,7 +491,7 @@ HTTP/1.1 200 OK
 
 ```http
 GET /api/users/user123 HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 Accept: application/json
 ```
@@ -512,7 +512,7 @@ Accept: application/json
 **Request:**
 ```http
 GET /api/users/user123 HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 ```
 
@@ -553,7 +553,7 @@ Authorization: Bearer ECARDS_API_KEY
 **Request:**
 ```http
 GET /api/users/user123/subscription HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 ```
 
@@ -604,7 +604,7 @@ Authorization: Bearer ECARDS_API_KEY
 **Request:**
 ```http
 GET /api/users/user123/limits HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 ```
 
@@ -654,7 +654,7 @@ Authorization: Bearer ECARDS_API_KEY
 **Request:**
 ```http
 POST /api/users/user123/verify HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 Content-Type: application/json
 
@@ -695,7 +695,7 @@ Content-Type: application/json
 **Request:**
 ```http
 POST /api/users/user123/usage HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 Content-Type: application/json
 
@@ -730,7 +730,7 @@ Content-Type: application/json
 **Request:**
 ```http
 GET /api/organizations/org456 HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ECARDS_API_KEY
 ```
 
@@ -891,7 +891,7 @@ async function validatePKCE(code, codeVerifier) {
 **Key Rotation:**
 ```http
 POST /admin/api-keys/rotate HTTP/1.1
-Host: epicdev.com
+Host: dev.aiepic.app
 Authorization: Bearer ADMIN_AUTH_TOKEN
 
 {
@@ -978,7 +978,7 @@ Access-Control-Allow-Headers: Authorization, Content-Type
 **Connection:**
 ```javascript
 // E-Cards Backend connects to Admin API WebSocket
-const ws = new WebSocket('ws://epicdev.com/admin/ws');
+const ws = new WebSocket('ws://dev.aiepic.app/admin/ws');
 
 ws.on('open', () => {
   // Authenticate
@@ -1174,7 +1174,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
 
 ### Integration Testing Checklist
 
-**User App (epicdev.com/app):**
+**User App (dev.aiepic.app/app):**
 - [ ] "E-Cards" button opens new tab to E-Cards
 - [ ] OAuth authorize endpoint shows consent screen
 - [ ] Consent approval redirects with authorization code
@@ -1184,7 +1184,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
 - [ ] Refresh token grant works correctly
 - [ ] Token revocation invalidates tokens
 
-**Admin API (epicdev.com/admin):**
+**Admin API (dev.aiepic.app/admin):**
 - [ ] API key authentication works
 - [ ] Invalid API key returns 401
 - [ ] User profile endpoint returns correct data
@@ -1215,7 +1215,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
             "value": "Bearer {{EXTERNAL_API_KEY}}"
           }
         ],
-        "url": "http://epicdev.com/admin/api/users/{{userId}}"
+        "url": "http://dev.aiepic.app/admin/api/users/{{userId}}"
       }
     },
     {
@@ -1228,7 +1228,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
             "value": "Bearer {{EXTERNAL_API_KEY}}"
           }
         ],
-        "url": "http://epicdev.com/admin/api/users/{{userId}}/subscription"
+        "url": "http://dev.aiepic.app/admin/api/users/{{userId}}/subscription"
       }
     },
     {
@@ -1252,7 +1252,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
             { "key": "code_verifier", "value": "{{code_verifier}}" }
           ]
         },
-        "url": "http://epicdev.com/app/oauth/token"
+        "url": "http://dev.aiepic.app/app/oauth/token"
       }
     }
   ]
@@ -1265,7 +1265,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
 
 ### Required Implementation by Remote Systems
 
-**User App (epicdev.com/app):**
+**User App (dev.aiepic.app/app):**
 1. ✅ Add "E-Cards" button/link to user dashboard
 2. ✅ Implement OAuth 2.0 Authorization Server:
    - `GET /oauth/authorize` (user consent)
@@ -1277,7 +1277,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
 5. ✅ Register E-Cards client credentials
 6. ✅ Configure CORS for E-Cards origin
 
-**Admin API (epicdev.com/admin):**
+**Admin API (dev.aiepic.app/admin):**
 1. ✅ Implement API key authentication
 2. ✅ Implement endpoints:
    - `GET /api/users/:userId` (profile)
