@@ -5,16 +5,18 @@
  */
 
 import Bull from 'bull';
+import { createLogger } from '../../../core/utils/logger';
 import { BatchProcessingJob, BATCH_PARSE_QUEUE } from '../../batch-upload/types';
 import { batchParsingService } from './batchParsingService';
+
+const log = createLogger('BatchParsingWorker');
 
 export class BatchParsingWorkerService {
   private parseQueue: Bull.Queue<BatchProcessingJob> | null = null;
   private isProcessing: boolean = false;
 
   constructor() {
-    // Don't initialize queue in constructor - wait for explicit start()
-    console.log('🔧 BatchParsingWorkerService constructor called');
+    // Queue is created on first start()
   }
 
   private initializeQueue(): Bull.Queue<BatchProcessingJob> {
@@ -26,8 +28,6 @@ export class BatchParsingWorkerService {
     const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
     const redisPassword = process.env.REDIS_PASSWORD;
 
-    console.log(`🔌 Connecting to Redis: ${redisHost}:${redisPort}`);
-
     const redisConfig: Bull.QueueOptions = {
       redis: {
         host: redisHost,
@@ -38,29 +38,23 @@ export class BatchParsingWorkerService {
 
     this.parseQueue = new Bull(BATCH_PARSE_QUEUE, redisConfig);
 
-    // Set up error handlers immediately
     this.parseQueue.on('error', (error) => {
-      console.error('❌ Queue error:', error);
+      log.error({ err: error }, 'Batch parse queue error');
     });
 
     this.parseQueue.on('failed', (job, error) => {
-      console.error(`❌ Job ${job.id} failed:`, error.message);
+      log.error({ jobId: job.id, err: error }, 'Batch parse job failed');
     });
 
-    console.log('✅ Redis queue initialized');
     return this.parseQueue;
   }
 
   private setupProcessor(): void {
     const queue = this.initializeQueue();
 
-    console.log('📋 Setting up job processor...');
-
-    // Process jobs with concurrency of 1 (sequential processing)
     queue.process('parse-batch', 1, async (job) => {
-      console.log(`📋 Processing batch parsing job ${job.id}...`);
-
       const { batchId, filePath, userEmail, workPhonePrefix, defaultCountryCode } = job.data;
+      log.info({ jobId: job.id, batchId }, 'Processing batch parse job');
 
       try {
         // Update job progress
@@ -78,7 +72,10 @@ export class BatchParsingWorkerService {
         await job.progress(90);
 
         if (result.success) {
-          console.log(`✅ Batch ${batchId} parsed successfully: ${result.records_processed}/${result.records_total} records`);
+          log.info(
+            { batchId, recordsProcessed: result.records_processed, recordsTotal: result.records_total },
+            'Batch parse completed'
+          );
 
           // Update job progress to 100%
           await job.progress(100);
@@ -94,52 +91,44 @@ export class BatchParsingWorkerService {
           throw new Error(result.error || 'Unknown parsing error');
         }
 
-      } catch (error: any) {
-        console.error(`❌ Batch parsing job ${job.id} failed:`, error);
-        throw new Error(`Batch parsing failed: ${error.message}`);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.error({ jobId: job.id, batchId: job.data.batchId, err: error }, 'Batch parsing job failed');
+        throw new Error(`Batch parsing failed: ${message}`);
       }
     });
 
-    // Event handlers
-    queue.on('active', (job) => {
-      console.log(`🔄 Job ${job.id} started processing`);
-    });
-
-    queue.on('completed', (job, result) => {
-      console.log(`✅ Job ${job.id} completed successfully:`, result);
-    });
-
     this.isProcessing = true;
-    console.log('✅ Batch parsing job processor setup complete');
+    log.info('Batch parse job processor ready');
   }
 
   async start(): Promise<void> {
     if (this.isProcessing) {
-      console.log('⚠️  Worker already started');
+      log.warn('Batch parsing worker already started');
       return;
     }
 
     try {
-      console.log('🚀 Starting batch parsing worker...');
       this.setupProcessor();
-      console.log('✅ Batch parsing worker started successfully');
-    } catch (error: any) {
-      console.error('❌ Failed to start batch parsing worker:', error);
+      const redisHost = process.env.REDIS_HOST || 'redis';
+      const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
+      log.info({ redisHost, redisPort }, 'Batch parsing worker started');
+    } catch (error: unknown) {
+      log.error({ err: error }, 'Failed to start batch parsing worker');
       throw error;
     }
   }
 
   async stop(): Promise<void> {
     if (!this.parseQueue) {
-      console.log('⚠️  Worker not started, nothing to stop');
       return;
     }
 
-    console.log('⏹️  Stopping batch parsing worker...');
+    log.info('Stopping batch parsing worker');
     await this.parseQueue.close();
     this.isProcessing = false;
     this.parseQueue = null;
-    console.log('✅ Batch parsing worker stopped');
+    log.info('Batch parsing worker stopped');
   }
 
   async getWorkerStats(): Promise<{

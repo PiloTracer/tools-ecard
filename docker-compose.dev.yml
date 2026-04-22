@@ -94,6 +94,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
       # API & WebSocket
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7400}
@@ -114,6 +115,8 @@ services:
       OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
       OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
+      NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}
+      POST_LOGIN_REDIRECT_URL: ${POST_LOGIN_REDIRECT_URL:-/dashboard}
     networks:
       - ecards-network
     depends_on:

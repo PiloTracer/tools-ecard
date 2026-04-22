@@ -17,6 +17,19 @@ const COOKIE_CONFIG = {
   },
 };
 
+function clearAuthCookie(response: NextResponse, name: string, httpOnly: boolean) {
+  response.cookies.delete(name);
+  response.cookies.set({
+    name,
+    value: '',
+    path: '/',
+    maxAge: 0,
+    httpOnly,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Create response
@@ -25,10 +38,10 @@ export async function POST(request: NextRequest) {
       message: 'Logged out successfully',
     });
 
-    // Clear all authentication cookies
-    response.cookies.delete(COOKIE_CONFIG.accessToken.name);
-    response.cookies.delete(COOKIE_CONFIG.refreshToken.name);
-    response.cookies.delete('user_id');
+    // Clear E-Cards session cookies (Tools Dashboard may still have its own browser session)
+    clearAuthCookie(response, COOKIE_CONFIG.accessToken.name, true);
+    clearAuthCookie(response, COOKIE_CONFIG.refreshToken.name, true);
+    clearAuthCookie(response, 'user_id', false);
 
     return response;
   } catch (error) {

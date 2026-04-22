@@ -7,8 +7,10 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import type { User, AuthContext as AuthContextType } from '@/shared/types/auth';
+import { clearOAuthData } from '@/shared/lib/oauth-utils';
+import { OAUTH_CONFIG } from '@/shared/lib/oauth-config';
 
 // Create context
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -16,6 +18,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // Provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
@@ -80,6 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         setUser(null);
         setIsAuthenticated(false);
+        try {
+          clearOAuthData(OAUTH_CONFIG.clientId);
+          sessionStorage.removeItem('redirect_after_login');
+        } catch {
+          /* non-browser or storage blocked */
+        }
         router.push('/login');
       } else {
         throw new Error('Logout failed');
@@ -123,10 +132,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Check auth on mount
+  // Check auth on mount (skip /auth/continue: child effects run first; avoid racing window.location)
   useEffect(() => {
+    if (pathname === '/auth/continue') {
+      setIsLoading(false);
+      return;
+    }
     checkAuth();
-  }, [checkAuth]);
+  }, [pathname, checkAuth]);
 
   // Context value
   const value: AuthContextType = {

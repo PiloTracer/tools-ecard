@@ -18,7 +18,7 @@ import {
   OAuthErrors,
   getOAuthErrorMessage,
 } from '@/shared/lib/oauth-utils';
-import { OAUTH_CONFIG } from '@/shared/lib/oauth-config';
+import { OAUTH_CONFIG, POST_LOGIN_REDIRECT_URL } from '@/shared/lib/oauth-config';
 import type { TokenExchangeRequest, TokenExchangeResponse } from '@/shared/types/auth';
 
 export default function AuthCallbackPage() {
@@ -170,12 +170,15 @@ export default function AuthCallbackPage() {
 
       // Success!
       console.log('✓ OAuth flow completed successfully!');
-      console.log('=== Redirecting to dashboard ===');
       setStatus('success');
 
-      // Redirect to dashboard
       setTimeout(() => {
-        router.push('/dashboard');
+        const target = POST_LOGIN_REDIRECT_URL.trim();
+        if (target.startsWith('http://') || target.startsWith('https://')) {
+          window.location.href = target;
+        } else {
+          router.push(target.startsWith('/') ? target : `/${target}`);
+        }
       }, 1500);
     } catch (err) {
       console.error('=== Callback handling error ===');
@@ -255,7 +258,7 @@ export default function AuthCallbackPage() {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Login Successful!</h2>
-              <p className="text-gray-600">Redirecting to your dashboard...</p>
+              <p className="text-gray-600">Redirecting...</p>
             </>
           )}
 

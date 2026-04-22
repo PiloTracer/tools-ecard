@@ -1,6 +1,9 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import { createLogger, serializeError } from '../../../core/utils/logger';
 import { projectService } from '../services/projectService';
 import type { CreateProjectDto, UpdateSelectedProjectDto, UpdateProjectDto } from '../types';
+
+const log = createLogger('Projects');
 
 // Extended Request type with user
 interface AuthenticatedRequest extends FastifyRequest {
@@ -21,8 +24,6 @@ export const projectController = {
       // Use authenticated user's email as userId
       const userId = request.user?.email || 'guest@example.com';
 
-      console.log('[getProjects] userId:', userId, 'user:', request.user);
-
       const result = await projectService.getUserProjects(userId);
 
       const response = {
@@ -37,8 +38,6 @@ export const projectController = {
         })),
         selectedProjectId: result.selectedProjectId
       };
-
-      console.log('[getProjects] Returning response:', JSON.stringify(response, null, 2));
 
       return reply.send(response);
     } catch (error) {
@@ -124,11 +123,7 @@ export const projectController = {
     try {
       const userId = request.user?.email || 'guest@example.com';
 
-      console.log('[ensureDefaultProject] Starting for userId:', userId, 'user:', request.user);
-
       const project = await projectService.ensureUserDefaultProject(userId);
-
-      console.log('[ensureDefaultProject] Success:', project);
 
       return reply.send({
         id: project.id,
@@ -137,9 +132,13 @@ export const projectController = {
         createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString()
       });
-    } catch (error: any) {
-      console.error('[ensureDefaultProject] Error:', error);
-      return reply.status(500).send({ error: error.message || 'Failed to ensure default project' });
+    } catch (error: unknown) {
+      log.error({ err: serializeError(error) }, 'ensureDefaultProject failed');
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to ensure default project';
+      return reply.status(500).send({ error: message });
     }
   },
 
@@ -164,8 +163,6 @@ export const projectController = {
         createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString()
       };
-
-      console.log('[updateProject] Updated project:', JSON.stringify(response, null, 2));
 
       return reply.send(response);
     } catch (error: any) {

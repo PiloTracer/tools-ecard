@@ -4,7 +4,8 @@
  * Handles OAuth 2.0 callback with server-side redirect
  * - No JavaScript execution (bypasses ad blockers like AdGuard)
  * - Validates state and exchanges code for tokens
- * - Sets HTTP-only cookies and redirects to dashboard
+ * - Sets HTTP-only cookies, then same-origin redirect to /auth/continue (so cookies
+ *   stick) before the client sends the user to POST_LOGIN_REDIRECT_URL (e.g. app library).
  *
  * GET /oauth/complete?code=...&state=...
  */
@@ -26,6 +27,34 @@ const getBaseUrl = () => {
   const url = new URL(OAUTH_CONFIG.redirectUri);
   return url.origin; // e.g., http://localhost:7300
 };
+
+function getPostLoginRedirectUrl(): string {
+  const raw = (
+    process.env.POST_LOGIN_REDIRECT_URL ||
+    process.env.NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL ||
+    '/dashboard'
+  ).trim();
+  if (raw.startsWith('/')) {
+    return `${getBaseUrl()}${raw}`;
+  }
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      return `${getBaseUrl()}/dashboard`;
+    }
+    return raw;
+  } catch {
+    return `${getBaseUrl()}/dashboard`;
+  }
+}
+
+function isSameOriginAsEcards(target: string): boolean {
+  try {
+    return new URL(target).origin === new URL(getBaseUrl()).origin;
+  } catch {
+    return false;
+  }
+}
 
 // Cookie configuration
 const COOKIE_CONFIG = {
@@ -127,7 +156,7 @@ export async function GET(request: NextRequest) {
       }
 
       codeVerifier = storedCodeVerifier;
-      console.log('✓ Code verifier found:', codeVerifier.substring(0, 10) + '...');
+      console.log('✓ Code verifier found:', storedCodeVerifier.substring(0, 10) + '...');
     } else {
       // Pre-initiated OAuth flow - no PKCE required
       console.log('✓ Pre-initiated OAuth flow - no PKCE validation needed');
@@ -196,12 +225,12 @@ export async function GET(request: NextRequest) {
       email: user.email,
     });
 
-    // Create redirect response to dashboard
-    console.log('Setting cookies and redirecting to dashboard...');
-    // Use the OAuth redirect URI's origin to ensure correct port (7300, not Docker's internal 3000)
-    const dashboardUrl = OAUTH_CONFIG.redirectUri.replace(/\/oauth\/complete$/, '/dashboard');
-    console.log('Redirecting to:', dashboardUrl);
-    const redirectResponse = NextResponse.redirect(dashboardUrl);
+    const afterLoginUrl = getPostLoginRedirectUrl();
+    const redirectTo = isSameOriginAsEcards(afterLoginUrl)
+      ? afterLoginUrl
+      : `${getBaseUrl()}/auth/continue`;
+    console.log('Setting cookies; redirecting after login to:', redirectTo);
+    const redirectResponse = NextResponse.redirect(redirectTo);
 
     // Set access token cookie
     redirectResponse.cookies.set({
@@ -240,7 +269,7 @@ export async function GET(request: NextRequest) {
     redirectResponse.cookies.delete(COOKIE_CONFIG.codeVerifier.name);
 
     console.log('✓ All cookies set successfully!');
-    console.log('=== Server-Side OAuth Complete - Redirecting to /dashboard ===');
+    console.log('=== Server-Side OAuth Complete ===');
 
     return redirectResponse;
   } catch (err) {

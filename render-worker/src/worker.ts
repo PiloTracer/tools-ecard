@@ -12,10 +12,6 @@ const connection = {
 };
 
 async function start() {
-  console.log('🚀 Starting render worker...');
-  console.log(`📊 Environment: ${workerConfig.env}`);
-  console.log(`⚙️  Concurrency: ${workerConfig.worker.concurrency}`);
-
   // Create worker
   const worker = new Worker(
     'card-rendering',
@@ -23,7 +19,7 @@ async function start() {
       try {
         await processRenderCard(job);
       } catch (error) {
-        console.error(`❌ Job failed:`, error);
+        console.error('Render job failed:', error);
         throw error; // Let BullMQ handle retries
       }
     },
@@ -38,28 +34,23 @@ async function start() {
   );
 
   worker.on('ready', () => {
-    console.log('✅ Worker ready and waiting for jobs');
-  });
-
-  worker.on('completed', (job) => {
-    console.log(`✅ Job completed: ${job.id}`);
+    console.log(
+      `Render worker ready (env=${workerConfig.env}, concurrency=${workerConfig.worker.concurrency})`
+    );
   });
 
   worker.on('failed', (job, error) => {
-    console.error(`❌ Job failed: ${job?.id}`, error.message);
+    console.error(`Render job failed: ${job?.id}`, error.message);
   });
 
   worker.on('error', (error) => {
-    console.error('❌ Worker error:', error);
+    console.error('Render worker error:', error);
   });
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
-    console.log(`\n${signal} received, shutting down worker...`);
-
+    console.log(`${signal} received, shutting down render worker...`);
     await worker.close();
-
-    console.log('✅ Worker shutdown complete');
     process.exit(0);
   };
 
@@ -68,6 +59,6 @@ async function start() {
 }
 
 start().catch((error) => {
-  console.error('❌ Failed to start worker:', error);
+  console.error('Failed to start render worker:', error);
   process.exit(1);
 });

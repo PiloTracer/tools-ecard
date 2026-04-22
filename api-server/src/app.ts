@@ -26,10 +26,23 @@ import fontRoutes from './features/font-management/routes/fontRoutes';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
 
+const devVerboseHttp =
+  appConfig.env === 'development' && process.env.FASTIFY_REQUEST_LOG === '1';
+
 export async function buildApp() {
   const app = Fastify({
+    // Per-request JSON logs are noisy next to Cassandra/Redis; opt in with FASTIFY_REQUEST_LOG=1
+    disableRequestLogging: appConfig.env === 'development' && !devVerboseHttp,
     logger: {
       level: appConfig.env === 'development' ? 'info' : 'warn',
+      serializers: {
+        req(request) {
+          return { method: request.method, url: request.url, host: request.hostname };
+        },
+        res(reply) {
+          return { statusCode: reply.statusCode };
+        },
+      },
     },
   });
 
@@ -53,7 +66,7 @@ export async function buildApp() {
         cb(null, true);
       } else {
         // In production, be strict
-        cb(new Error('Not allowed by CORS'));
+        cb(new Error('Not allowed by CORS'), false);
       }
     },
     credentials: true, // Allow cookies and credentials
