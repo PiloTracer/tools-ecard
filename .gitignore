@@ -157,6 +157,12 @@ README_*
 SUBAGENTS/
 .dev-notes/
 **/bin/
+# Keep repo-root helper scripts (see exception after generic **/bin/ ignore)
+!/bin/
+!/bin/*.sh
+!/bin/*.bat
+!/bin/*.cmd
+bin/_backup_cron_generated.sh
 
 # NEXT:
 .next/
