@@ -1,0 +1,14 @@
+name: dashboard
+version: 1.0.0
+description: Main application dashboard and navigation
+
+services:
+  front-cards:
+    routes:
+      - app/dashboard/page.tsx
+    components: []
+
+database: {}
+external_dependencies: []
+configuration:
+  environment_variables: []

@@ -163,7 +163,9 @@ SUBAGENTS/
 
 # Local Storage (development fallback for SeaweedFS)
 .local-storage/
-.claude/
+# Project AI docs (tracked). Local-only overrides:
+.claude/settings.local.json
+.claude/tmp/
 .db.misc/
 .misc/
 *.log

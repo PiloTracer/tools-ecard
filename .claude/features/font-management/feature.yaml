@@ -1,0 +1,32 @@
+name: font-management
+version: 1.0.0
+description: Google Fonts integration and caching
+
+services:
+  api-server:
+    endpoints:
+      - method: GET
+        path: /api/v1/fonts
+        file: src/features/font-management/controllers/fontController.ts
+        auth: optional
+    services:
+      - src/features/font-management/services/fontService.ts
+    controllers:
+      - src/features/font-management/controllers/fontController.ts
+    routes:
+      - src/features/font-management/routes/fontRoutes.ts
+    types:
+      - src/features/font-management/types/index.ts
+    startup:
+      - src/features/font-management/startup/loadGoogleFonts.ts
+
+database:
+  cassandra:
+    - font_metadata: "Font information and metrics"
+
+external_dependencies:
+  - opentype.js
+
+configuration:
+  environment_variables:
+    - CASSANDRA_KEYSPACE: "ecards_canonical"

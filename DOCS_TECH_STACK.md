@@ -26,22 +26,20 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 ## API Server (`api-server`)
 
-**Framework:** Express.js (Node.js)
+**Framework:** Fastify (Node.js)
 **Language:** TypeScript
 **Runtime:** Node.js
 **Key Libraries:**
-- Express (HTTP server)
-- Socket.IO (WebSocket communication)
-- Cassandra driver (event store)
-- PostgreSQL driver (relational data)
-- Redis client (caching, job queue)
+- Prisma (PostgreSQL ORM)
+- Fastify + `@fastify/websocket` (WebSocket)
+- `cassandra-driver` (event log / audit patterns)
+- Redis + Bull/BullMQ (queues)
+- S3 / storage clients for remote object storage
 
 **Features:**
-- RESTful API endpoints
-- WebSocket support for real-time updates
-- LLM integration (OpenAI, Anthropic, DeepSeek)
-- Rate limiting
-- JWT token generation (internal)
+- RESTful API and WebSocket routes
+- LLM integration (OpenAI, Anthropic, DeepSeek) where configured
+- Rate limiting, JWT and cookie-based session patterns
 
 **Port:** 7400 (host) → 4000 (container)
 
@@ -109,22 +107,13 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 ## External Services
 
-### OAuth Server (Tools Dashboard)
+### OAuth / user management (remote)
 
-**Location:** `tools-dashboard` (separate project)
-**Purpose:** OAuth 2.0 authorization server
-**Stack:**
-- FastAPI (Python backend)
-- PostgreSQL (client registration)
-- Cassandra (authorization codes, tokens)
-- RSA key management (JWT signing)
+**Purpose:** OAuth 2.0 and user APIs used **as a client** by this app (this repo is not the auth server).
 
-**Endpoints:**
-- `/oauth/authorize` - Authorization endpoint
-- `/oauth/token` - Token exchange endpoint
-- `/api/users/me` - User info endpoint
+**Typical dev wiring:** `epicdev.com` resolvable to the host via `/etc/hosts` and `extra_hosts` in `docker-compose.dev.yml` (see [README.md](./README.md) and env examples).
 
-**Domain:** `epicdev.com` (mapped to localhost via hosts file)
+**Endpoints (environment-specific):** authorization, token, and userinfo URLs come from `OAUTH_*` and `NEXT_PUBLIC_OAUTH_*` variables — do not hardcode in code without checking config.
 
 ### SeaweedFS (Remote)
 
@@ -302,21 +291,18 @@ docker-compose down -v
 
 ---
 
-## Related Projects
+## Related projects
 
-**Tools Dashboard:** OAuth 2.0 authorization server (FastAPI + Python)
-**Project Location:** `D:\Projects\EPIC\tools-dashboard`
-
-**E-Cards Application:** This project
-**Project Location:** `D:\Projects\EPIC\tools-ecards`
+- **This repo:** E-Cards monorepo (`tools-ecards`).
+- **Other EPIC services** (OAuth, admin, etc.): live in their own repositories; this app **calls** them — see `DOCS_CONTEXT.md` and **`.claude/features/`** (e.g. auto-auth).
 
 ---
 
-## Notes for AI Agents
+## Notes for AI agents
 
-- **Next.js 16:** Uses App Router (not Pages Router), React Server Components
-- **TypeScript:** All services use TypeScript with strict mode
-- **Docker Networking:** Services communicate via service names (e.g., `postgres`, `cassandra`)
-- **OAuth Flow:** Server-side callback route (not client-side) for AdGuard compatibility
-- **Database Choice:** PostgreSQL for normalized data, Cassandra for events/logs
-- **Authentication:** HTTP-only cookies, no localStorage/sessionStorage for tokens
+- **Next.js 16:** App Router, RSC where applicable — confirm per route under `front-cards/app/`.
+- **TypeScript:** Services aim for strict typing; use existing patterns in each package.
+- **Docker networking:** Services reach each other by compose service name (`postgres`, `redis`, `cassandra`, `api-server`, etc.).
+- **Databases:** PostgreSQL for relational data; Cassandra for high-write / event-style tables per `db/init-cassandra/`.
+- **Auth:** HTTP-only cookies and OAuth flows as implemented — read env + feature docs before changing.
+- **Editor MCP (`.cursor/mcp.json`):** Cursor loads [project MCP](https://cursor.com/docs/mcp) from **`.cursor/mcp.json`** (same folder as this file’s parent is the workspace root). The `filesystem` server uses **`${workspaceFolder}`** so it works on any machine. The **Postgres** URL matches default **dev** compose (`ecards_user` / `ecards_dev_password` on host port **7432**); override locally via your user **`~/.cursor/mcp.json`** or by changing the project entry if your DB differs. Prefer **`${env:VAR}`** for secrets (see Cursor MCP docs — never commit production credentials).

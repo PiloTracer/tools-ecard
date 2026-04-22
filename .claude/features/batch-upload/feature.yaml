@@ -1,0 +1,61 @@
+name: batch-upload
+version: 1.0.0
+description: Batch file upload with storage and job queuing
+
+services:
+  front-cards:
+    routes:
+      - app/batches/page.tsx
+    components: []
+    hooks: []
+
+  api-server:
+    endpoints:
+      - method: POST
+        path: /api/batches/upload
+        file: src/features/batch-upload/controllers/batchController.ts
+        auth: required
+      - method: GET
+        path: /api/batches/:id/status
+        file: src/features/batch-upload/controllers/batchController.ts
+        auth: required
+      - method: GET
+        path: /api/batches
+        file: src/features/batch-upload/controllers/batchController.ts
+        auth: required
+      - method: DELETE
+        path: /api/batches/:id
+        file: src/features/batch-upload/controllers/batchController.ts
+        auth: required
+      - method: POST
+        path: /api/batches/:id/retry
+        file: src/features/batch-upload/controllers/batchController.ts
+        auth: required
+    services:
+      - src/features/batch-upload/services/batchUploadService.ts
+      - src/features/batch-upload/services/storageService.ts
+      - src/features/batch-upload/services/queueService.ts
+    repositories:
+      - src/features/batch-upload/repositories/batchRepository.ts
+    validators:
+      - src/features/batch-upload/validators/batchValidators.ts
+    types:
+      - src/features/batch-upload/types.ts
+    routes:
+      - src/features/batch-upload/routes.fastify.ts
+
+database:
+  postgres:
+    - batches: "Batch metadata and status tracking"
+  cassandra:
+    - batch_records: "Parsed contact records"
+
+external_dependencies:
+  - bullmq
+  - "@fastify/multipart"
+
+configuration:
+  environment_variables:
+    - MAX_FILE_SIZE: "10485760 (10MB)"
+    - REDIS_HOST: "Redis host for job queue"
+    - REDIS_PORT: "Redis port"

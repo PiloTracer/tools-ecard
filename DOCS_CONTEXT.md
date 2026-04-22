@@ -1184,10 +1184,12 @@ docker exec -it ecards-redis redis-cli
 ├── render-worker/                # Background job processor
 ├── db/                           # Database initialization
 ├── docker-compose.dev.yml
-├── DOCS_CONTEXT.md             # THIS FILE - Complete context
-├── DOCS_CONTEXT.md                    # Detailed project docs
-├── ARCHITECTURE.md               # Feature-centered architecture
-└── README.md                     # Quick start guide
+├── CONTEXT.md                    # At-a-glance link table
+├── DOCS_CONTEXT.md              # This file (full project context)
+├── DOCS_TECH_STACK.md           # Stack, ports, Docker
+├── .ai/context/HANDOFF.md      # Short session handoff
+├── ARCHITECTURE.md              # Feature-centered architecture
+└── README.md                    # Quick start
 ```
 
 ### Code Standards

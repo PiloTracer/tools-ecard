@@ -1,0 +1,31 @@
+name: batch-import
+version: 1.0.0
+description: Field mapping and data import (PLACEHOLDER)
+
+services:
+  api-server:
+    endpoints:
+      - method: POST
+        path: /api/batch-import/:id/import
+        file: src/features/batch-import/controllers/batchImportController.ts
+        auth: required
+      - method: GET
+        path: /api/batch-import/:id/preview
+        file: src/features/batch-import/controllers/batchImportController.ts
+        auth: required
+      - method: GET
+        path: /api/batch-import/:id/mappings/suggest
+        file: src/features/batch-import/controllers/batchImportController.ts
+        auth: required
+    services:
+      - src/features/batch-import/services/batchImportService.ts
+    controllers:
+      - src/features/batch-import/controllers/batchImportController.ts
+    routes:
+      - src/features/batch-import/routes.fastify.ts
+    types:
+      - src/features/batch-import/types.ts
+
+database:
+  cassandra:
+    - batch_records: "Imported contact records"

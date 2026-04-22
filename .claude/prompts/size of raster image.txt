@@ -1,0 +1,33 @@
+> same shit!!!
+  I'm going to explain it to you like a retard:
+  - In the case of our current test, the dimensions of the    
+  svg are: 539x171
+  - but you are supposed to rasterize that svg to an image    
+  5x larger, which results in image of size: 2695x857
+  - of course this is too big to show in the canvas, so you   
+  create a 300x95 (which keeps the aspect ratio of the        
+  image).
+  - AND HERE IS WHERE YOU FUCK UP.  You must escale the       
+  contained image from 2695x857 to 300x95, and do the exact   
+  same thing every time the box size changes.
+  - BUT AT ALL TIMES YOU must have all the information (full  
+  image data) available, so you can properly render the       
+  visual representation (viewed image).
+  - WHEN I EXPORT the card, the export must use the original  
+  data escaled accordingly to what's required to the output   
+  size.
+  - FOR EXAMPLE: if I'm exporting an image 1920px wide, and   
+  the image is at 100% the width of the output, then the      
+  2695x857 image is scaled to: 1920x609 or something like     
+  that.
+
+  Look, I'm describing above the exact math process from my   
+  perspective, this should not be this complex by you, as     
+  everything is handled by fabric, or whatever, but simpler.  
+
+  MAKE THIS WORK NOW!
+
+  fabric code (just for reference if needed):
+  D:\Projects\EPIC\tools-fabric-reference\fabric.js
+  which uses:
+  D:\Projects\EPIC\tools-fabric-canvas-reference\node-canvas  

@@ -1,0 +1,34 @@
+name: batch-parsing
+version: 1.0.0
+description: Background batch file parsing with LLM integration
+
+services:
+  api-server:
+    endpoints:
+      - method: GET
+        path: /api/batches/:id/diagnostics
+        file: src/features/batch-parsing/routes/diagnostics.fastify.ts
+        auth: required
+    services:
+      - src/features/batch-parsing/services/batchParsingService.ts
+      - src/features/batch-parsing/services/workerService.ts
+    repositories:
+      - src/features/batch-parsing/repositories/batchRecordRepository.ts
+    routes:
+      - src/features/batch-parsing/routes.fastify.ts
+      - src/features/batch-parsing/routes/diagnostics.fastify.ts
+
+database:
+  cassandra:
+    - batch_records: "Parsed contact data"
+
+external_dependencies:
+  - axios (for LLM API calls)
+
+configuration:
+  environment_variables:
+    - LLM_ENABLED: "Enable/disable LLM parsing"
+    - LLM_PRIMARY_PROVIDER: "openai, anthropic, or deepseek"
+    - OPENAI_API_KEY: "OpenAI API key"
+    - ANTHROPIC_API_KEY: "Anthropic API key"
+    - DEEPSEEK_API_KEY: "DeepSeek API key"

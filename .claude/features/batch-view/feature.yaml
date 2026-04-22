@@ -1,0 +1,27 @@
+name: batch-view
+version: 1.0.0
+description: Batch listing and detail viewing
+
+services:
+  front-cards:
+    routes:
+      - app/batches/page.tsx
+      - app/batches/[batchId]/page.tsx
+    components: []
+
+  api-server:
+    endpoints:
+      - method: GET
+        path: /api/batches/:id
+        file: src/features/batch-view/controllers/batchViewController.ts
+        auth: required
+    services:
+      - src/features/batch-view/services/batchViewService.ts
+    controllers:
+      - src/features/batch-view/controllers/batchViewController.ts
+    routes:
+      - src/features/batch-view/routes.fastify.ts
+
+database:
+  postgres:
+    - batches: "Batch metadata"

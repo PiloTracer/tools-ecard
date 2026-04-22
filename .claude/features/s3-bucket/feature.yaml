@@ -1,0 +1,99 @@
+name: s3-bucket
+version: 1.0.0
+description: S3-compatible storage with local fallback for file management
+
+services:
+  api-server:
+    endpoints:
+      - method: POST
+        path: /api/v1/s3/objects
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Upload a file
+      - method: GET
+        path: /api/v1/s3/objects/:bucket/:key
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Download a file
+      - method: HEAD
+        path: /api/v1/s3/objects/:bucket/:key
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Check if file exists
+      - method: DELETE
+        path: /api/v1/s3/objects/:bucket/:key
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Delete a file
+      - method: POST
+        path: /api/v1/s3/objects/delete-batch
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Delete multiple files
+      - method: GET
+        path: /api/v1/s3/objects
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: List objects in bucket
+      - method: POST
+        path: /api/v1/s3/presigned-url
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Generate presigned URL
+      - method: POST
+        path: /api/v1/s3/multipart/start
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Start multipart upload
+      - method: POST
+        path: /api/v1/s3/multipart/part
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Upload multipart chunk
+      - method: POST
+        path: /api/v1/s3/multipart/complete
+        file: src/features/s3-bucket/controllers/s3Controller.ts
+        auth: optional
+        description: Complete multipart upload
+    services:
+      - src/features/s3-bucket/services/s3Service.ts
+      - src/features/s3-bucket/services/localStorageService.ts
+    controllers:
+      - src/features/s3-bucket/controllers/s3Controller.ts
+    routes:
+      - src/features/s3-bucket/routes/s3Routes.ts
+    types:
+      - src/features/s3-bucket/types/index.ts
+    config:
+      - src/features/s3-bucket/config/s3Config.ts
+    tests:
+      - src/features/s3-bucket/test-s3.ts
+
+database:
+  postgres: []
+  cassandra: []
+
+external_dependencies:
+  - "@aws-sdk/client-s3"
+  - "@aws-sdk/lib-storage"
+  - "@aws-sdk/s3-request-presigner"
+  - sharp
+  - mime-types
+
+configuration:
+  environment_variables:
+    - USE_LOCAL_STORAGE: "Force local storage mode (true/false)"
+    - SEAWEEDFS_ENDPOINT: "S3 endpoint URL"
+    - SEAWEEDFS_ACCESS_KEY: "S3 access key"
+    - SEAWEEDFS_SECRET_KEY: "S3 secret key"
+    - SEAWEEDFS_BUCKET: "Default bucket name"
+    - SEAWEEDFS_REGION: "S3 region"
+    - STORAGE_MAX_FILE_SIZE: "Max file size in bytes"
+    - STORAGE_MULTIPART_THRESHOLD: "Multipart threshold in bytes"
+  feature_flags: []
+
+links:
+  planning_docs:
+    - api-server/src/features/s3-bucket/README.md
+  implementation_docs:
+    - .claude/features/s3-bucket/README.md

@@ -1,0 +1,49 @@
+name: simple-projects
+version: 1.0.0
+description: Multi-project workspace management
+
+services:
+  front-cards:
+    routes:
+      - app/dashboard/page.tsx
+    components: []
+
+  api-server:
+    endpoints:
+      - method: GET
+        path: /api/v1/projects
+        file: src/features/simple-projects/controllers/projectController.ts
+        auth: required
+      - method: POST
+        path: /api/v1/projects
+        file: src/features/simple-projects/controllers/projectController.ts
+        auth: required
+      - method: GET
+        path: /api/v1/projects/selected
+        file: src/features/simple-projects/controllers/projectController.ts
+        auth: required
+      - method: PUT
+        path: /api/v1/projects/selected
+        file: src/features/simple-projects/controllers/projectController.ts
+        auth: required
+      - method: POST
+        path: /api/v1/projects/ensure-default
+        file: src/features/simple-projects/controllers/projectController.ts
+        auth: required
+    services:
+      - src/features/simple-projects/services/projectService.ts
+    repositories:
+      - src/features/simple-projects/repositories/projectRepository.ts
+    validators:
+      - src/features/simple-projects/validators/projectValidators.ts
+    routes:
+      - src/features/simple-projects/routes.ts
+
+database:
+  postgres:
+    - users: "User accounts"
+    - projects: "Project metadata"
+    - user_project_selections: "Active project tracking"
+
+configuration:
+  environment_variables: []

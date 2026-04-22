@@ -1,0 +1,31 @@
+name: batch-records
+version: 1.0.0
+description: Individual record management within batches
+
+services:
+  api-server:
+    endpoints:
+      - method: GET
+        path: /api/batches/:batchId/records
+        file: src/features/batch-records/controllers/batchRecordController.ts
+        auth: required
+      - method: PUT
+        path: /api/batches/:batchId/records/:recordId
+        file: src/features/batch-records/controllers/batchRecordController.ts
+        auth: required
+      - method: DELETE
+        path: /api/batches/:batchId/records/:recordId
+        file: src/features/batch-records/controllers/batchRecordController.ts
+        auth: required
+    services:
+      - src/features/batch-records/services/batchRecordService.ts
+    controllers:
+      - src/features/batch-records/controllers/batchRecordController.ts
+    validators:
+      - src/features/batch-records/validators/recordValidator.ts
+    routes:
+      - src/features/batch-records/routes.fastify.ts
+
+database:
+  cassandra:
+    - batch_records: "Contact record storage"
