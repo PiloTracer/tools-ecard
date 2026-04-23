@@ -5,6 +5,10 @@
 #   ./bin/start.sh
 #   ./bin/start.sh dev
 #
+# If startup errors scroll away in the menu, use CLI (no menu, stable output):
+#   ./bin/start.sh dev up
+# Or skip clearing the screen once: ECARDS_START_NO_CLEAR=1 ./bin/start.sh dev
+#
 # CLI (no menu — runs command and exits):
 #   ./bin/start.sh dev up
 #   ./bin/start.sh dev up-build
@@ -30,6 +34,7 @@ Usage:
 
 Commands:
   up            Start stack (up -d, no image rebuild), wait for API /health, print URLs
+                (best for debugging: full docker output, no interactive menu — use this if menu hides errors)
   up-build      Start stack with image rebuild (--build)
   down          Stop stack (down --remove-orphans)
   logs          Follow all service logs (tail 100)
@@ -42,7 +47,9 @@ Commands:
   help, -h      Show this help
 
 Environment:
-  ECARDS_URL_HOST   Host printed in URLs (default: localhost)
+  ECARDS_URL_HOST           Host printed in URLs (default: localhost)
+  ECARDS_START_NO_CLEAR=1   Skip clearing the terminal when opening the interactive menu
+  ECARDS_START_LOG_TAIL_ALL=1   With diagnostics: tail logs for all services (default: api, postgres, cassandra, redis, db-init)
 EOF
 }
 
@@ -203,9 +210,43 @@ run_compose() {
   "${DOCKER_COMPOSE[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
+# After failed compose up or health wait: ps + log tails (stderr so it stays visible).
+compose_failure_context() {
+  echo >&2 ""
+  echo >&2 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo >&2 "--- Compose diagnostics (last failure) ---"
+  echo >&2 "Project: $PROJ_NAME  |  Compose: $(basename "$COMPOSE_FILE")  |  Env: $(basename "$ENV_FILE")"
+  echo >&2 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  run_compose ps -a 2>&1 | sed 's/^/  /' >&2 || true
+  echo >&2 ""
+  if [ "${ECARDS_START_LOG_TAIL_ALL:-0}" = 1 ]; then
+    echo >&2 "--- logs --tail=120 (all services) ---"
+    run_compose logs --tail=120 2>&1 | sed 's/^/  /' >&2 || true
+  else
+    for svc in api-server postgres cassandra redis; do
+      echo >&2 "--- logs --tail=60 ${svc} ---"
+      run_compose logs --tail=60 "$svc" 2>&1 | sed 's/^/  /' >&2 || true
+    done
+    echo >&2 "--- logs --tail=40 db-init ---"
+    run_compose logs --tail=40 db-init 2>&1 | sed 's/^/  /' >&2 || true
+  fi
+  echo >&2 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
 pause() {
   read -r -n1 -s -p "Press any key to continue..." || true
   echo
+}
+
+# After a failed menu action: do not clear diagnostics; wait for Enter.
+pause_after_error() {
+  echo >&2 ""
+  echo >&2 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo >&2 "The last command did not complete successfully. Read the output above."
+  echo >&2 "Tip (stable scrollback, no menu):  $0 $TARGET_ENV up"
+  echo >&2 "     (follow logs):                  $0 $TARGET_ENV logs"
+  echo >&2 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  read -r -p "Press Enter to return to the menu..." _ || true
 }
 
 ensure_volumes_info() {
@@ -253,7 +294,7 @@ wait_for_api_ready() {
       if [ $((n % 20)) -eq 0 ]; then echo "  ... ${n}s"; fi
     done
     echo "Timeout waiting for nginx /health (check api-server and front-cards logs)." >&2
-    run_compose ps || true
+    compose_failure_context
     return 1
   fi
 
@@ -268,7 +309,7 @@ wait_for_api_ready() {
     if [ $((n % 20)) -eq 0 ]; then echo "  ... ${n}s"; fi
   done
   echo "Timeout waiting for API /health." >&2
-  run_compose ps || true
+  compose_failure_context
   return 1
 }
 
@@ -354,7 +395,11 @@ print_stack_urls() {
 
 cmd_up_quick() {
   echo "Starting stack (no image rebuild)..."
-  run_compose up -d
+  if ! run_compose up -d; then
+    echo "docker compose up -d failed." >&2
+    compose_failure_context
+    return 1
+  fi
   prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 120)"; then
     echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
@@ -365,7 +410,11 @@ cmd_up_quick() {
 
 cmd_up_build() {
   echo "Starting stack (with image rebuild)..."
-  run_compose up -d --build
+  if ! run_compose up -d --build; then
+    echo "docker compose up -d --build failed." >&2
+    compose_failure_context
+    return 1
+  fi
   prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
@@ -402,9 +451,11 @@ cmd_restart() {
   run_compose restart
   if wait_for_api_ready "$(compose_api_wait_secs 120)"; then
     print_stack_urls
-  else
-    echo "Warning: API /health not ready after restart — inspect logs." >&2
+    return 0
   fi
+  echo "Warning: API /health not ready after restart — inspect logs." >&2
+  compose_failure_context
+  return 1
 }
 
 cmd_rebuild_stack() {
@@ -416,7 +467,11 @@ cmd_rebuild_stack() {
   fi
   run_compose down --remove-orphans
   run_compose build 2>&1 | tee "${PROJECT_ROOT}/build.log"
-  run_compose up -d
+  if ! run_compose up -d; then
+    echo "docker compose up -d failed after rebuild." >&2
+    compose_failure_context
+    return 1
+  fi
   prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
@@ -433,7 +488,11 @@ cmd_reset_stack() {
   fi
   run_compose down -v --remove-orphans
   run_compose build 2>&1 | tee "${PROJECT_ROOT}/build.log"
-  run_compose up -d
+  if ! run_compose up -d; then
+    echo "docker compose up -d failed after reset build." >&2
+    compose_failure_context
+    return 1
+  fi
   prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
@@ -445,10 +504,15 @@ cmd_force_rebuild() {
   echo "Force rebuild (no cache) — volumes kept."
   run_compose down --remove-orphans
   if ! run_compose build --no-cache; then
-    echo "Build failed."
+    echo "Build failed." >&2
+    compose_failure_context
     return 1
   fi
-  run_compose up -d
+  if ! run_compose up -d; then
+    echo "docker compose up -d failed after force build." >&2
+    compose_failure_context
+    return 1
+  fi
   prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
@@ -497,7 +561,12 @@ mount_and_start() {
     docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/_backup_cassandra.tar.gz -C /data"
   fi
 
-  run_compose up -d --build
+  if ! run_compose up -d --build; then
+    echo "docker compose up -d --build failed after restore." >&2
+    compose_failure_context
+    pause_after_error
+    return 1
+  fi
   prune_anonymous_volumes
   echo "Restore complete."
   pause
@@ -544,7 +613,7 @@ if [ -n "${ECARDS_CLI_CMD:-}" ] && [ "$ECARDS_CLI_CMD" != "menu" ]; then
     down) cmd_down ;;
     logs) cmd_logs ;;
     status) cmd_status ;;
-    restart) cmd_restart ;;
+    restart) cmd_restart || exit 1 ;;
     rebuild) cmd_rebuild_stack || exit 1 ;;
     reset) cmd_reset_stack || exit 1 ;;
     force-rebuild) cmd_force_rebuild || exit 1 ;;
@@ -563,11 +632,16 @@ echo "Backup dir:     $BACKUP_DIR"
 echo "Compose file:   $COMPOSE_FILE"
 echo "Env file:       $ENV_FILE"
 echo "CLI:            $0 $TARGET_ENV up | up-build | down | logs | status | ..."
+echo "Debug (no menu, full compose output):  $0 $TARGET_ENV up"
+echo "Or:  ECARDS_START_NO_CLEAR=1 $0 $TARGET_ENV   — keeps prior terminal output when opening menu"
 echo "========================================="
 echo ""
 
-while true; do
+if [ "${ECARDS_START_NO_CLEAR:-0}" != 1 ] && [ "$(echo "${ECARDS_START_NO_CLEAR:-}" | tr '[:upper:]' '[:lower:]')" != "true" ]; then
   clear || true
+fi
+
+while true; do
   echo "========================================="
   echo "   tools-ecards — Docker ($TARGET_ENV)"
   echo "========================================="
@@ -587,17 +661,18 @@ while true; do
   echo "  0. Exit"
   echo "-----------------------------------------"
   echo "CLI: $0 $TARGET_ENV up | up-build | down | logs | status | restart | rebuild | reset | force-rebuild"
+  echo "Debug (no menu): $0 $TARGET_ENV up"
   echo "========================================="
   read -r -p "Select: " opt
   case "$opt" in
-    1) cmd_up_quick || pause ;;
-    2) cmd_up_build || pause ;;
+    1) cmd_up_quick || pause_after_error ;;
+    2) cmd_up_build || pause_after_error ;;
     3) cmd_down; pause ;;
     4) run_cleanup; pause ;;
-    5) cmd_force_rebuild || pause ;;
-    6) cmd_restart; pause ;;
-    7) cmd_rebuild_stack || true; pause ;;
-    8) cmd_reset_stack || true; pause ;;
+    5) if cmd_force_rebuild; then pause; else pause_after_error; fi ;;
+    6) if cmd_restart; then pause; else pause_after_error; fi ;;
+    7) if cmd_rebuild_stack; then pause; else pause_after_error; fi ;;
+    8) if cmd_reset_stack; then pause; else pause_after_error; fi ;;
     9) mount_and_start ;;
     10) backup ;;
     11) view_logs || true ;;
