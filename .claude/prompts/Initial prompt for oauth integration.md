@@ -2,7 +2,7 @@ YOU ARE AN EXPERT IN THE OAUTH INTEGRATION PROCESS (read
   /.claude/implementations/OAUTH_IMPLEMENTATION_GUIDE.md)
 
   1. in .env.dev.example set a URI variable for the user to subscribe through     
-  the Tools dashboard at: http://dev.aiepic.app/app/features/user-subscription       
+  the Tools dashboard at: https://dev.aiepic.app/app/features/user-subscription       
   2. in .env.dev.example Add additional Redirect URI's for Oauth (comma
   separated for single variable maybe) according to the oauth implementation      
   guide.

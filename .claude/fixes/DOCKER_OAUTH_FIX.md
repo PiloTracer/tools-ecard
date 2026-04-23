@@ -24,7 +24,7 @@ code: 'UND_ERR_CONNECT_TIMEOUT'
 2. User is redirected to `http://localhost:7300/oauth/complete?code=xxx&state=yyy`
 3. Frontend calls `/api/auth/exchange-token` API route
 4. Backend API route (running inside Docker container) tries to exchange code with OAuth server
-5. **Backend makes request to `http://dev.aiepic.app/oauth/token`**
+5. **Backend makes request to `https://dev.aiepic.app/oauth/token`**
 6. **Container cannot resolve `dev.aiepic.app` correctly**
 7. Request times out after 10 seconds
 
@@ -40,9 +40,9 @@ On the Windows host machine, the hosts file contains:
 ```
 
 This means:
-- Browser on host can access `http://dev.aiepic.app` ✅
-- Applications on host can access `http://dev.aiepic.app` ✅
-- **Docker containers CANNOT access `http://dev.aiepic.app`** ❌
+- Browser on host can access `https://dev.aiepic.app` ✅
+- Applications on host can access `https://dev.aiepic.app` ✅
+- **Docker containers CANNOT access `https://dev.aiepic.app`** ❌
 
 ### Why Docker Containers Can't Access dev.aiepic.app
 
@@ -53,7 +53,7 @@ Docker containers run in an isolated network namespace with their own:
 
 By default, containers do NOT have access to the host's hosts file mappings.
 
-When the backend API route (running in Docker) tried to fetch `http://dev.aiepic.app/oauth/token`:
+When the backend API route (running in Docker) tried to fetch `https://dev.aiepic.app/oauth/token`:
 1. Container's DNS resolver tried to look up `dev.aiepic.app`
 2. DNS lookup failed or returned incorrect IP
 3. Connection attempt timed out
@@ -111,9 +111,9 @@ Changed backend OAuth endpoints to use `dev.aiepic.app` (now that containers can
 # NOTE: With extra_hosts in docker-compose.yml, dev.aiepic.app resolves to host machine inside containers
 OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
-OAUTH_AUTHORIZATION_ENDPOINT=http://dev.aiepic.app/oauth/authorize
-OAUTH_TOKEN_ENDPOINT=http://dev.aiepic.app/oauth/token
-OAUTH_USER_INFO_ENDPOINT=http://dev.aiepic.app/api/users/me
+OAUTH_AUTHORIZATION_ENDPOINT=https://dev.aiepic.app/oauth/authorize
+OAUTH_TOKEN_ENDPOINT=https://dev.aiepic.app/oauth/token
+OAUTH_USER_INFO_ENDPOINT=https://dev.aiepic.app/api/users/me
 OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 ```
@@ -124,7 +124,7 @@ OAUTH_SCOPES=profile email subscription
 
 ### Network Flow After Fix
 
-1. **Container tries to access `http://dev.aiepic.app/oauth/token`**
+1. **Container tries to access `https://dev.aiepic.app/oauth/token`**
 2. **Docker injects host mapping:** Container's `/etc/hosts` now contains:
    ```
    <host-gateway-ip>  dev.aiepic.app
@@ -148,7 +148,7 @@ OAUTH_SCOPES=profile email subscription
 │                                                                  │
 │  API Route: /api/auth/exchange-token                           │
 │  ↓                                                               │
-│  fetch('http://dev.aiepic.app/oauth/token')                       │
+│  fetch('https://dev.aiepic.app/oauth/token')                       │
 │  ↓                                                               │
 │  Container resolves dev.aiepic.app using injected /etc/hosts      │
 │  → dev.aiepic.app = <host-gateway-ip>  (from extra_hosts)         │
@@ -184,9 +184,9 @@ Ensure your `.env` file matches `.env.dev.example`:
 # Backend OAuth Configuration (server-side only)
 OAUTH_CLIENT_ID=ecards_app_dev
 OAUTH_CLIENT_SECRET=h_auHylyxVBrBRpoJlS72JMhfiURJw2w
-OAUTH_AUTHORIZATION_ENDPOINT=http://dev.aiepic.app/oauth/authorize
-OAUTH_TOKEN_ENDPOINT=http://dev.aiepic.app/oauth/token
-OAUTH_USER_INFO_ENDPOINT=http://dev.aiepic.app/api/users/me
+OAUTH_AUTHORIZATION_ENDPOINT=https://dev.aiepic.app/oauth/authorize
+OAUTH_TOKEN_ENDPOINT=https://dev.aiepic.app/oauth/token
+OAUTH_USER_INFO_ENDPOINT=https://dev.aiepic.app/api/users/me
 OAUTH_REDIRECT_URI=http://localhost:7300/oauth/complete
 OAUTH_SCOPES=profile email subscription
 ```
@@ -227,7 +227,7 @@ Test that the container can reach the host's OAuth server:
 
 ```bash
 # Test HTTP connectivity
-docker exec ecards-frontend wget -O- http://dev.aiepic.app 2>&1 || docker exec ecards-frontend curl -v http://dev.aiepic.app 2>&1
+docker exec ecards-frontend wget -O- https://dev.aiepic.app 2>&1 || docker exec ecards-frontend curl -v https://dev.aiepic.app 2>&1
 
 # Should get HTTP response (even if 404 Not Found)
 # The important part is that it connects (no timeout)
@@ -250,7 +250,7 @@ docker logs ecards-frontend -f
 === Token Exchange API Started ===
 Flow type: Pre-Initiated OAuth (no PKCE)
 Exchanging code for token with OAuth server...
-Token endpoint: http://dev.aiepic.app/oauth/token
+Token endpoint: https://dev.aiepic.app/oauth/token
 Token exchange response status: 200
 ✓ Token exchange successful!
 ✓ User info fetched successfully!
@@ -272,7 +272,7 @@ Token exchange response status: 200
 3. Check that dev.aiepic.app OAuth server is running on host machine:
    ```bash
    # On host machine
-   curl http://dev.aiepic.app/oauth/token
+   curl https://dev.aiepic.app/oauth/token
    # or
    curl http://127.0.0.1/oauth/token
    ```
@@ -333,7 +333,7 @@ Added `extra_hosts` configuration to docker-compose.yml, mapping `dev.aiepic.app
 
 ### Result
 
-✅ Containers can now access `http://dev.aiepic.app/*` URLs
+✅ Containers can now access `https://dev.aiepic.app/*` URLs
 ✅ OAuth token exchange succeeds
 ✅ Pre-initiated OAuth flows work
 ✅ Manual login flows work

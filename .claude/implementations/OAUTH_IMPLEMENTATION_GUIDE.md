@@ -92,7 +92,7 @@ Redirect URIs are URLs in **your application** where users will be sent back aft
 const OAUTH_CONFIG = {
   clientId: 'ecards_app_dev',
   redirectUri: 'http://localhost:7300/oauth/callback', // Must match exactly!
-  authorizationEndpoint: 'http://dev.aiepic.app/oauth/authorize',
+  authorizationEndpoint: 'https://dev.aiepic.app/oauth/authorize',
 };
 
 // When user clicks login button:
@@ -197,7 +197,7 @@ export default async function handler(
 
   try {
     // Exchange code for access token
-    const tokenResponse = await fetch('http://dev.aiepic.app/oauth/token', {
+    const tokenResponse = await fetch('https://dev.aiepic.app/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -273,7 +273,7 @@ Scopes define **what data and actions** your application can access on behalf of
 ```javascript
 const scopes = ['profile', 'email', 'subscription'];
 
-const authUrl = `http://dev.aiepic.app/oauth/authorize?` +
+const authUrl = `https://dev.aiepic.app/oauth/authorize?` +
   `response_type=code&` +
   `client_id=${CLIENT_ID}&` +
   `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
@@ -290,7 +290,7 @@ Once you have an access token, you can access data based on the granted scopes:
 ```javascript
 // Example: Fetch user profile
 async function getUserProfile(accessToken) {
-  const response = await fetch('http://dev.aiepic.app/api/users/me', {
+  const response = await fetch('https://dev.aiepic.app/api/users/me', {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },
@@ -374,9 +374,9 @@ export const OAUTH_CONFIG = {
   clientId: process.env.OAUTH_CLIENT_ID, // From App Library
   clientSecret: process.env.OAUTH_CLIENT_SECRET, // KEEP SECRET!
   redirectUri: process.env.OAUTH_REDIRECT_URI,
-  authorizationEndpoint: 'http://dev.aiepic.app/oauth/authorize',
-  tokenEndpoint: 'http://dev.aiepic.app/oauth/token',
-  userInfoEndpoint: 'http://dev.aiepic.app/api/users/me',
+  authorizationEndpoint: 'https://dev.aiepic.app/oauth/authorize',
+  tokenEndpoint: 'https://dev.aiepic.app/oauth/token',
+  userInfoEndpoint: 'https://dev.aiepic.app/api/users/me',
   scopes: ['profile', 'email', 'subscription'],
 };
 ```
@@ -503,7 +503,7 @@ export default async function handler(
 
   try {
     // Exchange authorization code for access token
-    const tokenResponse = await fetch('http://dev.aiepic.app/oauth/token', {
+    const tokenResponse = await fetch('https://dev.aiepic.app/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -539,7 +539,7 @@ export default async function handler(
     */
 
     // Fetch user info
-    const userResponse = await fetch('http://dev.aiepic.app/api/users/me', {
+    const userResponse = await fetch('https://dev.aiepic.app/api/users/me', {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
       },
@@ -587,7 +587,7 @@ export async function apiRequest(url, options = {}) {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`http://dev.aiepic.app${url}`, {
+  const response = await fetch(`https://dev.aiepic.app${url}`, {
     ...options,
     headers: {
       ...options.headers,
@@ -630,7 +630,7 @@ export default async function handler(
   }
 
   try {
-    const tokenResponse = await fetch('http://dev.aiepic.app/oauth/token', {
+    const tokenResponse = await fetch('https://dev.aiepic.app/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -682,7 +682,7 @@ When users click **"Launch App"** in the Tools Dashboard App Library, the Tools 
        ├────────────────────────────────────────────────►│
        │                                                  │
        │  2. Redirect DIRECTLY to OAuth endpoint         │
-       │     http://dev.aiepic.app/oauth/authorize?         │
+       │     https://dev.aiepic.app/oauth/authorize?         │
        │     client_id=xxx&state=yyy&redirect_uri=...    │
        │◄─────────────────────────────────────────────────┤
        │                                                  │
@@ -730,7 +730,7 @@ When Tools Dashboard redirects to the authorization endpoint, it includes:
 
 **Example Authorization URL:**
 ```
-http://dev.aiepic.app/oauth/authorize?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4&response_type=code
+https://dev.aiepic.app/oauth/authorize?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=40ed89e34402fb08436e5692e8568e23d372442916638a77b65e99bc4930bca4&response_type=code
 ```
 
 ### ⚠️ Critical: Handle State Validation Correctly!
@@ -975,12 +975,12 @@ export default function OAuthCallback() {
 
 **Test from Tools Dashboard:**
 
-1. Go to `http://dev.aiepic.app/app/features/app-library`
+1. Go to `https://dev.aiepic.app/app/features/app-library`
 2. Make sure you're logged in to Tools Dashboard
 3. Click "Launch App" for your registered application
 4. You should be redirected to the OAuth consent screen:
    ```
-   http://dev.aiepic.app/oauth/authorize?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=...&response_type=code
+   https://dev.aiepic.app/oauth/authorize?client_id=ecards_app_dev&redirect_uri=http%3A%2F%2Flocalhost%3A7300%2Fauth%2Fcallback&scope=profile+email+subscription&state=...&response_type=code
    ```
 5. Click "Allow" to approve the authorization
 6. You should be redirected to your app's callback URL:
@@ -1082,7 +1082,7 @@ const response = await fetch('/api/auth/exchange-token', {
 });
 
 // YOUR Backend - uses client_secret
-const tokenResponse = await fetch('http://dev.aiepic.app/oauth/token', {
+const tokenResponse = await fetch('https://dev.aiepic.app/oauth/token', {
   body: JSON.stringify({
     code,
     client_secret: process.env.OAUTH_CLIENT_SECRET, // ✅ Server-side only
@@ -1185,8 +1185,8 @@ const OAUTH_CONFIG = {
   clientId: process.env.OAUTH_CLIENT_ID,
   clientSecret: process.env.OAUTH_CLIENT_SECRET,
   redirectUri: 'http://localhost:3000/oauth/callback',
-  authorizationEndpoint: 'http://dev.aiepic.app/oauth/authorize',
-  tokenEndpoint: 'http://dev.aiepic.app/oauth/token',
+  authorizationEndpoint: 'https://dev.aiepic.app/oauth/authorize',
+  tokenEndpoint: 'https://dev.aiepic.app/oauth/token',
   scopes: ['profile', 'email'],
 };
 
@@ -1250,7 +1250,7 @@ app.get('/api/user', async (req, res) => {
   }
 
   try {
-    const userResponse = await axios.get('http://dev.aiepic.app/api/users/me', {
+    const userResponse = await axios.get('https://dev.aiepic.app/api/users/me', {
       headers: {
         'Authorization': `Bearer ${req.session.accessToken}`,
       },
@@ -1288,8 +1288,8 @@ OAUTH_CONFIG = {
     'client_id': os.environ['OAUTH_CLIENT_ID'],
     'client_secret': os.environ['OAUTH_CLIENT_SECRET'],
     'redirect_uri': 'http://localhost:5000/oauth/callback',
-    'authorization_endpoint': 'http://dev.aiepic.app/oauth/authorize',
-    'token_endpoint': 'http://dev.aiepic.app/oauth/token',
+    'authorization_endpoint': 'https://dev.aiepic.app/oauth/authorize',
+    'token_endpoint': 'https://dev.aiepic.app/oauth/token',
     'scopes': ['profile', 'email'],
 }
 
@@ -1344,7 +1344,7 @@ def get_user():
         return jsonify({'error': 'Not authenticated'}), 401
 
     user_response = requests.get(
-        'http://dev.aiepic.app/api/users/me',
+        'https://dev.aiepic.app/api/users/me',
         headers={'Authorization': f'Bearer {access_token}'}
     )
 
@@ -1483,12 +1483,12 @@ const tokenRequest = {
 
 **1. Test authorization (copy URL to browser):**
 ```bash
-echo "http://dev.aiepic.app/oauth/authorize?response_type=code&client_id=ecards_app_dev&redirect_uri=http://localhost:7300/oauth/callback&scope=profile%20email&state=random123"
+echo "https://dev.aiepic.app/oauth/authorize?response_type=code&client_id=ecards_app_dev&redirect_uri=http://localhost:7300/oauth/callback&scope=profile%20email&state=random123"
 ```
 
 **2. Exchange code for token:**
 ```bash
-curl -X POST http://dev.aiepic.app/oauth/token \
+curl -X POST https://dev.aiepic.app/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "grant_type": "authorization_code",
@@ -1501,13 +1501,13 @@ curl -X POST http://dev.aiepic.app/oauth/token \
 
 **3. Use access token:**
 ```bash
-curl http://dev.aiepic.app/api/users/me \
+curl https://dev.aiepic.app/api/users/me \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
 **4. Refresh token:**
 ```bash
-curl -X POST http://dev.aiepic.app/oauth/token \
+curl -X POST https://dev.aiepic.app/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "grant_type": "refresh_token",

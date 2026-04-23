@@ -26,7 +26,7 @@
 
 ## User Story
 
-**As a** user authenticated in the remote application (http://dev.aiepic.app/app)
+**As a** user authenticated in the remote application (https://dev.aiepic.app/app)
 **I want to** be automatically authenticated when accessing the E-Cards application
 **So that** I can seamlessly use E-Cards without re-entering credentials
 
@@ -34,13 +34,13 @@
 
 **Important:** This feature integrates with **two remote applications**:
 
-1. **User App** (`http://dev.aiepic.app/app`)
+1. **User App** (`https://dev.aiepic.app/app`)
    - User-facing application where users work daily
    - Contains "E-Cards" button to launch E-Cards
    - Hosts OAuth 2.0 Authorization Server for authentication
    - Handles user login and consent screens
 
-2. **Admin API** (`http://dev.aiepic.app/admin`)
+2. **Admin API** (`https://dev.aiepic.app/admin`)
    - Backend API for administrative operations
    - Provides user profile, subscription, and rate limit data
    - Receives usage reports from E-Cards
@@ -183,7 +183,7 @@
 
 2. **Redirect to remote auth** with parameters:
    ```
-   http://dev.aiepic.app/oauth/authorize?
+   https://dev.aiepic.app/oauth/authorize?
      client_id=ecards_app
      &redirect_uri=http://localhost:7300/oauth/complete
      &response_type=code
@@ -208,7 +208,7 @@
 
 6. **Exchange code for tokens** (backend-to-backend):
    ```http
-   POST http://dev.aiepic.app/oauth/token
+   POST https://dev.aiepic.app/oauth/token
    Content-Type: application/x-www-form-urlencoded
 
    grant_type=authorization_code
@@ -300,7 +300,7 @@
 8. Frontend generates random state token
 9. Frontend stores code_verifier and state in sessionStorage
 10. Frontend redirects to:
-    http://dev.aiepic.app/oauth/authorize?client_id=ecards&...
+    https://dev.aiepic.app/oauth/authorize?client_id=ecards&...
 11. Remote App detects user already authenticated (via cookie)
 12. Remote App shows consent screen (optional, first time only):
     "E-Cards wants to access your profile and subscription info"
@@ -367,7 +367,7 @@
 4. Frontend redirects to Remote OAuth
 5. Remote App detects NO valid session (cookie expired/deleted)
 6. Remote App redirects to Login Page:
-   http://dev.aiepic.app/login?returnUrl=/oauth/authorize?...
+   https://dev.aiepic.app/login?returnUrl=/oauth/authorize?...
 7. User enters username + password
 8. Remote App authenticates user
 9. Remote App redirects to OAuth authorize page
@@ -390,7 +390,7 @@
     [Upgrade Now] [Contact Support]
 25. User clicks [Upgrade Now]
 26. Frontend redirects to Remote App subscription page:
-    http://dev.aiepic.app/account/subscription?upgrade=ecards
+    https://dev.aiepic.app/account/subscription?upgrade=ecards
 ```
 
 ### Scenario 6: Rate Limit Exceeded
@@ -477,7 +477,7 @@ export function LandingPage() {
         <button onClick={initiateLogin} className="btn-primary">
           Sign In
         </button>
-        <button onClick={() => window.open('http://dev.aiepic.app/subscribe')}
+        <button onClick={() => window.open('https://dev.aiepic.app/subscribe')}
                 className="btn-secondary">
           Subscribe
         </button>
@@ -1575,10 +1575,10 @@ OAUTH_CLIENT_SECRET=your_client_secret_here
 
 # Remote System URLs
 # User App - OAuth 2.0 Server
-EXTERNAL_AUTH_URL=http://dev.aiepic.app/app
+EXTERNAL_AUTH_URL=https://dev.aiepic.app/app
 
 # Admin API - Backend services
-EXTERNAL_USER_API=http://dev.aiepic.app/admin/api
+EXTERNAL_USER_API=https://dev.aiepic.app/admin/api
 EXTERNAL_SUBSCRIPTION_WS=ws://dev.aiepic.app/admin/ws
 
 # External API Authentication (for backend-to-backend calls)
@@ -1620,7 +1620,7 @@ AUTH_RATE_LIMIT_REFRESH_MAX=20
 NEXT_PUBLIC_API_URL=http://localhost:7400
 NEXT_PUBLIC_WS_URL=ws://localhost:7400
 NEXT_PUBLIC_OAUTH_CLIENT_ID=ecards_app
-NEXT_PUBLIC_EXTERNAL_AUTH_URL=http://dev.aiepic.app
+NEXT_PUBLIC_EXTERNAL_AUTH_URL=https://dev.aiepic.app
 ```
 
 ---
@@ -1836,13 +1836,13 @@ test('User can sign in via auto-auth', async ({ page }) => {
 
 **IMPORTANT:** This feature requires integration with TWO remote applications:
 
-1. **User App** (`http://dev.aiepic.app/app`)
+1. **User App** (`https://dev.aiepic.app/app`)
    - Hosts OAuth 2.0 authorization server
    - Provides user authentication and consent screens
    - Issues JWT access tokens and refresh tokens
    - Endpoints: `/oauth/authorize`, `/oauth/token`, `/.well-known/jwks.json`
 
-2. **Admin API** (`http://dev.aiepic.app/admin`)
+2. **Admin API** (`https://dev.aiepic.app/admin`)
    - Provides user profile, subscription, and rate limit data
    - Handles backend-to-backend API calls (requires API key)
    - Sends real-time updates via WebSocket

@@ -14,7 +14,7 @@ The previous implementation couldn't properly distinguish between:
 
 When the App Library redirected directly to the authorization endpoint:
 1. User clicks "Launch App" in App Library
-2. App Library redirects to `http://dev.aiepic.app/oauth/authorize?...` (E-Cards app never sees this request)
+2. App Library redirects to `https://dev.aiepic.app/oauth/authorize?...` (E-Cards app never sees this request)
 3. User approves on consent screen
 4. OAuth server redirects to `http://localhost:7300/oauth/complete?code=...&state=...`
 5. E-Cards receives callback but has NO state in sessionStorage (because it never initiated the flow)
@@ -73,7 +73,7 @@ if (isManualLogin) {
 ### Pre-Initiated OAuth Flow (from App Library)
 
 1. User clicks "Launch App" in App Library
-2. App Library generates state and redirects to `http://dev.aiepic.app/oauth/authorize?...`
+2. App Library generates state and redirects to `https://dev.aiepic.app/oauth/authorize?...`
 3. OAuth server shows consent screen
 4. User approves
 5. OAuth server validates state and redirects to `http://localhost:7300/oauth/complete?code=...&state=...`
@@ -90,7 +90,7 @@ if (isManualLogin) {
 1. User navigates directly to E-Cards
 2. User clicks "Login with Tools Dashboard"
 3. E-Cards generates state + PKCE and stores in `sessionStorage` with key `oauth_state_ecards_app_dev`
-4. E-Cards redirects to `http://dev.aiepic.app/oauth/authorize?...`
+4. E-Cards redirects to `https://dev.aiepic.app/oauth/authorize?...`
 5. OAuth server shows consent screen
 6. User approves
 7. OAuth server redirects to `http://localhost:7300/oauth/complete?code=...&state=...`

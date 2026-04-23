@@ -26,12 +26,12 @@
 
 The E-Cards auto-auth feature requires integration with **two remote applications**:
 
-1. **User Application** (`http://dev.aiepic.app/app`)
+1. **User Application** (`https://dev.aiepic.app/app`)
    - User-facing application where users are already authenticated
    - Initiates E-Cards access via button/link
    - Hosts OAuth 2.0 authorization server
 
-2. **Admin API** (`http://dev.aiepic.app/admin`)
+2. **Admin API** (`https://dev.aiepic.app/admin`)
    - Backend API for administrative operations
    - Provides user verification, subscription data, rate limits
    - Handles backend-to-backend authentication
@@ -98,7 +98,7 @@ The E-Cards auto-auth feature requires integration with **two remote application
 
 **URL Structure:**
 ```
-Base URL: http://dev.aiepic.app/app (or http://dev.aiepic.app/app in production)
+Base URL: https://dev.aiepic.app/app (or https://dev.aiepic.app/app in production)
 
 User-facing:
   /                          # User dashboard
@@ -124,7 +124,7 @@ API endpoints:
 
 **URL Structure:**
 ```
-Base URL: http://dev.aiepic.app/admin (or http://dev.aiepic.app/admin in production)
+Base URL: https://dev.aiepic.app/admin (or https://dev.aiepic.app/admin in production)
 
 API endpoints:
   /api/users/:userId                    # User profile
@@ -146,7 +146,7 @@ WebSocket:
 
 #### 1. User Initiates E-Cards Access (User App)
 
-**Location:** `http://dev.aiepic.app/app` (User Dashboard)
+**Location:** `https://dev.aiepic.app/app` (User Dashboard)
 
 **Implementation:**
 ```html
@@ -183,7 +183,7 @@ function openECards() {
 
 **Request to User App:**
 ```
-GET http://dev.aiepic.app/app/oauth/authorize?
+GET https://dev.aiepic.app/app/oauth/authorize?
   client_id=ecards_app
   &redirect_uri=http://localhost:7300/oauth/complete
   &response_type=code
@@ -200,7 +200,7 @@ GET http://dev.aiepic.app/app/oauth/authorize?
 
 #### 3. OAuth Consent Screen (User App)
 
-**Location:** `http://dev.aiepic.app/app/oauth/authorize` (if consent needed)
+**Location:** `https://dev.aiepic.app/app/oauth/authorize` (if consent needed)
 
 **UI Requirements:**
 ```html
@@ -261,7 +261,7 @@ function deny() {
 
 #### 4. Token Exchange (User App OAuth Server)
 
-**Endpoint:** `POST http://dev.aiepic.app/app/oauth/token`
+**Endpoint:** `POST https://dev.aiepic.app/app/oauth/token`
 
 **E-Cards Request:**
 ```http
@@ -300,7 +300,7 @@ Content-Type: application/json
   "roles": ["user"],             // User roles (optional)
   "iat": 1630000000,             // Issued at timestamp
   "exp": 1630003600,             // Expiry timestamp (1 hour)
-  "iss": "http://dev.aiepic.app",   // Issuer (User App URL)
+  "iss": "https://dev.aiepic.app",   // Issuer (User App URL)
   "aud": "ecards_app"            // Audience (E-Cards client ID)
 }
 ```
@@ -469,10 +469,10 @@ HTTP/1.1 200 OK
 **Response:**
 ```json
 {
-  "issuer": "http://dev.aiepic.app",
-  "authorization_endpoint": "http://dev.aiepic.app/app/oauth/authorize",
-  "token_endpoint": "http://dev.aiepic.app/app/oauth/token",
-  "jwks_uri": "http://dev.aiepic.app/app/.well-known/jwks.json",
+  "issuer": "https://dev.aiepic.app",
+  "authorization_endpoint": "https://dev.aiepic.app/app/oauth/authorize",
+  "token_endpoint": "https://dev.aiepic.app/app/oauth/token",
+  "jwks_uri": "https://dev.aiepic.app/app/.well-known/jwks.json",
   "response_types_supported": ["code"],
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "token_endpoint_auth_methods_supported": ["client_secret_post"],
@@ -1215,7 +1215,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
             "value": "Bearer {{EXTERNAL_API_KEY}}"
           }
         ],
-        "url": "http://dev.aiepic.app/admin/api/users/{{userId}}"
+        "url": "https://dev.aiepic.app/admin/api/users/{{userId}}"
       }
     },
     {
@@ -1228,7 +1228,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
             "value": "Bearer {{EXTERNAL_API_KEY}}"
           }
         ],
-        "url": "http://dev.aiepic.app/admin/api/users/{{userId}}/subscription"
+        "url": "https://dev.aiepic.app/admin/api/users/{{userId}}/subscription"
       }
     },
     {
@@ -1252,7 +1252,7 @@ EXTERNAL_API_KEY=eak_test_4f3b9a8c7d6e5f4a3b2c1d0e9f8a7b6c
             { "key": "code_verifier", "value": "{{code_verifier}}" }
           ]
         },
-        "url": "http://dev.aiepic.app/app/oauth/token"
+        "url": "https://dev.aiepic.app/app/oauth/token"
       }
     }
   ]

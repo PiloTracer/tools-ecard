@@ -10,7 +10,7 @@ import type { User } from '@/shared/types/auth';
 
 // OAuth configuration from environment variables
 const OAUTH_CONFIG = {
-  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'http://dev.aiepic.app/api/users/me',
+  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'https://dev.aiepic.app/api/users/me',
 };
 
 // Cookie configuration

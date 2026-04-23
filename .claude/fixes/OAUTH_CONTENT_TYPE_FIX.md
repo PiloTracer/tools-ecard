@@ -100,7 +100,7 @@ docker-compose -f docker-compose.dev.yml restart front-cards
 === Token Exchange API Started ===
 Flow type: Pre-Initiated OAuth (no PKCE)
 Exchanging code for token with OAuth server...
-Token endpoint: http://dev.aiepic.app/oauth/token
+Token endpoint: https://dev.aiepic.app/oauth/token
 Token exchange response status: 200  ← Should be 200, not 500
 ✓ Token exchange successful!
 ✓ User info fetched successfully!

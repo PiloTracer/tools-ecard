@@ -12,7 +12,7 @@ import type { RefreshTokenResponse, OAuthTokenResponse } from '@/shared/types/au
 const OAUTH_CONFIG = {
   clientId: process.env.OAUTH_CLIENT_ID || 'ecards_app_dev',
   clientSecret: process.env.OAUTH_CLIENT_SECRET,
-  tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT || 'http://dev.aiepic.app/oauth/token',
+  tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT || 'https://dev.aiepic.app/oauth/token',
 };
 
 // Cookie configuration

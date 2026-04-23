@@ -101,18 +101,18 @@ services:
       # OAuth Configuration (Frontend - browser-accessible, requires NEXT_PUBLIC_ prefix)
       # NOTE: Must use same OAUTH_CLIENT_ID value as backend (ecards_app_dev)
       NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:-ecards_app_dev}
-      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-http://dev.aiepic.app/oauth/authorize}
-      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-http://dev.aiepic.app/oauth/token}
-      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
-      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-http://dev.aiepic.app/app}
-      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-http://dev.aiepic.app/app/features/user-subscription}
+      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-https://dev.aiepic.app/oauth/authorize}
+      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-https://dev.aiepic.app/oauth/token}
+      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-https://dev.aiepic.app/api/users/me}
+      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-https://dev.aiepic.app/app}
+      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-https://dev.aiepic.app/app/features/user-subscription}
       # OAuth Configuration (Backend - for API routes in front-cards/app/api/auth/*)
       # Server-side OAuth calls use dev.aiepic.app (mapped to host via extra_hosts)
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
-      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://dev.aiepic.app/oauth/authorize}
-      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://dev.aiepic.app/oauth/token}
-      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
+      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-https://dev.aiepic.app/oauth/authorize}
+      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-https://dev.aiepic.app/oauth/token}
+      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-https://dev.aiepic.app/api/users/me}
       OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
       OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
       NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}

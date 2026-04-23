@@ -111,7 +111,7 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 **Purpose:** OAuth 2.0 and user APIs used **as a client** by this app (this repo is not the auth server).
 
-**Typical dev wiring:** `http://dev.aiepic.app` points at services running on your **host** (Tools dashboard / OAuth, etc.). See **Local DNS (dev.aiepic.app)** below.
+**Typical dev wiring:** `https://dev.aiepic.app` points at services running on your **host** (Tools dashboard / OAuth, etc.). See **Local DNS (dev.aiepic.app)** below.
 
 **Endpoints (environment-specific):** authorization, token, and userinfo URLs come from `OAUTH_*` and `NEXT_PUBLIC_OAUTH_*` variables — do not hardcode in code without checking config.
 
@@ -152,7 +152,7 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 ### Local DNS (`dev.aiepic.app`)
 
-**On your computer (browser + native tools):** map the hostname to loopback so `http://dev.aiepic.app/...` hits whatever is listening on the host (e.g. port 80/443 for your auth stack).
+**On your computer (browser + native tools):** map the hostname to loopback so `https://dev.aiepic.app/...` hits whatever is listening on the host (e.g. port 80/443 for your auth stack).
 
 **Linux / macOS** — edit `/etc/hosts` (needs admin):
 
@@ -216,11 +216,11 @@ After changing hosts or compose, restart containers: `docker compose -f docker-c
 ### External APIs
 
 **API Server → OAuth Server:**
-- HTTP (`http://dev.aiepic.app/oauth/token`, etc.)
+- HTTP (`https://dev.aiepic.app/oauth/token`, etc.)
 - Uses `extra_hosts` so the container reaches the host where the OAuth service runs
 
 **Frontend → OAuth Server:**
-- Browser redirects (`http://dev.aiepic.app/oauth/authorize`, …) — resolved via your OS **hosts** file
+- Browser redirects (`https://dev.aiepic.app/oauth/authorize`, …) — resolved via your OS **hosts** file
 - Server-side token exchange from Next API routes uses the same hostnames + `extra_hosts`
 
 ---
