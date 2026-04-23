@@ -1,27 +1,50 @@
 name: batch-view
 version: 1.0.0
-description: Batch listing and detail viewing
+description: Batch listing UI (front-cards); optional duplicate API module in api-server (not mounted)
 
 services:
   front-cards:
     routes:
       - app/batches/page.tsx
-      - app/batches/[batchId]/page.tsx
-    components: []
+      - app/batches/[batchId]/records/page.tsx
+    components:
+      - features/batch-view/components/BatchList.tsx
+      - features/batch-view/components/BatchCard.tsx
+      - features/batch-view/components/BatchFilters.tsx
+      - features/batch-view/components/BatchStatusBadge.tsx
+    hooks:
+      - features/batch-view/hooks/useBatches.ts
+      - features/batch-view/hooks/useBatchDelete.ts
+    services:
+      - features/batch-view/services/batchViewService.ts
+    types:
+      - features/batch-view/types/index.ts
 
   api-server:
-    endpoints:
-      - method: GET
-        path: /api/batches/:id
-        file: src/features/batch-view/controllers/batchViewController.ts
-        auth: required
-    services:
-      - src/features/batch-view/services/batchViewService.ts
-    controllers:
-      - src/features/batch-view/controllers/batchViewController.ts
-    routes:
+    note: "batch-view Fastify routes exist but are NOT registered in src/app.ts. Live /api/batches traffic is handled by batch-upload."
+    alternate_implementation:
       - src/features/batch-view/routes.fastify.ts
+      - src/features/batch-view/controllers/batchViewController.ts
+      - src/features/batch-view/services/batchViewService.ts
+    endpoints_if_mounted_under_api_batches:
+      - method: GET
+        path: /api/batches/stats
+        auth: required
+      - method: GET
+        path: /api/batches
+        auth: required
+      - method: GET
+        path: /api/batches/:batchId
+        auth: required
+      - method: DELETE
+        path: /api/batches/:batchId
+        auth: required
+
+  live_api_for_same_prefix:
+    service: batch-upload
+    registered: true
+    see: .claude/features/batch-upload/feature.yaml
 
 database:
   postgres:
-    - batches: "Batch metadata"
+    - batches: "Batch metadata (shared with batch-upload)"

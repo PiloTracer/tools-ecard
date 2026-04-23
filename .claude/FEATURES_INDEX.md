@@ -4,10 +4,11 @@ Complete index of all documented features in the E-Cards project. Each feature h
 
 ## Quick Navigation
 
-- [Core Features](#core-features)
+- [Core Features](#core-features) (includes authentication)
 - [Batch Processing Features](#batch-processing-features)
 - [Infrastructure Features](#infrastructure-features)
-- [UI Features](#ui-features)
+- [UI Features](#ui-features) (includes simple quick actions)
+- [Workers](#12-render-worker)
 
 ---
 
@@ -54,18 +55,28 @@ Multi-project workspace management for organizing templates and batches into log
 
 ---
 
-### Authentication (cross-cutting)
+### 3. Authentication
+**Directory:** `.claude/features/authentication/`
 
-**Docs:** `.claude/features/auto-auth.md`, `.claude/features/auto-auth.external.md`  
-**Code:** `api-server/src/core/middleware/authMiddleware.ts`, cookie config; `front-cards/app/login`, `front-cards/app/auth/callback`, `front-cards/app/auth/continue`
+OAuth 2.0 with PKCE on the Next.js app (BFF route handlers under `app/api/auth/*`), client session via `AuthProvider`, and cookie-based user resolution on **api-server** (`authMiddleware`).
 
-Session is cookie-based; user is synced to PostgreSQL on authenticated requests.
+- **Purpose:** Sign-in, refresh, logout, and propagate identity to API calls
+- **Services:** front-cards, api-server (middleware only)
+- **Key Files:**
+  - `README.md` — route and context map
+  - `feature.yaml` — file paths and environment variables
+  - `auto-auth.md` / `auto-auth.external.md` — long-form integration specs
+
+**Use Cases:**
+- Log in via organization OAuth
+- Stay signed in with refresh where configured
+- Call **api-server** with the same session cookie
 
 ---
 
 ## Batch Processing Features
 
-### 3. Batch Upload
+### 4. Batch Upload
 **Directory:** `.claude/features/batch-upload/`
 
 File upload management for batch card generation with storage and async job queuing.
@@ -85,7 +96,7 @@ File upload management for batch card generation with storage and async job queu
 
 ---
 
-### 4. Batch Parsing
+### 5. Batch Parsing
 **Directory:** `.claude/features/batch-parsing/`
 
 Background worker for parsing uploaded files (Python subprocess from Node) with optional LLM-assisted name parsing, plus **read/search** HTTP APIs on `/api/batch-records` and **diagnostics** on `/api/diagnostics/*`.
@@ -104,7 +115,7 @@ Background worker for parsing uploaded files (Python subprocess from Node) with 
 
 ---
 
-### 5. Batch Import
+### 6. Batch Import
 **Directory:** `.claude/features/batch-import/`
 
 Field mapping and data import workflow (PLACEHOLDER implementation).
@@ -121,16 +132,16 @@ Field mapping and data import workflow (PLACEHOLDER implementation).
 
 ---
 
-### 6. Batch Records
+### 7. Batch Records
 **Directory:** `.claude/features/batch-records/`
 
 Individual record management within batches for editing and validation.
 
 - **Purpose:** Manage contact records within batches
-- **Services:** api-server
+- **Services:** front-cards (records page and components), api-server (CRUD under `/api/batches/:batchId/records`)
 - **Key Files:**
   - `README.md` - Record management workflows
-  - `feature.yaml` - CRUD endpoints
+  - `feature.yaml` - CRUD endpoints and front-end paths
 
 **Use Cases:**
 - View all records in a batch
@@ -140,16 +151,16 @@ Individual record management within batches for editing and validation.
 
 ---
 
-### 7. Batch View
+### 8. Batch View
 **Directory:** `.claude/features/batch-view/`
 
 Batch listing and detail viewing with filtering and search.
 
-- **Purpose:** UI for batch browsing and management
-- **Services:** front-cards, api-server
+- **Purpose:** UI for batch browsing and management; HTTP calls hit **`/api/batches`** on **api-server**
+- **Services:** front-cards; **live** list/stats/delete/upload routes are implemented by **batch-upload** (registered). A separate **`batch-view`** Fastify module exists but is **not** registered — see `README.md` for the split and `GET /api/batches/:id` detail caveat.
 - **Key Files:**
-  - `README.md` - Viewing workflows
-  - `feature.yaml` - List/detail endpoints
+  - `README.md` - Viewing workflows and API split
+  - `feature.yaml` - Front-end paths and alternate API module
 
 **Use Cases:**
 - List all user batches
@@ -161,7 +172,7 @@ Batch listing and detail viewing with filtering and search.
 
 ## Infrastructure Features
 
-### 8. S3-Bucket Storage
+### 9. S3-Bucket Storage
 **Directory:** `.claude/features/s3-bucket/`
 
 S3-compatible storage with local fallback for file management.
@@ -181,7 +192,7 @@ S3-compatible storage with local fallback for file management.
 
 ---
 
-### 9. Font Management
+### 10. Font Management
 **Directory:** `.claude/features/font-management/`
 
 Google Fonts integration with caching and metadata storage.
@@ -202,7 +213,7 @@ Google Fonts integration with caching and metadata storage.
 
 ## UI Features
 
-### 10. Dashboard
+### 11. Dashboard
 **Directory:** `.claude/features/dashboard/`
 
 Main application dashboard with project selector and navigation.
@@ -221,7 +232,7 @@ Main application dashboard with project selector and navigation.
 
 ---
 
-### 11. Render Worker
+### 12. Render Worker
 **Directory:** `.claude/features/render-worker/`
 
 Background **BullMQ** worker service (`render-worker/`) consuming the **`card-rendering`** queue.
@@ -236,6 +247,24 @@ Background **BullMQ** worker service (`render-worker/`) consuming the **`card-re
 **Use Cases:**
 - Drain render jobs from Redis
 - (Future) Export PNG/JPG and upload to object storage
+
+---
+
+### 13. Simple quick actions
+**Directory:** `.claude/features/simple-quick-actions/`
+
+Dashboard **Quick Actions** strip: template designer, batch import (embedded upload), view batches — **disabled until a project is selected**.
+
+- **Purpose:** One entry point for common tasks from the dashboard
+- **Services:** front-cards
+- **Key Files:**
+  - `README.md` — dependencies on simple-projects and batch-upload
+  - `feature.yaml` — components and parent page
+
+**Use Cases:**
+- Start template design from dashboard
+- Upload a batch file in context
+- Jump to batch list
 
 ---
 
@@ -291,19 +320,19 @@ Each feature directory follows this standardized structure:
 
 ## Feature Statistics
 
-- **Total Features:** 11 (numbered sections above)
-- **Core Features:** 2 (template-textile, simple-projects)
+- **Total Features:** 13 (numbered sections above)
+- **Core Features:** 3 (template-textile, simple-projects, authentication)
 - **Batch Processing:** 5 (upload, parsing, import, records, view)
 - **Infrastructure:** 2 (s3-bucket, font-management)
-- **UI Features:** 1 (dashboard)
+- **UI Features:** 2 (dashboard, simple-quick-actions)
 - **Workers:** 1 (render-worker)
 
 ### Service Coverage
 
 | Service | Features |
 |---------|----------|
-| front-cards | 5 features (template-textile, simple-projects, batches, dashboard, batch-view) |
-| api-server | 9 features (all except dashboard and render-worker) |
+| front-cards | 7 areas (template-textile, simple-projects, authentication, batch-view, batch-upload UI, dashboard, simple-quick-actions; batch-records UI) |
+| api-server | 9 feature modules + global auth middleware (see each `feature.yaml`) |
 | render-worker | 1 documented feature (card-rendering queue; handler stubbed) |
 
 ### Technology Stack

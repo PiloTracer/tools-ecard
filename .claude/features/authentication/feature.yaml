@@ -1,0 +1,46 @@
+name: authentication
+version: 1.0.0
+description: OAuth PKCE session, Next.js BFF auth routes, client auth context, api-server cookie middleware
+
+services:
+  front-cards:
+    components:
+      - features/auth/AuthContext.tsx
+      - features/auth/ProtectedRoute.tsx
+    public_exports:
+      - features/auth/index.ts
+    app_routes:
+      - app/login/page.tsx
+      - app/auth/callback/page.tsx
+      - app/auth/continue/page.tsx
+    api_routes_next:
+      - app/api/auth/login/route.ts
+      - app/api/auth/logout/route.ts
+      - app/api/auth/user/route.ts
+      - app/api/auth/refresh-token/route.ts
+      - app/api/auth/exchange-token/route.ts
+    shared:
+      - shared/lib/oauth-config.ts
+      - shared/lib/oauth-utils.ts
+      - shared/types/auth.ts
+
+  api-server:
+    middleware:
+      - src/core/middleware/authMiddleware.ts
+    note: "No dedicated /api/auth on api-server; browser talks to Next for OAuth, to api-server for business APIs with session cookie."
+
+documentation:
+  detailed_spec:
+    - .claude/features/auto-auth.md
+    - .claude/features/auto-auth.external.md
+
+configuration:
+  environment_variables:
+    - NEXT_PUBLIC_OAUTH_CLIENT_ID
+    - NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT
+    - OAUTH_REDIRECT_URI
+    - OAUTH_SCOPES
+    - OAUTH_USER_INFO_ENDPOINT
+    - SESSION_COOKIE_NAME
+    - CORS_ALLOWED_ORIGINS
+    - NEXT_PUBLIC_API_URL

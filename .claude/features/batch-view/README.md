@@ -1,35 +1,30 @@
-# Batch View Feature
+# Batch view
 
-Batch listing and detail viewing with filtering and search.
+UI for **listing batches**, **filters/search**, **stats**, **delete**, and navigation into **batch records**. HTTP calls go to **api-server** via `apiClient` (`NEXT_PUBLIC_API_URL`) on the **`/api/batches`** prefix.
 
-## Overview
+## Overview (frontend)
 
-Provides UI and API for viewing batch lists, filtering by status, searching by name, and displaying batch details with record previews.
+- **Pages:** `app/batches/page.tsx`, `app/batches/[batchId]/records/page.tsx` (records page is owned by **batch-records** UX but lives under `/batches`).
+- **Data layer:** `features/batch-view/services/batchViewService.ts` — `GET/DELETE /api/batches/...`, `GET /api/batches/stats`.
 
-## User Stories
+## Overview (api-server)
 
-- As a user, I want to see all my uploaded batches
-- As a user, I want to filter batches by status
-- As a user, I want to search batches by filename
-- As a user, I want to see batch details and record count
+There are **two** implementations under `api/batches`:
 
-## Key Workflows
+| Module | Registered in `app.ts` | Role |
+|--------|-------------------------|------|
+| **batch-upload** (`routes.fastify.ts`) | **Yes** | Upload, list, `/:id/status`, delete, retry, `stats`, `recent` |
+| **batch-view** (`batch-view/routes.fastify.ts`) | **No** | Would expose list, `stats`, **`GET /:batchId` (detail)**, delete — overlaps list/stats/delete with batch-upload |
 
-### 1. List Batches
-1. User navigates to batches page
-2. Batches fetched from PostgreSQL
-3. Filtered by user and project
-4. Sorted by date descending
-5. Paginated results displayed
+Today only **batch-upload** is mounted on `/api/batches`. The **batch-view** Fastify plugin is **legacy / alternate** and is not registered; **`GET /api/batches/:batchId` (full detail)** is not provided by batch-upload routes (only **`GET /api/batches/:id/status`**). If batch detail fetch fails at runtime, align by registering non-conflicting routes or extending batch-upload.
 
-### 2. View Batch Details
-1. User clicks on batch
-2. Batch metadata loaded
-3. Record count retrieved
-4. Sample records displayed
-5. Actions available (download, delete, regenerate)
+## User stories
+
+- As a user, I want to see all batches for my account with pagination and filters.
+- As a user, I want to open a batch and edit records.
 
 ## Dependencies
 
-- **Depends on:** batch-upload
-- **Used by:** batch-records
+- **batch-upload** (live API for list, stats, delete, upload, status).
+- **batch-records** (per-batch record UI and `GET/PUT/DELETE` records under `/api/batches/:batchId/records`).
+- **simple-projects** (project context used elsewhere in the app flow).

@@ -3,6 +3,8 @@
 ## Overview
 Template Textile is a modular canvas-based template editor for creating and exporting personalized business cards and graphics. It consists of three independent sub-features that work together.
 
+**Note:** `api-server/src/features/template-designer/` exists in the tree but only holds re-export stubs pointing at non-local paths; the **real** API feature is **`api-server/src/features/template-textile`**. Ignore `template-designer` for routing and documentation unless it is cleaned up in code.
+
 ## Sub-Features
 
 ### 1. [Template Textile Core](./template-textile-core.md)

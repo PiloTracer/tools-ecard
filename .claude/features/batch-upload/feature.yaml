@@ -6,8 +6,14 @@ services:
   front-cards:
     routes:
       - app/batches/page.tsx
-    components: []
-    hooks: []
+    components:
+      - features/batch-upload/components/FileUploadComponent.tsx
+      - features/batch-upload/components/UploadBatchComponent.tsx
+      - features/batch-upload/components/BatchStatusTracker.tsx
+    hooks:
+      - features/batch-upload/hooks/useBatchUpload.ts
+    services:
+      - features/batch-upload/services/batchService.ts
 
   api-server:
     endpoints:

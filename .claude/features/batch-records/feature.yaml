@@ -3,6 +3,21 @@ version: 1.0.0
 description: Individual record management within batches
 
 services:
+  front-cards:
+    routes:
+      - app/batches/[batchId]/records/page.tsx
+    components:
+      - features/batch-records/components/RecordsList.tsx
+      - features/batch-records/components/RecordCard.tsx
+      - features/batch-records/components/RecordEditModal.tsx
+      - features/batch-records/components/RecordSearch.tsx
+    hooks:
+      - features/batch-records/hooks/useRecords.ts
+      - features/batch-records/hooks/useRecordEdit.ts
+      - features/batch-records/hooks/useRecordDelete.ts
+    services:
+      - features/batch-records/services/batchRecordService.ts
+
   api-server:
     endpoints:
       - method: GET

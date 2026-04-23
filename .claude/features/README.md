@@ -23,6 +23,8 @@ These map directly to shipped or in-progress code under `front-cards`, `api-serv
 | [font-management/](font-management/README.md) | Google Fonts and upload APIs |
 | [dashboard/](dashboard/README.md) | Dashboard route shell |
 | [render-worker/](render-worker/README.md) | BullMQ `card-rendering` worker (stub job handler today) |
+| [authentication/](authentication/README.md) | Next.js auth routes, `AuthProvider`, cookies; API `authMiddleware` |
+| [simple-quick-actions/](simple-quick-actions/README.md) | Dashboard quick actions (project-gated); composes batch-upload |
 
 ---
 
@@ -34,14 +36,13 @@ These map directly to shipped or in-progress code under `front-cards`, `api-serv
 
 ---
 
-## Authentication
+## Authentication (detailed specs)
 
 | File | Notes |
 |------|--------|
-| [auto-auth.md](auto-auth.md) | Full OAuth / remote-auth **spec** (historical detail); core behavior is implemented via cookie + `authMiddleware` and `front-cards` login/callback routes |
+| [authentication/README.md](authentication/README.md) | **Canonical** map of routes, context, and middleware |
+| [auto-auth.md](auto-auth.md) | Long-form OAuth / integration spec |
 | [auto-auth.external.md](auto-auth.external.md) | External system contracts |
-
-There is no separate `authentication/` folder; treat **auto-auth** docs plus `api-server/src/core/middleware/authMiddleware.ts` and `front-cards/app/login` / `app/auth/*` as the source of truth for login behavior.
 
 ---
 

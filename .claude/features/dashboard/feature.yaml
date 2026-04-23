@@ -6,7 +6,13 @@ services:
   front-cards:
     routes:
       - app/dashboard/page.tsx
-    components: []
+    components:
+      - features/simple-quick-actions/components/QuickActions.tsx
+      - features/simple-projects/components/ProjectSelector.tsx
+      - features/simple-projects/components/ProjectSettings.tsx
+    contexts:
+      - features/auth/AuthContext.tsx
+      - features/simple-projects/contexts/ProjectsContext.tsx
 
 database: {}
 external_dependencies: []

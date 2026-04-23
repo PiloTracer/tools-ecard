@@ -1,0 +1,24 @@
+name: simple-quick-actions
+version: 1.0.0
+description: Dashboard quick actions (template, batch import, view batches), project-gated
+
+services:
+  front-cards:
+    components:
+      - features/simple-quick-actions/components/QuickActions.tsx
+    public_exports:
+      - features/simple-quick-actions/index.ts
+    tests:
+      - features/simple-quick-actions/components/QuickActions.test.tsx
+    consumed_by:
+      - app/dashboard/page.tsx
+
+  api-server:
+    endpoints: []
+
+database: {}
+
+external_dependencies: []
+
+configuration:
+  environment_variables: []
