@@ -1,8 +1,10 @@
 # Batch Upload and Parsing Features - Complete Context
 
-**Last Updated:** 2025-11-25
-**Status:** Implementation complete with bug fixes in progress
+**Last Updated:** 2026-04-22 (metadata refresh; technical narrative cross-check with `batch-upload/` + `batch-parsing/` READMEs)
+**Status:** Upload + parse pipeline implemented; incremental fixes and hardening may continue
 **Features:** `batch-upload` + `batch-parsing`
+
+**Accuracy note:** This document is long-form narrative context. For **exact HTTP paths and files**, treat [batch-upload/feature.yaml](./batch-upload/feature.yaml) and [batch-parsing/feature.yaml](./batch-parsing/feature.yaml) as authoritative.
 
 ---
 

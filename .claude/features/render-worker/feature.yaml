@@ -1,0 +1,36 @@
+name: render-worker
+version: 1.0.0
+description: BullMQ worker for card rendering jobs (handler currently stubbed)
+
+services:
+  render-worker:
+    queue:
+      name: card-rendering
+      library: bullmq
+    entrypoints:
+      - src/worker.ts
+    jobs:
+      - src/jobs/render-card.ts
+    config:
+      - src/core/config/index.ts
+      - src/core/queue/index.ts
+
+  api-server:
+    note: "Enqueue/render orchestration APIs may live here in future; today focus is worker process."
+
+database:
+  postgres: []
+  cassandra: []
+
+external_dependencies:
+  - redis
+
+configuration:
+  environment_variables:
+    - REDIS_HOST
+    - REDIS_PORT
+    - REDIS_PASSWORD
+
+status:
+  job_handler: "MOCK / stub — see render-card.ts TODOs"
+  production_ready: false

@@ -1,7 +1,8 @@
 # E-Cards Feature Development Order
 
-**Version:** 1.0
-**Last Updated:** 2025-11-15
+**Version:** 1.0  
+**Last Updated:** 2025-11-15  
+**Note (2026-04-22):** This document is a **historical planning** timeline. For what is implemented today, use [`.claude/features/README.md`](./README.md), per-feature `README.md` / `feature.yaml` files, and [`.claude/FEATURES_INDEX.md`](../FEATURES_INDEX.md).
 
 ---
 
@@ -107,7 +108,7 @@ This document defines the optimal order for implementing E-Cards features based 
 ### Stage 2.2: SeaweedFS Integration
 **Duration:** Week 7
 **Priority:** **HIGH**
-**Spec:** `.claude/features/seaweedfs-integration.md`
+**Spec:** `.claude/features/s3-bucket/README.md` (S3-compatible storage; SeaweedFS in dev/prod)
 
 **Why Now:**
 - Needed by Template Designer (background images)
@@ -224,7 +225,7 @@ This document defines the optimal order for implementing E-Cards features based 
 ### Stage 4.2: C# Logic Porting
 **Duration:** Week 13
 **Priority:** **HIGH**
-**Spec:** `.claude/features/csharp-porting.md`
+**Spec:** No standalone `csharp-porting.md` in repo; layout logic tracked with render-worker / plans under `.claude/plans/`
 
 **Why Now:**
 - Render Worker needs layout calculation logic
@@ -312,7 +313,7 @@ This document defines the optimal order for implementing E-Cards features based 
 ### Stage 6.1: Testing & QA
 **Duration:** Week 16
 **Priority:** **CRITICAL**
-**Spec:** `.claude/features/testing-qa.md`
+**Spec:** Not checked in as `testing-qa.md`; follow service `package.json` test scripts and CI
 
 **Deliverables:**
 - Unit tests (80%+ coverage)
@@ -327,7 +328,7 @@ This document defines the optimal order for implementing E-Cards features based 
 ### Stage 6.2: WebSocket Real-Time Updates
 **Duration:** Week 17
 **Priority:** **MEDIUM**
-**Spec:** `.claude/features/websocket-updates.md`
+**Spec:** Not checked in as `websocket-updates.md`; `api-server` registers `@fastify/websocket` — verify routes per task
 
 **Why Now:**
 - Enhances UX but not critical

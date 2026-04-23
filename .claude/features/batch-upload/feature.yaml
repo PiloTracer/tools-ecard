@@ -13,23 +13,31 @@ services:
     endpoints:
       - method: POST
         path: /api/batches/upload
-        file: src/features/batch-upload/controllers/batchController.ts
+        file: src/features/batch-upload/routes.fastify.ts
         auth: required
       - method: GET
         path: /api/batches/:id/status
-        file: src/features/batch-upload/controllers/batchController.ts
+        file: src/features/batch-upload/routes.fastify.ts
         auth: required
       - method: GET
         path: /api/batches
-        file: src/features/batch-upload/controllers/batchController.ts
+        file: src/features/batch-upload/routes.fastify.ts
         auth: required
       - method: DELETE
         path: /api/batches/:id
-        file: src/features/batch-upload/controllers/batchController.ts
+        file: src/features/batch-upload/routes.fastify.ts
         auth: required
       - method: POST
         path: /api/batches/:id/retry
-        file: src/features/batch-upload/controllers/batchController.ts
+        file: src/features/batch-upload/routes.fastify.ts
+        auth: required
+      - method: GET
+        path: /api/batches/stats
+        file: src/features/batch-upload/routes.fastify.ts
+        auth: required
+      - method: GET
+        path: /api/batches/recent
+        file: src/features/batch-upload/routes.fastify.ts
         auth: required
     services:
       - src/features/batch-upload/services/batchUploadService.ts
@@ -56,6 +64,6 @@ external_dependencies:
 
 configuration:
   environment_variables:
-    - MAX_FILE_SIZE: "10485760 (10MB)"
+    - MAX_FILE_SIZE: "10485760 (10MB) — enforced in batch-upload validators/types.ts; Fastify multipart plugin allows larger parts in app.ts"
     - REDIS_HOST: "Redis host for job queue"
     - REDIS_PORT: "Redis port"

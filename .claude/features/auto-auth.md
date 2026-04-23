@@ -1,6 +1,6 @@
 # Auto-Auth Feature
 
-**Status:** In Progress
+**Status:** Core login path **implemented** (cookie session + `authMiddleware` + Next.js login/callback pages). This document remains the **detailed integration spec** (remote OAuth, edge cases); verify env-specific URLs against `DOCS_TECH_STACK.md` and `.env.*.example`.
 **Priority:** High
 **Owner:** TBD
 

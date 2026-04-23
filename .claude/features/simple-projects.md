@@ -1,5 +1,7 @@
 # Feature: Simple Projects
 
+> **2026-04:** Canonical paths, endpoints, and code map: [simple-projects/README.md](./simple-projects/README.md) and [simple-projects/feature.yaml](./simple-projects/feature.yaml). This file is an older narrative spec.
+
 ## Overview
 The simple-projects feature provides multi-project support for users, allowing them to organize their cards and templates into different projects. Each user gets a default project automatically created on first login, and can create additional projects as needed.
 
@@ -18,11 +20,13 @@ The simple-projects feature provides multi-project support for users, allowing t
    - Associate user with default project
    - Set default project as selected
 
-2. **API Endpoints**:
-   - `GET /api/projects` - Get all projects for authenticated user
-   - `POST /api/projects` - Create new project
-   - `GET /api/projects/selected` - Get currently selected project
-   - `PUT /api/projects/selected` - Update selected project
+2. **API Endpoints** (prefix `/api/v1/projects` in `api-server`):
+   - `GET /api/v1/projects` - Get all projects for authenticated user
+   - `POST /api/v1/projects` - Create new project
+   - `GET /api/v1/projects/selected` - Get currently selected project
+   - `PUT /api/v1/projects/selected` - Update selected project
+   - `POST /api/v1/projects/ensure-default` - Ensure default project exists
+   - `PATCH /api/v1/projects/:id` - Update project settings (e.g. phone prefix fields)
 
 ### Frontend UI
 1. **Project Selection Dropdown**:

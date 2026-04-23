@@ -4,7 +4,7 @@ Background worker for parsing uploaded batch files into structured contact recor
 
 ## Overview
 
-Processes uploaded files (.csv, .txt, .vcf) asynchronously, extracting contact data with LLM-assisted name parsing, and stores records in Cassandra.
+Processes uploaded files (`.csv`, `.txt`, `.vcf`, `.xls`, `.xlsx` per batch-upload allowlist) asynchronously via a **Python subprocess** from Node, with LLM-assisted name parsing when enabled, and stores records in Cassandra (with PostgreSQL batch status).
 
 ## User Stories
 
@@ -32,3 +32,15 @@ Processes uploaded files (.csv, .txt, .vcf) asynchronously, extracting contact d
 
 - LLM providers: OpenAI, Anthropic, DeepSeek
 - Fallback: Parse as-is when LLM unavailable
+
+## APIs (read/search vs edit)
+
+- **Search and cross-batch reads:** HTTP routes under `/api/batch-records` (implemented in `batch-parsing/routes.fastify.ts`). See `feature.yaml`.
+- **Per-batch record edits:** `/api/batches/:batchId/records` — documented under **batch-records**.
+
+## Diagnostics
+
+- `GET /api/diagnostics/queue-stats` — Redis queue + worker stats (see `batch-parsing/routes/diagnostics.fastify.ts`).
+- `GET /api/diagnostics/redis-status` — Redis connectivity probe.
+
+These diagnostic routes do not enforce auth in code; protect them in production (network policy or auth plugin).

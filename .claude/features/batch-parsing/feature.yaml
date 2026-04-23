@@ -1,14 +1,40 @@
 name: batch-parsing
 version: 1.0.0
-description: Background batch file parsing with LLM integration
+description: Background batch file parsing (Bull worker + Python subprocess), record search APIs, and queue diagnostics
 
 services:
   api-server:
     endpoints:
+      # Record search / listing (prefix /api/batch-records)
       - method: GET
-        path: /api/batches/:id/diagnostics
-        file: src/features/batch-parsing/routes/diagnostics.fastify.ts
+        path: /api/batch-records
+        description: "Search records across batches (query params)"
+        file: src/features/batch-parsing/routes.fastify.ts
         auth: required
+      - method: GET
+        path: /api/batch-records/:id
+        description: "Full contact record by Cassandra record id"
+        file: src/features/batch-parsing/routes.fastify.ts
+        auth: required
+      - method: GET
+        path: /api/batch-records/batch/:batchId
+        description: "Paginated records for one batch"
+        file: src/features/batch-parsing/routes.fastify.ts
+        auth: required
+      - method: GET
+        path: /api/batch-records/batch/:batchId/stats
+        description: "Record count for batch"
+        file: src/features/batch-parsing/routes.fastify.ts
+        auth: required
+      # Operational diagnostics (prefix /api/diagnostics)
+      - method: GET
+        path: /api/diagnostics/queue-stats
+        file: src/features/batch-parsing/routes/diagnostics.fastify.ts
+        auth: "not enforced in route handler — restrict at edge in production"
+      - method: GET
+        path: /api/diagnostics/redis-status
+        file: src/features/batch-parsing/routes/diagnostics.fastify.ts
+        auth: "not enforced in route handler — restrict at edge in production"
     services:
       - src/features/batch-parsing/services/batchParsingService.ts
       - src/features/batch-parsing/services/workerService.ts
@@ -18,12 +44,17 @@ services:
       - src/features/batch-parsing/routes.fastify.ts
       - src/features/batch-parsing/routes/diagnostics.fastify.ts
 
+  note: "Editing records by batch uses batch-records feature at /api/batches/:batchId/records — different from /api/batch-records above."
+
 database:
   cassandra:
     - batch_records: "Parsed contact data"
+  postgres:
+    - batches: "Batch status updated after parse"
 
 external_dependencies:
   - axios (for LLM API calls)
+  - python3 (subprocess parser; PYTHON_PATH)
 
 configuration:
   environment_variables:
@@ -32,3 +63,4 @@ configuration:
     - OPENAI_API_KEY: "OpenAI API key"
     - ANTHROPIC_API_KEY: "Anthropic API key"
     - DEEPSEEK_API_KEY: "DeepSeek API key"
+    - PYTHON_PATH: "Python executable for batch parser"

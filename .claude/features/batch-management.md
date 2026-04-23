@@ -1,27 +1,7 @@
-# Batch-management Feature
+# Batch-management
 
-**Priority:** HIGH
-**Status:** Planned
-**Dependencies:** See `.claude/features/feature-order.md`
+**Status:** Not a separate package. Batch **listing**, **detail**, and **upload** behavior is covered by **batch-view**, **batch-upload**, and **batch-records** under `.claude/features/`.
 
-## Purpose
+**Canonical docs:** [batch-view/README.md](./batch-view/README.md), [batch-upload/README.md](./batch-upload/README.md), [batch-records/README.md](./batch-records/README.md)
 
-[Feature brief - see `/CONTEXT.md` for overview]
-
-## Specification
-
-**This file is a placeholder. Full specification to be developed during implementation phase.**
-
-**Quick Reference:**
-- Overview: See `/CONTEXT.md` → Features section
-- Implementation Order: See `.claude/features/feature-order.md`
-- Session Template: See `.claude/SESSION_STARTERS.md`
-
-## Development Notes
-
-When ready to implement:
-1. Copy template from `auto-auth.md` structure
-2. Define: User Story, Acceptance Criteria, Architecture, API, DB Schema
-3. Add security considerations and testing strategy
-4. Update session starter in `SESSION_STARTERS.md`
-
+**Planning context:** [feature-order.md](./feature-order.md)

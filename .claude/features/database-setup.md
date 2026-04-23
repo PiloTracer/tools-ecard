@@ -1,27 +1,7 @@
-# Database Setup Feature
+# Database setup
 
-**Priority:** CRITICAL
-**Status:** Planned
-**Dependencies:** None
+**Status:** **Delivered** for ongoing development — PostgreSQL schema via **Prisma** (`api-server/prisma/schema.prisma`, migrations), Cassandra initialization under `db/init-cassandra/` (see `DOCS_TECH_STACK.md`).
 
-## Purpose
+This file is a **brief pointer**; detailed table designs live in Prisma models and service feature docs.
 
-Establish database schemas for PostgreSQL (normalized) and Cassandra (canonical events).
-
-## Deliverables
-
-- Prisma schema with all models
-- Database migrations
-- TypeScript types
-- Seed data for development
-
-## Key Models
-
-**PostgreSQL:**
-- User, UserSession, Template, Batch, CanonicalStaff, RenderJob
-
-**Cassandra:**
-- AuthAuditLog, BatchEventLog
-
-**See `/CONTEXT.md` for detailed schema definitions**
-
+**Planning context:** [feature-order.md](./feature-order.md)

@@ -30,6 +30,10 @@ services:
         path: /api/v1/projects/ensure-default
         file: src/features/simple-projects/controllers/projectController.ts
         auth: required
+      - method: PATCH
+        path: /api/v1/projects/:id
+        file: src/features/simple-projects/controllers/projectController.ts
+        auth: required
     services:
       - src/features/simple-projects/services/projectService.ts
     repositories:

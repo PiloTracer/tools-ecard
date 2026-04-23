@@ -1,5 +1,7 @@
 # S3-Bucket Feature Specification
 
+> **2026-04:** For the standardized feature bundle (README + `feature.yaml`), use [s3-bucket/README.md](./s3-bucket/README.md). This file is the longer standalone spec.
+
 ## Overview
 
 The s3-bucket feature provides S3-compatible cloud storage integration for the E-Cards application using SeaweedFS as the storage backend. This feature handles all file storage operations including template backgrounds, user assets, rendered cards, and batch archives.

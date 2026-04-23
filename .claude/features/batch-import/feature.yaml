@@ -1,21 +1,38 @@
 name: batch-import
 version: 1.0.0
-description: Field mapping and data import (PLACEHOLDER)
+description: Field mapping and data import (placeholder service; routes not mounted on main API)
+
+mounting:
+  registered_in_api_server_app: false
+  note: "Fastify plugin `batchImportRoutes` in `routes.fastify.ts` defines relative paths `/:id/...`. Register in `api-server/src/app.ts` with a non-conflicting prefix (e.g. `/api/batch-import`) before these URLs are live."
 
 services:
   api-server:
     endpoints:
+      # Example full paths if mounted with prefix `/api/batch-import`
       - method: POST
         path: /api/batch-import/:id/import
-        file: src/features/batch-import/controllers/batchImportController.ts
+        file: src/features/batch-import/routes.fastify.ts
         auth: required
       - method: GET
         path: /api/batch-import/:id/preview
-        file: src/features/batch-import/controllers/batchImportController.ts
+        file: src/features/batch-import/routes.fastify.ts
         auth: required
       - method: GET
         path: /api/batch-import/:id/mappings/suggest
-        file: src/features/batch-import/controllers/batchImportController.ts
+        file: src/features/batch-import/routes.fastify.ts
+        auth: required
+      - method: POST
+        path: /api/batch-import/:id/validate
+        file: src/features/batch-import/routes.fastify.ts
+        auth: required
+      - method: GET
+        path: /api/batch-import/:id/status
+        file: src/features/batch-import/routes.fastify.ts
+        auth: required
+      - method: POST
+        path: /api/batch-import/:id/cancel
+        file: src/features/batch-import/routes.fastify.ts
         auth: required
     services:
       - src/features/batch-import/services/batchImportService.ts
@@ -23,9 +40,10 @@ services:
       - src/features/batch-import/controllers/batchImportController.ts
     routes:
       - src/features/batch-import/routes.fastify.ts
+      - src/features/batch-import/routes.ts
     types:
       - src/features/batch-import/types.ts
 
 database:
   cassandra:
-    - batch_records: "Imported contact records"
+    - batch_records: "Target for imported contact records (when implemented)"

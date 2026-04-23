@@ -54,6 +54,15 @@ Multi-project workspace management for organizing templates and batches into log
 
 ---
 
+### Authentication (cross-cutting)
+
+**Docs:** `.claude/features/auto-auth.md`, `.claude/features/auto-auth.external.md`  
+**Code:** `api-server/src/core/middleware/authMiddleware.ts`, cookie config; `front-cards/app/login`, `front-cards/app/auth/callback`, `front-cards/app/auth/continue`
+
+Session is cookie-based; user is synced to PostgreSQL on authenticated requests.
+
+---
+
 ## Batch Processing Features
 
 ### 3. Batch Upload
@@ -79,19 +88,19 @@ File upload management for batch card generation with storage and async job queu
 ### 4. Batch Parsing
 **Directory:** `.claude/features/batch-parsing/`
 
-Background worker for parsing uploaded files with LLM-assisted name parsing.
+Background worker for parsing uploaded files (Python subprocess from Node) with optional LLM-assisted name parsing, plus **read/search** HTTP APIs on `/api/batch-records` and **diagnostics** on `/api/diagnostics/*`.
 
-- **Purpose:** Parse files asynchronously into structured records
-- **Services:** api-server
+- **Purpose:** Parse files asynchronously into structured records; expose search/list/stats for Cassandra records
+- **Services:** api-server (worker runs in api-server process via Bull; Python parser on host/container PATH)
 - **Key Files:**
-  - `README.md` - Parsing workflows
-  - `feature.yaml` - Worker configuration
+  - `README.md` - Parsing workflows, API split vs batch-records
+  - `feature.yaml` - Routes, worker, diagnostics
 
 **Use Cases:**
-- Parse CSV/TXT/VCF files automatically
+- Parse CSV/TXT/VCF/XLS/XLSX (per upload allowlist) automatically
 - AI-powered name parsing (OpenAI, Anthropic, DeepSeek)
-- Progress tracking
-- Error handling and reporting
+- Cross-batch record search and batch-level stats
+- Queue / Redis diagnostics for operators
 
 ---
 
@@ -102,7 +111,7 @@ Field mapping and data import workflow (PLACEHOLDER implementation).
 
 - **Purpose:** Map file columns to card fields and import data
 - **Services:** api-server
-- **Status:** PLACEHOLDER - Mock responses only
+- **Status:** PLACEHOLDER — service returns mock/structured responses; **Fastify routes are not registered in `api-server/src/app.ts`**, so HTTP API is not live until wired
 
 **Use Cases:**
 - Smart field mapping suggestions
@@ -212,6 +221,24 @@ Main application dashboard with project selector and navigation.
 
 ---
 
+### 11. Render Worker
+**Directory:** `.claude/features/render-worker/`
+
+Background **BullMQ** worker service (`render-worker/`) consuming the **`card-rendering`** queue.
+
+- **Purpose:** Generate card images from templates and batch records (pipeline target)
+- **Services:** render-worker (Redis); future coupling to api-server, s3-bucket, template-textile, batch-records
+- **Status:** Process and queue wiring exist; **`processRenderCard` is a stub** (see `render-worker/src/jobs/render-card.ts`)
+- **Key Files:**
+  - `README.md` — current scope and file map
+  - `feature.yaml` — queue name and paths
+
+**Use Cases:**
+- Drain render jobs from Redis
+- (Future) Export PNG/JPG and upload to object storage
+
+---
+
 ## Feature Documentation Structure
 
 Each feature directory follows this standardized structure:
@@ -264,19 +291,20 @@ Each feature directory follows this standardized structure:
 
 ## Feature Statistics
 
-- **Total Features:** 10
+- **Total Features:** 11 (numbered sections above)
 - **Core Features:** 2 (template-textile, simple-projects)
 - **Batch Processing:** 5 (upload, parsing, import, records, view)
 - **Infrastructure:** 2 (s3-bucket, font-management)
 - **UI Features:** 1 (dashboard)
+- **Workers:** 1 (render-worker)
 
 ### Service Coverage
 
 | Service | Features |
 |---------|----------|
 | front-cards | 5 features (template-textile, simple-projects, batches, dashboard, batch-view) |
-| api-server | 9 features (all except dashboard) |
-| render-worker | 0 features (uses batch-records data) |
+| api-server | 9 features (all except dashboard and render-worker) |
+| render-worker | 1 documented feature (card-rendering queue; handler stubbed) |
 
 ### Technology Stack
 
@@ -300,6 +328,6 @@ Each feature directory follows this standardized structure:
 
 ---
 
-Last Updated: 2025-11-28
+Last Updated: 2026-04-22
 Project: E-Cards / QR-Code Designer
 Maintained by: Engineering Team

@@ -1,27 +1,7 @@
-# User-profile Feature
+# User-profile
 
-**Priority:** HIGH
-**Status:** Planned
-**Dependencies:** See `.claude/features/feature-order.md`
+**Status:** No dedicated **user-profile** feature area in the repo today (no matching `front-cards` route package or `api-server` feature module under this name).
 
-## Purpose
+**Related:** Auth user sync in `api-server` (`authMiddleware` + Prisma user upsert), **simple-projects** for workspace context.
 
-[Feature brief - see `/CONTEXT.md` for overview]
-
-## Specification
-
-**This file is a placeholder. Full specification to be developed during implementation phase.**
-
-**Quick Reference:**
-- Overview: See `/CONTEXT.md` → Features section
-- Implementation Order: See `.claude/features/feature-order.md`
-- Session Template: See `.claude/SESSION_STARTERS.md`
-
-## Development Notes
-
-When ready to implement:
-1. Copy template from `auto-auth.md` structure
-2. Define: User Story, Acceptance Criteria, Architecture, API, DB Schema
-3. Add security considerations and testing strategy
-4. Update session starter in `SESSION_STARTERS.md`
-
+**Planning context:** [feature-order.md](./feature-order.md)

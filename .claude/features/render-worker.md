@@ -1,27 +1,14 @@
-# Render-worker Feature
+# Render-worker
 
-**Priority:** HIGH
-**Status:** Planned
-**Dependencies:** See `.claude/features/feature-order.md`
+**Status:** Worker process runs; **job handler is stubbed** (see `render-worker/src/jobs/render-card.ts`).  
+**Canonical docs:** [render-worker/README.md](render-worker/README.md) and [render-worker/feature.yaml](render-worker/feature.yaml)
 
-## Purpose
+## What exists today
 
-[Feature brief - see `/CONTEXT.md` for overview]
+- BullMQ worker on queue **`card-rendering`** (`render-worker/src/worker.ts`).
+- Config and Redis connection under `render-worker/src/core/`.
+- `processRenderCard` simulates work only; real rendering, storage upload, and DB updates are TODO.
 
-## Specification
+## Planning context
 
-**This file is a placeholder. Full specification to be developed during implementation phase.**
-
-**Quick Reference:**
-- Overview: See `/CONTEXT.md` → Features section
-- Implementation Order: See `.claude/features/feature-order.md`
-- Session Template: See `.claude/SESSION_STARTERS.md`
-
-## Development Notes
-
-When ready to implement:
-1. Copy template from `auto-auth.md` structure
-2. Define: User Story, Acceptance Criteria, Architecture, API, DB Schema
-3. Add security considerations and testing strategy
-4. Update session starter in `SESSION_STARTERS.md`
-
+Historical phase planning: [feature-order.md](feature-order.md).

@@ -1,53 +1,74 @@
-# Features Directory
+# Features directory
 
-**Purpose:** Detailed specifications for E-Cards features. Read on-demand, not all at once.
+**Purpose:** Authoritative feature documentation for the E-Cards (tools-ecards) monorepo. Read on demand; start from the index below.
 
-## Directory Contents
+**Last verified against codebase:** 2026-04-22
 
-Each feature has one or more markdown files:
-- `{feature-name}.md` - E-Cards implementation specification
-- `{feature-name}.external.md` - External system requirements (if applicable)
+---
 
-## Feature List
+## Canonical feature packages (README + feature.yaml)
 
-| Feature | Status | Priority | Files |
-|---------|--------|----------|-------|
-| **Auto-Auth** | In Progress | **HIGH** | `auto-auth.md`, `auto-auth.external.md` |
-| **Database Setup** | Planned | **HIGH** | `database-setup.md` |
-| **Template Designer** | Planned | **HIGH** | `template-designer.md` |
-| **Batch Import** | Planned | **HIGH** | `batch-import.md` |
-| **Render Worker** | Planned | **HIGH** | `render-worker.md` |
-| **Batch Management** | Planned | MEDIUM | `batch-management.md` |
-| **Name Parser** | Planned | MEDIUM | `name-parser.md` |
-| **User Profile** | Planned | LOW | `user-profile.md` |
+These map directly to shipped or in-progress code under `front-cards`, `api-server`, and `render-worker`. The master index with summaries is [`.claude/FEATURES_INDEX.md`](../FEATURES_INDEX.md).
 
-## Development Sequence
+| Directory | Scope |
+|-----------|--------|
+| [template-textile/](template-textile/README.md) | Canvas template designer (Fabric.js), backgrounds, QR, fonts |
+| [simple-projects/](simple-projects/README.md) | Projects API (`/api/v1/projects`), default project, selection |
+| [batch-upload/](batch-upload/README.md) | Multipart upload, batch list/status/delete/retry, stats, recent |
+| [batch-parsing/](batch-parsing/README.md) | Bull worker, Python parser integration, `/api/batch-records` search APIs, diagnostics |
+| [batch-records/](batch-records/README.md) | CRUD for records under `/api/batches/:batchId/records` |
+| [batch-view/](batch-view/README.md) | Frontend batch listing and navigation |
+| [batch-import/](batch-import/README.md) | Post-parse import / mapping (placeholder service; routes not mounted in `api-server` `app.ts`) |
+| [s3-bucket/](s3-bucket/README.md) | S3-compatible storage (SeaweedFS), presigned URLs |
+| [font-management/](font-management/README.md) | Google Fonts and upload APIs |
+| [dashboard/](dashboard/README.md) | Dashboard route shell |
+| [render-worker/](render-worker/README.md) | BullMQ `card-rendering` worker (stub job handler today) |
 
-See [`feature-order.md`](./feature-order.md) for the recommended implementation order with dependencies.
+---
 
-## Usage
+## Consolidated / deep-dive specs
 
-**Load only what you need:**
+| File | Use when |
+|------|-----------|
+| [BATCH_UPLOAD_AND_PARSING.md](BATCH_UPLOAD_AND_PARSING.md) | End-to-end upload → queue → Python parse → storage (long-form) |
 
-```bash
-# Working on auto-auth
-Read: .claude/features/auto-auth.md
+---
 
-# Need external API specs
-Read: .claude/features/auto-auth.external.md
+## Authentication
 
-# Planning implementation order
-Read: .claude/features/feature-order.md
-```
+| File | Notes |
+|------|--------|
+| [auto-auth.md](auto-auth.md) | Full OAuth / remote-auth **spec** (historical detail); core behavior is implemented via cookie + `authMiddleware` and `front-cards` login/callback routes |
+| [auto-auth.external.md](auto-auth.external.md) | External system contracts |
 
-## Feature Specification Structure
+There is no separate `authentication/` folder; treat **auto-auth** docs plus `api-server/src/core/middleware/authMiddleware.ts` and `front-cards/app/login` / `app/auth/*` as the source of truth for login behavior.
 
-Each `*.md` file includes:
-1. User Story & Acceptance Criteria
-2. Architecture & Data Flow
-3. API Endpoints (request/response)
-4. Database Schema
-5. Security & Error Handling
-6. Testing Strategy
+---
 
-**Principle:** Detailed specs here. High-level overview in `/CONTEXT.md`.
+## Legacy flat specs (planning / partial)
+
+These files predate the `*/README.md` + `feature.yaml` layout. Prefer the **directory** in the first table when both exist.
+
+| File | Prefer instead |
+|------|----------------|
+| [simple-projects.md](simple-projects.md) | [simple-projects/](simple-projects/README.md) |
+| [s3-bucket.md](s3-bucket.md) | [s3-bucket/](s3-bucket/README.md) |
+| [template-designer.md](template-designer.md) | [template-textile/](template-textile/README.md) |
+| [batch-import.md](batch-import.md) | [batch-import/](batch-import/README.md) |
+| [render-worker.md](render-worker.md) | [render-worker/](render-worker/README.md) |
+| [batch-management.md](batch-management.md) | Overlaps **batch-view** + **batch-upload**; no dedicated package yet |
+| [name-parser.md](name-parser.md) | Implemented inside **batch-parsing** (LLM name parsing), not a standalone service |
+| [user-profile.md](user-profile.md) | Not implemented as a dedicated feature area |
+| [database-setup.md](database-setup.md) | Reference for Prisma / DB; schema lives in `api-server/prisma` |
+
+---
+
+## Implementation order (historical)
+
+[feature-order.md](feature-order.md) is a **2025 planning** timeline (phases, dependency graph). It is useful for context but **does not** reflect current completion state; use per-feature READMEs and `feature.yaml` files for what exists today.
+
+---
+
+## Conventions
+
+Feature doc structure is defined in [`.claude/FEATURE_STANDARD.md`](../FEATURE_STANDARD.md).
