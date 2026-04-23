@@ -42,7 +42,7 @@ api-server/src/features/s3-bucket/
 
 ### Environment Configuration
 
-Add these variables to your `.env` file:
+Add these variables to the **monorepo root** `.env` (not `api-server/.env`):
 
 ```env
 # Storage Mode

@@ -126,6 +126,8 @@ services:
 
   # API Server - Internal backend service (NOT the external auth API)
   # This is the E-Cards application's own API server for internal operations
+  # All runtime configuration comes from the monorepo root .env (same as bin/start.sh --env-file);
+  # copy .env.dev.example → .env and align hostnames for Compose (e.g. postgres, cassandra, redis).
   api-server:
     build:
       context: ./api-server
@@ -140,108 +142,8 @@ services:
       # Local dev: add "127.0.0.1 dev.aiepic.app" on the host (see DOCS_TECH_STACK.md)
       - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      API_PORT: ${API_PORT:-7400}
-      API_INTERNAL_PORT: ${API_INTERNAL_PORT:-4000}
-      PORT: ${API_INTERNAL_PORT:-4000}
-      API_URL: ${API_URL:-http://localhost:7400}
-      # PostgreSQL
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ecards_user}:${POSTGRES_PASSWORD:-ecards_dev_password}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-ecards_db}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-ecards_db}
-      POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecards_dev_password}
-      # Cassandra
-      CASSANDRA_HOSTS: ${CASSANDRA_HOSTS:-cassandra}
-      CASSANDRA_PORT: ${CASSANDRA_PORT:-9042}
-      CASSANDRA_KEYSPACE: ${CASSANDRA_KEYSPACE:-ecards_canonical}
-      CASSANDRA_DC: ${CASSANDRA_DC:-dc1}
-      # Redis
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # JWT (for internal token generation)
-      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
-      JWT_EXPIRY: ${JWT_EXPIRY:-7d}
-      # Rate limiting
-      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
-      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
-      # LLM Configuration
-      LLM_ENABLED: ${LLM_ENABLED:-true}
-      LLM_PRIMARY_PROVIDER: ${LLM_PRIMARY_PROVIDER:-openai}
-      LLM_FALLBACK_PROVIDER: ${LLM_FALLBACK_PROVIDER:-deepseek}
-      LLM_CREDIT_COST: ${LLM_CREDIT_COST:-1}
-      LLM_RETRY_ATTEMPTS: ${LLM_RETRY_ATTEMPTS:-2}
-      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-10000}
-      # OpenAI
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-proj-your-openai-api-key-here}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-500}
-      OPENAI_TEMPERATURE: ${OPENAI_TEMPERATURE:-0.3}
-      # Anthropic
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-sk-ant-your-anthropic-api-key-here}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
-      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-500}
-      ANTHROPIC_TEMPERATURE: ${ANTHROPIC_TEMPERATURE:-0.3}
-      # DeepSeek
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-your-deepseek-api-key-here}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
-      DEEPSEEK_MAX_TOKENS: ${DEEPSEEK_MAX_TOKENS:-500}
-      DEEPSEEK_TEMPERATURE: ${DEEPSEEK_TEMPERATURE:-0.3}
-      # External LLM (Backward Compatibility)
-      EXTERNAL_LLM_API: ${EXTERNAL_LLM_API:-http://remote-llm-server:5000/api/llm}
-      # SeaweedFS (Remote - Client Configuration)
-      USE_LOCAL_STORAGE: ${USE_LOCAL_STORAGE:-false}
-      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://192.168.65.254:8333}
-      SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-any}
-      SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-any}
-      SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET}
-      SEAWEEDFS_REGION: ${SEAWEEDFS_REGION:-us-east-1}
-      # External services (Remote Auth & User Management API)
-      EXTERNAL_AUTH_URL: ${EXTERNAL_AUTH_URL:-http://dev.aiepic.app/app}
-      EXTERNAL_SUBSCRIPTION_WS: ${EXTERNAL_SUBSCRIPTION_WS:-ws://dev.aiepic.app/admin/ws}
-      EXTERNAL_USER_API: ${EXTERNAL_USER_API:-http://dev.aiepic.app/admin/api}
-      # OAuth 2.0 Configuration (Backend - for token exchange)
-      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
-      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
-      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-http://dev.aiepic.app/oauth/authorize}
-      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-http://dev.aiepic.app/oauth/token}
-      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-http://dev.aiepic.app/api/users/me}
-      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
-      OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
-      # Application Identity
-      APPLICATION_ID: ${APPLICATION_ID}
-      EXTERNAL_API_KEY: ${EXTERNAL_API_KEY}
-      USER_SUBSCRIPTION_URL: ${USER_SUBSCRIPTION_URL:-http://dev.aiepic.app/app/features/user-subscription}
-      # Token Security
-      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
-      # Session Cookie Configuration
-      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-ecards_auth}
-      REFRESH_COOKIE_NAME: ${REFRESH_COOKIE_NAME:-ecards_refresh}
-      SESSION_COOKIE_MAX_AGE: ${SESSION_COOKIE_MAX_AGE:-3600}
-      REFRESH_COOKIE_MAX_AGE: ${REFRESH_COOKIE_MAX_AGE:-2592000}
-      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
-      SESSION_COOKIE_HTTP_ONLY: ${SESSION_COOKIE_HTTP_ONLY:-true}
-      SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-strict}
-      # PKCE Configuration
-      PKCE_ENABLED: ${PKCE_ENABLED:-true}
-      PKCE_CODE_CHALLENGE_METHOD: ${PKCE_CODE_CHALLENGE_METHOD:-S256}
-      # OAuth State Parameter
-      OAUTH_STATE_ENABLED: ${OAUTH_STATE_ENABLED:-true}
-      # Rate Limiting for Auth Endpoints
-      AUTH_RATE_LIMIT_LOGIN_WINDOW: ${AUTH_RATE_LIMIT_LOGIN_WINDOW:-900000}
-      AUTH_RATE_LIMIT_LOGIN_MAX: ${AUTH_RATE_LIMIT_LOGIN_MAX:-5}
-      AUTH_RATE_LIMIT_CALLBACK_WINDOW: ${AUTH_RATE_LIMIT_CALLBACK_WINDOW:-900000}
-      AUTH_RATE_LIMIT_CALLBACK_MAX: ${AUTH_RATE_LIMIT_CALLBACK_MAX:-10}
-      AUTH_RATE_LIMIT_REFRESH_WINDOW: ${AUTH_RATE_LIMIT_REFRESH_WINDOW:-3600000}
-      AUTH_RATE_LIMIT_REFRESH_MAX: ${AUTH_RATE_LIMIT_REFRESH_MAX:-20}
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-debug}
-      # Exclude Prisma, AuthMiddleware, and axios debug logs to reduce noise
-      DEBUG: ${DEBUG:-*,-prisma:*,-AuthMiddleware,-axios,-axios:*,-follow-redirects}
-      # Disable axios verbose logging
+    env_file:
+      - .env
     networks:
       - ecards-network
     depends_on:

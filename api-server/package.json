@@ -4,16 +4,16 @@
   "description": "E-Cards internal API server",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "prisma generate && prisma db push && tsx watch src/server.ts",
+    "dev": "node -r ./scripts/preload-root-env.cjs node_modules/prisma/build/index.js generate && node -r ./scripts/preload-root-env.cjs node_modules/prisma/build/index.js db push && tsx watch src/server.ts",
     "dev:server": "tsx watch src/server.ts",
     "build": "tsc",
     "build:docker": "npx --yes esbuild@0.25.0 src/server.ts --bundle --platform=node --target=node20 --format=cjs --packages=external --outfile=dist/server.js",
     "start": "node dist/server.js",
-    "test": "jest",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "test": "node -r ./scripts/preload-root-env.cjs node_modules/jest/bin/jest.js",
+    "db:push": "node -r ./scripts/preload-root-env.cjs node_modules/prisma/build/index.js db push",
+    "db:migrate": "node -r ./scripts/preload-root-env.cjs node_modules/prisma/build/index.js migrate dev",
+    "db:generate": "node -r ./scripts/preload-root-env.cjs node_modules/prisma/build/index.js generate",
+    "db:studio": "node -r ./scripts/preload-root-env.cjs node_modules/prisma/build/index.js studio"
   },
   "keywords": [
     "ecards",

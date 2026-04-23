@@ -3,9 +3,17 @@
  * Loads and validates environment variables
  */
 
+import { existsSync } from 'fs';
+import { resolve } from 'path';
 import { config } from 'dotenv';
 
-config();
+// Monorepo root `.env` only (api-server/ has no local .env). `config` = this file's dir = .../core/config
+const monorepoEnv = resolve(__dirname, '../../../..', '.env');
+if (existsSync(monorepoEnv)) {
+  config({ path: monorepoEnv });
+} else {
+  config();
+}
 
 export const appConfig = {
   env: process.env.NODE_ENV || 'development',

@@ -84,7 +84,7 @@ Provides a unified storage interface for the E-Cards application supporting both
 
 ## Configuration
 
-See `api-server/.env` for storage configuration:
+See the **monorepo root** `.env` for storage configuration:
 - `USE_LOCAL_STORAGE` - Force local storage mode
 - `SEAWEEDFS_ENDPOINT` - S3 endpoint URL
 - `SEAWEEDFS_ACCESS_KEY` - Access key
