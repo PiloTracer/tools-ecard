@@ -111,7 +111,7 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 **Purpose:** OAuth 2.0 and user APIs used **as a client** by this app (this repo is not the auth server).
 
-**Typical dev wiring:** `https://dev.aiepic.app` points at services running on your **host** (Tools dashboard / OAuth, etc.). See **Local DNS (dev.aiepic.app)** below.
+**Typical dev wiring:** use the hosted **`https://dev.aiepic.app`** endpoints (public DNS and TLS). Optional: run OAuth on loopback with hosts + compose override — see **`dev.aiepic.app` (default: public HTTPS)** below.
 
 **Endpoints (environment-specific):** authorization, token, and userinfo URLs come from `OAUTH_*` and `NEXT_PUBLIC_OAUTH_*` variables — do not hardcode in code without checking config.
 
@@ -150,23 +150,19 @@ Quick reference guide for the E-Cards application stack, organized by service.
 - Nodemon (hot reload)
 - ESLint + Prettier
 
-### Local DNS (`dev.aiepic.app`)
+### `dev.aiepic.app` (default: public HTTPS)
 
-**On your computer (browser + native tools):** map the hostname to loopback so `https://dev.aiepic.app/...` hits whatever is listening on the host (e.g. port 80/443 for your auth stack).
+**Default (recommended):** Do **not** map `dev.aiepic.app` in `/etc/hosts`. The browser and Docker containers resolve **`https://dev.aiepic.app`** with normal DNS and a public certificate chain. Server-side OAuth in `front-cards` (for example `app/oauth/complete/route.ts`) and the API use the same hostnames and hit the **same** endpoints as your browser.
 
-**Linux / macOS** — edit `/etc/hosts` (needs admin):
+If you still have **`127.0.0.1 dev.aiepic.app`** from an old setup, remove it unless you are doing **advanced — OAuth only on your machine** below; otherwise the browser can get an authorization code from a **local** server while the container exchanges it with the **public** server, which fails in confusing ways.
 
-```text
-127.0.0.1 dev.aiepic.app
-::1 dev.aiepic.app
-```
+**Inside Docker** (`front-cards`, `api-server`), `docker-compose.dev.yml` sets:
 
-**Windows** — edit `C:\Windows\System32\drivers\etc\hosts` as Administrator, same two lines.
-
-**Inside Docker** (`front-cards`, `api-server`): `docker-compose.dev.yml` sets:
-
-- `extra_hosts: dev.aiepic.app:host-gateway` — containers resolve `dev.aiepic.app` to the host gateway (same machine as your browser’s `127.0.0.1` mapping).
 - `extra_hosts: host.docker.internal:host-gateway` — so URLs like `http://host.docker.internal:8333` (SeaweedFS, etc.) work on **Linux** where that name is not built in.
+
+`dev.aiepic.app` is **not** mapped to `host-gateway` by default. Mapping it forced containers to talk to whatever TLS was listening on your **host** for that name, which often did **not** match the public `dev.aiepic.app` certificate and caused `UNABLE_TO_VERIFY_LEAF_SIGNATURE` in Node even when the real site was fine in the browser.
+
+**Advanced — OAuth only on your machine:** If you intentionally run the auth stack on loopback, add `127.0.0.1 dev.aiepic.app` to the OS hosts file for the **browser**, and use a **compose override** that adds `extra_hosts: dev.aiepic.app:host-gateway` for `front-cards` and `api-server` so containers reach that host listener. If that listener uses a private CA (mkcert, corporate TLS), set `NODE_EXTRA_CA_CERTS` in `.env` to a PEM path readable inside the container (mount the file in the override). See `.env.dev.example` for an optional placeholder.
 
 After changing hosts or compose, restart containers: `docker compose -f docker-compose.dev.yml up -d`.
 
@@ -216,12 +212,11 @@ After changing hosts or compose, restart containers: `docker compose -f docker-c
 ### External APIs
 
 **API Server → OAuth Server:**
-- HTTP (`https://dev.aiepic.app/oauth/token`, etc.)
-- Uses `extra_hosts` so the container reaches the host where the OAuth service runs
+- HTTPS (`https://dev.aiepic.app/oauth/token`, etc.) — public DNS from the container unless you add a compose override for host-local OAuth.
 
 **Frontend → OAuth Server:**
-- Browser redirects (`https://dev.aiepic.app/oauth/authorize`, …) — resolved via your OS **hosts** file
-- Server-side token exchange from Next API routes uses the same hostnames + `extra_hosts`
+- Browser redirects (`https://dev.aiepic.app/oauth/authorize`, …) — normal DNS by default; optional OS **hosts** file only for advanced local-OAuth setups.
+- Server-side token exchange from Next routes uses the same configured URLs and **public** `dev.aiepic.app` TLS by default.
 
 ---
 

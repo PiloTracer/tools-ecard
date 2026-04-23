@@ -264,14 +264,13 @@ JWT_EXPIRY=7d
 
 > See `.env.dev.example` for the complete list (Cassandra, Redis, worker settings, feature flags, etc.).
 
-### Local OAuth host (`dev.aiepic.app`)
+### OAuth / `dev.aiepic.app`
 
-OAuth and dashboard URLs default to **`https://dev.aiepic.app`**. On your workstation, map that name to loopback so the browser and local services resolve it correctly:
+OAuth and related URLs default to **`https://dev.aiepic.app`**. In normal development you **do not** need `/etc/hosts` changes: the browser and Docker services use public DNS and the same TLS as production-style dev.
 
-- Add **`127.0.0.1 dev.aiepic.app`** (and optionally **`::1 dev.aiepic.app`**) to your OS hosts file.
-- **`docker-compose.dev.yml`** already adds **`dev.aiepic.app:host-gateway`** (and **`host.docker.internal:host-gateway`**) for `front-cards` and `api-server` so containers reach the same host.
+If you run the auth stack **only on your laptop** (advanced), map **`127.0.0.1 dev.aiepic.app`** in the OS hosts file and add a **compose override** so containers can reach the host; see **`DOCS_TECH_STACK.md`** → *`dev.aiepic.app` (default: public HTTPS)*.
 
-Details: **`DOCS_TECH_STACK.md`** → section *Local DNS (`dev.aiepic.app`)*.
+**`docker-compose.dev.yml`** adds **`host.docker.internal:host-gateway`** for `front-cards` and `api-server` (Linux); it does **not** override `dev.aiepic.app` by default.
 
 ### LLM Provider Setup (Optional)
 
