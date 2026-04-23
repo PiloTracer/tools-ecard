@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-sanity:
+    name: docker compose config sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate dev compose (with .env.dev.example)
+        run: |
+          cp .env.dev.example .env
+          docker compose -f docker-compose.dev.yml --env-file .env config >/dev/null
+      - name: Validate prd compose (with .env.prd.example)
+        run: |
+          cp .env.prd.example .env.prd
+          docker compose -f docker-compose.prd.yml --env-file .env.prd config >/dev/null
+
+  api-server:
+    name: api-server (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: api-server/package-lock.json
+      - name: Install native build deps for canvas/sharp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 make g++ \
+            libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev libvips-dev
+      - name: npm ci
+        run: npm ci
+      - name: Preload root env for Prisma
+        run: |
+          cp ../.env.dev.example ../.env
+      - name: prisma generate
+        run: npm run db:generate
+      - name: TypeScript compile
+        run: npm run build
+      - name: Tests
+        run: npm test -- --ci --reporters=default
+
+  render-worker:
+    name: render-worker (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: render-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: render-worker/package-lock.json
+      - name: Install native build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 make g++ \
+            libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev librsvg2-dev libvips-dev
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: TypeScript compile
+        run: npm run build
+      - name: Tests
+        run: npm test -- --ci --passWithNoTests
+
+  front-cards:
+    name: front-cards (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front-cards
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: front-cards/package-lock.json
+      - name: npm ci
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Lint
+        run: npm run lint --if-present
+      - name: Next.js build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:7400
+          NEXT_PUBLIC_WS_URL: ws://localhost:7400
+          NEXT_PUBLIC_OAUTH_CLIENT_ID: ci_dummy
+          NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: http://localhost/oauth/authorize
+          NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: http://localhost/oauth/token
+          NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: http://localhost/api/users/me
+          NEXT_PUBLIC_EXTERNAL_AUTH_URL: http://localhost/app
+          NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: /dashboard
+        run: npm run build
+      - name: Tests
+        run: npm test -- --ci --passWithNoTests
+
+  shared-types:
+    name: shared-types (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/shared-types
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        run: npm install
+      - name: Build
+        run: npm run build

@@ -23,6 +23,43 @@ docker-compose -f docker-compose.dev.yml up
 - **Nginx** fronts **Next.js** and **Fastify** on one hostname; see **`deploy/nginx/ecards.prd.conf`**.
 - TLS: terminate HTTPS at your load balancer, or extend nginx with certificates.
 
+### Production readiness checklist
+
+Before a production deploy, confirm:
+
+- **Secrets set in `.env.prd`** (all `CHANGE_ME_*` placeholders replaced):
+  - `POSTGRES_PASSWORD`, `DATABASE_URL` (must match), `JWT_SECRET` (≥ 32 random chars)
+  - `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`
+  - `APPLICATION_ID`, `EXTERNAL_API_KEY`
+  - `TOKEN_ENCRYPTION_KEY` (exactly 64 hex chars = 32 bytes)
+  - `SEAWEEDFS_ACCESS_KEY`, `SEAWEEDFS_SECRET_KEY`, `SEAWEEDFS_BUCKET`
+  - Optional LLM keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`
+- **OAuth redirect URI registered** with your IdP: `https://ecards.aiepic.app/oauth/complete`.
+- **DNS** `ecards.aiepic.app` points to the production host.
+- **TLS terminated** (load balancer or nginx certs); `SESSION_COOKIE_SECURE=true`.
+- **Database migrations** applied — `api-server` runs `prisma migrate deploy` on start; verify the `prisma/migrations/` directory is committed and built into the image.
+- **Image build** succeeded locally or in CI (see `.github/workflows/ci.yml`).
+- **Backups** scheduled for `postgres_prd_data` and `cassandra_prd_data` volumes.
+- **Logs** retained and rotated (`json-file` driver with 20MB x 5 files is configured per service).
+- **Healthchecks** green (`nginx`, `postgres`, `cassandra`, `redis`, `api-server`, `front-cards`).
+
+### Secret hygiene
+
+- `.env` and `.env.prd` are **gitignored**. Only `*.example` files are tracked.
+- **Rotate** any secret that has ever been committed, pasted into a chat, or shared outside the secret manager.
+- Never reuse dev values (`dev_jwt_secret_change_in_production`, all-zero `TOKEN_ENCRYPTION_KEY`) in production.
+- If you must pre-provision `.env.prd` on hosts, deliver it via your secret manager (SSM, Vault, 1Password CLI) with `chmod 600` and root ownership; do not `scp` in cleartext.
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR:
+
+- `docker compose config` sanity check for both `dev` and `prd`.
+- `api-server`: `npm ci` → `prisma generate` → `tsc` → `jest`.
+- `render-worker`: `npm ci` → `tsc` → `jest`.
+- `front-cards`: `npm ci` → lint → `next build` → `jest`.
+- `packages/shared-types`: `tsc`.
+
 ## Project Structure
 
 ```
