@@ -16,6 +16,7 @@ Use this file for **30-second orientation**. For details, follow the links (do n
 | **Human quick start** | [`README.md`](README.md) |
 | **CI (build / test / compose sanity)** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 | **Production stack** | `docker-compose.prd.yml` + `.env.prd` + per-service `Dockerfile.prd` (suffix is **`prd`**, not `prod`) |
+| **Identity / OAuth (Tools Dashboard)** | Sibling repo **`../tools-dashboard`** — compose + nginx in [`DOCS_TECH_STACK.md`](DOCS_TECH_STACK.md) under *External Services* |
 
 **Apps:** `front-cards/` (Next.js) · `api-server/` (Fastify + Prisma) · `render-worker/` (jobs).
 

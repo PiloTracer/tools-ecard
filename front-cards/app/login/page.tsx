@@ -20,9 +20,20 @@ function LoginPageContent() {
   useEffect(() => {
     // Check for error in URL params (redirected from callback with error)
     const errorParam = searchParams.get('error');
+    const errorDetail =
+      searchParams.get('error_description') || searchParams.get('description');
     if (errorParam) {
-      setError(getOAuthErrorMessage(errorParam));
-      console.error('OAuth error:', errorParam);
+      let detail = '';
+      if (errorDetail) {
+        try {
+          detail = decodeURIComponent(errorDetail);
+        } catch {
+          detail = errorDetail;
+        }
+      }
+      const base = getOAuthErrorMessage(errorParam);
+      setError(detail ? `${base}\n${detail}` : base);
+      console.error('OAuth error:', errorParam, detail || '');
     }
 
     // Check if OAuth parameters are present (pre-initiated from Tools Dashboard)
@@ -143,7 +154,7 @@ function LoginPageContent() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-red-800 whitespace-pre-wrap break-words">{error}</p>
               </div>
             </div>
           )}

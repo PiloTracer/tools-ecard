@@ -1,6 +1,6 @@
 # Docker OAuth Network Configuration Fix
 
-> **Update (2026-04):** Default `docker-compose.dev.yml` **removed** `dev.aiepic.app:host-gateway`. Containers now resolve `dev.aiepic.app` with public DNS so server-side `fetch()` to `https://dev.aiepic.app/...` uses the same certificate chain as the browser. Keep a compose **override** with `extra_hosts` only if you intentionally run OAuth on the host with `/etc/hosts` loopback.
+> **Update (2026-04):** `dev.aiepic.app:host-gateway` is **restored** by default. With `127.0.0.1 dev.aiepic.app` on the host, containers otherwise resolve `dev.aiepic.app` to loopback **inside the container** (`ECONNREFUSED` on token exchange) while the browser still hits the host’s nginx. Removing host-gateway only makes sense for public-DNS-only dev (no hosts override).
 
 **Date:** 2025-01-16
 **Issue:** OAuth token exchange timeout (Connect Timeout Error)

@@ -89,8 +89,9 @@ services:
       - /app/node_modules
       - /app/.next
     extra_hosts:
-      # dev.aiepic.app is NOT overridden here — server-side fetch() uses public DNS and the real TLS chain.
-      # For OAuth running only on the host, add a compose override with dev.aiepic.app:host-gateway (see DOCS_TECH_STACK.md).
+      # dev.aiepic.app → host: with `127.0.0.1 dev.aiepic.app` on the host, containers otherwise resolve
+      # dev.aiepic.app to 127.0.0.1 *inside the container* (nothing on :443) → fetch ECONNREFUSED / OAuth fails.
+      - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
@@ -109,7 +110,7 @@ services:
       NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-https://dev.aiepic.app/app}
       NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-https://dev.aiepic.app/app/features/user-subscription}
       # OAuth Configuration (Backend - for API routes in front-cards/app/api/auth/*)
-      # Server-side OAuth calls https://dev.aiepic.app via normal DNS from the container
+      # Server-side OAuth: same host:port as browser (extra_hosts dev.aiepic.app → host-gateway)
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
       OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-https://dev.aiepic.app/oauth/authorize}
@@ -141,6 +142,7 @@ services:
       - ./api-server:/app
       - /app/node_modules
     extra_hosts:
+      - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
     env_file:
       - .env

@@ -266,11 +266,9 @@ JWT_EXPIRY=7d
 
 ### OAuth / `dev.aiepic.app`
 
-OAuth and related URLs default to **`https://dev.aiepic.app`**. In normal development you **do not** need `/etc/hosts` changes: the browser and Docker services use public DNS and the same TLS as production-style dev.
+OAuth URLs default to **`https://dev.aiepic.app`**. If you map **`127.0.0.1 dev.aiepic.app`** in `/etc/hosts` (typical: nginx / Tools on the host), the browser and your identity logs line up — but Docker must still reach **that host**, not `127.0.0.1` inside the container.
 
-If you run the auth stack **only on your laptop** (advanced), map **`127.0.0.1 dev.aiepic.app`** in the OS hosts file and add a **compose override** so containers can reach the host; see **`DOCS_TECH_STACK.md`** → *`dev.aiepic.app` (default: public HTTPS)*.
-
-**`docker-compose.dev.yml`** adds **`host.docker.internal:host-gateway`** for `front-cards` and `api-server` (Linux); it does **not** override `dev.aiepic.app` by default.
+**`docker-compose.dev.yml`** sets **`dev.aiepic.app:host-gateway`** and **`host.docker.internal:host-gateway`** on `front-cards` and `api-server`. Details: **`DOCS_TECH_STACK.md`** → *`dev.aiepic.app` in Docker*.
 
 ### LLM Provider Setup (Optional)
 
