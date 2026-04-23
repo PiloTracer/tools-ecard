@@ -1,8 +1,8 @@
 /**
  * Load monorepo root env into `process.env` before Next.js starts.
- * - No `front-cards/.env.local` — use repo root **`.env`** (preferred local dev) or **`.env.dev`** if `.env` is absent.
- * - In Docker, `env_file` on `ecards-frontend` usually sets variables already; this file only fills gaps.
- * - Does not overwrite keys already set (non-empty).
+ * Canonical key list: repo root **`.env.dev.example`** (dev) and **`.env.prd.example`** (prd). Runtime: **`.env`** / **`.env.prd`** only.
+ * Optional: **`.env.dev`** if **`.env`** is absent — same keys as `.env`, not a separate template.
+ * No per-app files (`front-cards/.env.local`). Docker `env_file` usually sets vars; this only fills gaps. Does not overwrite non-empty keys.
  */
 const fs = require('fs');
 const path = require('path');

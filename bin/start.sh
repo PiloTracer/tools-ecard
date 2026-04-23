@@ -18,6 +18,9 @@
 # Environments: dev | stg | prd  (aliases: development, staging, prod|production)
 # Production: copy .env.prd.example → .env.prd, then: ./bin/start.sh prd up
 # (requires docker-compose.prd.yml — shipped in this repository.)
+#
+# Env file policy (tools-ecards): canonical key lists are repo root .env.dev.example and .env.prd.example
+# only. Dev uses .env (or optional .env.dev with the same keys). Prd uses .env.prd. No per-package .env files.
 
 set -euo pipefail
 

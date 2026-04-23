@@ -1,6 +1,7 @@
 /**
  * Load monorepo root env before Prisma/Jest.
- * Templates live only at repo root (`.env.dev.example`); there is no `api-server/.env.example`.
+ * Keys: see repo root **`.env.dev.example`** (dev) and **`.env.prd.example`** (prd). No `api-server/.env.example`.
+ * Uses **`.env`**, or **`.env.dev`** if `.env` missing (same key set as `.env`).
  */
 const fs = require('fs');
 const path = require('path');
