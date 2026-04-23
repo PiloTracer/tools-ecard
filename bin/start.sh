@@ -40,9 +40,9 @@ Commands:
   logs          Follow all service logs (tail 100)
   status        Show paths, compose project, volumes, short compose ps
   restart       docker compose restart
-  rebuild       Down → build (tee build.log) → up — keeps named volumes
-  reset         Down -v (deletes compose volumes/data) → build → up — destructive
-  force-rebuild Down → build --no-cache → up — keeps volumes
+  rebuild       Down → build → up — keeps named volumes (build tee’d to repo-root build.log)
+  reset         Down -v (deletes compose volumes/data) → build → up — destructive (same build.log)
+  force-rebuild Down → build --no-cache → up — keeps volumes (same build.log)
   menu          Open interactive menu
   help, -h      Show this help
 
@@ -50,6 +50,10 @@ Environment:
   ECARDS_URL_HOST           Host printed in URLs (default: localhost)
   ECARDS_START_NO_CLEAR=1   Skip clearing the terminal when opening the interactive menu
   ECARDS_START_LOG_TAIL_ALL=1   With diagnostics: tail logs for all services (default: api, postgres, cassandra, redis, db-init)
+
+Build output:
+  After up-build, rebuild, reset, force-rebuild, or restore+up — full transcript is written to:
+    <repo-root>/build.log   (same path as rebuild; re-run overwrites the file)
 EOF
 }
 
@@ -210,6 +214,46 @@ run_compose() {
   "${DOCKER_COMPOSE[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
+# Full transcript of image builds / `up --build` (requires set -o pipefail).
+BUILD_LOG="${PROJECT_ROOT}/build.log"
+
+report_build_log_tail() {
+  local lines="${1:-200}"
+  if [ -f "$BUILD_LOG" ]; then
+    echo >&2 ""
+    echo >&2 "━━ Build transcript: $BUILD_LOG (last ${lines} lines) ━━"
+    tail -n "$lines" "$BUILD_LOG" 2>&1 | sed 's/^/  /' >&2 || true
+    echo >&2 "━━ Full file: less $BUILD_LOG  |  wc -l $BUILD_LOG ━━" >&2
+  else
+    echo >&2 "(No build log at $BUILD_LOG — nothing was tee'd.)" >&2
+  fi
+}
+
+# docker compose build … — tee to BUILD_LOG; on failure print tail (image build errors).
+run_compose_build_logged() {
+  echo "docker compose build — output to terminal and: $BUILD_LOG" >&2
+  if ! run_compose build "$@" 2>&1 | tee "$BUILD_LOG"; then
+    echo "docker compose build failed." >&2
+    report_build_log_tail 220
+    return 1
+  fi
+  echo "Build finished — transcript: $BUILD_LOG"
+  return 0
+}
+
+# docker compose up -d --build — tee full output to BUILD_LOG; on failure tail + compose diagnostics.
+run_compose_up_build_logged() {
+  echo "docker compose up -d --build — output to terminal and: $BUILD_LOG" >&2
+  if ! run_compose up -d --build 2>&1 | tee "$BUILD_LOG"; then
+    echo "docker compose up -d --build failed (includes image build output)." >&2
+    report_build_log_tail 220
+    compose_failure_context
+    return 1
+  fi
+  echo "Build/up transcript: $BUILD_LOG"
+  return 0
+}
+
 # After failed compose up or health wait: ps + log tails (stderr so it stays visible).
 compose_failure_context() {
   echo >&2 ""
@@ -245,6 +289,7 @@ pause_after_error() {
   echo >&2 "The last command did not complete successfully. Read the output above."
   echo >&2 "Tip (stable scrollback, no menu):  $0 $TARGET_ENV up"
   echo >&2 "     (follow logs):                  $0 $TARGET_ENV logs"
+  echo >&2 "     (last build transcript):        less ${BUILD_LOG}  (repo root build.log)"
   echo >&2 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   read -r -p "Press Enter to return to the menu..." _ || true
 }
@@ -410,9 +455,7 @@ cmd_up_quick() {
 
 cmd_up_build() {
   echo "Starting stack (with image rebuild)..."
-  if ! run_compose up -d --build; then
-    echo "docker compose up -d --build failed." >&2
-    compose_failure_context
+  if ! run_compose_up_build_logged; then
     return 1
   fi
   prune_anonymous_volumes
@@ -466,9 +509,12 @@ cmd_rebuild_stack() {
     return 0
   fi
   run_compose down --remove-orphans
-  run_compose build 2>&1 | tee "${PROJECT_ROOT}/build.log"
+  if ! run_compose_build_logged; then
+    return 1
+  fi
   if ! run_compose up -d; then
     echo "docker compose up -d failed after rebuild." >&2
+    report_build_log_tail 80
     compose_failure_context
     return 1
   fi
@@ -487,9 +533,12 @@ cmd_reset_stack() {
     return 0
   fi
   run_compose down -v --remove-orphans
-  run_compose build 2>&1 | tee "${PROJECT_ROOT}/build.log"
+  if ! run_compose_build_logged; then
+    return 1
+  fi
   if ! run_compose up -d; then
     echo "docker compose up -d failed after reset build." >&2
+    report_build_log_tail 80
     compose_failure_context
     return 1
   fi
@@ -503,13 +552,12 @@ cmd_reset_stack() {
 cmd_force_rebuild() {
   echo "Force rebuild (no cache) — volumes kept."
   run_compose down --remove-orphans
-  if ! run_compose build --no-cache; then
-    echo "Build failed." >&2
-    compose_failure_context
+  if ! run_compose_build_logged --no-cache; then
     return 1
   fi
   if ! run_compose up -d; then
     echo "docker compose up -d failed after force build." >&2
+    report_build_log_tail 80
     compose_failure_context
     return 1
   fi
@@ -561,9 +609,7 @@ mount_and_start() {
     docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/_backup_cassandra.tar.gz -C /data"
   fi
 
-  if ! run_compose up -d --build; then
-    echo "docker compose up -d --build failed after restore." >&2
-    compose_failure_context
+  if ! run_compose_up_build_logged; then
     pause_after_error
     return 1
   fi
