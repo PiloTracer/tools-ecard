@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { batchController } from './controllers/batchController';
-import { authMiddleware } from '@/core/middleware/auth';
+import { authMiddleware } from '@/core/middleware/authMiddleware';
 import { MAX_FILE_SIZE } from './types';
 
 // Configure multer for file upload

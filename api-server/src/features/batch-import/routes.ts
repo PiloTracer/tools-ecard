@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { batchImportController } from './controllers/batchImportController';
-import { authMiddleware } from '@/core/middleware/auth';
+import { authMiddleware } from '@/core/middleware/authMiddleware';
 
 const router = Router();
 
