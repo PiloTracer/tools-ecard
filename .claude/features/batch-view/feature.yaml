@@ -21,7 +21,11 @@ services:
       - features/batch-view/types/index.ts
 
   api-server:
-    note: "batch-view Fastify routes exist but are NOT registered in src/app.ts. Live /api/batches traffic is handled by batch-upload."
+    live_owner_for_api_batches:
+      feature: batch-upload
+      file: src/features/batch-upload/routes.fastify.ts
+      includes_get_batch_detail: true
+    note: "batch-view Fastify routes exist but are NOT registered in src/app.ts."
     alternate_implementation:
       - src/features/batch-view/routes.fastify.ts
       - src/features/batch-view/controllers/batchViewController.ts
@@ -39,11 +43,6 @@ services:
       - method: DELETE
         path: /api/batches/:batchId
         auth: required
-
-  live_api_for_same_prefix:
-    service: batch-upload
-    registered: true
-    see: .claude/features/batch-upload/feature.yaml
 
 database:
   postgres:

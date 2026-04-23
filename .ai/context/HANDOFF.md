@@ -2,13 +2,30 @@
 
 **Purpose:** One screen so a **new agent or human** can resume without prior chat. Depth lives in **`.claude/`** and `DOCS_CONTEXT.md`.
 
-**Freshness:** After `git pull`, skim **§7** and re-run one check from **§4** before claiming a release.
+**Freshness:** Updated **2026-04-22**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
 
 ### Last verified (update when you run checks)
 
 | Area | Date | Notes |
 |------|------|--------|
-| Baseline | _pending_ | e.g. `docker compose … config`, `api-server` `npm run build` + `npm test`, or CI green on PR |
+| Improvement plan work | 2026-04-22 | **Shipped:** `GET /api/batches/:id` in `batch-upload` (`getBatchDetail` + Cassandra `recordsCount`); **`batch-import`** registered at `/api/batch-import`** in `app.ts`; **removed** broken `api-server/src/features/template-designer/` tree. **Docs/plan:** `.claude/plans/20260422-ecards-application-improvement-priorities.md` and `.claude/features/render-worker/` updated. |
+| Baseline CI / full build | _pending_ | Run **§4** after `npm ci` + `npm run db:generate` in `api-server`; local `tsc` had many **pre-existing** errors unrelated to the batch-detail change—use **CI log** as gate. |
+
+---
+
+## 0) Start here tomorrow — improvement plan (2026-04-22)
+
+**Primary plan:** [`.claude/plans/20260422-ecards-application-improvement-priorities.md`](../.claude/plans/20260422-ecards-application-improvement-priorities.md)
+
+| Priority | Status (end of 2026-04-22) | Next concrete step |
+|----------|---------------------------|---------------------|
+| **1** Batch HTTP | **Partially done** — `GET /api/batches/:id` live on **batch-upload**; duplicate **`api-server/.../batch-view/`** Fastify module still **unregistered** | Decide: delete `batch-view` api package or merge; add smoke/API test for batch detail; verify `deleteBatch` vs Cassandra parity if deleting batches matters |
+| **2** Render pipeline | **Open** — `render-worker` job handler still **stub**; **`canvas`/`sharp`/`qrcode`** in worker `package.json` **unused** in `src/` | Read **`.claude/features/render-worker/README.md`**; choose stack (node-canvas parity with Fabric vs headless Chromium); define job payload + status API/table |
+| **3** Batch import | **Partially done** — routes **live** at `/api/batch-import`; responses still **placeholder** | Implement real import/mapping against parsed batches; tests |
+
+**Feature docs index:** [`.claude/FEATURES_INDEX.md`](../.claude/FEATURES_INDEX.md) (13 feature areas; includes **authentication**, **simple-quick-actions**).
+
+**Browser reference for server render:** `front-cards/features/template-textile/services/exportService.ts`, `canvasRenderer.ts`, `components/Canvas/CanvasControls.tsx` (Fabric — today’s real export path).
 
 ---
 
@@ -17,9 +34,10 @@
 1. **`.cursorrules`** — project rules, protected areas, verify-before-done, no cross-repo assumptions.
 2. **`DOCS_TECH_STACK.md`** — services, ports, containers, commands (canonical).
 3. **`.claude/DIRECTORY_MAP.md`** — plans, features, fixes.
-4. **`.claude/FEATURES_INDEX.md`** → **`.claude/features/<name>/`** on demand.
-5. **`DOCS_CONTEXT.md`** — broad / cross-cutting architecture only.
-6. **This file** — resume pointers only; keep **short**; no secrets.
+4. **`.claude/plans/20260422-ecards-application-improvement-priorities.md`** — if you are continuing the improvement track.
+5. **`.claude/FEATURES_INDEX.md`** → **`.claude/features/<name>/`** on demand.
+6. **`DOCS_CONTEXT.md`** — broad / cross-cutting architecture only.
+7. **This file** — resume pointers only; keep **short**; no secrets.
 
 ---
 
@@ -97,7 +115,8 @@ Prefer **one** `.claude/features/<name>/` folder over re-reading all of `DOCS_CO
 
 ## 7) Open threads (optional — trim when stale)
 
-- **`api-server` `npm run build` (tsc):** CI is intended to enforce this. If CI fails, errors often group as: missing `node_modules` / run `npm run db:generate`; per-route `AuthenticatedRequest` vs global `FastifyRequest['user']`; template-designer / template-textile type issues — triage from CI log, not from memory.
+- **`api-server` `npm run build` (tsc):** CI is intended to enforce this. If CI fails, triage from the log: missing `node_modules` / run `npm run db:generate`; per-route `AuthenticatedRequest` vs global `FastifyRequest['user']`; Prisma schema vs `Project` types; AWS SDK typings — **not** from memory. The obsolete **`api-server/src/features/template-designer/`** stub was **removed** (2026-04); do not resurrect unless intentionally reintroducing an alias to **template-textile**.
+- **`batch-upload` `deleteBatch`:** Confirm whether deletes must also clear **Cassandra** batch records ( **`batch-view` service** had that path; verify parity with live **`batch-upload`** delete).
 - **Do not paste** real `.env` / `.env.prd` contents into chats or handoff; use **`.env.*.example`** for key names only.
 
 ---

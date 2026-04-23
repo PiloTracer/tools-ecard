@@ -13,6 +13,7 @@ import { batchRepository } from '../repositories/batchRepository';
 import { storageService } from './storageService';
 import { queueService } from './queueService';
 import { prisma } from '../../../core/database/prisma';
+import { batchRecordRepository } from '../../batch-parsing/repositories/batchRecordRepository';
 
 export class BatchUploadService {
   async uploadBatch(request: BatchUploadRequest): Promise<BatchUploadResponse> {
@@ -72,6 +73,40 @@ export class BatchUploadService {
         500
       );
     }
+  }
+
+  /**
+   * Full batch row + Cassandra record count (for batch-view UI: GET /api/batches/:id).
+   */
+  async getBatchDetail(userId: string, batchId: string) {
+    const batch = await batchRepository.findByUserIdAndId(userId, batchId);
+
+    if (!batch) {
+      throw new BatchUploadError(
+        'Batch not found',
+        'BATCH_NOT_FOUND',
+        404
+      );
+    }
+
+    const recordCount = await batchRecordRepository.getRecordCountByBatchId(batchId);
+
+    return {
+      batch: {
+        id: batch.id,
+        fileName: batch.fileName,
+        fileSize: batch.fileSize,
+        status: batch.status,
+        errorMessage: batch.errorMessage,
+        createdAt: batch.createdAt.toISOString(),
+        updatedAt: batch.updatedAt.toISOString(),
+        processedAt: batch.processedAt?.toISOString() ?? null,
+        recordsCount: recordCount,
+        recordsProcessed: batch.recordsProcessed,
+        parsingStartedAt: batch.parsingStartedAt?.toISOString() ?? null,
+        parsingCompletedAt: batch.parsingCompletedAt?.toISOString() ?? null,
+      },
+    };
   }
 
   async getBatchStatus(userId: string, batchId: string): Promise<BatchStatusResponse> {

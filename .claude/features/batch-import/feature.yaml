@@ -3,8 +3,9 @@ version: 1.0.0
 description: Field mapping and data import (placeholder service; routes not mounted on main API)
 
 mounting:
-  registered_in_api_server_app: false
-  note: "Fastify plugin `batchImportRoutes` in `routes.fastify.ts` defines relative paths `/:id/...`. Register in `api-server/src/app.ts` with a non-conflicting prefix (e.g. `/api/batch-import`) before these URLs are live."
+  registered_in_api_server_app: true
+  app_register_prefix: /api/batch-import
+  note: "Registered in src/app.ts with prefix /api/batch-import. Plugin paths are relative `/:id/...`."
 
 services:
   api-server:

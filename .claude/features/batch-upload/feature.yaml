@@ -22,6 +22,11 @@ services:
         file: src/features/batch-upload/routes.fastify.ts
         auth: required
       - method: GET
+        path: /api/batches/:id
+        file: src/features/batch-upload/routes.fastify.ts
+        description: "Single batch + Cassandra record count (shape { batch }) for batch-view UI"
+        auth: required
+      - method: GET
         path: /api/batches/:id/status
         file: src/features/batch-upload/routes.fastify.ts
         auth: required

@@ -328,6 +328,46 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
       throw error;
     }
   });
+
+  // Get single batch (detail for batch-view UI) — register after /stats and /recent so those are not captured as :id
+  fastify.get<{
+    Params: { id: string };
+    Request: AuthenticatedRequest;
+  }>('/:id', async (request, reply) => {
+    try {
+      if (!request.user) {
+        throw new BatchUploadError(
+          'Authentication required',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      const validation = getBatchStatusSchema.safeParse({
+        params: request.params,
+      });
+
+      if (!validation.success) {
+        const errors = validation.error.errors.map((e) => e.message).join(', ');
+        throw new BatchUploadError(errors, 'VALIDATION_ERROR', 400);
+      }
+
+      const result = await batchUploadService.getBatchDetail(
+        request.user.id,
+        request.params.id
+      );
+
+      return reply.send(result);
+    } catch (error) {
+      if (error instanceof BatchUploadError) {
+        return reply.code(error.statusCode).send({
+          error: error.message,
+          code: error.code,
+        });
+      }
+      throw error;
+    }
+  });
 };
 
 export { batchUploadRoutes };

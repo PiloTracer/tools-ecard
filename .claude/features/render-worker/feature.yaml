@@ -14,6 +14,13 @@ services:
     config:
       - src/core/config/index.ts
       - src/core/queue/index.ts
+    npm_dependencies_prepared_not_wired_in_src:
+      - canvas
+      - sharp
+      - qrcode
+
+  front_cards_reference_implementation:
+    note: "Actual PNG/JPG export today is browser Fabric.js — see template-textile exportService / canvasRenderer / CanvasControls."
 
   api-server:
     note: "Enqueue/render orchestration APIs may live here in future; today focus is worker process."
@@ -30,6 +37,7 @@ configuration:
     - REDIS_HOST
     - REDIS_PORT
     - REDIS_PASSWORD
+    - RENDER_ENGINE
 
 status:
   job_handler: "MOCK / stub — see render-card.ts TODOs"

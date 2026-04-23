@@ -122,7 +122,7 @@ Field mapping and data import workflow (PLACEHOLDER implementation).
 
 - **Purpose:** Map file columns to card fields and import data
 - **Services:** api-server
-- **Status:** PLACEHOLDER — service returns mock/structured responses; **Fastify routes are not registered in `api-server/src/app.ts`**, so HTTP API is not live until wired
+- **Status:** PLACEHOLDER responses for most operations; **routes are registered** on **`/api/batch-import`** in `api-server/src/app.ts`
 
 **Use Cases:**
 - Smart field mapping suggestions
@@ -157,7 +157,7 @@ Individual record management within batches for editing and validation.
 Batch listing and detail viewing with filtering and search.
 
 - **Purpose:** UI for batch browsing and management; HTTP calls hit **`/api/batches`** on **api-server**
-- **Services:** front-cards; **live** list/stats/delete/upload routes are implemented by **batch-upload** (registered). A separate **`batch-view`** Fastify module exists but is **not** registered — see `README.md` for the split and `GET /api/batches/:id` detail caveat.
+- **Services:** front-cards; **live** list/stats/delete/upload/detail routes are implemented by **batch-upload** (registered), including **`GET /api/batches/:id`** returning **`{ batch }`**. A separate **`batch-view`** Fastify module remains in the tree but is **not** registered — see `README.md`.
 - **Key Files:**
   - `README.md` - Viewing workflows and API split
   - `feature.yaml` - Front-end paths and alternate API module

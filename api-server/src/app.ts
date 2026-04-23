@@ -19,6 +19,7 @@ import { projectRoutes } from './features/simple-projects/routes';
 import { s3Routes, initializeS3Feature } from './features/s3-bucket';
 import { templateRoutes } from './features/template-textile';
 import { batchUploadRoutes as batchUploadRoutesFastify } from './features/batch-upload/routes.fastify';
+import { batchImportRoutesFastify } from './features/batch-import';
 import batchParsingRoutes from './features/batch-parsing/routes.fastify';
 import diagnosticRoutes from './features/batch-parsing/routes/diagnostics.fastify';
 import batchRecordRoutes from './features/batch-records/routes.fastify';
@@ -132,6 +133,8 @@ export async function buildApp() {
 
   // Register batch-upload routes (includes list, upload, status, delete, stats)
   await app.register(batchUploadRoutesFastify, { prefix: '/api/batches' });
+
+  await app.register(batchImportRoutesFastify, { prefix: '/api/batch-import' });
 
   // Register batch-parsing routes (record search and retrieval)
   await app.register(batchParsingRoutes, { prefix: '/api/batch-records' });

@@ -1,13 +1,8 @@
 # Render-worker
 
-**Status:** Worker process runs; **job handler is stubbed** (see `render-worker/src/jobs/render-card.ts`).  
+**Status:** Worker process runs; **job handler is stubbed**. **Dependencies** `canvas` / `sharp` / `qrcode` are in `package.json` but **not used** in `src/` yet. **In-browser** rendering/export is **Fabric.js** in **template-textile** (`exportService`, `canvasRenderer`, `CanvasControls`).
+
 **Canonical docs:** [render-worker/README.md](render-worker/README.md) and [render-worker/feature.yaml](render-worker/feature.yaml)
-
-## What exists today
-
-- BullMQ worker on queue **`card-rendering`** (`render-worker/src/worker.ts`).
-- Config and Redis connection under `render-worker/src/core/`.
-- `processRenderCard` simulates work only; real rendering, storage upload, and DB updates are TODO.
 
 ## Planning context
 

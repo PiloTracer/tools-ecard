@@ -1,74 +1,143 @@
 # E-Cards application improvement priorities
 
-**Date:** 2026-04-22  
-**Scope:** tools-ecards monorepo (front-cards, api-server, render-worker)  
-**Audience:** Engineering leads and implementers  
+**Plan date:** 2026-04-22  
+**Last updated:** 2026-04-22 (end-of-session sync for handoff / resume)  
+**Scope:** tools-ecards monorepo (`front-cards`, `api-server`, `render-worker`)  
+**Audience:** Engineers and agents resuming work  
 
-This plan captures the **three highest-impact** improvement tracks derived from current architecture, feature documentation under `.claude/features/`, and known gaps (duplicate batch APIs, stub worker, unmounted import).
+**Handoff pointer:** [`.ai/context/HANDOFF.md`](../../.ai/context/HANDOFF.md) §0 — same status in shorter form.
+
+---
+
+## Executive summary (state for the next session)
+
+| Track | Done already | Still to do |
+|-------|----------------|-------------|
+| **P1** Batch HTTP | **`GET /api/batches/:id`** on **batch-upload** returns `{ batch }` (Prisma + Cassandra `recordsCount`). Route order preserves `/stats`, `/recent` before param `/:id`. | Remove or merge duplicate **`api-server/src/features/batch-view/`** (unregistered). Tests / smoke. Optional: **`deleteBatch`** Cassandra parity vs old batch-view logic. |
+| **P2** Render worker | Docs updated: stub handler; **`canvas`/`sharp`/`qrcode`** in worker `package.json` unused in `src/`; **Fabric** export is the **live** client path. | Choose stack; implement **`processRenderCard`**; enqueue + **job status** (DB/API); S3 artifact. |
+| **P3** Batch import + cleanup | **`batch-import`** registered **`/api/batch-import`** in `app.ts`. Broken **`api-server/src/features/template-designer/`** removed. | Real import/mapping logic; tests. |
 
 ---
 
 ## Priority 1 — Unify and harden the batch HTTP surface
 
-**Problem:** The UI targets **`/api/batches`** for list, stats, delete, and batch detail. **batch-upload** is registered on that prefix and covers upload, list, status, retry, stats, and recent, but **does not** expose a dedicated **`GET /api/batches/:batchId`** full-detail contract that matches **`batch-view`**’s alternate Fastify module (which exists but is **not** registered in `api-server/src/app.ts`). That split risks **404s, duplicated logic, and drift** between `features/batch-view` on the client and the live server.
+### Original problem
 
-**Direction:**
+The UI (`front-cards/features/batch-view/`) calls **`NEXT_PUBLIC_API_URL`** + **`/api/batches`**. Only **batch-upload** was registered; **`GET /api/batches/:id`** for batch **detail** was missing while the client expected **`BatchResponse` (`{ batch }`)**. A second implementation lived under **`api-server/src/features/batch-view/`** but was **never** registered on `app.ts`.
 
-- Pick a **single owner** for `/api/batches` (either extend **batch-upload** with missing read operations or register **batch-view** with a clear merge strategy—never two plugins fighting the same paths).
-- Align **response shapes** with `front-cards/features/batch-view/services/batchViewService.ts` expectations.
-- Document the final contract in `.claude/features/batch-view/feature.yaml` and `.claude/features/batch-upload/feature.yaml` after the change.
+### Completed (2026-04-22)
 
-**Success criteria:**
+| Item | Location |
+|------|-----------|
+| **`GET /api/batches/:id`** | `api-server/src/features/batch-upload/routes.fastify.ts` (registered **after** `GET /stats` and `GET /recent`) |
+| **Service** | `api-server/src/features/batch-upload/services/batchUploadService.ts` — **`getBatchDetail(userId, batchId)`** uses `batchRepository.findByUserIdAndId` + **`batchRecordRepository.getRecordCountByBatchId`** |
+| **Docs** | `.claude/features/batch-upload/feature.yaml`, `.claude/features/batch-view/README.md`, `.claude/FEATURES_INDEX.md` |
 
-- One registered Fastify tree for `/api/batches` with no duplicate route definitions.
-- Batch list, stats, delete, status, and **batch detail** (if required by UI) all work against **api-server** in dev compose with passing smoke or integration checks.
+### Remaining work
+
+1. **Duplicate module:** Either delete **`api-server/src/features/batch-view/`** or merge any unique logic into **batch-upload**, then drop dead code. Today it only adds confusion.
+2. **Contract tests:** Add API test or smoke: `GET /api/batches/<uuid>` → 200 + `{ batch }` for owned batch; 404 for other user.
+3. **Delete semantics:** If production requires Cassandra cleanup on batch delete, align **`batchUploadService.deleteBatch`** with the approach in **`batchViewService.deleteBatch`** (Cassandra + Postgres) and test.
+
+### Success criteria (checklist)
+
+- [x] Single registered Fastify tree for **`/api/batches`** (still **batch-upload** only).
+- [x] **`GET /api/batches/:id`** returns shape compatible with **`batchViewService.fetchBatch`** (`{ batch }`).
+- [ ] Duplicate **`batch-view`** server package resolved (removed or merged).
+- [ ] Automated test or documented manual smoke for batch detail.
 
 ---
 
 ## Priority 2 — Implement the real card render pipeline (render-worker)
 
-**Problem:** **`render-worker`** consumes **`card-rendering`** jobs but **`processRenderCard`** is still a **stub** (simulated delay, TODO list for template fetch, layout, export, S3 upload, persistence). Without this, batches and templates do not deliver finished assets—the core product outcome.
+### Problem (unchanged core)
 
-**Direction:**
+**`render-worker`** subscribes to BullMQ queue **`card-rendering`**, but **`render-worker/src/jobs/render-card.ts`** only **stubs** work (sleep + logs). **No** PNG is written; **no** S3 upload; **no** job status persistence.
 
-- Define job payload and idempotency (template id, record id, batch id, output keys).
-- Integrate **template-textile** data (PostgreSQL / APIs), **batch-records** / Cassandra reads, and **s3-bucket** for inputs and outputs.
-- Implement rendering (node-canvas, Puppeteer, or agreed stack), retries, and structured failure reporting; update **`.claude/features/render-worker/`** as behavior lands.
+### Facts to reuse (do not ignore)
 
-**Success criteria:**
+| Fact | Implication |
+|------|----------------|
+| **`render-worker/package.json`** lists **`canvas`**, **`sharp`**, **`qrcode`** | Intended **Node-side** rendering; **not wired** in TS yet. |
+| **`RENDER_ENGINE`** in `render-worker/src/core/config/index.ts` defaults to **`canvas`** | Config exists; handler does not branch on it yet. |
+| **No Puppeteer** in render-worker dependencies | If you pick Chromium, add dep + container story explicitly. |
+| **`front-cards`** already exports cards via **Fabric.js** | **`exportService.ts`**, **`canvasRenderer.ts`**, **`CanvasControls.tsx`**. Server implementation should **mirror template JSON + layout** or call a shared package—avoid a second incompatible layout engine without a plan. |
 
-- A job enqueued from the app (or a test harness) produces a **stored artifact** (e.g. PNG) in the configured bucket and a **verifiable job status** path (DB or API) suitable for UI polling.
+### Recommended next steps (tomorrow)
+
+1. **Decision (record in PR):** **Node `canvas`** (port Fabric layout logic / shared lib) vs **headless browser** vs **“enqueue from client export”** hybrid—pick one MVP.
+2. **Job contract:** Freeze `RenderCardJob` fields (`templateId`, `recordId`, `batchId`, output key, user id, retry token).
+3. **Minimal vertical slice:** One job → load template + record → render PNG buffer → **s3-bucket** upload → status row or Redis hash → UI or admin can verify.
+4. **Docs:** Update `.claude/features/render-worker/` after the first non-stub commit.
+
+### Success criteria
+
+- [ ] Job processed without stub sleep path producing a **real file** in object storage (or agreed staging path).
+- [ ] **Observable status** (API or DB) for poll/UX.
+- [ ] Retries / failure message surfaced for ops.
 
 ---
 
 ## Priority 3 — Wire batch import and reduce dead or misleading code
 
-**Problem:** **batch-import** has Fastify routes in code but **is not registered** in `app.ts`, so the field-mapping / import step remains **non-functional** at the HTTP layer. Separately, **`api-server/src/features/template-designer/`** is a **broken stub** (imports paths that do not exist under that folder), which confuses navigation and onboarding.
+### Original problem
 
-**Direction:**
+**batch-import** had Fastify routes but was **not** mounted. **`api-server/src/features/template-designer/`** was invalid (broken imports).
 
-- Register **batch-import** under a **non-conflicting prefix** (for example `/api/batch-import`, as already reflected in feature docs), connect to real persistence when requirements are clear, and keep placeholder responses only behind an explicit flag if needed.
-- Either **delete** the stray **template-designer** folder or replace it with a one-line re-export from **template-textile** only if the team wants a compatibility alias—avoid leaving broken trees in `src/features/`.
-- Add minimal E2E or API tests for import preview/mapping once the first real step ships.
+### Completed (2026-04-22)
 
-**Success criteria:**
+| Item | Location |
+|------|-----------|
+| **Mount batch-import** | `api-server/src/app.ts` — `app.register(batchImportRoutesFastify, { prefix: '/api/batch-import' })` |
+| **Example paths** | `.claude/features/batch-import/feature.yaml` — `/api/batch-import/:id/import`, `preview`, `mappings/suggest`, `validate`, `status`, `cancel` |
+| **Remove template-designer stub** | Directory **`api-server/src/features/template-designer/`** removed (files + empty dirs) |
+| **Docs** | `.claude/features/batch-import/README.md`, flat `batch-import.md`, `template-textile/README.md` |
 
-- `app.ts` documents and registers batch-import; **OpenAPI or feature.yaml** matches live routes.
-- No `api-server` feature directory that fails to resolve imports on a clean checkout.
+### Remaining work
+
+1. Replace **placeholder** responses in **`batchImportService`** with real behavior tied to **parsed batches** and **batch-records**.
+2. **Tests** when first non-mock endpoint ships.
+3. **Front-cards:** Wire UI to **`/api/batch-import`** when product is ready (today may still be unused in UI).
+
+### Success criteria
+
+- [x] `app.ts` registers batch-import; **feature.yaml** matches live prefix.
+- [x] No broken **`template-designer`** tree under `api-server/src/features/`.
+- [ ] Non-placeholder import/mapping behavior + tests.
 
 ---
 
-## Suggested sequencing
+## Suggested sequencing (updated)
 
-1. **Priority 1** first — unblocks correct dashboard and batch UX and reduces production risk on every batch-related change.  
-2. **Priority 2** in parallel where staffing allows — largest product delta but depends on stable data and storage contracts (often easier after batch API clarity).  
-3. **Priority 3** once batch reads are trustworthy — import builds on parsed records and clear batch identity.
+1. **Close Priority 1** — remove/merge **`api-server/batch-view`**, confirm delete/Cassandra behavior, add tests. Low risk, clears mental load.
+2. **Priority 2 MVP** — in parallel once P1 cleanup is stable enough not to churn batch APIs while render work needs batch/template IDs.
+3. **Priority 3 product logic** — after stable **batch detail** and **records** contracts; import UX depends on knowing batch + column state.
 
 ---
 
-## References
+## Tomorrow starter checklist (copy-friendly)
 
-- `.claude/features/batch-view/README.md` — API split and registration note  
-- `.claude/features/batch-import/README.md` — mount status  
-- `.claude/features/render-worker/README.md` — worker and stub status  
-- `.claude/features/template-textile/README.md` — note on `template-designer` stub folder  
+- [ ] Read [`.ai/context/HANDOFF.md`](../../.ai/context/HANDOFF.md) §0.
+- [ ] `git pull` and run **one** verification from handoff **§4** (or trust CI on your branch).
+- [ ] Open **`api-server/src/app.ts`** — confirm **`/api/batch-import`** and **`/api/batches`** registrations.
+- [ ] If working **P1:** open **`api-server/src/features/batch-view/`** and decide delete vs merge; grep references.
+- [ ] If working **P2:** open **`render-worker/src/jobs/render-card.ts`** + **`front-cards/.../exportService.ts`** side by side.
+- [ ] If working **P3:** open **`api-server/src/features/batch-import/services/batchImportService.ts`** and define first real use case (e.g. preview from Cassandra).
+
+---
+
+## References (authoritative paths)
+
+| Topic | Path |
+|-------|------|
+| Batch list / detail / upload (live) | `.claude/features/batch-upload/README.md`, `feature.yaml` |
+| Batch UI client | `.claude/features/batch-view/README.md` |
+| Batch import HTTP | `.claude/features/batch-import/README.md`, `feature.yaml` |
+| Render worker + Fabric context | `.claude/features/render-worker/README.md`, `feature.yaml` |
+| Template editor / export | `.claude/features/template-textile/README.md`, `template-textile-core.md` |
+| Feature index | `.claude/FEATURES_INDEX.md` |
+| Deep dive upload/parse | `.claude/features/BATCH_UPLOAD_AND_PARSING.md` |
+
+---
+
+**Document owner:** Engineering (update **Last updated** and checkboxes when progress lands.)

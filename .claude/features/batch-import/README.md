@@ -8,7 +8,7 @@ Handles the data import step after file parsing, including field mapping suggest
 
 ## Status
 
-PLACEHOLDER — service layer returns mock/structured placeholder responses; **Fastify routes for batch-import are not registered in `api-server/src/app.ts`**, so these endpoints are not exposed on the running API until wired (implementation exists under `api-server/src/features/batch-import/`, including `routes.fastify.ts`).
+PLACEHOLDER — service layer still returns mock/structured placeholder responses for most operations. **Fastify routes are registered** in `api-server/src/app.ts` under prefix **`/api/batch-import`** (see `feature.yaml` for example paths). Behavior remains placeholder until business logic is implemented.
 
 ## User Stories
 

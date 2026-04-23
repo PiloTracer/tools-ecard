@@ -9,14 +9,9 @@ UI for **listing batches**, **filters/search**, **stats**, **delete**, and navig
 
 ## Overview (api-server)
 
-There are **two** implementations under `api/batches`:
+**Live:** **`batch-upload`** is registered on **`/api/batches`** and implements list, upload, status, retry, stats, recent, delete, and **`GET /api/batches/:id`** returning **`{ batch }`** (Prisma row + Cassandra record count) for the batch-view client.
 
-| Module | Registered in `app.ts` | Role |
-|--------|-------------------------|------|
-| **batch-upload** (`routes.fastify.ts`) | **Yes** | Upload, list, `/:id/status`, delete, retry, `stats`, `recent` |
-| **batch-view** (`batch-view/routes.fastify.ts`) | **No** | Would expose list, `stats`, **`GET /:batchId` (detail)**, delete — overlaps list/stats/delete with batch-upload |
-
-Today only **batch-upload** is mounted on `/api/batches`. The **batch-view** Fastify plugin is **legacy / alternate** and is not registered; **`GET /api/batches/:batchId` (full detail)** is not provided by batch-upload routes (only **`GET /api/batches/:id/status`**). If batch detail fetch fails at runtime, align by registering non-conflicting routes or extending batch-upload.
+**Alternate module:** **`batch-view`** (`batch-view/routes.fastify.ts`) is **not** registered; kept as reference or for a future merge. Do not register both on the same prefix without deduplicating handlers.
 
 ## User stories
 
@@ -25,6 +20,6 @@ Today only **batch-upload** is mounted on `/api/batches`. The **batch-view** Fas
 
 ## Dependencies
 
-- **batch-upload** (live API for list, stats, delete, upload, status).
+- **batch-upload** (live API for list, stats, delete, upload, status, **batch detail**).
 - **batch-records** (per-batch record UI and `GET/PUT/DELETE` records under `/api/batches/:batchId/records`).
 - **simple-projects** (project context used elsewhere in the app flow).
