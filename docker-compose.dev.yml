@@ -93,33 +93,14 @@ services:
       # dev.aiepic.app to 127.0.0.1 *inside the container* (nothing on :443) → fetch ECONNREFUSED / OAuth fails.
       - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
+    # Single source of truth: monorepo root `.env` (same as api-server). No front-cards/.env.local.
+    env_file:
+      - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
-      # Optional: only if you use a compose override that maps dev.aiepic.app to host-local TLS (corp CA / mkcert).
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
-      # API & WebSocket
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7400}
-      # OAuth Configuration (Frontend - browser-accessible, requires NEXT_PUBLIC_ prefix)
-      # NOTE: Must use same OAUTH_CLIENT_ID value as backend (ecards_app_dev)
-      NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:-ecards_app_dev}
-      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-https://dev.aiepic.app/oauth/authorize}
-      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-https://dev.aiepic.app/oauth/token}
-      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-https://dev.aiepic.app/api/users/me}
-      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-https://dev.aiepic.app/app}
-      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-https://dev.aiepic.app/app/features/user-subscription}
-      # OAuth Configuration (Backend - for API routes in front-cards/app/api/auth/*)
-      # Server-side OAuth: same host:port as browser (extra_hosts dev.aiepic.app → host-gateway)
-      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-ecards_app_dev}
-      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
-      OAUTH_AUTHORIZATION_ENDPOINT: ${OAUTH_AUTHORIZATION_ENDPOINT:-https://dev.aiepic.app/oauth/authorize}
-      OAUTH_TOKEN_ENDPOINT: ${OAUTH_TOKEN_ENDPOINT:-https://dev.aiepic.app/oauth/token}
-      OAUTH_USER_INFO_ENDPOINT: ${OAUTH_USER_INFO_ENDPOINT:-https://dev.aiepic.app/api/users/me}
-      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost:7300/oauth/complete}
-      OAUTH_SCOPES: ${OAUTH_SCOPES:-profile email subscription}
-      NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}
-      POST_LOGIN_REDIRECT_URL: ${POST_LOGIN_REDIRECT_URL:-/dashboard}
+      OAUTH_DEV_INSECURE_TLS: ${OAUTH_DEV_INSECURE_TLS:-}
     networks:
       - ecards-network
     depends_on:
@@ -144,6 +125,8 @@ services:
     extra_hosts:
       - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
+    environment:
+      OAUTH_DEV_INSECURE_TLS: ${OAUTH_DEV_INSECURE_TLS:-}
     env_file:
       - .env
     networks:

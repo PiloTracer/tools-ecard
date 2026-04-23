@@ -7,6 +7,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { userOperations, projectOperations } from '../prisma/client';
 import { createLogger } from '../utils/logger';
+import { oauthServerFetch } from '../oauthFetch';
 
 const log = createLogger('AuthMiddleware');
 
@@ -47,7 +48,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     }
 
     // Fetch user information from external auth service
-    const userResponse = await fetch(OAUTH_CONFIG.userInfoEndpoint, {
+    const userResponse = await oauthServerFetch(OAUTH_CONFIG.userInfoEndpoint, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },

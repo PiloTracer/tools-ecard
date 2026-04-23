@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { oauthServerFetch } from '@/shared/server/oauth-fetch';
 import type { User } from '@/shared/types/auth';
 
 // OAuth configuration from environment variables
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch user information from Tools Dashboard
-    const userResponse = await fetch(OAUTH_CONFIG.userInfoEndpoint, {
+    const userResponse = await oauthServerFetch(OAUTH_CONFIG.userInfoEndpoint, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },

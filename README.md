@@ -79,7 +79,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR:
 ├── db/                      # Database initialization scripts
 ├── docker-compose.dev.yml   # Local development environment
 ├── docker-compose.prd.yml   # Production stack (nginx + images)
-├── .env.prd.example         # Production env template
+├── .env.dev.example         # Dev env template (copy → repo root `.env`)
+├── .env.prd.example         # Production env template (copy → `.env.prd`)
 ├── deploy/nginx/            # Production reverse proxy configs
 ├── CONTEXT.md               # Fast pointer table (start here for agents)
 ├── DOCS_CONTEXT.md         # Full project documentation

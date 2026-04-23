@@ -53,11 +53,13 @@
 
 | File | Role |
 |------|------|
-| **Repo root** `.env` | Dev / local + **`docker-compose.dev.yml`** `api-server` (`env_file: .env`). Copy from **`.env.dev.example`**. **No** `api-server/.env`. |
-| **Repo root** `.env.prd` | Production stack; copy from **`.env.prd.example`**. Gitignored. |
+| **Repo root** `.env` | **Preferred** local dev + Docker **`env_file`** for **`api-server`** and **`ecards-frontend`** (`docker-compose.dev.yml`). Copy from **`.env.dev.example`** (repo root only — **no** `api-server/.env`, **`api-server/.env.example`**, or **`front-cards/.env.local`**). |
+| **Repo root** `.env.dev` | Optional alternate for **`bin/start.sh`** compose interpolation when `.env` is missing; host `npm run dev` in `front-cards/` may load it via **`front-cards/scripts/preload-root-env.cjs`** only if `.env` does not exist. Docker `env_file` still expects **`.env`** at repo root for dev containers — keep `.env` present or symlink it to your active file. |
+| **Repo root** `.env.prd` | Production stack; copy from **`.env.prd.example`**. Gitignored. **`docker-compose.prd.yml`** `ecards-frontend` uses `env_file: .env.prd`. |
 | **`api-server/scripts/preload-root-env.cjs`** | Loads repo-root `.env` for **Prisma CLI** and **Jest** when run from `api-server/`. App also loads root `.env` via config (see `api-server/src/core/config/`). |
+| **`front-cards/scripts/preload-root-env.cjs`** | Before **`next dev` / `next build` / `next start`**, loads repo-root **`.env`** (or **`.env.dev`** if `.env` missing). Same keys as Docker dev when you use root `.env`. |
 
-**Compose / start:** `./bin/start.sh dev` uses root `.env` or `.env.dev` with `docker-compose.dev.yml`. Production: `docker compose --env-file .env.prd -f docker-compose.prd.yml …` (see root `README.md`).
+**Compose / start:** `./bin/start.sh dev` uses root `.env` if present, else `.env.dev`, for compose `--env-file`. Production: `docker compose --env-file .env.prd -f docker-compose.prd.yml …` (see root `README.md`).
 
 ---
 

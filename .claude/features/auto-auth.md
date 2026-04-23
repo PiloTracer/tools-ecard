@@ -1614,14 +1614,18 @@ AUTH_RATE_LIMIT_REFRESH_WINDOW=3600000
 AUTH_RATE_LIMIT_REFRESH_MAX=20
 ```
 
-### Frontend Environment Variables (.env.local)
+### Frontend environment (monorepo root only)
 
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:7400
-NEXT_PUBLIC_WS_URL=ws://localhost:7400
-NEXT_PUBLIC_OAUTH_CLIENT_ID=ecards_app
-NEXT_PUBLIC_EXTERNAL_AUTH_URL=https://dev.aiepic.app
-```
+`front-cards` does **not** use `.env.local`. Use the **repo root** file for the environment:
+
+| Environment | File |
+|---------------|------|
+| Local dev (final) | **`.env`** (copy from `.env.dev.example`) |
+| Production deploy | **`.env.prd`** (copy from `.env.prd.example`) |
+
+Docker dev / `api-server` load root **`.env`**. Docker prd loads **`.env.prd`**. Host `npm run dev` / `npm run build` in `front-cards/` runs `scripts/preload-root-env.cjs` so the same root **`.env`** is applied before Next starts (without overwriting variables already set by Docker or CI).
+
+`NEXT_PUBLIC_*`, `OAUTH_*`, and API URLs belong in those root files—see `.env.dev.example`.
 
 ---
 

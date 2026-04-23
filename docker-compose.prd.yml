@@ -237,6 +237,8 @@ services:
       dockerfile: Dockerfile.prd
     image: ${ECARDS_FRONT_IMAGE:-ecards-front:prd}
     restart: unless-stopped
+    env_file:
+      - .env.prd
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"

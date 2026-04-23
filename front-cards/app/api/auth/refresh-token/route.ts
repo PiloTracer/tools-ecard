@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { RefreshTokenResponse, OAuthTokenResponse } from '@/shared/types/auth';
+import { oauthServerFetch } from '@/shared/server/oauth-fetch';
 
 // OAuth configuration from environment variables
 const OAUTH_CONFIG = {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Request new access token using refresh token
-    const tokenResponse = await fetch(OAUTH_CONFIG.tokenEndpoint, {
+    const tokenResponse = await oauthServerFetch(OAUTH_CONFIG.tokenEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

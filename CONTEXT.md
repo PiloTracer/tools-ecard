@@ -20,6 +20,6 @@ Use this file for **30-second orientation**. For details, follow the links (do n
 
 **Apps:** `front-cards/` (Next.js) · `api-server/` (Fastify + Prisma) · `render-worker/` (jobs).
 
-**Env:** monorepo root `.env` (dev) / `.env.prd` (prod); no `api-server/.env`. See **`.ai/context/HANDOFF.md` §3**.
+**Env:** monorepo root **`.env`** (local dev, final) / **`.env.prd`** (prod); templates **`.env.dev.example`**, **`.env.prd.example`** only. No per-app env files (`api-server/.env`, **`api-server/.env.example`**, `front-cards/.env.local`). `front-cards` loads root env via Docker `env_file` or `scripts/preload-root-env.cjs` for host `npm run dev`. See **`.ai/context/HANDOFF.md` §3**.
 
 **Default compose:** `docker compose -f docker-compose.dev.yml up` (see `DOCS_TECH_STACK.md` for URLs).

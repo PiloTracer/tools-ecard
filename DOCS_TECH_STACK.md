@@ -6,6 +6,8 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 ## Frontend Service (`front-cards`)
 
+**Environment variables:** Only the **monorepo root** files — **`.env`** (local dev, final), **`.env.prd`** (production), templates **`.env.dev.example`** / **`.env.prd.example`**. There is no `front-cards/.env.local`. Docker injects root `.env` via `env_file` on `ecards-frontend`; host `npm run dev` / `npm run build` in `front-cards/` uses `scripts/preload-root-env.cjs` to load the same root `.env` before Next (without overwriting variables already set).
+
 **Framework:** Next.js 16 (App Router, React Server Components)
 **Language:** TypeScript
 **Runtime:** Node.js (in Docker container)
@@ -173,7 +175,7 @@ When **`/etc/hosts`** maps **`dev.aiepic.app`** to loopback, E-Cards containers 
 Also:
 
 - **`host.docker.internal:host-gateway`** — SeaweedFS and other host URLs on Linux.
-- **TLS:** If nginx on the host uses a private CA or an incomplete chain, Node may still reject HTTPS until the chain is fixed or you set **`NODE_EXTRA_CA_CERTS`** (PEM path readable inside the container; see `.env.dev.example`).
+- **TLS (mkcert):** Node often cannot verify the host’s `https://dev.aiepic.app` certificate. In **non-`production`**, OAuth server calls use a relaxed HTTPS client by default (`shared/server/oauth-fetch.ts` / `api-server/src/core/oauthFetch.ts`). Set **`OAUTH_DEV_INSECURE_TLS=0`** (or `false` / `off`) to force strict verification, then use **`NODE_EXTRA_CA_CERTS`** with a mounted CA bundle if needed.
 
 **Public-only dev (no hosts override):** If you do **not** map `dev.aiepic.app` to loopback, you can remove the `dev.aiepic.app:host-gateway` lines via a small **compose override** so containers use public DNS only.
 

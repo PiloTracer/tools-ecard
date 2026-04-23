@@ -101,6 +101,8 @@ jobs:
       - name: npm ci
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Root .env for Next preload (same as local dev)
+        run: cp ../.env.dev.example ../.env
       - name: Lint
         run: npm run lint --if-present
       - name: Next.js build

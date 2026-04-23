@@ -735,7 +735,7 @@ New renderer:
 
 ### Key Environment Variables
 
-All services now pull from root-level `.env.dev.example` and `.env.prd.example`.
+All services pull from the **repo root** `.env` / `.env.prd`, documented by **`.env.dev.example`** and **`.env.prd.example`** only. There is no `api-server/.env.example` or other per-package env template in this repo.
 
 **Database**:
 ```bash

@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { OAuthTokenResponse, User } from '@/shared/types/auth';
+import { oauthServerFetch } from '@/shared/server/oauth-fetch';
 
 // OAuth configuration from environment variables
 const OAUTH_CONFIG = {
@@ -182,7 +183,7 @@ export async function GET(request: NextRequest) {
       console.log('Including code_verifier for PKCE validation');
     }
 
-    const tokenResponse = await fetch(OAUTH_CONFIG.tokenEndpoint, {
+    const tokenResponse = await oauthServerFetch(OAUTH_CONFIG.tokenEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -205,7 +206,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch user information
     console.log('Fetching user information...');
-    const userResponse = await fetch(OAUTH_CONFIG.userInfoEndpoint, {
+    const userResponse = await oauthServerFetch(OAUTH_CONFIG.userInfoEndpoint, {
       headers: {
         Authorization: `Bearer ${tokens.access_token}`,
       },

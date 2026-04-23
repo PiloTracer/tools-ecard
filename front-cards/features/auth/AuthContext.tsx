@@ -133,8 +133,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Check auth on mount (skip /auth/continue: child effects run first; avoid racing window.location)
+  // Skip /login and /oauth/complete: no session cookies yet — calling /api/auth/user + refresh-token only spams 401s in logs.
   useEffect(() => {
     if (pathname === '/auth/continue') {
+      setIsLoading(false);
+      return;
+    }
+    if (pathname === '/login' || pathname === '/oauth/complete') {
+      setUser(null);
+      setIsAuthenticated(false);
       setIsLoading(false);
       return;
     }
