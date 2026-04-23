@@ -731,11 +731,11 @@ New renderer:
 ### Security Pre-requirements
 
 1. **NEVER READ** the `.env` file for security reasons
-2. **YOU CAN READ AND MODIFY** `.env.dev.example` and `.env.prod.example` (both should have the same KEYS)
+2. **YOU CAN READ AND MODIFY** `.env.dev.example` and `.env.prd.example` (both should have the same KEYS)
 
 ### Key Environment Variables
 
-All services now pull from root-level `.env.dev.example` and `.env.prod.example`.
+All services now pull from root-level `.env.dev.example` and `.env.prd.example`.
 
 **Database**:
 ```bash

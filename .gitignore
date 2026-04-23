@@ -73,7 +73,7 @@ MANIFEST
 .dockerignore
 .docker/
 !docker-compose.yml
-!docker-compose.prod.yml
+!docker-compose.prd.yml
 
 # IDE
 .vscode/

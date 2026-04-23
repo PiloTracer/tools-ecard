@@ -226,7 +226,7 @@ npx prisma migrate dev
 
 ## Environment Configuration
 
-All services now pull from the root-level `.env.dev.example` (and `.env.prod.example` for production defaults). Copy `.env.dev.example` to `.env` before running Docker or local scripts and adjust the values as needed. The compose file maps every variable directly, so you only need to maintain a single source of truth. Key entries include:
+All services now pull from the root-level `.env.dev.example` (and `.env.prd.example` for production defaults). Copy `.env.dev.example` to `.env` before running Docker or local scripts and adjust the values as needed. The compose file maps every variable directly, so you only need to maintain a single source of truth. Key entries include:
 
 ```bash
 # Database

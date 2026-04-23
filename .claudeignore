@@ -79,7 +79,7 @@
 # ============================================================================
 # !.env.dev  # Example config - has placeholders, not real secrets
 # !docker-compose.dev.yml  # Primary dev config
-# !docker-compose.prod.yml  # Prod reference config
+# !docker-compose.prd.yml  # Prd reference config
 
 # ============================================================================
 # GENERATED DOCUMENTATION (can be rebuilt)

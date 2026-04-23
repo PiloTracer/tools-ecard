@@ -28,7 +28,7 @@ This tells you exactly which files to modify without searching the codebase.
    - Adding or updating comments and documentation
 
 2. **Configuration Management**:
-   - Updating environment variables in `.env.dev.example` and `.env.prod.example`
+   - Updating environment variables in `.env.dev.example` and `.env.prd.example`
    - Modifying Docker configurations
    - Adjusting package.json dependencies
    - Simple CI/CD configuration updates
@@ -147,7 +147,7 @@ The codebase follows **feature isolation architecture**. Each service organizes 
 
 - **Type Safety**: Strict TypeScript mode (frontend) and Python type hints (backend)
 - **TODO Format**: Use `# TODO [OWNER]: [ACTION]` (Python) or `// TODO [OWNER]: [ACTION]` (TypeScript)
-- **Security**: NEVER read `.env` files; only modify `.env.dev.example` and `.env.prod.example`
+- **Security**: NEVER read `.env` files; only modify `.env.dev.example` and `.env.prd.example`
 - **Testing**: Features should have comprehensive test coverage
 
 ### Current Features

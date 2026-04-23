@@ -108,7 +108,7 @@ services:
   api-server:
     build:
       context: ./api-server
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile.prd
     image: ${ECARDS_API_IMAGE:-ecards-api:prd}
     restart: unless-stopped
     command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/server.js"]
@@ -191,7 +191,7 @@ services:
   render-worker:
     build:
       context: ./render-worker
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile.prd
     image: ${ECARDS_WORKER_IMAGE:-ecards-render-worker:prd}
     restart: unless-stopped
     environment:
@@ -234,7 +234,7 @@ services:
   front-cards:
     build:
       context: ./front-cards
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile.prd
     image: ${ECARDS_FRONT_IMAGE:-ecards-front:prd}
     restart: unless-stopped
     environment:

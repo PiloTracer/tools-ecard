@@ -474,7 +474,7 @@ batches/{userEmail}/{projectId}/{filename}
 
 **Files Modified:**
 - `api-server/Dockerfile.dev`
-- `api-server/Dockerfile.prod`
+- `api-server/Dockerfile.prd`
 
 ---
 
