@@ -6,11 +6,19 @@
  * Provides authentication state and actions throughout the application
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import type { User, AuthContext as AuthContextType } from '@/shared/types/auth';
 import { clearOAuthData } from '@/shared/lib/oauth-utils';
 import { OAUTH_CONFIG } from '@/shared/lib/oauth-config';
+
+function userFromAuthUserBody(data: unknown): User | null {
+  if (!data || typeof data !== 'object') return null;
+  if ('authenticated' in data && (data as { authenticated?: boolean }).authenticated === false) {
+    return null;
+  }
+  return data as User;
+}
 
 // Create context
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -19,6 +27,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
@@ -37,15 +47,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (response.ok) {
-        const userData: User = await response.json();
-        setUser(userData);
-        setIsAuthenticated(true);
-      } else if (response.status === 401) {
-        // Token expired - try to refresh
-        const refreshed = await refreshToken();
-        if (!refreshed) {
+        const body = await response.json();
+        const userData = userFromAuthUserBody(body);
+        if (userData) {
+          setUser(userData);
+          setIsAuthenticated(true);
+        } else {
           setUser(null);
           setIsAuthenticated(false);
+        }
+      } else if (response.status === 401) {
+        // No session yet on these routes — refresh is pointless and spams 401s in logs.
+        const p = pathnameRef.current;
+        if (p === '/login' || p === '/oauth/complete') {
+          setUser(null);
+          setIsAuthenticated(false);
+        } else {
+          const refreshed = await refreshToken();
+          if (!refreshed) {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
         }
       } else {
         setUser(null);
@@ -118,10 +140,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (userResponse.ok) {
-          const userData: User = await userResponse.json();
-          setUser(userData);
-          setIsAuthenticated(true);
-          return true;
+          const body = await userResponse.json();
+          const userData = userFromAuthUserBody(body);
+          if (userData) {
+            setUser(userData);
+            setIsAuthenticated(true);
+            return true;
+          }
         }
       }
 
@@ -133,15 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Check auth on mount (skip /auth/continue: child effects run first; avoid racing window.location)
-  // Skip /login and /oauth/complete: no session cookies yet — calling /api/auth/user + refresh-token only spams 401s in logs.
   useEffect(() => {
     if (pathname === '/auth/continue') {
-      setIsLoading(false);
-      return;
-    }
-    if (pathname === '/login' || pathname === '/oauth/complete') {
-      setUser(null);
-      setIsAuthenticated(false);
       setIsLoading(false);
       return;
     }

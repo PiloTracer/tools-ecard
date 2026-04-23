@@ -8,14 +8,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { TokenExchangeRequest, TokenExchangeResponse, OAuthTokenResponse, User } from '@/shared/types/auth';
 import { oauthServerFetch } from '@/shared/server/oauth-fetch';
+import {
+  getOAuthClientId,
+  getOAuthClientSecret,
+  getOAuthRedirectUri,
+  getTokenEndpoint,
+  getUserInfoEndpoint,
+} from '@/shared/server/oauth-routes-config';
 
-// OAuth configuration from environment variables
 const OAUTH_CONFIG = {
-  clientId: process.env.OAUTH_CLIENT_ID || 'ecards_app_dev',
-  clientSecret: process.env.OAUTH_CLIENT_SECRET,
-  tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT || 'https://dev.aiepic.app/oauth/token',
-  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'https://dev.aiepic.app/api/users/me',
-  redirectUri: process.env.OAUTH_REDIRECT_URI?.split(',')[0] || 'http://localhost:7300/oauth/complete',
+  get clientId() {
+    return getOAuthClientId();
+  },
+  get clientSecret() {
+    return getOAuthClientSecret();
+  },
+  get tokenEndpoint() {
+    return getTokenEndpoint();
+  },
+  get userInfoEndpoint() {
+    return getUserInfoEndpoint();
+  },
+  get redirectUri() {
+    return getOAuthRedirectUri();
+  },
 };
 
 // Cookie configuration

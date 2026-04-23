@@ -13,14 +13,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { OAuthTokenResponse, User } from '@/shared/types/auth';
 import { oauthServerFetch } from '@/shared/server/oauth-fetch';
+import {
+  getOAuthClientId,
+  getOAuthClientSecret,
+  getOAuthRedirectUri,
+  getTokenEndpoint,
+  getUserInfoEndpoint,
+} from '@/shared/server/oauth-routes-config';
 
-// OAuth configuration from environment variables
 const OAUTH_CONFIG = {
-  clientId: process.env.OAUTH_CLIENT_ID || 'ecards_app_dev',
-  clientSecret: process.env.OAUTH_CLIENT_SECRET,
-  tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT || 'https://dev.aiepic.app/oauth/token',
-  userInfoEndpoint: process.env.OAUTH_USER_INFO_ENDPOINT || 'https://dev.aiepic.app/api/users/me',
-  redirectUri: process.env.OAUTH_REDIRECT_URI?.split(',')[0] || 'http://localhost:7300/oauth/complete',
+  get clientId() {
+    return getOAuthClientId();
+  },
+  get clientSecret() {
+    return getOAuthClientSecret();
+  },
+  get tokenEndpoint() {
+    return getTokenEndpoint();
+  },
+  get userInfoEndpoint() {
+    return getUserInfoEndpoint();
+  },
+  get redirectUri() {
+    return getOAuthRedirectUri();
+  },
 };
 
 // Get the correct base URL (using redirect URI's origin to ensure correct port)
@@ -131,9 +147,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${getBaseUrl()}/login?error=server_misconfigured`);
     }
 
-    // Determine flow type and validate state/PKCE
     const storedState = request.cookies.get(COOKIE_CONFIG.state.name)?.value;
     const storedCodeVerifier = request.cookies.get(COOKIE_CONFIG.codeVerifier.name)?.value;
+
+    // Both must match for the PKCE flow; otherwise we would trade the code without code_verifier and the IdP would reject.
+    if (storedState && receivedState && storedState !== receivedState) {
+      return NextResponse.redirect(
+        `${getBaseUrl()}/login?error=state_mismatch&description=${encodeURIComponent(
+          'The OAuth state did not match. Start a new sign-in (do not open the return URL in another browser or a preview tool).',
+        )}`,
+      );
+    }
 
     // Check if this is a manual login flow (state matches)
     const isManualLogin = storedState && receivedState && storedState === receivedState;
@@ -194,10 +218,19 @@ export async function GET(request: NextRequest) {
     console.log('Token exchange response status:', tokenResponse.status);
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json().catch(() => ({}));
+      const errorData = (await tokenResponse.json().catch(() => ({}))) as {
+        error?: string;
+        error_description?: string;
+      };
       console.error('Token exchange failed:', errorData);
+      const serverDesc = (errorData.error_description || errorData.error || '').trim();
+      const hint =
+        !codeVerifier &&
+        (errorData.error === 'invalid_grant' || /code|expired|invalid/i.test(serverDesc))
+          ? ' This often happens if PKCE is required (you used "Sign in") but cookies were not sent on the redirect back, or the authorization code was already used—open the app at the same host you started from, allow cookies, click Sign in once, and do not refresh the return URL.'
+          : '';
       return NextResponse.redirect(
-        `${getBaseUrl()}/login?error=token_exchange_failed&description=${encodeURIComponent(errorData.error_description || '')}`
+        `${getBaseUrl()}/login?error=token_exchange_failed&description=${encodeURIComponent(serverDesc + hint)}`
       );
     }
 

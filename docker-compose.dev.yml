@@ -97,10 +97,24 @@ services:
     env_file:
       - .env
     environment:
+      # Next reads `PORT`; root `.env` also sets `PORT` for api-server — force the in-container listen to match the published port mapping.
+      PORT: ${FRONTEND_PORT:-3000}
+      # `DEBUG=*` in monorepo `.env` (for api) makes Next log send/compression/router at huge volume; use FRONT_CARDS_DEBUG if you need Next debug only.
+      DEBUG: ${FRONT_CARDS_DEBUG:-}
       NODE_ENV: ${NODE_ENV:-development}
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
       OAUTH_DEV_INSECURE_TLS: ${OAUTH_DEV_INSECURE_TLS:-}
+      # Defaults mirror .env.dev.example so a partial root `.env` still gets browser + OAuth URLs in the container.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7400}
+      NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}
+      NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:-ecards_app_dev}
+      NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-https://dev.aiepic.app/oauth/authorize}
+      NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: ${NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT:-https://dev.aiepic.app/oauth/token}
+      NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-https://dev.aiepic.app/api/users/me}
+      NEXT_PUBLIC_EXTERNAL_AUTH_URL: ${NEXT_PUBLIC_EXTERNAL_AUTH_URL:-https://dev.aiepic.app/app}
+      NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-https://dev.aiepic.app/app/features/user-subscription}
     networks:
       - ecards-network
     depends_on:

@@ -33,7 +33,10 @@ function LoginPageContent() {
       }
       const base = getOAuthErrorMessage(errorParam);
       setError(detail ? `${base}\n${detail}` : base);
-      console.error('OAuth error:', errorParam, detail || '');
+      if (process.env.NODE_ENV === 'development') {
+        // Avoid Next overlay treating this as an uncaught "Console Error" — auth failures are expected paths.
+        console.info('[login] OAuth redirect params:', { error: errorParam, description: detail || undefined });
+      }
     }
 
     // Check if OAuth parameters are present (pre-initiated from Tools Dashboard)

@@ -240,6 +240,8 @@ services:
     env_file:
       - .env.prd
     environment:
+      # Next reads `PORT`; root env may set `PORT` for the API — keep the app on the internal FRONTEND_PORT.
+      PORT: ${FRONTEND_PORT:-3000}
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://ecards.aiepic.app}

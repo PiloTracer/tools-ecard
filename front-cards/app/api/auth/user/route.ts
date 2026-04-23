@@ -26,11 +26,9 @@ export async function GET(request: NextRequest) {
     // Get access token from cookie
     const accessToken = request.cookies.get(COOKIE_CONFIG.accessToken.name)?.value;
 
+    // No cookie: not an auth *failure* — avoid 401 so dev logs are not spammed and clients treat this as “signed out”.
     if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({ authenticated: false as const });
     }
 
     // Fetch user information from Tools Dashboard
