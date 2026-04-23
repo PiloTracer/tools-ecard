@@ -6,12 +6,12 @@
  * Entry point for user authentication via Tools Dashboard OAuth
  */
 
-import { use, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { generateAuthorizationUrl, getOAuthErrorMessage } from '@/shared/lib/oauth-utils';
 import { OAUTH_CONFIG, USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -237,5 +237,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <p className="text-gray-600">Loading…</p>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

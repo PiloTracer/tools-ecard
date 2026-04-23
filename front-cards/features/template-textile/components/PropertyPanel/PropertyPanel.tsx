@@ -445,9 +445,8 @@ export function PropertyPanel() {
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { width: newWidth, height: newWidth });
                                 } else if (shapeEl.shapeType === 'ellipse') {
-                                  // For ellipses, update rx
+                                  // For ellipses, update rx (Fabric ellipse exposes rx/ry on instance, not on FabricObject typing)
                                   const newRx = newWidth / 2;
-                                  const currentRy = fabricObj.ry * (fabricObj.scaleY || 1);
                                   fabricObj.set({ rx: newRx, scaleX: 1, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
@@ -508,7 +507,6 @@ export function PropertyPanel() {
                                 } else if (shapeEl.shapeType === 'ellipse') {
                                   // For ellipses, update ry
                                   const newRy = newHeight / 2;
-                                  const currentRx = fabricObj.rx * (fabricObj.scaleX || 1);
                                   fabricObj.set({ ry: newRy, scaleX: 1, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();

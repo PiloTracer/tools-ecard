@@ -1,58 +1,55 @@
-# Multi-stage build for production
-FROM node:20-alpine AS builder
+# Production worker — Debian bookworm for reliable node-canvas + sharp builds.
+FROM node:20-bookworm-slim AS builder
 
-# Install canvas dependencies
-RUN apk add --no-cache \
-    build-base \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    giflib-dev \
-    pixman-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    libcairo2-dev \
+    libjpeg-dev \
+    libpango1.0-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libvips-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHON=/usr/bin/python3
 
 WORKDIR /app
 
-# Copy package files
 COPY package.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
 RUN npm install
 
-# Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+RUN npm run build:docker
+RUN npm prune --omit=dev
 
-# Production stage
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
-# Install runtime dependencies for canvas
-RUN apk add --no-cache \
-    cairo \
-    jpeg \
-    pango \
-    giflib \
-    pixman
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+    libvips42 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy package files
 COPY package.json ./
-
-# Install only production dependencies
-RUN npm install --omit=dev
-
-# Copy built application
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 worker && \
-    chown -R worker:nodejs /app
+RUN groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs worker \
+    && chown -R worker:nodejs /app
 
 USER worker
 

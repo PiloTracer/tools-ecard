@@ -1,66 +1,77 @@
-# Multi-stage build for production
-FROM node:20-alpine AS builder
+# Production image — Debian bookworm (glibc): canvas + sharp + Prisma build reliably;
+# Alpine GCC 15 currently breaks node-canvas native compile.
+FROM node:20-bookworm-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    libcairo2-dev \
+    libjpeg-dev \
+    libpango1.0-dev \
+    libgif-dev \
+    librsvg2-dev \
+    libvips-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHON=/usr/bin/python3
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm install
+RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+RUN npx prisma generate && npm run build:docker
+RUN npm prune --omit=dev
 
-# Generate Prisma client
-RUN npx prisma generate
-
-# Production stage
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install Python and pip for batch parsing
-# Install libev for Cassandra driver Python 3.12 compatibility
-RUN apk add --no-cache \
+COPY package.json ./
+COPY batch-parsing/requirements.txt ./batch-parsing/
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-dev \
-    py3-pip \
+    python3-pip \
+    build-essential \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+    libvips42 \
+    libev4 \
     libev-dev \
-    gcc \
-    musl-dev
+    wget \
+    ca-certificates \
+    && pip3 install --no-cache-dir --break-system-packages -r ./batch-parsing/requirements.txt \
+    && apt-get purge -y build-essential \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package files
-COPY package.json ./
-
-# Install only production dependencies
-RUN npm install --omit=dev
-
-# Copy Python requirements and install dependencies
-COPY batch-parsing/requirements.txt ./batch-parsing/
-RUN pip3 install --no-cache-dir --break-system-packages -r ./batch-parsing/requirements.txt
-
-# Copy built application and Prisma schema
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
-# Copy Python batch-parsing scripts
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/batch-parsing ./batch-parsing
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 apiserver && \
-    chown -R apiserver:nodejs /app
+RUN groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs apiserver \
+    && chown -R apiserver:nodejs /app
 
 USER apiserver
 
 EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:4000/health > /dev/null || exit 1
 
 CMD ["npm", "start"]

@@ -16,6 +16,13 @@ docker-compose -f docker-compose.dev.yml up
 # - Redis: localhost:6379
 ```
 
+## Production (ecards.aiepic.app)
+
+- Copy **`.env.prd.example`** to **`.env.prd`** and set secrets (file is gitignored).
+- Build and run: **`docker compose --env-file .env.prd -f docker-compose.prd.yml up -d --build`**
+- **Nginx** fronts **Next.js** and **Fastify** on one hostname; see **`deploy/nginx/ecards.prd.conf`**.
+- TLS: terminate HTTPS at your load balancer, or extend nginx with certificates.
+
 ## Project Structure
 
 ```
@@ -34,6 +41,9 @@ docker-compose -f docker-compose.dev.yml up
 ├── render-worker/           # Background job processor
 ├── db/                      # Database initialization scripts
 ├── docker-compose.dev.yml   # Local development environment
+├── docker-compose.prd.yml   # Production stack (nginx + images)
+├── .env.prd.example         # Production env template
+├── deploy/nginx/            # Production reverse proxy configs
 ├── CONTEXT.md               # Fast pointer table (start here for agents)
 ├── DOCS_CONTEXT.md         # Full project documentation
 ├── DOCS_TECH_STACK.md     # Services, ports, commands

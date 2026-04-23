@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/worker.ts",
     "build": "tsc",
+    "build:docker": "npx --yes esbuild@0.25.0 src/worker.ts --bundle --platform=node --target=node20 --format=cjs --packages=external --outfile=dist/worker.js",
     "start": "node dist/worker.js",
     "worker": "tsx src/worker.ts",
     "test": "jest"

@@ -12,7 +12,8 @@
 #   ./bin/start.sh dev help
 #
 # Environments: dev | stg | prd  (aliases: development, staging, prod|production)
-# Only dev is fully supported unless docker-compose.stg.yml / docker-compose.prd.yml exist.
+# Production: copy .env.prd.example → .env.prd, then: ./bin/start.sh prd up
+# (requires docker-compose.prd.yml — shipped in this repository.)
 
 set -euo pipefail
 
@@ -127,12 +128,17 @@ esac
 
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "Compose file not found: $COMPOSE_FILE"
-  echo "This repository ships docker-compose.dev.yml for local development."
+  echo "This repository ships docker-compose.dev.yml (dev) and docker-compose.prd.yml (prd)."
   exit 1
 fi
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Env file not found: $ENV_FILE"
+  if [ "$TARGET_ENV" = "prd" ]; then
+    echo "Create it from the example: cp \"$PROJECT_ROOT/.env.prd.example\" \"$ENV_FILE\" then fill secrets."
+  elif [ "$TARGET_ENV" = "stg" ]; then
+    echo "Create \"$ENV_FILE\" (staging compose is optional in this repo)."
+  fi
   exit 1
 fi
 
@@ -175,7 +181,9 @@ read_env_value() {
   [ -n "$val" ] && echo "$val" || echo "$def"
 }
 
+# API_PORT: dev / logical default. API_HOST_PORT: prd host publish (see docker-compose.prd.yml).
 ECARDS_API_PORT="$(read_env_port API_PORT 7400)"
+ECARDS_API_PUBLISHED_PORT="$(read_env_port API_HOST_PORT "${ECARDS_API_PORT}")"
 ECARDS_FRONT_PORT="$(read_env_port FRONTEND_HOST_PORT 7300)"
 ECARDS_PG_PORT="$(read_env_port POSTGRES_HOST_PORT 7432)"
 ECARDS_CASS_PORT="$(read_env_port CASSANDRA_NATIVE_PORT_HOST 7042)"
@@ -230,9 +238,28 @@ wait_for_api_ready() {
   local max="${1:-120}"
   local n=0
   local H="127.0.0.1"
-  echo "Waiting for API GET /health at http://${H}:${ECARDS_API_PORT}/health (up to ${max}s)..."
+  local nginx_p
+
+  if [ "$TARGET_ENV" = "prd" ]; then
+    nginx_p="$(read_env_port NGINX_HTTP_PORT 80)"
+    echo "Waiting for production readiness (nginx http://${H}:${nginx_p}/health — up to ${max}s)..."
+    while [ "$n" -lt "$max" ]; do
+      if curl -sf "http://${H}:${nginx_p}/health" >/dev/null 2>&1; then
+        echo "Nginx /health passed (API + frontend chain is up)."
+        return 0
+      fi
+      sleep 1
+      n=$((n + 1))
+      if [ $((n % 20)) -eq 0 ]; then echo "  ... ${n}s"; fi
+    done
+    echo "Timeout waiting for nginx /health (check api-server and front-cards logs)." >&2
+    run_compose ps || true
+    return 1
+  fi
+
+  echo "Waiting for API GET /health at http://${H}:${ECARDS_API_PUBLISHED_PORT}/health (up to ${max}s)..."
   while [ "$n" -lt "$max" ]; do
-    if curl -sf "http://${H}:${ECARDS_API_PORT}/health" >/dev/null 2>&1; then
+    if curl -sf "http://${H}:${ECARDS_API_PUBLISHED_PORT}/health" >/dev/null 2>&1; then
       echo "API health check passed."
       return 0
     fi
@@ -243,6 +270,15 @@ wait_for_api_ready() {
   echo "Timeout waiting for API /health." >&2
   run_compose ps || true
   return 1
+}
+
+# Cassandra + db-init + images — prd needs a longer first-boot window than dev.
+compose_api_wait_secs() {
+  if [ "$TARGET_ENV" = "prd" ]; then
+    echo "${1:-300}"
+  else
+    echo "$1"
+  fi
 }
 
 print_stack_urls() {
@@ -262,17 +298,28 @@ print_stack_urls() {
   sub_url="$(read_env_value NEXT_PUBLIC_USER_SUBSCRIPTION_URL "")"
   [ -z "$sub_url" ] && sub_url="$(read_env_value USER_SUBSCRIPTION_URL 'http://dev.aiepic.app/app/features/user-subscription')"
   seaweed="$(read_env_value SEAWEEDFS_ENDPOINT 'http://host.docker.internal:8333')"
-  api_pub="$(read_env_value NEXT_PUBLIC_API_URL "http://${H}:${ECARDS_API_PORT}")"
-  ws_pub="$(read_env_value NEXT_PUBLIC_WS_URL "ws://${H}:${ECARDS_API_PORT}")"
+  api_pub="$(read_env_value NEXT_PUBLIC_API_URL "http://${H}:${ECARDS_API_PUBLISHED_PORT}")"
+  ws_pub="$(read_env_value NEXT_PUBLIC_WS_URL "ws://${H}:${ECARDS_API_PUBLISHED_PORT}")"
   oauth_redirect="$(read_env_value OAUTH_REDIRECT_URI "http://${H}:${ECARDS_FRONT_PORT}/oauth/complete")"
 
   echo ""
   echo "Stack is up (env=$TARGET_ENV, project=$PROJ_NAME) — open in your browser (replace ${H} with your host if remote)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  if [ "$TARGET_ENV" = "prd" ]; then
+    local nginx_port
+    nginx_port="$(read_env_port NGINX_HTTP_PORT 80)"
+    echo "  Production entry (nginx → Next + API)"
+    echo "  Public URL:          http://${H}:${nginx_port}/  (TLS at load balancer or extend deploy/nginx)"
+    echo "  API (browser env):   ${api_pub}"
+    echo "  WebSocket (env):     ${ws_pub}"
+    echo "  OAuth callback:      ${oauth_redirect}"
+    echo "  API direct (ops):  http://${H}:${ECARDS_API_PUBLISHED_PORT}/health  (bound to loopback in compose prd)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  fi
   echo "  E-Cards in this compose (direct host ports — not TD nginx)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "  Frontend (Next.js):    http://${H}:${ECARDS_FRONT_PORT}/"
-  echo "  API (REST + WS):       http://${H}:${ECARDS_API_PORT}/   health: /health"
+  echo "  API (REST + WS):       http://${H}:${ECARDS_API_PUBLISHED_PORT}/   health: /health"
   echo "  Frontend→API (env):   NEXT_PUBLIC_API_URL=${api_pub}"
   echo "  Frontend→WS (env):    NEXT_PUBLIC_WS_URL=${ws_pub}"
   echo "  OAuth redirect (env):  OAUTH_REDIRECT_URI=${oauth_redirect}"
@@ -309,7 +356,7 @@ cmd_up_quick() {
   echo "Starting stack (no image rebuild)..."
   run_compose up -d
   prune_anonymous_volumes
-  if ! wait_for_api_ready 120; then
+  if ! wait_for_api_ready "$(compose_api_wait_secs 120)"; then
     echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
     return 1
   fi
@@ -320,7 +367,7 @@ cmd_up_build() {
   echo "Starting stack (with image rebuild)..."
   run_compose up -d --build
   prune_anonymous_volumes
-  if ! wait_for_api_ready 180; then
+  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
     return 1
   fi
@@ -353,7 +400,7 @@ cmd_status() {
 cmd_restart() {
   echo "Restarting all services..."
   run_compose restart
-  if wait_for_api_ready 120; then
+  if wait_for_api_ready "$(compose_api_wait_secs 120)"; then
     print_stack_urls
   else
     echo "Warning: API /health not ready after restart — inspect logs." >&2
@@ -371,7 +418,7 @@ cmd_rebuild_stack() {
   run_compose build 2>&1 | tee "${PROJECT_ROOT}/build.log"
   run_compose up -d
   prune_anonymous_volumes
-  if ! wait_for_api_ready 180; then
+  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
   print_stack_urls
@@ -388,7 +435,7 @@ cmd_reset_stack() {
   run_compose build 2>&1 | tee "${PROJECT_ROOT}/build.log"
   run_compose up -d
   prune_anonymous_volumes
-  if ! wait_for_api_ready 180; then
+  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
   print_stack_urls
@@ -403,7 +450,7 @@ cmd_force_rebuild() {
   fi
   run_compose up -d
   prune_anonymous_volumes
-  if ! wait_for_api_ready 180; then
+  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
   print_stack_urls

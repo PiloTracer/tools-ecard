@@ -7,6 +7,7 @@
     "dev": "prisma generate && prisma db push && tsx watch src/server.ts",
     "dev:server": "tsx watch src/server.ts",
     "build": "tsc",
+    "build:docker": "npx --yes esbuild@0.25.0 src/server.ts --bundle --platform=node --target=node20 --format=cjs --packages=external --outfile=dist/server.js",
     "start": "node dist/server.js",
     "test": "jest",
     "db:push": "prisma db push",

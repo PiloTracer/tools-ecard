@@ -35,8 +35,6 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
 import { loadS3Config, type S3Config } from '../config/s3Config';
 import { createLogger, serializeError } from '../../../core/utils/logger';
-
-const slog = createLogger('S3Service');
 import {
   type IS3Service,
   type ObjectMetadata,
@@ -58,6 +56,9 @@ import {
   InvalidRequestError,
   S3Error
 } from '../types';
+import { LocalStorageService } from './localStorageService';
+
+const slog = createLogger('S3Service');
 
 /**
  * S3 Service implementation using AWS SDK v3
@@ -577,9 +578,6 @@ export class S3Service implements IS3Service {
     return error as Error;
   }
 }
-
-import { LocalStorageService } from './localStorageService';
-import type { IS3Service } from '../types';
 
 // Singleton instance
 let s3Service: IS3Service | null = null;

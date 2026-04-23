@@ -49,23 +49,31 @@ export async function buildApp() {
   // Register plugins
   await app.register(cors, {
     origin: (origin, cb) => {
-      // Allow requests from the frontend development server
-      const allowedOrigins = [
+      const devOrigins = [
         'http://localhost:7300',
         'http://localhost:3000',
         'http://127.0.0.1:7300',
         'http://127.0.0.1:3000',
       ];
 
-      // In development, allow the origin if it's in our allowed list
+      const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+
+      const productionOrigins = [
+        ...new Set(['https://ecards.aiepic.app', ...configuredOrigins]),
+      ];
+
+      const allowedOrigins =
+        appConfig.env === 'production' ? productionOrigins : [...devOrigins, ...configuredOrigins];
+
       if (!origin || allowedOrigins.includes(origin)) {
         cb(null, true);
       } else if (appConfig.env === 'development') {
-        // In development, be more permissive but log unexpected origins
         log.warn({ origin }, 'CORS: Unexpected origin');
         cb(null, true);
       } else {
-        // In production, be strict
         cb(new Error('Not allowed by CORS'), false);
       }
     },

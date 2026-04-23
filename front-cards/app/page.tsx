@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth';
 import { USER_SUBSCRIPTION_URL, OAUTH_CONFIG } from '@/shared/lib/oauth-config';
 import { generateAuthorizationUrl } from '@/shared/lib/oauth-utils';
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
@@ -233,5 +233,19 @@ export default function Home() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <p className="text-white">Loading…</p>
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -9,7 +9,7 @@
  * - Redirects to dashboard on success
  */
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   validateState,
@@ -21,7 +21,7 @@ import {
 import { OAUTH_CONFIG, POST_LOGIN_REDIRECT_URL } from '@/shared/lib/oauth-config';
 import type { TokenExchangeRequest, TokenExchangeResponse } from '@/shared/types/auth';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -288,5 +288,21 @@ export default function AuthCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8 text-center">
+            <p className="text-gray-600">Loading…</p>
+          </div>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   );
 }
