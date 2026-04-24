@@ -65,6 +65,38 @@ class DataNormalizer:
     Normalizes and formats data fields according to vCard standards
     """
 
+    # Initials: runs of (letter + dot) like A., j.p., J.M.A. — not "St." (two letters + dot).
+    _RE_INITIALS_DOTTED = re.compile(r"^(?:[A-Za-zÀ-ÿ]\.){1,4}\.?$", re.UNICODE)
+    _RE_INITIAL_LETTER = re.compile(r"^[A-Za-zÀ-ÿ]\.?$", re.UNICODE)
+
+    def _is_initials_token(self, token: str) -> bool:
+        """
+        True if this whitespace token should not be run through str.title() / .capitalize()
+        (e.g. Python's str.title() turns "J.P." into "J.p.").
+        """
+        t = token.strip()
+        if not t or len(t) > 20:
+            return False
+        if any(ch.isdigit() for ch in t) or "-" in t or "_" in t:
+            return False
+        if not re.match(r"^[A-Za-zÀ-ÿ.]+$", t):
+            return False
+        if self._RE_INITIALS_DOTTED.match(t):
+            return True
+        if self._RE_INITIAL_LETTER.match(t):
+            return True
+        return False
+
+    def _title_preserve_initials(self, phrase: str) -> str:
+        if phrase is None:
+            return ""
+        s = str(phrase).strip()
+        if not s:
+            return ""
+        return " ".join(
+            w if self._is_initials_token(w) else w.title() for w in s.split()
+        )
+
     def __init__(self):
         # Common Spanish given names (from Costa Rica data)
         self.spanish_given_names = {
@@ -108,8 +140,10 @@ class DataNormalizer:
 
         result = []
         for i, word in enumerate(words):
+            if self._is_initials_token(word):
+                result.append(word)
             # Always capitalize first and last word
-            if i == 0 or i == len(words) - 1:
+            elif i == 0 or i == len(words) - 1:
                 result.append(word.capitalize())
             # Keep articles/prepositions lowercase if they're in the middle
             elif word.lower() in lowercase_words:
@@ -174,12 +208,13 @@ class DataNormalizer:
 
         text_with_placeholders = re.sub(r'\([^)]+\)', preserve_parens, text)
 
-        # Apply title case
-        formatted = text_with_placeholders.title()
+        # Apply title case (do not mangle initial-like tokens, e.g. "J.D.")
+        formatted = self._title_preserve_initials(text_with_placeholders)
 
         # Restore parentheses content with original casing
         for placeholder, original in parentheses_content.items():
-            formatted = formatted.replace(placeholder.title(), original)
+            ph_key = self._title_preserve_initials(placeholder)
+            formatted = formatted.replace(ph_key, original)
 
         return formatted
 
@@ -355,10 +390,10 @@ class DataNormalizer:
         proper_full_name = f"{first_name} {last_name}".strip()
 
         return {
-            "first_name": first_name.title() if first_name else "",
-            "last_name": last_name.title() if last_name else "",
-            "full_name": proper_full_name.title() if proper_full_name else raw_name.title(),
-            "business_title": title.title() if title else "",
+            "first_name": self._title_preserve_initials(first_name) if first_name else "",
+            "last_name": self._title_preserve_initials(last_name) if last_name else "",
+            "full_name": self._title_preserve_initials(proper_full_name) if proper_full_name else self._title_preserve_initials(raw_name),
+            "business_title": self._title_preserve_initials(title) if title else "",
             "suffix": suffix
         }
 
