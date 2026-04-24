@@ -2,6 +2,7 @@
 
 import * as fabric from 'fabric';
 import { Fragment, useState, useEffect, useRef } from 'react';
+import { useProjects } from '@/features/simple-projects';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
@@ -22,12 +23,18 @@ function templateSnapshotForPersistence(
   canvasW: number,
   canvasH: number,
   exportW: number,
-  unit: LengthUnit
+  unit: LengthUnit,
+  nameOverride?: string | null
 ): Template {
   const ar = canvasW / canvasH;
   const exportH = Math.max(1, Math.round(exportW / ar));
+  const name =
+    nameOverride != null && String(nameOverride).trim() !== ''
+      ? String(nameOverride).trim()
+      : base.name;
   return {
     ...base,
+    name,
     width: canvasW,
     height: canvasH,
     canvasWidth: canvasW,
@@ -126,6 +133,7 @@ export function CanvasControls() {
 
   // File input ref for importing templates
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { selectedProject } = useProjects();
 
   const {
     zoom,
@@ -163,6 +171,8 @@ export function CanvasControls() {
     createTemplate
   } = useTemplateStore();
 
+  const projectNameForSave = currentProjectName || selectedProject?.name || 'default';
+
   // Sync background color from template to canvas store on template load
   useEffect(() => {
     if (currentTemplate?.backgroundColor) {
@@ -180,7 +190,7 @@ export function CanvasControls() {
         if (currentTemplate) {
           if (currentTemplateName && hasUnsavedChanges) {
             // Quick save with existing name
-            handleSaveTemplate(currentTemplateName, currentProjectName || 'default');
+            handleSaveTemplate(currentTemplateName, projectNameForSave);
           } else if (!currentTemplateName) {
             // Open save modal for new templates
             setShowSaveModal(true);
@@ -191,7 +201,7 @@ export function CanvasControls() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTemplate, currentTemplateName, currentProjectName, hasUnsavedChanges]);
+  }, [currentTemplate, currentTemplateName, hasUnsavedChanges, projectNameForSave]);
 
   const handleSaveTemplate = async (templateName: string, projectName: string) => {
     if (!currentTemplate) {
@@ -206,7 +216,8 @@ export function CanvasControls() {
         canvasWidth,
         canvasHeight,
         exportWidth,
-        canvasSizeUnit
+        canvasSizeUnit,
+        templateName
       );
       // Rasterize all images before saving to avoid SVG corruption
       const processedTemplate = await rasterizeImages(toPersist, fabricCanvas);
@@ -249,9 +260,9 @@ export function CanvasControls() {
       // CRITICAL: Await font preloading before rendering
       await loadTemplate(loadedTemplate.data);
 
-      // Update save metadata
+      // Update save metadata (use dashboard-selected project when available)
       setSaveMetadata(
-        'Default Project',
+        selectedProject?.name ?? 'Default Project',
         loadedTemplate.name
       );
       markAsSaved();
@@ -285,8 +296,11 @@ export function CanvasControls() {
     createTemplate('Untitled Template', 800, 600);
     setDimensions(800, 600);
 
-    // Reset save metadata
-    setSaveMetadata('', '');
+    // Point metadata at a fresh untitled design under the current dashboard project
+    setSaveMetadata(
+      selectedProject?.name ?? 'Default Project',
+      'Untitled Template'
+    );
 
     // Close the confirmation modal if open
     setShowCloseConfirmModal(false);
@@ -682,12 +696,18 @@ export function CanvasControls() {
     try {
       console.log('[Export] Starting complete package export...');
 
+      const displayName =
+        (currentTemplateName && currentTemplateName.trim() !== '' ? currentTemplateName : null) ||
+        (currentTemplate.name && currentTemplate.name.trim() !== '' ? currentTemplate.name : null) ||
+        'template';
+
       const toPackage = templateSnapshotForPersistence(
         currentTemplate,
         canvasWidth,
         canvasHeight,
         exportWidth,
-        canvasSizeUnit
+        canvasSizeUnit,
+        displayName
       );
 
       // Export as complete ZIP package with all resources
@@ -696,7 +716,8 @@ export function CanvasControls() {
       // Download ZIP file
       const url = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
-      link.download = `${currentTemplate.name || 'template'}.zip`;
+      const safeFileStem = displayName.replace(/[<>:"/\\|?*]/g, '_').trim() || 'template';
+      link.download = `${safeFileStem}.zip`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
@@ -762,7 +783,7 @@ export function CanvasControls() {
       loadTemplate(newTemplate);
 
       // Update save metadata
-      setSaveMetadata('Default Project', newTemplate.name);
+      setSaveMetadata(selectedProject?.name ?? 'Default Project', newTemplate.name);
       markAsSaved();
 
       console.log('[Import] Template imported successfully:', newTemplate.name);
@@ -806,7 +827,7 @@ export function CanvasControls() {
         onClose={() => setShowSaveModal(false)}
         onSave={handleSaveTemplate}
         currentTemplateName={currentTemplateName || ''}
-        currentProjectName={currentProjectName || 'default'}
+        currentProjectName={projectNameForSave}
       />
 
       {/* Open Modal */}
@@ -940,7 +961,7 @@ export function CanvasControls() {
           {/* Quick Save (Ctrl+S) */}
           {currentTemplateName && (
             <button
-              onClick={() => handleSaveTemplate(currentTemplateName, currentProjectName || 'default')}
+              onClick={() => handleSaveTemplate(currentTemplateName, projectNameForSave)}
               disabled={!hasUnsavedChanges || isSaving}
               className="hidden min-h-[2rem] min-w-0 text-xs text-slate-500 hover:text-slate-400 disabled:opacity-50 sm:inline"
               title="Quick Save (Ctrl+S)"

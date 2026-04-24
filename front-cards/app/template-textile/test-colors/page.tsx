@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { ProjectsProvider } from '@/features/simple-projects';
 import { TemplateDesigner } from '@/features/template-textile';
 import { useTemplateStore } from '@/features/template-textile/stores/templateStore';
 import type { TextElement } from '@/features/template-textile/types';
@@ -59,7 +60,9 @@ export default function TestColorsPage() {
           <li>"This Is A Test" in blue (last color applies to remaining words)</li>
         </ul>
       </div>
-      <TemplateDesigner />
+      <ProjectsProvider>
+        <TemplateDesigner />
+      </ProjectsProvider>
     </div>
   );
 }

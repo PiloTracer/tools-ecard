@@ -14,6 +14,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
 interface PackageMetadata {
   version: '1.0';
   exportDate: string;
+  /** Redundant copy of `template.json` `name` for older clients; written on export. */
+  templateName?: string;
   customFonts: Array<{
     fontFamily: string;
     fontId: string;
@@ -98,6 +100,7 @@ export class TemplatePackageService {
 
     // 3. Create modified template JSON with relative paths
     const packagedTemplate = this.createPackagedTemplate(template, metadata);
+    metadata.templateName = packagedTemplate.name;
     zip.file('template.json', JSON.stringify(packagedTemplate, null, 2));
 
     // 4. Add metadata file
@@ -137,7 +140,13 @@ export class TemplatePackageService {
     if (!templateFile) {
       throw new Error('Invalid package: missing template.json');
     }
-    const templateData: Template = JSON.parse(await templateFile.async('string'));
+    const rawTemplate: Template = JSON.parse(await templateFile.async('string'));
+    const resolvedName = this.resolveTemplateNameFromPackage(
+      rawTemplate,
+      metadata,
+      zipFile
+    );
+    const templateData: Template = { ...rawTemplate, name: resolvedName };
 
     // 3. Restore images (convert to data URLs for immediate use)
     const imageMap = new Map<string, string>();
@@ -200,6 +209,28 @@ export class TemplatePackageService {
   }
 
   // ============= Helper Methods =============
+
+  /**
+   * Prefer `template.json` name; then `package.json` templateName; then the .zip file stem.
+   */
+  private resolveTemplateNameFromPackage(
+    data: Template,
+    metadata: PackageMetadata,
+    file: File
+  ): string {
+    if (typeof data.name === 'string' && data.name.trim() !== '') {
+      return data.name.trim();
+    }
+    if (metadata.templateName && String(metadata.templateName).trim() !== '') {
+      return String(metadata.templateName).trim();
+    }
+    const stem = file.name.replace(/\.(zip|ZIP)$/, '');
+    if (stem.trim() !== '') {
+      const cleaned = stem.replace(/[<>:"/\\|?*]/g, '_').trim();
+      if (cleaned !== '') return cleaned;
+    }
+    return 'Imported template';
+  }
 
   /**
    * Fetch image data from URL (blob, data URL, or HTTP)

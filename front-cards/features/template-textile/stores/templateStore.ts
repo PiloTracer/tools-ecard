@@ -99,6 +99,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     };
     set({
       currentTemplate: template,
+      currentTemplateName: name, // so toolbar shows the same label as the document name before first save
       elements: [],
       canvasWidth: width,
       canvasHeight: height,
@@ -164,6 +165,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
     set({
       currentTemplate: template,
+      currentTemplateName: template.name,
       elements: template.elements,
       canvasWidth: template.width,
       canvasHeight: template.height,
@@ -228,6 +230,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         name,
         updatedAt: new Date(),
       },
+      currentTemplateName: name,
       hasUnsavedChanges: true
     };
   }),

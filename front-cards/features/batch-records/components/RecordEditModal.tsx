@@ -45,6 +45,31 @@ const InputField: React.FC<{
   </div>
 );
 
+/**
+ * Module-level form row — do NOT inline an equivalent inside RecordEditModal: a new
+ * function component on each parent render changes React’s component type, unmounting
+ * inputs and stealing focus after the first keystroke.
+ */
+const VCardField: React.FC<{
+  label: string;
+  field: string;
+  type?: string;
+  placeholder?: string;
+  formData: RecordUpdateInput;
+  errors: Record<string, string>;
+  onChange: (field: string, value: string) => void;
+}> = ({ label, field, type = 'text', placeholder = '', formData, errors, onChange }) => (
+  <InputField
+    label={label}
+    field={field}
+    value={formData[field] || ''}
+    onChange={onChange}
+    error={errors[field]}
+    type={type}
+    placeholder={placeholder}
+  />
+);
+
 export const RecordEditModal: React.FC<RecordEditModalProps> = ({
   record,
   batchId,
@@ -168,29 +193,6 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Wrapper to adapt new InputField to old usage pattern
-  const Field = ({
-    label,
-    field,
-    type = 'text',
-    placeholder = '',
-  }: {
-    label: string;
-    field: string;
-    type?: string;
-    placeholder?: string;
-  }) => (
-    <InputField
-      label={label}
-      field={field}
-      value={formData[field] || ''}
-      onChange={handleChange}
-      error={errors[field]}
-      type={type}
-      placeholder={placeholder}
-    />
-  );
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
@@ -221,9 +223,18 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Full Name" field="fullName" />
-              <Field label="First Name" field="firstName" />
-              <Field label="Last Name" field="lastName" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Full Name" field="fullName" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="First Name" field="firstName" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Last Name" field="lastName" />
             </div>
           </div>
 
@@ -231,10 +242,22 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Contact Methods</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Email" field="email" type="email" />
-              <Field label="Work Phone" field="workPhone" type="tel" />
-              <Field label="Work Phone Extension" field="workPhoneExt" />
-              <Field label="Mobile Phone" field="mobilePhone" type="tel" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Email" field="email" type="email" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Work Phone" field="workPhone" type="tel" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Work Phone Extension" field="workPhoneExt" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Mobile Phone" field="mobilePhone" type="tel" />
             </div>
           </div>
 
@@ -243,12 +266,27 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <Field label="Street" field="addressStreet" />
+                <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Street" field="addressStreet" />
               </div>
-              <Field label="City" field="addressCity" />
-              <Field label="State/Province" field="addressState" />
-              <Field label="Postal Code" field="addressPostal" />
-              <Field label="Country" field="addressCountry" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="City" field="addressCity" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="State/Province" field="addressState" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Postal Code" field="addressPostal" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Country" field="addressCountry" />
             </div>
           </div>
 
@@ -256,12 +294,27 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Business Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Company" field="businessName" />
-              <Field label="Title" field="businessTitle" />
-              <Field label="Department" field="businessDepartment" />
-              <Field label="Business URL" field="businessUrl" type="url" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Company" field="businessName" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Title" field="businessTitle" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Department" field="businessDepartment" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Business URL" field="businessUrl" type="url" />
               <div className="md:col-span-2">
-                <Field label="Business Hours" field="businessHours" />
+                <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Business Hours" field="businessHours" />
               </div>
             </div>
           </div>
@@ -271,12 +324,27 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
             <h3 className="text-lg font-medium text-gray-900 mb-4">Business Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <Field label="Street" field="businessAddressStreet" />
+                <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Street" field="businessAddressStreet" />
               </div>
-              <Field label="City" field="businessAddressCity" />
-              <Field label="State/Province" field="businessAddressState" />
-              <Field label="Postal Code" field="businessAddressPostal" />
-              <Field label="Country" field="businessAddressCountry" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="City" field="businessAddressCity" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="State/Province" field="businessAddressState" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Postal Code" field="businessAddressPostal" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Country" field="businessAddressCountry" />
             </div>
           </div>
 
@@ -284,9 +352,18 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Social Profiles</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Instagram" field="socialInstagram" placeholder="@username" />
-              <Field label="Twitter" field="socialTwitter" placeholder="@username" />
-              <Field label="Facebook" field="socialFacebook" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Instagram" field="socialInstagram" placeholder="@username" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Twitter" field="socialTwitter" placeholder="@username" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Facebook" field="socialFacebook" />
             </div>
           </div>
 
@@ -294,8 +371,14 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Professional Profiles</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="LinkedIn" field="businessLinkedin" placeholder="linkedin.com/in/username" />
-              <Field label="Business Twitter" field="businessTwitter" placeholder="@company" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="LinkedIn" field="businessLinkedin" placeholder="linkedin.com/in/username" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Business Twitter" field="businessTwitter" placeholder="@company" />
             </div>
           </div>
 
@@ -303,8 +386,14 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Personal Website" field="personalUrl" type="url" />
-              <Field label="Birthday" field="personalBirthday" type="date" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Personal Website" field="personalUrl" type="url" />
+              <VCardField
+        formData={formData}
+        errors={errors}
+        onChange={handleChange} label="Birthday" field="personalBirthday" type="date" />
               <div className="md:col-span-2">
                 <label htmlFor="personalBio" className="block text-sm font-medium text-gray-700 mb-1">
                   Bio

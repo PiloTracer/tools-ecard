@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useProjects } from '@/features/simple-projects';
 import { DesignCanvas } from './Canvas/DesignCanvas';
 import { CanvasControls } from './Canvas/CanvasControls';
 import { CanvasSettings } from './CanvasSettings';
@@ -12,8 +13,23 @@ import { useCanvasStore } from '../stores/canvasStore';
 
 export function TemplateDesigner() {
   const router = useRouter();
+  const { selectedProject } = useProjects();
   const { currentTemplate, createTemplate, hasUnsavedChanges } = useTemplateStore();
+  const setSaveMetadata = useTemplateStore((s) => s.setSaveMetadata);
   const { setDimensions } = useCanvasStore();
+
+  // Keep toolbar project in sync with the project selected on the dashboard (localStorage + API)
+  useEffect(() => {
+    if (!selectedProject?.name) {
+      return;
+    }
+    const s = useTemplateStore.getState();
+    const templateLabel =
+      (s.currentTemplateName && s.currentTemplateName.length > 0
+        ? s.currentTemplateName
+        : s.currentTemplate?.name) ?? '';
+    setSaveMetadata(selectedProject.name, templateLabel);
+  }, [selectedProject?.id, selectedProject?.name, setSaveMetadata]);
 
   const goToDashboard = () => {
     if (hasUnsavedChanges) {
