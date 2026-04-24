@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { fontService, type Font, type FontFamily } from '../../services/fontService';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 interface FontSelectorProps {
   value: string; // current font family
@@ -361,13 +362,16 @@ function FontUploadModal({ isOpen, onClose, onSuccess }: FontUploadModalProps) {
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Weight</label>
-              <input
-                type="number"
+              <NumericStringInput
                 value={fontWeight}
-                onChange={(e) => setFontWeight(parseInt(e.target.value))}
+                roundDisplay
+                resetKey="font-upload-weight"
                 min={100}
                 max={900}
-                step={100}
+                onCommit={(n) => {
+                  const stepped = Math.round(n / 100) * 100;
+                  setFontWeight(Math.min(900, Math.max(100, stepped)));
+                }}
                 className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
               />
             </div>

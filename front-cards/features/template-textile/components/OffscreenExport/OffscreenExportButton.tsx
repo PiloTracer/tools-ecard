@@ -6,8 +6,8 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { exportTemplateById, exportTemplate, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { exportTemplate, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
 import { templateService } from '../../services/templateService';
 import { exportTemplateToBatch, downloadZip } from '../../services/batchExportService';
 import type { ExportOptions } from '../../services/exportService';
@@ -63,9 +63,12 @@ export function OffscreenExportButton({
   const [format, setFormat] = useState<'png' | 'jpg'>('png');
   const [quality, setQuality] = useState(0.9);
   const [width, setWidth] = useState(1920);
+  const [baseWidthDraft, setBaseWidthDraft] = useState('');
+  const [exportSizeInputFocused, setExportSizeInputFocused] = useState(false);
   /** Unit for loaded template when not the active editor tab (e.g. export by id) */
   const [unitFromSource, setUnitFromSource] = useState<LengthUnit>('px');
   const [transparentBackground, setTransparentBackground] = useState(false);
+  const modalInitDone = useRef(false);
 
   const currentTemplate = useTemplateStore((s) => s.currentTemplate);
   const storeExportWidth = useTemplateStore((s) => s.exportWidth);
@@ -78,8 +81,15 @@ export function OffscreenExportButton({
 
   const calculatedHeight = Math.round((width * templateHeight) / templateWidth);
 
+  const displayUnit: LengthUnit = isEditorTemplate
+    ? storeCanvasSizeUnit
+    : template
+      ? (template.canvasSizeUnit ?? template.exportBaseWidthUnit ?? 'px')
+      : unitFromSource;
+
   const updateExportWidthPx = useCallback(
     (px: number) => {
+      setExportSizeInputFocused(false);
       const w = clampExportWidthPx(px);
       setWidth(w);
       if (isEditorTemplate) {
@@ -89,18 +99,20 @@ export function OffscreenExportButton({
     [isEditorTemplate, setStoreExportWidth]
   );
 
-  const displayUnit: LengthUnit = isEditorTemplate
-    ? storeCanvasSizeUnit
-    : template
-      ? (template.canvasSizeUnit ?? template.exportBaseWidthUnit ?? 'px')
-      : unitFromSource;
-
-  const onBaseWidthInput = useCallback(
-    (v: number) => {
-      updateExportWidthPx(toPixels(v, displayUnit));
-    },
-    [displayUnit, updateExportWidthPx]
-  );
+  const commitBaseWidthText = useCallback(() => {
+    setExportSizeInputFocused(false);
+    const raw = baseWidthDraft.trim();
+    if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
+      setBaseWidthDraft(String(fromPixels(width, displayUnit)));
+      return;
+    }
+    const v = parseFloat(raw);
+    if (Number.isNaN(v)) {
+      setBaseWidthDraft(String(fromPixels(width, displayUnit)));
+      return;
+    }
+    updateExportWidthPx(toPixels(v, displayUnit));
+  }, [baseWidthDraft, displayUnit, width, updateExportWidthPx]);
 
   // Canvas dimensions: from prop or load by id
   useEffect(() => {
@@ -121,11 +133,16 @@ export function OffscreenExportButton({
     }
   }, [showOptions, templateId, template]);
 
-  // Export base width: match canvas / store when editing, else file
+  // One-time init when the export modal opens (avoid re-running on every store update)
   useEffect(() => {
-    if (!showOptions) return;
+    if (!showOptions) {
+      modalInitDone.current = false;
+      return;
+    }
+    if (modalInitDone.current) return;
 
     if (template) {
+      modalInitDone.current = true;
       if (isEditorTemplate) {
         setWidth(clampExportWidthPx(storeExportWidth));
       } else {
@@ -134,8 +151,8 @@ export function OffscreenExportButton({
       }
       return;
     }
-
     if (templateId) {
+      modalInitDone.current = true;
       templateService
         .loadTemplate(templateId)
         .then((loaded) => {
@@ -147,8 +164,25 @@ export function OffscreenExportButton({
           setWidth(1920);
           setUnitFromSource('px');
         });
+      return;
     }
+    modalInitDone.current = true;
   }, [showOptions, template, templateId, isEditorTemplate, storeExportWidth]);
+
+  // Keep local width in sync if Canvas Settings changes export width while the modal is open
+  useEffect(() => {
+    if (!showOptions || !isEditorTemplate || exportSizeInputFocused) return;
+    const w = clampExportWidthPx(storeExportWidth);
+    if (w !== width) {
+      setWidth(w);
+    }
+  }, [storeExportWidth, showOptions, isEditorTemplate, exportSizeInputFocused, width]);
+
+  // Text field display: mirror width + unit when the user is not editing the text box
+  useEffect(() => {
+    if (exportSizeInputFocused) return;
+    setBaseWidthDraft(String(fromPixels(width, displayUnit)));
+  }, [width, displayUnit, exportSizeInputFocused]);
 
   useEffect(() => {
     if (showOptions && exportMode === 'batch') {
@@ -418,13 +452,21 @@ export function OffscreenExportButton({
                 </p>
                 <div className="mt-2">
                   <input
-                    type="number"
-                    value={fromPixels(width, displayUnit)}
-                    onChange={(e) => onBaseWidthInput(parseFloat(e.target.value) || 0)}
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={baseWidthDraft}
+                    onChange={(e) => {
+                      setExportSizeInputFocused(true);
+                      setBaseWidthDraft(e.target.value);
+                    }}
+                    onFocus={() => setExportSizeInputFocused(true)}
+                    onBlur={commitBaseWidthText}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
                     disabled={isExporting}
                     className="w-full max-w-xs rounded border border-gray-300 px-2 py-2 text-gray-900"
-                    min={0.01}
-                    step="any"
                   />
                 </div>
                 <p className="mt-2 text-sm text-gray-800">

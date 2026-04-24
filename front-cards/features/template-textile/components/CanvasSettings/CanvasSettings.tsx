@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTemplateStore } from '../../stores/templateStore';
 import { useCanvasStore } from '../../stores/canvasStore';
 import {
@@ -74,31 +74,53 @@ export function CanvasSettings() {
   } = useTemplateStore();
   const { setDimensions, fabricCanvas, setZoom } = useCanvasStore();
 
-  const [customW, setCustomW] = useState(fromPixels(canvasWidth, canvasSizeUnit));
-  const [customH, setCustomH] = useState(fromPixels(canvasHeight, canvasSizeUnit));
-  const [exportW, setExportW] = useState(fromPixels(exportWidth, canvasSizeUnit));
   const [showSettings, setShowSettings] = useState(false);
+  const [draftW, setDraftW] = useState(() => String(fromPixels(canvasWidth, canvasSizeUnit)));
+  const [draftH, setDraftH] = useState(() => String(fromPixels(canvasHeight, canvasSizeUnit)));
+  const [draftE, setDraftE] = useState(() => String(fromPixels(exportWidth, canvasSizeUnit)));
+
+  const prevW = useRef(canvasWidth);
+  const prevH = useRef(canvasHeight);
+  const prevE = useRef(exportWidth);
+  const prevU = useRef(canvasSizeUnit);
 
   useEffect(() => {
-    setCustomW(fromPixels(canvasWidth, canvasSizeUnit));
-    setCustomH(fromPixels(canvasHeight, canvasSizeUnit));
-  }, [canvasWidth, canvasHeight, canvasSizeUnit]);
-
-  useEffect(() => {
-    setExportW(fromPixels(exportWidth, canvasSizeUnit));
-  }, [exportWidth, canvasSizeUnit]);
+    const u = canvasSizeUnit;
+    if (u !== prevU.current) {
+      prevU.current = u;
+      prevW.current = canvasWidth;
+      prevH.current = canvasHeight;
+      prevE.current = exportWidth;
+      setDraftW(String(fromPixels(canvasWidth, u)));
+      setDraftH(String(fromPixels(canvasHeight, u)));
+      setDraftE(String(fromPixels(exportWidth, u)));
+      return;
+    }
+    if (canvasWidth !== prevW.current) {
+      prevW.current = canvasWidth;
+      setDraftW(String(fromPixels(canvasWidth, u)));
+    }
+    if (canvasHeight !== prevH.current) {
+      prevH.current = canvasHeight;
+      setDraftH(String(fromPixels(canvasHeight, u)));
+    }
+    if (exportWidth !== prevE.current) {
+      prevE.current = exportWidth;
+      setDraftE(String(fromPixels(exportWidth, u)));
+    }
+  }, [canvasWidth, canvasHeight, exportWidth, canvasSizeUnit]);
 
   const handlePresetSelect = (preset: AspectRatioPreset) => {
     setCanvasSizeUnit('px');
     setCanvasDimensions(preset.width, preset.height);
     setDimensions(preset.width, preset.height);
-    setCustomW(preset.width);
-    setCustomH(preset.height);
+    setDraftW(String(preset.width));
+    setDraftH(String(preset.height));
   };
 
   const handleCustomDimensions = () => {
-    const wPx = toPixels(customW, canvasSizeUnit);
-    const hPx = toPixels(customH, canvasSizeUnit);
+    const wPx = toPixels(parseFloat(draftW) || 0, canvasSizeUnit);
+    const hPx = toPixels(parseFloat(draftH) || 0, canvasSizeUnit);
     if (wPx >= 100 && hPx >= 100 && wPx <= 10000 && hPx <= 10000) {
       setCanvasDimensions(wPx, hPx);
       setDimensions(wPx, hPx);
@@ -109,11 +131,16 @@ export function CanvasSettings() {
     setCanvasSizeUnit(u);
   };
 
-  const onExportWChange = (v: number) => {
-    setExportW(v);
+  const commitExportWidth = () => {
+    const v = parseFloat(draftE);
+    if (Number.isNaN(v)) {
+      setDraftE(String(fromPixels(exportWidth, canvasSizeUnit)));
+      return;
+    }
     const px = toPixels(v, canvasSizeUnit);
     const clamped = Math.max(100, Math.min(10000, px || 0));
     setExportWidth(clamped);
+    setDraftE(String(fromPixels(clamped, canvasSizeUnit)));
   };
 
   const handleResetView = () => {
@@ -210,23 +237,23 @@ export function CanvasSettings() {
               <div className="min-w-[4.5rem] flex-1 sm:max-w-[10rem]">
                 <label className="mb-1 block text-xs text-slate-400">Width</label>
                 <input
-                  type="number"
-                  value={customW}
-                  onChange={(e) => setCustomW(parseFloat(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={draftW}
+                  onChange={(e) => setDraftW(e.target.value)}
                   className="w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-                  min={0.01}
-                  step="any"
                 />
               </div>
               <div className="min-w-[4.5rem] flex-1 sm:max-w-[10rem]">
                 <label className="mb-1 block text-xs text-slate-400">Height</label>
                 <input
-                  type="number"
-                  value={customH}
-                  onChange={(e) => setCustomH(parseFloat(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={draftH}
+                  onChange={(e) => setDraftH(e.target.value)}
                   className="w-full rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-                  min={0.01}
-                  step="any"
                 />
               </div>
               <button
@@ -244,12 +271,18 @@ export function CanvasSettings() {
               Export base width – canvas scales to this (same unit as above)
             </label>
             <input
-              type="number"
-              value={exportW}
-              onChange={(e) => onExportWChange(parseFloat(e.target.value) || 0)}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={draftE}
+              onChange={(e) => setDraftE(e.target.value)}
+              onBlur={commitExportWidth}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               className="w-full max-w-sm rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-              min={0.01}
-              step="any"
             />
             <p className="mt-2 text-sm text-slate-300">
               Export:{' '}

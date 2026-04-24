@@ -8,6 +8,7 @@ import { QRProperties } from './QRProperties';
 import { ShapeProperties } from './ShapeProperties';
 import { isTextElement, isImageElement, isQRElement, isShapeElement } from '../../types';
 import { generateVCardFromElements } from '../../services/vcardGenerator';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 export function PropertyPanel() {
   const { selectedElementId, fabricCanvas } = useCanvasStore();
@@ -361,14 +362,12 @@ export function PropertyPanel() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">X</label>
-                  <input
-                    type="number"
-                    value={Math.round(selectedElement.x)}
-                    onChange={(e) => {
-                      const newX = parseFloat(e.target.value) || 0;
+                  <NumericStringInput
+                    value={selectedElement.x}
+                    roundDisplay
+                    resetKey={selectedElementId}
+                    onCommit={(newX) => {
                       updateElement(selectedElementId!, { x: newX });
-
-                      // Update Fabric.js object immediately
                       if (fabricCanvas) {
                         const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
                         if (fabricObj) {
@@ -379,19 +378,17 @@ export function PropertyPanel() {
                       }
                     }}
                     disabled={selectedElement.locked}
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">Y</label>
-                  <input
-                    type="number"
-                    value={Math.round(selectedElement.y)}
-                    onChange={(e) => {
-                      const newY = parseFloat(e.target.value) || 0;
+                  <NumericStringInput
+                    value={selectedElement.y}
+                    roundDisplay
+                    resetKey={selectedElementId}
+                    onCommit={(newY) => {
                       updateElement(selectedElementId!, { y: newY });
-
-                      // Update Fabric.js object immediately
                       if (fabricCanvas) {
                         const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
                         if (fabricObj) {
@@ -402,7 +399,7 @@ export function PropertyPanel() {
                       }
                     }}
                     disabled={selectedElement.locked}
-                    className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                   />
                 </div>
               </div>
@@ -416,50 +413,43 @@ export function PropertyPanel() {
                   {selectedElement.width !== undefined && (
                     <div>
                       <label className="mb-1 block text-xs text-gray-600">Width</label>
-                      <input
-                        type="number"
-                        value={Math.round(selectedElement.width)}
-                        onChange={(e) => {
-                          const newWidth = parseFloat(e.target.value) || 1;
-
-                          // Update Fabric.js object immediately
+                      <NumericStringInput
+                        value={selectedElement.width!}
+                        roundDisplay
+                        min={1}
+                        resetKey={selectedElementId}
+                        onCommit={(newWidth) => {
                           if (fabricCanvas) {
                             const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
                             if (fabricObj) {
                               if (selectedElement.type === 'image') {
-                                // For images, calculate new scale to match the width
                                 const newScaleX = newWidth / (fabricObj.width || newWidth);
-                                const newScaleY = fabricObj.scaleY || 1; // Keep Y scale
+                                const newScaleY = fabricObj.scaleY || 1;
                                 fabricObj.set({ scaleX: newScaleX });
                                 fabricObj.setCoords();
                                 fabricCanvas.renderAll();
-                                // Update store with both width and scale
                                 updateElement(selectedElementId!, { width: newWidth, scaleX: newScaleX });
                               } else if (selectedElement.type === 'shape') {
-                                const shapeEl = selectedElement as any;
+                                const shapeEl = selectedElement as { shapeType?: string };
                                 if (shapeEl.shapeType === 'circle') {
-                                  // For circles, update radius
                                   const newRadius = newWidth / 2;
                                   fabricObj.set({ radius: newRadius, scaleX: 1, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { width: newWidth, height: newWidth });
                                 } else if (shapeEl.shapeType === 'ellipse') {
-                                  // For ellipses, update rx (Fabric ellipse exposes rx/ry on instance, not on FabricObject typing)
                                   const newRx = newWidth / 2;
                                   fabricObj.set({ rx: newRx, scaleX: 1, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { width: newWidth });
                                 } else {
-                                  // Other shapes
                                   fabricObj.set({ width: newWidth, scaleX: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { width: newWidth });
                                 }
                               } else {
-                                // For other elements, set width directly
                                 fabricObj.set({ width: newWidth, scaleX: 1 });
                                 fabricObj.setCoords();
                                 fabricCanvas.renderAll();
@@ -469,57 +459,50 @@ export function PropertyPanel() {
                           }
                         }}
                         disabled={selectedElement.locked}
-                        className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       />
                     </div>
                   )}
                   {selectedElement.height !== undefined && (
                     <div>
                       <label className="mb-1 block text-xs text-gray-600">Height</label>
-                      <input
-                        type="number"
-                        value={Math.round(selectedElement.height)}
-                        onChange={(e) => {
-                          const newHeight = parseFloat(e.target.value) || 1;
-
-                          // Update Fabric.js object immediately
+                      <NumericStringInput
+                        value={selectedElement.height!}
+                        roundDisplay
+                        min={1}
+                        resetKey={selectedElementId}
+                        onCommit={(newHeight) => {
                           if (fabricCanvas) {
                             const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
                             if (fabricObj) {
                               if (selectedElement.type === 'image') {
-                                // For images, calculate new scale to match the height
-                                const newScaleX = fabricObj.scaleX || 1; // Keep X scale
+                                const newScaleX = fabricObj.scaleX || 1;
                                 const newScaleY = newHeight / (fabricObj.height || newHeight);
                                 fabricObj.set({ scaleY: newScaleY });
                                 fabricObj.setCoords();
                                 fabricCanvas.renderAll();
-                                // Update store with both height and scale
                                 updateElement(selectedElementId!, { height: newHeight, scaleY: newScaleY });
                               } else if (selectedElement.type === 'shape') {
-                                const shapeEl = selectedElement as any;
+                                const shapeEl = selectedElement as { shapeType?: string };
                                 if (shapeEl.shapeType === 'circle') {
-                                  // For circles, height affects radius
                                   const newRadius = newHeight / 2;
                                   fabricObj.set({ radius: newRadius, scaleX: 1, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { width: newHeight, height: newHeight });
                                 } else if (shapeEl.shapeType === 'ellipse') {
-                                  // For ellipses, update ry
                                   const newRy = newHeight / 2;
                                   fabricObj.set({ ry: newRy, scaleX: 1, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { height: newHeight });
                                 } else {
-                                  // Other shapes
                                   fabricObj.set({ height: newHeight, scaleY: 1 });
                                   fabricObj.setCoords();
                                   fabricCanvas.renderAll();
                                   updateElement(selectedElementId!, { height: newHeight });
                                 }
                               } else {
-                                // For other elements, set height directly
                                 fabricObj.set({ height: newHeight, scaleY: 1 });
                                 fabricObj.setCoords();
                                 fabricCanvas.renderAll();
@@ -529,7 +512,7 @@ export function PropertyPanel() {
                           }
                         }}
                         disabled={selectedElement.locked}
-                        className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       />
                     </div>
                   )}
@@ -541,14 +524,12 @@ export function PropertyPanel() {
             <div>
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Rotation</h3>
               <div className="relative">
-                <input
-                  type="number"
-                  value={Math.round(selectedElement.rotation || 0)}
-                  onChange={(e) => {
-                    const newRotation = parseFloat(e.target.value) || 0;
+                <NumericStringInput
+                  value={selectedElement.rotation || 0}
+                  roundDisplay
+                  resetKey={selectedElementId}
+                  onCommit={(newRotation) => {
                     updateElement(selectedElementId!, { rotation: newRotation });
-
-                    // Update Fabric.js object immediately
                     if (fabricCanvas) {
                       const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
                       if (fabricObj) {
@@ -559,7 +540,7 @@ export function PropertyPanel() {
                     }
                   }}
                   disabled={selectedElement.locked}
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">°</span>
               </div>

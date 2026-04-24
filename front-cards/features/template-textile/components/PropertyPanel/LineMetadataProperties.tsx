@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { BaseElement } from '../../types';
 import { vcardFields } from '../../utils/vcardFields';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 interface LineMetadataPropertiesProps {
   element: BaseElement;
@@ -127,17 +128,17 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
       {/* Line Priority */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Line Priority</label>
-        <input
-          type="number"
-          value={element.linePriority || ''}
-          onChange={(e) => handleChange({ linePriority: parseInt(e.target.value) || undefined })}
-          placeholder="1, 2, 3..."
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
-          min={1}
+        <NumericStringInput
+          value={element.linePriority === undefined || element.linePriority === 0 ? 0 : element.linePriority}
+          roundDisplay
+          resetKey={element.id}
+          min={0}
           max={100}
+          onCommit={(n) => handleChange({ linePriority: n < 1 ? undefined : n })}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         />
         <p className="mt-1 text-xs text-gray-500">
-          Order for automatic line reordering (lower = higher priority)
+          Order for automatic line reordering (lower = higher priority). Use 0 for unset.
         </p>
       </div>
 

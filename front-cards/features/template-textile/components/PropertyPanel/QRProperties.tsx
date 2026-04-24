@@ -2,6 +2,7 @@
 
 import { useTemplateStore } from '../../stores/templateStore';
 import type { QRElement } from '../../types';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 interface QRPropertiesProps {
   element: QRElement;
@@ -42,16 +43,22 @@ export function QRProperties({ element }: QRPropertiesProps) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Size</label>
-        <input
-          type="number"
+        <NumericStringInput
           value={isNaN(element.size) ? 100 : element.size}
-          onChange={(e) => {
-            const newSize = parseInt(e.target.value) || 100;
-            handleChange({ size: newSize, width: newSize, height: newSize, originalWidth: newSize, originalHeight: newSize });
-          }}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          roundDisplay
+          resetKey={element.id}
           min={50}
           max={500}
+          onCommit={(newSize) => {
+            handleChange({
+              size: newSize,
+              width: newSize,
+              height: newSize,
+              originalWidth: newSize,
+              originalHeight: newSize,
+            });
+          }}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         />
       </div>
 

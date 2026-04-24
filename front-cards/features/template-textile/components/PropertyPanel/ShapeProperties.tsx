@@ -2,6 +2,7 @@
 
 import { useTemplateStore } from '../../stores/templateStore';
 import type { ShapeElement } from '../../types';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 interface ShapePropertiesProps {
   element: ShapeElement;
@@ -19,23 +20,25 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Width</label>
-          <input
-            type="number"
+          <NumericStringInput
             value={isNaN(element.width) ? 100 : element.width}
-            onChange={(e) => handleChange({ width: parseInt(e.target.value) || 10 })}
+            roundDisplay
+            resetKey={element.id}
+            min={10}
+            onCommit={(n) => handleChange({ width: n })}
             className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
-            min={element.shapeType === 'line' ? 10 : element.shapeType === 'circle' ? 10 : 10}
           />
         </div>
         {element.shapeType !== 'line' && element.shapeType !== 'circle' && (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Height</label>
-            <input
-              type="number"
+            <NumericStringInput
               value={isNaN(element.height) ? 100 : element.height}
-              onChange={(e) => handleChange({ height: parseInt(e.target.value) || 10 })}
-              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+              roundDisplay
+              resetKey={element.id}
               min={10}
+              onCommit={(n) => handleChange({ height: n })}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
             />
           </div>
         )}
@@ -65,13 +68,14 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Width</label>
-        <input
-          type="number"
+        <NumericStringInput
           value={isNaN(element.strokeWidth ?? 1) ? 1 : (element.strokeWidth ?? 1)}
-          onChange={(e) => handleChange({ strokeWidth: parseInt(e.target.value) || 0 })}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          roundDisplay
+          resetKey={element.id}
           min={0}
           max={20}
+          onCommit={(n) => handleChange({ strokeWidth: n })}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         />
       </div>
 

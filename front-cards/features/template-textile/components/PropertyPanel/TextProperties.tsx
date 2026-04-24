@@ -4,6 +4,7 @@ import { useTemplateStore } from '../../stores/templateStore';
 import type { TextElement } from '../../types';
 import { LineMetadataProperties } from './LineMetadataProperties';
 import { FontSelector } from './FontSelector';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -53,13 +54,14 @@ export function TextProperties({ element }: TextPropertiesProps) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Font Size</label>
-        <input
-          type="number"
+        <NumericStringInput
           value={element.fontSize || 16}
-          onChange={(e) => handleChange({ fontSize: parseInt(e.target.value) || 12 })}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          roundDisplay
+          resetKey={element.id}
           min={8}
           max={200}
+          onCommit={(n) => handleChange({ fontSize: n })}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         />
       </div>
 
@@ -221,13 +223,14 @@ export function TextProperties({ element }: TextPropertiesProps) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Width</label>
-        <input
-          type="number"
+        <NumericStringInput
           value={isNaN(element.strokeWidth ?? 0) ? 0 : (element.strokeWidth ?? 0)}
-          onChange={(e) => handleChange({ strokeWidth: parseInt(e.target.value) || 0 })}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          roundDisplay
+          resetKey={element.id}
           min={0}
           max={10}
+          onCommit={(n) => handleChange({ strokeWidth: n })}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         />
       </div>
 

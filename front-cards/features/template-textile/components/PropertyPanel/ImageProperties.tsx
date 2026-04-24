@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { ImageElement } from '../../types';
 import { LineMetadataProperties } from './LineMetadataProperties';
+import { NumericStringInput } from '../common/NumericStringInput';
 
 interface ImagePropertiesProps {
   element: ImageElement;
@@ -195,22 +196,24 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Width</label>
-          <input
-            type="number"
+          <NumericStringInput
             value={isNaN(element.width) ? 100 : element.width}
-            onChange={(e) => handleChange({ width: parseInt(e.target.value) || 100 })}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+            roundDisplay
+            resetKey={element.id}
             min={10}
+            onCommit={(n) => handleChange({ width: n })}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Height</label>
-          <input
-            type="number"
+          <NumericStringInput
             value={isNaN(element.height) ? 100 : element.height}
-            onChange={(e) => handleChange({ height: parseInt(e.target.value) || 100 })}
-            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+            roundDisplay
+            resetKey={element.id}
             min={10}
+            onCommit={(n) => handleChange({ height: n })}
+            className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
           />
         </div>
       </div>
