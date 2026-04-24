@@ -1,7 +1,8 @@
 'use client';
 
 import { useTemplateStore } from '../../stores/templateStore';
-import type { TextElement } from '../../types';
+import type { TextElement, WordColorMode } from '../../types';
+import { colorSlotLabel, wordIndexToColorIndex } from '../../utils/wordColorIndex';
 import { LineMetadataProperties } from './LineMetadataProperties';
 import { FontSelector } from './FontSelector';
 import { NumericStringInput } from '../common/NumericStringInput';
@@ -77,15 +78,38 @@ export function TextProperties({ element }: TextPropertiesProps) {
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Word Colors</label>
         <div className="space-y-2">
+          {element.colors && element.colors.length >= 2 && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">Spread</label>
+              <select
+                value={element.wordColorMode || 'sequential'}
+                onChange={(e) =>
+                  handleChange({ wordColorMode: e.target.value as WordColorMode })
+                }
+                className="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="sequential">By order (1st color → 2nd → last fills rest)</option>
+                <option value="proportional">Proportional (split words across colors)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Proportional divides the full line: e.g. with two colors, four words are 2+2, three
+                words are 1+2, five words are 2+3. Extra colors with fewer words are unused in that
+                mode; use <span className="font-medium">By order</span> for “first word / rest”
+                style rules.
+              </p>
+            </div>
+          )}
           {/* Display current colors */}
           {element.colors && element.colors.length > 0 ? (
             <>
               {element.colors.map((color, index) => {
-                const words = element.text.trim().split(/\s+/);
-                const isLastColor = index === element.colors!.length - 1;
-                const appliedWords = isLastColor
-                  ? `Words ${index + 1}${words.length > index + 1 ? '+' : ''}`
-                  : `Word ${index + 1}`;
+                const words = element.text.trim() ? element.text.trim().split(/\s+/) : [];
+                const appliedWords = colorSlotLabel(
+                  index,
+                  words.length,
+                  element.colors!.length,
+                  element.wordColorMode
+                );
 
                 return (
                   <div key={index} className="flex items-center gap-2">
@@ -150,15 +174,24 @@ export function TextProperties({ element }: TextPropertiesProps) {
             <div className="p-2 bg-gray-50 rounded text-xs text-gray-600">
               <div className="font-semibold mb-1">Preview:</div>
               <div className="flex flex-wrap gap-1">
-                {element.text.trim().split(/\s+/).map((word, index) => {
-                  const colorIndex = Math.min(index, (element.colors?.length || 1) - 1);
-                  const color = element.colors?.[colorIndex] || element.color || '#000000';
-                  return (
-                    <span key={index} style={{ color }}>
-                      {word}
-                    </span>
-                  );
-                })}
+                {(() => {
+                  const words = element.text.trim() ? element.text.trim().split(/\s+/) : [];
+                  const w = words.length;
+                  return words.map((word, index) => {
+                    const colorIndex = wordIndexToColorIndex(
+                      index,
+                      w,
+                      element.colors?.length || 0,
+                      element.wordColorMode
+                    );
+                    const color = element.colors?.[colorIndex] || element.color || '#000000';
+                    return (
+                      <span key={index} style={{ color }}>
+                        {word}
+                      </span>
+                    );
+                  });
+                })()}
               </div>
             </div>
           )}

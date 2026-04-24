@@ -1,5 +1,6 @@
 import * as fabric from 'fabric';
 import type { TextElement } from '../types';
+import { wordIndexToColorIndex } from './wordColorIndex';
 
 /**
  * Creates a fabric group that renders text with per-word colors
@@ -18,9 +19,9 @@ export function createMultiColorText(element: TextElement): fabric.Group {
   const fontWeight = element.fontWeight === 'bold' ? 700 : (element.fontWeight === 'normal' ? 400 : element.fontWeight || 400);
 
   // Create a text object for each word with its corresponding color
+  const wordCount = words.length;
   words.forEach((word, index) => {
-    // Determine which color to use (last color applies to remaining words)
-    const colorIndex = Math.min(index, colors.length - 1);
+    const colorIndex = wordIndexToColorIndex(index, wordCount, colors.length, element.wordColorMode);
     const color = colors[colorIndex];
 
     const textObj = new fabric.Text(word, {
@@ -101,6 +102,7 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
 
   // Recreate text objects with new properties
   const words = element.text.trim().split(/\s+/);
+  const wordCount = words.length;
   const colors = element.colors || (element.color ? [element.color] : ['#000000']);
 
   let currentX = 0;
@@ -110,7 +112,7 @@ export function updateMultiColorText(group: fabric.Group, element: TextElement):
   const fontWeight = element.fontWeight === 'bold' ? 700 : (element.fontWeight === 'normal' ? 400 : element.fontWeight || 400);
 
   words.forEach((word, index) => {
-    const colorIndex = Math.min(index, colors.length - 1);
+    const colorIndex = wordIndexToColorIndex(index, wordCount, colors.length, element.wordColorMode);
     const color = colors[colorIndex];
 
     const textObj = new fabric.Text(word, {

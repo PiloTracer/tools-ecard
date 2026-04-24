@@ -2,6 +2,9 @@
 
 import type { LengthUnit } from '../utils/lengthUnits';
 
+/** How palette entries map to words: `sequential` = word k uses color k (last color fills); `proportional` = split the word list evenly across colors. */
+export type WordColorMode = 'sequential' | 'proportional';
+
 export interface BaseElement {
   id: string;
   type: 'text' | 'image' | 'qr' | 'shape';
@@ -31,7 +34,8 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   fontFamily: string;
   color?: string; // Kept for backward compatibility
-  colors?: string[]; // NEW: Array of colors for per-word coloring
+  colors?: string[]; // Array of colors for per-word coloring
+  wordColorMode?: WordColorMode; // default: 'sequential' (legacy)
   textAlign?: 'left' | 'center' | 'right';
   fontWeight?: 'normal' | 'bold';
   fontStyle?: 'normal' | 'italic';

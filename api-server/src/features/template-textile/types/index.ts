@@ -3,6 +3,8 @@
  * Types for template storage and management in SeaweedFS
  */
 
+export type WordColorMode = 'sequential' | 'proportional';
+
 // Template element types matching frontend
 export interface BaseElement {
   id: string;
@@ -27,6 +29,7 @@ export interface TextElement extends BaseElement {
   fontFamily: string;
   color?: string;
   colors?: string[];
+  wordColorMode?: WordColorMode;
   textAlign?: 'left' | 'center' | 'right';
   fontWeight?: 'normal' | 'bold';
   fontStyle?: 'normal' | 'italic';
