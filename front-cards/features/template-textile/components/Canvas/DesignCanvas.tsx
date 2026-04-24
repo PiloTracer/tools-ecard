@@ -8,6 +8,30 @@ import { useTemplateStore } from '../../stores/templateStore';
 import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 import { createMultiColorText, updateMultiColorText, shouldUseMultiColor } from '../../utils/multiColorText';
 
+/**
+ * Fabric 6: ActiveSelection extends Group — `type` is often `'group'`, not `'activeSelection'`.
+ * Use the same idea as `canvas.getActiveObjects()` (see node_modules/fabric: `isActiveSelection`).
+ */
+function isFabricActiveSelection(obj: fabric.Object | null | undefined): obj is fabric.ActiveSelection {
+  return !!obj && typeof (obj as any).getObjects === 'function' && 'multiSelectionStacking' in (obj as any);
+}
+
+/** Authoritative: matches Fabric’s selection, including multi-select (ActiveSelection). */
+function getElementIdsFromActiveObjects(canvas: fabric.Canvas): string[] {
+  return canvas
+    .getActiveObjects()
+    .map((o: any) => o.elementId)
+    .filter((id: string | undefined): id is string => Boolean(id));
+}
+
+function getElementIdsFromSelectionEvent(canvas: fabric.Canvas, e: { selected?: fabric.Object[] }): string[] {
+  const selected = e.selected;
+  if (selected && selected.length > 0) {
+    return selected.map((o: any) => o.elementId).filter((id: string | undefined): id is string => Boolean(id));
+  }
+  return getElementIdsFromActiveObjects(canvas);
+}
+
 export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
@@ -34,8 +58,9 @@ export function DesignCanvas() {
   const objectsAtLastClick = useRef<fabric.Object[]>([]);
   const [cycleInfo, setCycleInfo] = useState<{ current: number; total: number } | null>(null);
 
-  const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setFabricCanvas, selectedElementId } = useCanvasStore();
-  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, duplicateElement, exportWidth, lastUndoRedoTimestamp } = useTemplateStore();
+  const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setSelectedElements, setFabricCanvas, selectedElementIds } = useCanvasStore();
+  const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, removeElements, duplicateElement, exportWidth, lastUndoRedoTimestamp } = useTemplateStore();
+  const selectedElementId = selectedElementIds[0] ?? null;
   const copiedElement = useRef<TemplateElement | null>(null);
   const lastKnownUndoRedoTimestamp = useRef<number>(0);
 
@@ -104,25 +129,19 @@ export function DesignCanvas() {
     setFabricCanvas(canvas);
     setIsReady(true);
 
-    // Selection events
+    // Selection events — support multi-select (drag / Shift+click) via all `e.selected` objects
     canvas.on('selection:created', (e: any) => {
-      const target = e.selected?.[0];
-      if (target) {
-        const elementId = (target as any).elementId;
-        if (elementId) setSelectedElement(elementId);
-      }
+      const ids = getElementIdsFromSelectionEvent(canvas, e);
+      if (ids.length) setSelectedElements(ids);
     });
 
     canvas.on('selection:updated', (e: any) => {
-      const target = e.selected?.[0];
-      if (target) {
-        const elementId = (target as any).elementId;
-        if (elementId) setSelectedElement(elementId);
-      }
+      const ids = getElementIdsFromSelectionEvent(canvas, e);
+      if (ids.length) setSelectedElements(ids);
     });
 
     canvas.on('selection:cleared', () => {
-      setSelectedElement(null);
+      setSelectedElements([]);
     });
 
     // Text editing events
@@ -242,6 +261,40 @@ export function DesignCanvas() {
     canvas.on('object:modified', (e: any) => {
       const target = e.target;
       if (!target) return;
+
+      // Multi-select: move/rotate the whole group — write each child’s position into the store
+      if (isFabricActiveSelection(target)) {
+        const sel = target;
+        const objs = sel.getObjects();
+        for (const obj of objs) {
+          const elementId = (obj as any).elementId;
+          if (!elementId) continue;
+          if (systemUpdating.current.has(elementId)) {
+            systemUpdating.current.delete(elementId);
+            continue;
+          }
+          const el = useTemplateStore.getState().elements.find(ee => ee.id === elementId);
+          if (!el) continue;
+          (obj as fabric.FabricObject).setCoords();
+          const p = (obj as fabric.FabricObject).getPointByOrigin('left', 'top');
+          updateElement(elementId, {
+            x: Math.round(p.x),
+            y: Math.round(p.y),
+            rotation: (obj as any).angle ?? el.rotation,
+          } as Partial<TemplateElement>);
+        }
+        setTimeout(() => {
+          sel.getObjects().forEach((o) => {
+            const id = (o as any).elementId;
+            if (id) {
+              processingModification.current.delete(id);
+              activelyInteracting.current.delete(id);
+            }
+          });
+          setGlobalSyncLock(false);
+        }, 300);
+        return;
+      }
 
       const elementId = (target as any).elementId;
       if (!elementId) return;
@@ -490,52 +543,13 @@ export function DesignCanvas() {
       }
     });
 
-    // Keyboard delete
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Check if user is editing an input field
-        const target = e.target as HTMLElement;
-        const isEditingInput = target.tagName === 'INPUT' ||
-                              target.tagName === 'TEXTAREA' ||
-                              target.getAttribute('contenteditable') === 'true';
-
-        if (isEditingInput) {
-          return; // Don't delete canvas object, let the input handle the key
-        }
-
-        const activeObject = canvas.getActiveObject();
-        if (activeObject) {
-          const elementId = (activeObject as any).elementId;
-          if (elementId) {
-            e.preventDefault();
-
-            // SAFETY CHECK: Don't remove if actively interacting
-            if (activelyInteracting.current.has(elementId) || globalSyncLock) {
-              console.warn(`[DELETE-KEY] BLOCKED deletion of ${elementId} - actively interacting or sync locked`);
-              return;
-            }
-
-            console.log(`[REMOVE] Delete key pressed for element ${elementId}`);
-            console.trace('[REMOVE] Stack trace for delete key removal:'); // STACK TRACE
-            canvas.remove(activeObject);
-            removeElement(elementId);
-            addedElementIds.current.delete(elementId);
-            fabricObjectsMap.current.delete(elementId);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
     // Cleanup
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       canvas.dispose();
       fabricCanvasRef.current = null;
       setIsReady(false);
     };
-  }, [width, height]); // ONLY width and height
+  }, [width, height, setSelectedElements]); // canvas recreated on size change; selection sync uses setSelectedElements
 
   // Apply zoom to Fabric.js canvas
   useEffect(() => {
@@ -590,9 +604,8 @@ export function DesignCanvas() {
       return;
     }
 
-    // Preserve the active object to prevent deselection during property updates
-    const activeObject = canvas.getActiveObject();
-    const activeElementId = activeObject ? (activeObject as any).elementId : null;
+    // Preserve the active object(s) to prevent deselection during property updates
+    const activeElementIds = getElementIdsFromActiveObjects(canvas);
 
     // Find elements to add
     const elementsToAdd = elements.filter(el => !addedElementIds.current.has(el.id));
@@ -686,7 +699,7 @@ export function DesignCanvas() {
                 fabricObjectsMap.current.set(element.id, newMultiColorText);
 
                 // Restore selection if this was the selected element
-                if (selectedElementId === element.id) {
+                if (selectedElementIds.length === 1 && selectedElementIds[0] === element.id) {
                   canvas.setActiveObject(newMultiColorText);
                 }
               } else {
@@ -1138,14 +1151,24 @@ export function DesignCanvas() {
     lastKnownUndoRedoTimestamp.current = lastUndoRedoTimestamp;
 
     // Restore the selection if it was lost during property updates
-    if (activeElementId && !canvas.getActiveObject()) {
-      const fabricObj = fabricObjectsMap.current.get(activeElementId);
-      if (fabricObj) {
-        canvas.setActiveObject(fabricObj);
-        canvas.renderAll();
+    if (activeElementIds.length > 0 && !canvas.getActiveObject()) {
+      if (activeElementIds.length === 1) {
+        const fabricObj = fabricObjectsMap.current.get(activeElementIds[0]);
+        if (fabricObj) {
+          canvas.setActiveObject(fabricObj);
+        }
+      } else {
+        const objects = activeElementIds
+          .map((id) => fabricObjectsMap.current.get(id))
+          .filter((o): o is fabric.Object => Boolean(o));
+        if (objects.length > 0) {
+          const ac = new fabric.ActiveSelection(objects, { canvas });
+          canvas.setActiveObject(ac);
+        }
       }
+      canvas.renderAll();
     }
-  }, [elements, isReady, lastUndoRedoTimestamp]);
+  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds]);
 
   // 3) Handle zoom
   useEffect(() => {
@@ -1546,7 +1569,7 @@ export function DesignCanvas() {
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
-  }, [isReady, setSelectedElement, isSpacePressed, isPanning]);
+  }, [isReady, setSelectedElement, setSelectedElements, isSpacePressed, isPanning]);
 
   // 9) Handle keyboard shortcuts
   useEffect(() => {
@@ -1564,24 +1587,32 @@ export function DesignCanvas() {
 
       const activeObject = canvas.getActiveObject();
 
-      // Delete/Backspace key - delete selected element
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
-        e.preventDefault(); // Prevent default browser behavior
-        removeElement(selectedElementId);
-        setSelectedElement(null);
+      // Delete/Backspace — use Fabric’s active objects (correct for multi-select; see isFabricActiveSelection)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const ids = getElementIdsFromActiveObjects(canvas);
+        if (
+          ids.length > 0 &&
+          !ids.some((id) => activelyInteracting.current.has(id) || globalSyncLock)
+        ) {
+          e.preventDefault();
+          removeElements(ids);
+          setSelectedElements([]);
+          canvas.discardActiveObject();
+          canvas.renderAll();
+        }
       }
 
       // Escape - deselect
       if (e.key === 'Escape') {
         canvas.discardActiveObject();
         canvas.renderAll();
-        setSelectedElement(null);
+        setSelectedElements([]);
       }
 
-      // Ctrl/Cmd + D - duplicate
-      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedElementId) {
+      // Ctrl/Cmd + D - duplicate (single selection only; multi is ambiguous)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedElementIds.length === 1) {
         e.preventDefault();
-        duplicateElement(selectedElementId);
+        duplicateElement(selectedElementIds[0]);
       }
 
       // Ctrl/Cmd + Z - undo
@@ -1602,10 +1633,10 @@ export function DesignCanvas() {
         }
       }
 
-      // Ctrl/Cmd + C - copy
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedElementId) {
+      // Ctrl/Cmd + C - copy (first selected when multiple)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedElementIds.length > 0) {
         e.preventDefault();
-        const element = elements.find(el => el.id === selectedElementId);
+        const element = elements.find(el => el.id === selectedElementIds[0]);
         if (element) {
           copiedElement.current = element;
         }
@@ -1666,8 +1697,8 @@ export function DesignCanvas() {
         }
       }
 
-      // Arrow keys - nudge element
-      if (activeObject && selectedElementId) {
+      // Arrow keys - nudge selection (one object or whole ActiveSelection)
+      if (activeObject && selectedElementIds.length > 0) {
         const nudgeAmount = e.shiftKey ? 10 : 1;
         let moved = false;
 
@@ -1692,18 +1723,29 @@ export function DesignCanvas() {
         if (moved) {
           activeObject.setCoords();
           canvas.renderAll();
-          // Update element position in store
-          updateElement(selectedElementId, {
-            x: activeObject.left || 0,
-            y: activeObject.top || 0
-          });
+          if (isFabricActiveSelection(activeObject)) {
+            activeObject.getObjects().forEach((obj) => {
+              const id = (obj as any).elementId;
+              if (!id) return;
+              const el = useTemplateStore.getState().elements.find(ee => ee.id === id);
+              if (!el) return;
+              (obj as fabric.FabricObject).setCoords();
+              const p = (obj as fabric.FabricObject).getPointByOrigin('left', 'top');
+              updateElement(id, { x: Math.round(p.x), y: Math.round(p.y) });
+            });
+          } else {
+            const id = (activeObject as any).elementId;
+            if (id) {
+              updateElement(id, { x: activeObject.left || 0, y: activeObject.top || 0 });
+            }
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementId, elements, isReady]);
+  }, [selectedElementIds, elements, isReady, setSelectedElements, removeElements, duplicateElement, updateElement]);
 
   // Helper: Add element to canvas
   const addElementToCanvas = (canvas: fabric.Canvas, element: TemplateElement) => {

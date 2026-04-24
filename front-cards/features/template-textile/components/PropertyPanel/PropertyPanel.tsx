@@ -11,20 +11,31 @@ import { generateVCardFromElements } from '../../services/vcardGenerator';
 import { NumericStringInput } from '../common/NumericStringInput';
 
 export function PropertyPanel() {
-  const { selectedElementId, fabricCanvas } = useCanvasStore();
-  const { elements, removeElement, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward, canvasWidth, canvasHeight } = useTemplateStore();
+  const { selectedElementIds, fabricCanvas, setSelectedElements } = useCanvasStore();
+  const { elements, removeElements, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward, canvasWidth, canvasHeight } = useTemplateStore();
+  const selectedElementId = selectedElementIds[0] ?? null;
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
 
   const handleDelete = () => {
-    if (selectedElementId) {
-      removeElement(selectedElementId);
+    const fromFabric = fabricCanvas
+      ? fabricCanvas
+          .getActiveObjects()
+          .map((o: { elementId?: string }) => o.elementId)
+          .filter((id): id is string => Boolean(id))
+      : [];
+    const ids = fromFabric.length > 0 ? fromFabric : selectedElementIds;
+    if (ids.length > 0) {
+      removeElements(ids);
+      setSelectedElements([]);
+      fabricCanvas?.discardActiveObject();
+      fabricCanvas?.renderAll();
     }
   };
 
   const handleDuplicate = () => {
-    if (selectedElementId) {
-      duplicateElement(selectedElementId);
+    if (selectedElementIds.length === 1) {
+      duplicateElement(selectedElementIds[0]);
     }
   };
 
@@ -297,6 +308,16 @@ export function PropertyPanel() {
           </div>
         ) : (
           <div className="space-y-6">
+            {selectedElementIds.length > 1 && (
+              <div
+                className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950"
+                role="status"
+              >
+                <span className="font-medium">{selectedElementIds.length} items selected.</span>{' '}
+                Delete removes all. Edits below apply to the first item only.
+              </div>
+            )}
+
             {/* Element Type Badge */}
             <div className="flex items-center justify-between">
               <div className="rounded bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 capitalize">
@@ -304,16 +325,19 @@ export function PropertyPanel() {
               </div>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={handleDuplicate}
-                  className="rounded bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-100"
+                  disabled={selectedElementIds.length !== 1}
+                  className="rounded bg-blue-50 px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Duplicate
                 </button>
                 <button
+                  type="button"
                   onClick={handleDelete}
                   className="rounded bg-red-50 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-100"
                 >
-                  Delete
+                  Delete{selectedElementIds.length > 1 ? ` (${selectedElementIds.length})` : ''}
                 </button>
               </div>
             </div>

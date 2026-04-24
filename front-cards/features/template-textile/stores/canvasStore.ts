@@ -13,8 +13,11 @@ interface CanvasState {
   gridSize: number;
   backgroundColor: string;
 
-  // Selection
-  selectedElementId: string | null;
+  /**
+   * All selected element IDs (in box/shift order). Empty when nothing is selected.
+   * The first entry is the "primary" item for the property panel.
+   */
+  selectedElementIds: string[];
 
   // Fabric canvas reference
   fabricCanvas: Canvas | null;
@@ -30,6 +33,7 @@ interface CanvasState {
   setGridSize: (size: number) => void;
   setBackgroundColor: (color: string) => void;
   setSelectedElement: (id: string | null) => void;
+  setSelectedElements: (ids: string[]) => void;
   setFabricCanvas: (canvas: Canvas | null) => void;
 }
 
@@ -42,7 +46,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   snapToGrid: false,
   gridSize: 10,
   backgroundColor: '#ffffff',
-  selectedElementId: null,
+  selectedElementIds: [],
   fabricCanvas: null,
 
   // Actions
@@ -68,7 +72,8 @@ export const useCanvasStore = create<CanvasState>((set) => ({
 
   setBackgroundColor: (backgroundColor) => set({ backgroundColor }),
 
-  setSelectedElement: (selectedElementId) => set({ selectedElementId }),
+  setSelectedElement: (id) => set({ selectedElementIds: id ? [id] : [] }),
+  setSelectedElements: (ids) => set({ selectedElementIds: ids }),
 
   setFabricCanvas: (fabricCanvas) => set({ fabricCanvas }),
 }));

@@ -43,6 +43,7 @@ interface TemplateState {
   addElement: (element: TemplateElement) => void;
   updateElement: (id: string, updates: Partial<TemplateElement>) => void;
   removeElement: (id: string) => void;
+  removeElements: (ids: string[]) => void;
   duplicateElement: (id: string) => void;
   bringToFront: (id: string) => void;
   sendToBack: (id: string) => void;
@@ -295,6 +296,23 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
   removeElement: (id) => set((state) => {
     const newElements = state.elements.filter(el => el.id !== id);
+    const historyUpdate = pushHistory(state, newElements);
+    return {
+      elements: newElements,
+      ...historyUpdate,
+      currentTemplate: state.currentTemplate ? {
+        ...state.currentTemplate,
+        elements: newElements,
+        updatedAt: new Date(),
+      } : null,
+      hasUnsavedChanges: true
+    };
+  }),
+
+  removeElements: (ids) => set((state) => {
+    if (!ids.length) return state;
+    const idSet = new Set(ids);
+    const newElements = state.elements.filter(el => !idSet.has(el.id));
     const historyUpdate = pushHistory(state, newElements);
     return {
       elements: newElements,
