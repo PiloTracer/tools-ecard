@@ -1,7 +1,7 @@
 'use client';
 
 import * as fabric from 'fabric';
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
@@ -11,6 +11,34 @@ import { OffscreenExportButton } from '../OffscreenExport/OffscreenExportButton'
 import { templateService } from '../../services/templateService';
 import { templatePackageService } from '../../services/templatePackageService';
 import type { Template, ImageElement } from '../../types';
+import type { LengthUnit } from '../../utils/lengthUnits';
+
+/**
+ * Merges live store dimensions/units into the template object so saves and ZIP exports
+ * always include canvas size, export base width, and display unit.
+ */
+function templateSnapshotForPersistence(
+  base: Template,
+  canvasW: number,
+  canvasH: number,
+  exportW: number,
+  unit: LengthUnit
+): Template {
+  const ar = canvasW / canvasH;
+  const exportH = Math.max(1, Math.round(exportW / ar));
+  return {
+    ...base,
+    width: canvasW,
+    height: canvasH,
+    canvasWidth: canvasW,
+    canvasHeight: canvasH,
+    exportWidth: exportW,
+    exportHeight: exportH,
+    canvasSizeUnit: unit,
+    exportBaseWidthUnit: unit,
+    updatedAt: new Date(),
+  };
+}
 
 /**
  * Rasterize all images in a template to PNG format
@@ -121,6 +149,7 @@ export function CanvasControls() {
     canvasWidth,
     canvasHeight,
     exportWidth,
+    canvasSizeUnit,
     elements,
     updateElement,
     updateBackgroundColor,
@@ -172,8 +201,15 @@ export function CanvasControls() {
     setIsSaving(true);
 
     try {
+      const toPersist = templateSnapshotForPersistence(
+        currentTemplate,
+        canvasWidth,
+        canvasHeight,
+        exportWidth,
+        canvasSizeUnit
+      );
       // Rasterize all images before saving to avoid SVG corruption
-      const processedTemplate = await rasterizeImages(currentTemplate, fabricCanvas);
+      const processedTemplate = await rasterizeImages(toPersist, fabricCanvas);
 
       // Save the template (resource extraction happens inside saveTemplate)
       const metadata = await templateService.saveTemplate({
@@ -646,8 +682,16 @@ export function CanvasControls() {
     try {
       console.log('[Export] Starting complete package export...');
 
+      const toPackage = templateSnapshotForPersistence(
+        currentTemplate,
+        canvasWidth,
+        canvasHeight,
+        exportWidth,
+        canvasSizeUnit
+      );
+
       // Export as complete ZIP package with all resources
-      const zipBlob = await templatePackageService.exportPackage(currentTemplate);
+      const zipBlob = await templatePackageService.exportPackage(toPackage);
 
       // Download ZIP file
       const url = URL.createObjectURL(zipBlob);
@@ -739,7 +783,7 @@ export function CanvasControls() {
   };
 
   return (
-    <>
+    <Fragment>
       {/* Hidden File Input for Template Import */}
       <input
         ref={fileInputRef}
@@ -810,13 +854,14 @@ export function CanvasControls() {
         </div>
       )}
 
-      {/* Project + file + view controls (single wrapping strip) */}
+      {/* Project / file row + scrollable view & export bar */}
       <div className="border-b border-slate-800 bg-slate-900/95 px-2 py-1.5 sm:px-3">
-        <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-x-2 sm:gap-y-0">
-        <div className="w-full min-w-0 sm:w-auto sm:max-w-[min(100%,20rem)] lg:max-w-[24rem]">
-        <TemplateStatus compact />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1.5 sm:justify-end sm:pl-0">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div className="min-w-0 max-w-full sm:max-w-[min(100%,24rem)]">
+              <TemplateStatus compact />
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
           {/* Save Button */}
           <button
             onClick={() => setShowSaveModal(true)}
@@ -904,15 +949,20 @@ export function CanvasControls() {
             </button>
           )}
 
-          <div
-            className="mt-1.5 flex w-full min-w-0 flex-col flex-wrap content-start items-stretch gap-1.5 border-t border-slate-700/60 pt-1.5 sm:mt-0 sm:h-auto sm:max-w-none sm:flex-1 sm:flex-row sm:flex-nowrap sm:content-center sm:items-center sm:gap-2 sm:overflow-x-auto sm:border-0 sm:pt-0 sm:pl-1.5 [scrollbar-gutter:stable]"
-            role="group"
-            aria-label="View and export"
-          >
-            <p className="w-full text-xs text-slate-500 sm:hidden">View and export</p>
-            <div className="flex w-full min-w-0 shrink-0 items-center gap-1.5 sm:w-auto">
+            </div>
+          </div>
+
+          <div className="w-full min-w-0 border-t border-slate-800/90 pt-1.5 sm:border-0 sm:pt-0">
+            <p className="mb-1 text-xs text-slate-500 sm:hidden">View and export</p>
+            <div className="overflow-x-auto overflow-y-visible pb-0.5">
+              <div
+                className="inline-flex w-max min-w-0 max-w-none flex-nowrap items-center gap-1.5 sm:gap-2"
+                role="group"
+                aria-label="View and export"
+              >
+            <div className="inline-flex min-w-0 shrink-0 items-center gap-1.5">
               <span className="shrink-0 text-xs text-slate-400">Zoom</span>
-              <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                 <button
                   onClick={zoomOut}
                   className="min-h-8 min-w-8 rounded border border-slate-600 bg-slate-800 text-sm font-bold text-white transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-1.5"
@@ -943,7 +993,11 @@ export function CanvasControls() {
               </div>
             </div>
 
-        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+        <div
+          className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block"
+          aria-hidden
+        >
+        </div>
 
         {/* Undo/Redo */}
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
@@ -975,35 +1029,54 @@ export function CanvasControls() {
         </button>
         </div>
 
-        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
-
-        {/* Grid + snap */}
-        <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
-        <button
-          onClick={toggleGrid}
-          type="button"
-          className={`min-h-8 rounded border px-1.5 text-xs font-medium transition-colors sm:px-2 ${
-            showGrid
-              ? 'border-blue-400 bg-blue-600 text-white hover:bg-blue-500'
-              : 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
-          }`}
+        <div
+          className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block"
+          aria-hidden
         >
-          {showGrid ? 'Hide' : 'Grid'}
-        </button>
-        <button
-          onClick={toggleSnapToGrid}
-          type="button"
-          className={`min-h-8 rounded border px-1.5 text-xs font-medium transition-colors sm:px-2 ${
-            snapToGrid
-              ? 'border-blue-400 bg-blue-600 text-white hover:bg-blue-500'
-              : 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
-          }`}
-        >
-          {snapToGrid ? 'Snap' : 'Free'}
-        </button>
         </div>
 
-        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+        {/* Grid + snap */}
+        <div className="inline-flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <span className="shrink-0 text-xs text-slate-500" title="Pixel grid on the canvas">
+            Grid
+          </span>
+          <button
+            onClick={toggleGrid}
+            type="button"
+            className={`min-h-8 min-w-[2.5rem] shrink-0 rounded border px-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:min-w-[2.75rem] sm:px-2 ${
+              showGrid
+                ? 'border-blue-400 bg-blue-600 text-white hover:bg-blue-500'
+                : 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
+            }`}
+            title={showGrid ? 'Hide grid' : 'Show grid'}
+          >
+            {showGrid ? 'On' : 'Off'}
+          </button>
+          <span className="shrink-0 text-slate-600" aria-hidden>
+            |
+          </span>
+          <span className="shrink-0 text-xs text-slate-500" title="Move objects to grid">
+            Snap
+          </span>
+          <button
+            onClick={toggleSnapToGrid}
+            type="button"
+            className={`min-h-8 min-w-[2.5rem] shrink-0 rounded border px-1.5 text-xs font-medium whitespace-nowrap transition-colors sm:min-w-[2.75rem] sm:px-2 ${
+              snapToGrid
+                ? 'border-blue-400 bg-blue-600 text-white hover:bg-blue-500'
+                : 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
+            }`}
+            title={snapToGrid ? 'Pixel snap on' : 'Pixel snap off'}
+          >
+            {snapToGrid ? 'On' : 'Off'}
+          </button>
+        </div>
+
+        <div
+          className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block"
+          aria-hidden
+        >
+        </div>
 
         {/* Background */}
         <div className="flex min-w-0 items-center gap-1.5 sm:pl-0">
@@ -1021,15 +1094,19 @@ export function CanvasControls() {
         />
         </div>
 
-        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+        <div
+          className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block"
+          aria-hidden
+        >
+        </div>
 
-        {/* Quick export + download */}
-        <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-0.5 sm:w-auto sm:justify-start sm:gap-1.5 sm:pl-0">
-        <span className="text-xs text-slate-500 sm:text-slate-300">Export</span>
+        {/* Quick export + download (keep on one line) */}
+        <div className="inline-flex shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2">
+        <span className="shrink-0 pr-0.5 text-xs text-slate-500 sm:text-slate-300">Export</span>
         <button
           onClick={handleExportPNG}
           type="button"
-          className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
+          className="min-h-8 shrink-0 rounded border border-slate-600 bg-slate-800 px-2 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700"
           title="Export as PNG"
         >
           PNG
@@ -1037,7 +1114,7 @@ export function CanvasControls() {
         <button
           onClick={handleExportJPG}
           type="button"
-          className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
+          className="min-h-8 shrink-0 rounded border border-slate-600 bg-slate-800 px-2 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700"
           title="Export as JPG"
         >
           JPG
@@ -1045,7 +1122,7 @@ export function CanvasControls() {
         <button
           onClick={handleExportSVG}
           type="button"
-          className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
+          className="min-h-8 shrink-0 rounded border border-slate-600 bg-slate-800 px-2 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700"
           title="Export as SVG"
         >
           SVG
@@ -1053,10 +1130,16 @@ export function CanvasControls() {
         <button
           onClick={handleExportJSON}
           type="button"
-          className="inline-flex min-h-8 items-center gap-1 rounded border border-green-600 bg-green-600 px-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:px-2"
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded border border-green-600 bg-green-600 px-2 text-xs font-medium text-white transition-colors hover:bg-green-700"
           title="Download template package (ZIP)"
         >
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           <span className="sm:hidden">ZIP</span>
@@ -1067,6 +1150,7 @@ export function CanvasControls() {
         </div>
         </div>
         </div>
-    </>
+      </div>
+    </Fragment>
   );
 }

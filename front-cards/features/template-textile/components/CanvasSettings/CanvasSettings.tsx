@@ -294,34 +294,39 @@ export function CanvasSettings({ leadingContent, titleContent }: CanvasSettingsP
             <p className="mt-1 text-xs text-slate-500">Canvas: {canvasWidth}×{canvasHeight} px</p>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">
-              Export base width – canvas scales to this (same unit as above)
-            </label>
-            <input
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={draftE}
-              onChange={(e) => setDraftE(e.target.value)}
-              onBlur={commitExportWidth}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-              className="w-full max-w-sm rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-            />
-            <p className="mt-2 text-sm text-slate-300">
-              Export:{' '}
-              <span className="font-semibold text-white">
-                {exportWidth}×{exportHeightPx} px
-              </span>
-            </p>
-            <p className="text-xs text-slate-500">
-              ≈ {fromPixels(exportWidth, 'in').toFixed(3)}×{fromPixels(exportHeightPx, 'in').toFixed(3)} in •{' '}
-              {fromPixels(exportWidth, 'cm').toFixed(1)}×{fromPixels(exportHeightPx, 'cm').toFixed(1)} cm
-            </p>
+          <div className="grid gap-3 sm:grid-cols-[1fr_minmax(0,16rem)] sm:items-end sm:gap-4">
+            <div>
+              <label className="mb-1 block text-xs text-slate-400" htmlFor="export-base-width">
+                Export base width (same unit as above; output scales to this width)
+              </label>
+              <input
+                id="export-base-width"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={draftE}
+                onChange={(e) => setDraftE(e.target.value)}
+                onBlur={commitExportWidth}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                className="w-full max-w-md rounded border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            <div className="rounded border border-slate-700/80 bg-slate-800/50 px-3 py-2 sm:min-h-[2.75rem]">
+              <p className="text-xs text-slate-500">Result at this base width</p>
+              <p className="text-sm text-slate-200">
+                <span className="font-semibold text-white">
+                  {exportWidth}×{exportHeightPx} px
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                ≈ {fromPixels(exportWidth, 'in').toFixed(3)}×{fromPixels(exportHeightPx, 'in').toFixed(3)} in ·{' '}
+                {fromPixels(exportWidth, 'cm').toFixed(1)}×{fromPixels(exportHeightPx, 'cm').toFixed(1)} cm
+              </p>
+            </div>
           </div>
         </div>
       )}
