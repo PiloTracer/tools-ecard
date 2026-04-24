@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useTemplateStore } from '../../stores/templateStore';
 import { useCanvasStore } from '../../stores/canvasStore';
 import {
@@ -62,7 +62,17 @@ const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = [
   },
 ];
 
-export function CanvasSettings() {
+type CanvasSettingsProps = {
+  /** e.g. back to dashboard; placed in the first column of the top bar */
+  leadingContent?: ReactNode;
+  /** Centered between nav and settings on wide screens, full width on narrow */
+  titleContent?: ReactNode;
+};
+
+const btnClass =
+  'inline-flex items-center gap-1.5 rounded border border-slate-600 bg-slate-700 px-2 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-600 sm:gap-2 sm:px-2.5 sm:py-1.5 sm:text-sm';
+
+export function CanvasSettings({ leadingContent, titleContent }: CanvasSettingsProps) {
   const {
     canvasWidth,
     canvasHeight,
@@ -155,13 +165,29 @@ export function CanvasSettings() {
   const exportHeightPx = Math.round(exportWidth / (canvasWidth / canvasHeight));
 
   return (
-    <div className="border-b border-slate-700 bg-slate-800 px-4 py-3">
-      <div className="flex items-center gap-2">
+    <div className="border-b border-slate-700 bg-slate-800 px-2 py-1.5 sm:px-3">
+      <div className="flex flex-col gap-1.5 sm:gap-0">
+        {titleContent && (
+          <div className="w-full min-w-0 text-center text-sm sm:hidden">
+            {titleContent}
+          </div>
+        )}
+
+        <div className="flex min-w-0 items-center gap-2 sm:py-0">
+        {leadingContent && <div className="shrink-0 flex items-center">{leadingContent}</div>}
+
+        {titleContent && (
+          <div className="hidden min-w-0 flex-1 px-1 sm:block sm:text-center sm:text-sm">
+            {titleContent}
+          </div>
+        )}
+
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:pl-0">
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-600"
+          className={btnClass}
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -170,18 +196,18 @@ export function CanvasSettings() {
             />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          Canvas Settings
-          <span className="text-xs text-slate-400">
-            ({canvasWidth}×{canvasHeight} px • {currentAspectRatio}:1)
+          <span className="whitespace-nowrap sm:inline">Canvas</span>
+          <span className="text-[10px] text-slate-400 sm:text-xs">
+            {canvasWidth}×{canvasHeight} • {currentAspectRatio}:1
           </span>
         </button>
 
         <button
           onClick={handleResetView}
-          className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-600"
+          className={btnClass}
           title="Reset zoom to 100% and center the canvas"
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -189,8 +215,10 @@ export function CanvasSettings() {
               d="M9 11H3m0 0l3 3m-3-3l3-3m13 0a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          Reset View
+          Reset
         </button>
+        </div>
+        </div>
       </div>
 
       {showSettings && (

@@ -810,19 +810,22 @@ export function CanvasControls() {
         </div>
       )}
 
-      {/* Template Status Bar */}
-      <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-2">
-        <TemplateStatus />
-        <div className="flex items-center gap-2">
+      {/* Project + file + view controls (single wrapping strip) */}
+      <div className="border-b border-slate-800 bg-slate-900/95 px-2 py-1.5 sm:px-3">
+        <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-x-2 sm:gap-y-0">
+        <div className="w-full min-w-0 sm:w-auto sm:max-w-[min(100%,20rem)] lg:max-w-[24rem]">
+        <TemplateStatus compact />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1.5 sm:justify-end sm:pl-0">
           {/* Save Button */}
           <button
             onClick={() => setShowSaveModal(true)}
             disabled={!currentTemplate || isSaving}
-            className={`flex items-center gap-2 rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-[2rem] items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors sm:px-2.5 sm:py-1.5 sm:text-sm ${
               hasUnsavedChanges
                 ? 'border-amber-500 bg-amber-600 text-white hover:bg-amber-700'
                 : 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            } disabled:cursor-not-allowed disabled:opacity-50`}
             title={hasUnsavedChanges ? 'Save Template (Unsaved Changes)' : 'Save Template'}
           >
             {isSaving ? (
@@ -835,7 +838,7 @@ export function CanvasControls() {
               </>
             ) : (
               <>
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V2" />
                 </svg>
                 Save
@@ -846,10 +849,10 @@ export function CanvasControls() {
           {/* Open Button */}
           <button
             onClick={() => setShowOpenModal(true)}
-            className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600"
+            className="inline-flex min-h-[2rem] items-center gap-1.5 rounded border border-slate-600 bg-slate-700 px-2 py-1 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-600 sm:px-2.5 sm:py-1.5 sm:text-sm"
             title="Open Template"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
             </svg>
             Open
@@ -858,10 +861,10 @@ export function CanvasControls() {
           {/* Import Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600"
+            className="inline-flex min-h-[2rem] items-center gap-1.5 rounded border border-slate-600 bg-slate-700 px-2 py-1 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-600 sm:px-2.5 sm:py-1.5 sm:text-sm"
             title="Import Template from File"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Import
@@ -870,10 +873,10 @@ export function CanvasControls() {
           {/* Close Button */}
           <button
             onClick={handleCloseTemplate}
-            className="flex items-center gap-2 rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-600 hover:border-red-500 hover:text-red-300"
+            className="inline-flex min-h-[2rem] items-center gap-1.5 rounded border border-slate-600 bg-slate-700 px-2 py-1 text-xs font-medium text-slate-200 transition-colors hover:border-red-500 hover:bg-slate-600 hover:text-red-300 sm:px-2.5 sm:py-1.5 sm:text-sm"
             title="Close Template"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
             Close
@@ -884,7 +887,7 @@ export function CanvasControls() {
             <OffscreenExportButton
               template={currentTemplate}
               templateName={currentTemplateName}
-              className="flex items-center gap-2 rounded border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              className="inline-flex min-h-[2rem] items-center gap-1.5 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 sm:px-2.5 sm:py-1.5 sm:text-sm"
               buttonLabel="Batch Export"
             />
           )}
@@ -894,151 +897,176 @@ export function CanvasControls() {
             <button
               onClick={() => handleSaveTemplate(currentTemplateName, currentProjectName || 'default')}
               disabled={!hasUnsavedChanges || isSaving}
-              className="text-xs text-slate-500 hover:text-slate-400 disabled:opacity-50"
+              className="hidden min-h-[2rem] min-w-0 text-xs text-slate-500 hover:text-slate-400 disabled:opacity-50 sm:inline"
               title="Quick Save (Ctrl+S)"
             >
               Ctrl+S
             </button>
           )}
-        </div>
-      </div>
 
-      {/* Main Controls Bar */}
-      <div className="flex items-center gap-4 border-b border-slate-800 bg-slate-800 px-4 py-3 shadow-md">
-      {/* Zoom Controls */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-slate-300">Zoom:</span>
-        <button
-          onClick={zoomOut}
-          className="rounded bg-slate-700 border border-slate-600 px-3 py-1.5 text-base font-bold text-white hover:bg-slate-600 hover:border-slate-500 transition-colors"
-          title="Zoom Out"
-        >
-          −
-        </button>
-        <span className="min-w-[60px] text-center text-sm font-semibold text-white">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          onClick={zoomIn}
-          className="rounded bg-slate-700 border border-slate-600 px-3 py-1.5 text-base font-bold text-white hover:bg-slate-600 hover:border-slate-500 transition-colors"
-          title="Zoom In"
-        >
-          +
-        </button>
-        <button
-          onClick={resetZoom}
-          className="rounded bg-slate-700 border border-slate-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-600 hover:border-slate-500 transition-colors"
-          title="Reset Zoom"
-        >
-          100%
-        </button>
-      </div>
+          <div
+            className="mt-1.5 flex w-full min-w-0 flex-col flex-wrap content-start items-stretch gap-1.5 border-t border-slate-700/60 pt-1.5 sm:mt-0 sm:h-auto sm:max-w-none sm:flex-1 sm:flex-row sm:flex-nowrap sm:content-center sm:items-center sm:gap-2 sm:overflow-x-auto sm:border-0 sm:pt-0 sm:pl-1.5 [scrollbar-gutter:stable]"
+            role="group"
+            aria-label="View and export"
+          >
+            <p className="w-full text-xs text-slate-500 sm:hidden">View and export</p>
+            <div className="flex w-full min-w-0 shrink-0 items-center gap-1.5 sm:w-auto">
+              <span className="shrink-0 text-xs text-slate-400">Zoom</span>
+              <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+                <button
+                  onClick={zoomOut}
+                  className="min-h-8 min-w-8 rounded border border-slate-600 bg-slate-800 text-sm font-bold text-white transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-1.5"
+                  type="button"
+                  title="Zoom out"
+                >
+                  −
+                </button>
+                <span className="min-w-[2.5rem] text-center text-xs font-semibold text-white sm:text-sm">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  onClick={zoomIn}
+                  className="min-h-8 min-w-8 rounded border border-slate-600 bg-slate-800 text-sm font-bold text-white transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-1.5"
+                  type="button"
+                  title="Zoom in"
+                >
+                  +
+                </button>
+                <button
+                  onClick={resetZoom}
+                  className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-white transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
+                  type="button"
+                  title="Reset zoom to 100%"
+                >
+                  1:1
+                </button>
+              </div>
+            </div>
 
-      {/* Undo/Redo Controls */}
-      <div className="flex items-center gap-2 border-l border-slate-700 pl-4">
+        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+
+        {/* Undo/Redo */}
+        <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
         <button
           onClick={undo}
           disabled={!canUndo()}
-          className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
+          type="button"
+          className={`min-h-8 rounded border px-1.5 py-0.5 text-xs font-medium transition-colors sm:px-2 sm:py-1 ${
             canUndo()
-              ? 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600 hover:border-slate-500'
-              : 'border-slate-700 bg-slate-800 text-slate-500 cursor-not-allowed'
+              ? 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
+              : 'cursor-not-allowed border-slate-700 bg-slate-900 text-slate-500'
           }`}
           title="Undo (Ctrl+Z)"
         >
-          ↶ Undo
+          ↶
         </button>
         <button
           onClick={redo}
           disabled={!canRedo()}
-          className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
+          type="button"
+          className={`min-h-8 rounded border px-1.5 py-0.5 text-xs font-medium transition-colors sm:px-2 sm:py-1 ${
             canRedo()
-              ? 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600 hover:border-slate-500'
-              : 'border-slate-700 bg-slate-800 text-slate-500 cursor-not-allowed'
+              ? 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
+              : 'cursor-not-allowed border-slate-700 bg-slate-900 text-slate-500'
           }`}
           title="Redo (Ctrl+Y)"
         >
-          ↷ Redo
+          ↷
         </button>
-      </div>
+        </div>
 
-      {/* Grid Controls */}
-      <div className="flex items-center gap-2 border-l border-slate-700 pl-4">
+        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+
+        {/* Grid + snap */}
+        <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
         <button
           onClick={toggleGrid}
-          className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
+          type="button"
+          className={`min-h-8 rounded border px-1.5 text-xs font-medium transition-colors sm:px-2 ${
             showGrid
               ? 'border-blue-400 bg-blue-600 text-white hover:bg-blue-500'
-              : 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600 hover:border-slate-500'
+              : 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
           }`}
         >
-          {showGrid ? 'Hide Grid' : 'Show Grid'}
+          {showGrid ? 'Hide' : 'Grid'}
         </button>
         <button
           onClick={toggleSnapToGrid}
-          className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors ${
+          type="button"
+          className={`min-h-8 rounded border px-1.5 text-xs font-medium transition-colors sm:px-2 ${
             snapToGrid
               ? 'border-blue-400 bg-blue-600 text-white hover:bg-blue-500'
-              : 'border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600 hover:border-slate-500'
+              : 'border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'
           }`}
         >
-          {snapToGrid ? 'Snap: On' : 'Snap: Off'}
+          {snapToGrid ? 'Snap' : 'Free'}
         </button>
-      </div>
+        </div>
 
-      {/* Background Color */}
-      <div className="flex items-center gap-2 border-l border-slate-700 pl-4">
-        <span className="text-sm font-medium text-slate-300">Background:</span>
+        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+
+        {/* Background */}
+        <div className="flex min-w-0 items-center gap-1.5 sm:pl-0">
+        <span className="text-xs text-slate-500 sm:text-slate-300">BG</span>
         <input
           type="color"
           value={backgroundColor}
           onChange={(e) => {
             const newColor = e.target.value;
-            setBackgroundColor(newColor); // Update canvas visual
-            updateBackgroundColor(newColor); // Save to template
+            setBackgroundColor(newColor);
+            updateBackgroundColor(newColor);
           }}
-          className="h-8 w-16 rounded border border-slate-600 cursor-pointer"
-          title="Canvas Background Color"
+          className="h-7 w-10 cursor-pointer rounded border border-slate-600"
+          title="Canvas background"
         />
-      </div>
+        </div>
 
-      {/* Export Controls */}
-      <div className="flex items-center gap-2 border-l border-slate-700 pl-4">
-        <span className="text-sm font-medium text-slate-300">Export:</span>
+        <div className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block" aria-hidden />
+
+        {/* Quick export + download */}
+        <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-0.5 sm:w-auto sm:justify-start sm:gap-1.5 sm:pl-0">
+        <span className="text-xs text-slate-500 sm:text-slate-300">Export</span>
         <button
           onClick={handleExportPNG}
-          className="rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+          type="button"
+          className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
           title="Export as PNG"
         >
           PNG
         </button>
         <button
           onClick={handleExportJPG}
-          className="rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+          type="button"
+          className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
           title="Export as JPG"
         >
           JPG
         </button>
         <button
           onClick={handleExportSVG}
-          className="rounded border border-slate-600 bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-600 hover:border-slate-500 transition-colors"
+          type="button"
+          className="min-h-8 rounded border border-slate-600 bg-slate-800 px-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700 sm:px-2"
           title="Export as SVG"
         >
           SVG
         </button>
-        {/* Download Button */}
         <button
           onClick={handleExportJSON}
-          className="flex items-center gap-2 rounded border border-green-600 bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
-          title="Download Template to File"
+          type="button"
+          className="inline-flex min-h-8 items-center gap-1 rounded border border-green-600 bg-green-600 px-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:px-2"
+          title="Download template package (ZIP)"
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Download
+          <span className="sm:hidden">ZIP</span>
+          <span className="hidden sm:inline">Download</span>
         </button>
-      </div>
-    </div>
+        </div>
+        </div>
+        </div>
+        </div>
+        </div>
     </>
   );
 }
