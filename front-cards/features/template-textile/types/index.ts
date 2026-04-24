@@ -1,5 +1,7 @@
 // Core template types for template-textile feature
 
+import type { LengthUnit } from '../utils/lengthUnits';
+
 export interface BaseElement {
   id: string;
   type: 'text' | 'image' | 'qr' | 'shape';
@@ -81,6 +83,13 @@ export interface Template {
   canvasHeight?: number; // Alias for height (backward compatibility)
   exportWidth?: number; // Export resolution width
   exportHeight?: number; // Export resolution height
+  /**
+   * Display unit for canvas W×H and for export base width in the UI (stored sizes stay px).
+   * Legacy templates may only have `exportBaseWidthUnit`; treat it as a fallback for this value.
+   */
+  canvasSizeUnit?: LengthUnit;
+  /** @deprecated Use `canvasSizeUnit`; still read for older saved JSON. */
+  exportBaseWidthUnit?: LengthUnit;
   backgroundColor?: string; // Canvas background color
   elements: TemplateElement[];
   createdAt: Date;

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { exportTemplateById, exportTemplate, downloadDataUrl, estimateFileSizeKB } from '../../services/exportService';
 import { templateService } from '../../services/templateService';
 import { exportTemplateToBatch, downloadZip } from '../../services/batchExportService';
@@ -14,69 +14,142 @@ import type { ExportOptions } from '../../services/exportService';
 import type { Template } from '../../types';
 import type { Batch } from '@/features/batch-view/types';
 import { batchViewService } from '@/features/batch-view/services/batchViewService';
+import { useTemplateStore } from '../../stores/templateStore';
+import { fromPixels, toPixels, unitLabel, type LengthUnit } from '../../utils/lengthUnits';
 
-interface OffscreenExportButtonProps {
-  templateId?: string;      // For loading from storage
-  template?: Template;      // For exporting already-loaded template (skips storage load)
-  templateName: string;
-  className?: string;
-  buttonLabel?: string; // Custom button label (default: "Export")
+function clampExportWidthPx(px: number): number {
+  return Math.max(100, Math.min(10000, Math.round(px)));
 }
 
-export function OffscreenExportButton({ templateId, template, templateName, className, buttonLabel = 'Export' }: OffscreenExportButtonProps) {
+function backgroundLabel(hex?: string): string {
+  if (!hex) return 'White';
+  const n = hex.trim().toLowerCase();
+  if (n === '#ffffff' || n === '#fff' || n === 'white') return 'White';
+  if (n === 'transparent') return 'Transparent';
+  return hex;
+}
+
+interface OffscreenExportButtonProps {
+  templateId?: string;
+  template?: Template;
+  templateName: string;
+  className?: string;
+  buttonLabel?: string;
+}
+
+export function OffscreenExportButton({
+  templateId,
+  template,
+  templateName,
+  className,
+  buttonLabel = 'Export',
+}: OffscreenExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStep, setExportStep] = useState('');
   const [showOptions, setShowOptions] = useState(false);
 
-  // Export mode: 'single' or 'batch'
   const [exportMode, setExportMode] = useState<'single' | 'batch'>('single');
-
-  // Batch selection
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [loadingBatches, setLoadingBatches] = useState(false);
-
-  // Batch export progress
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
-
-  // Cancellation
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
 
-  // Template dimensions for aspect ratio calculation
   const [templateWidth, setTemplateWidth] = useState(1200);
   const [templateHeight, setTemplateHeight] = useState(600);
 
-  // Export options
   const [format, setFormat] = useState<'png' | 'jpg'>('png');
   const [quality, setQuality] = useState(0.9);
-  const [width, setWidth] = useState(2400);
+  const [width, setWidth] = useState(1920);
+  /** Unit for loaded template when not the active editor tab (e.g. export by id) */
+  const [unitFromSource, setUnitFromSource] = useState<LengthUnit>('px');
   const [transparentBackground, setTransparentBackground] = useState(false);
 
-  // Calculate height based on aspect ratio
-  const calculatedHeight = Math.round(width * templateHeight / templateWidth);
+  const currentTemplate = useTemplateStore((s) => s.currentTemplate);
+  const storeExportWidth = useTemplateStore((s) => s.exportWidth);
+  const storeCanvasSizeUnit = useTemplateStore((s) => s.canvasSizeUnit);
+  const setStoreExportWidth = useTemplateStore((s) => s.setExportWidth);
 
-  // Load template dimensions when modal opens
+  const isEditorTemplate = Boolean(
+    template && currentTemplate && template.id === currentTemplate.id
+  );
+
+  const calculatedHeight = Math.round((width * templateHeight) / templateWidth);
+
+  const updateExportWidthPx = useCallback(
+    (px: number) => {
+      const w = clampExportWidthPx(px);
+      setWidth(w);
+      if (isEditorTemplate) {
+        setStoreExportWidth(w);
+      }
+    },
+    [isEditorTemplate, setStoreExportWidth]
+  );
+
+  const displayUnit: LengthUnit = isEditorTemplate
+    ? storeCanvasSizeUnit
+    : template
+      ? (template.canvasSizeUnit ?? template.exportBaseWidthUnit ?? 'px')
+      : unitFromSource;
+
+  const onBaseWidthInput = useCallback(
+    (v: number) => {
+      updateExportWidthPx(toPixels(v, displayUnit));
+    },
+    [displayUnit, updateExportWidthPx]
+  );
+
+  // Canvas dimensions: from prop or load by id
   useEffect(() => {
-    if (showOptions) {
-      if (template) {
-        // Use provided template object (already loaded)
-        setTemplateWidth(template.width || template.canvasWidth || 1200);
-        setTemplateHeight(template.height || template.canvasHeight || 600);
-      } else if (templateId) {
-        // Load from storage
-        templateService.loadTemplate(templateId).then(loaded => {
+    if (!showOptions) return;
+    if (template) {
+      setTemplateWidth(template.width || template.canvasWidth || 1200);
+      setTemplateHeight(template.height || template.canvasHeight || 600);
+    } else if (templateId) {
+      templateService
+        .loadTemplate(templateId)
+        .then((loaded) => {
           setTemplateWidth(loaded.data.width || loaded.data.canvasWidth || 1200);
           setTemplateHeight(loaded.data.height || loaded.data.canvasHeight || 600);
-        }).catch(err => {
+        })
+        .catch((err) => {
           console.error('Failed to load template dimensions:', err);
         });
-      }
     }
   }, [showOptions, templateId, template]);
 
-  // Load batches when modal opens in batch mode
+  // Export base width: match canvas / store when editing, else file
+  useEffect(() => {
+    if (!showOptions) return;
+
+    if (template) {
+      if (isEditorTemplate) {
+        setWidth(clampExportWidthPx(storeExportWidth));
+      } else {
+        setWidth(clampExportWidthPx(template.exportWidth ?? 1920));
+        setUnitFromSource(template.canvasSizeUnit ?? template.exportBaseWidthUnit ?? 'px');
+      }
+      return;
+    }
+
+    if (templateId) {
+      templateService
+        .loadTemplate(templateId)
+        .then((loaded) => {
+          const t = loaded.data;
+          setWidth(clampExportWidthPx(t.exportWidth ?? 1920));
+          setUnitFromSource(t.canvasSizeUnit ?? t.exportBaseWidthUnit ?? 'px');
+        })
+        .catch(() => {
+          setWidth(1920);
+          setUnitFromSource('px');
+        });
+    }
+  }, [showOptions, template, templateId, isEditorTemplate, storeExportWidth]);
+
   useEffect(() => {
     if (showOptions && exportMode === 'batch') {
       loadBatches();
@@ -87,35 +160,19 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     setLoadingBatches(true);
     setExportStep('');
     try {
-      // Load all batches to see what's available
-      console.log('[OffscreenExport] Loading ALL batches (no filter)...');
       const allBatchesResponse = await batchViewService.fetchBatches({
         page: 1,
         pageSize: 100,
-        filters: {}
+        filters: {},
       });
-      console.log('[OffscreenExport] All batches response:', allBatchesResponse);
-      console.log('[OffscreenExport] Total batches found:', allBatchesResponse.batches?.length || 0);
-
-      if (allBatchesResponse.batches && allBatchesResponse.batches.length > 0) {
-        console.log('[OffscreenExport] Batch statuses:', allBatchesResponse.batches.map(b => ({
-          fileName: b.fileName,
-          status: b.status,
-          recordsCount: b.recordsCount
-        })));
-      }
-
-      // Filter to only LOADED batches (final successful status with parsed records)
-      console.log('[OffscreenExport] Filtering for LOADED batches...');
-      const loadedBatches = (allBatchesResponse.batches || []).filter(b => b.status === 'LOADED');
-      console.log('[OffscreenExport] LOADED batches:', loadedBatches.length);
-
+      const loadedBatches = (allBatchesResponse.batches || []).filter((b) => b.status === 'LOADED');
       setBatches(loadedBatches);
-
       if (loadedBatches.length === 0) {
         const totalBatches = allBatchesResponse.batches?.length || 0;
         if (totalBatches > 0) {
-          setExportStep(`Found ${totalBatches} batch(es), but none are LOADED. Batches must be fully loaded before export.`);
+          setExportStep(
+            `Found ${totalBatches} batch(es), but none are LOADED. Batches must be fully loaded before export.`
+          );
         } else {
           setExportStep('No batches found. Upload a batch first.');
         }
@@ -142,32 +199,26 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     setExportStep('Starting export...');
 
     try {
-      // Get template data
       const exportTemplate_data = template || (await templateService.loadTemplate(templateId!)).data;
 
       const options: ExportOptions = {
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
-        backgroundColor: transparentBackground ? undefined : (exportTemplate_data.backgroundColor || '#ffffff'),
+        backgroundColor: transparentBackground
+          ? undefined
+          : (exportTemplate_data.backgroundColor || '#ffffff'),
         onProgress: (step, progress) => {
           setExportStep(step);
           setExportProgress(progress);
-        }
+        },
       };
 
-      // Export
       const result = await exportTemplate(exportTemplate_data, options);
-
-      // Download the exported image
       const filename = `${templateName.replace(/[^a-z0-9]/gi, '_')}.${result.format}`;
       downloadDataUrl(result.dataUrl, filename);
-
-      // Show success message
       const sizeKB = estimateFileSizeKB(result.dataUrl);
-      setExportStep(`✓ Exported ${result.width}x${result.height}px (${sizeKB}KB)`);
-
-      // Close modal after short delay
+      setExportStep(`✓ Exported ${result.width}×${result.height}px (${sizeKB}KB)`);
       setTimeout(() => {
         setShowOptions(false);
         setExportStep('');
@@ -185,7 +236,6 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
       setExportStep('✗ Please select a batch');
       return;
     }
-
     if (!template && !templateId) {
       setExportStep('✗ No template available');
       return;
@@ -197,11 +247,10 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     setCancelRequested(false);
 
     try {
-      // Get template
       const exportTemplate_data = template || (await templateService.loadTemplate(templateId!)).data;
-
-      // CRITICAL: Use template's backgroundColor, not hardcoded 'white'
-      const finalBackgroundColor = transparentBackground ? undefined : (exportTemplate_data.backgroundColor || '#ffffff');
+      const finalBackgroundColor = transparentBackground
+        ? undefined
+        : (exportTemplate_data.backgroundColor || '#ffffff');
 
       const batchExportOptions = {
         format,
@@ -211,42 +260,27 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
         onProgress: (current: number, total: number, status: string) => {
           setBatchProgress({ current, total });
           setExportStep(status);
-          setExportProgress(current / total);
+          setExportProgress(total > 0 ? current / total : 0);
         },
         onCancel: () => cancelRequested,
       };
 
-      console.log('[OffscreenExport] Batch export options:', {
-        transparentBackground,
-        templateBackgroundColor: exportTemplate_data.backgroundColor,
-        finalBackgroundColor: finalBackgroundColor,
-        willBeUsed: finalBackgroundColor
-      });
-
-      // Export with batch data
       const result = await exportTemplateToBatch(exportTemplate_data, selectedBatchId, batchExportOptions);
 
       if (result.cancelled) {
         setExportStep(`✗ Export cancelled (${result.successCount}/${result.totalRecords} completed)`);
-      } else {
-        // Download ZIP file
-        if (result.zipBlob) {
-          const zipFilename = `${result.batchName}_export.zip`;
-          downloadZip(result.zipBlob, zipFilename);
-
-          // Show success message
-          setExportStep(
-            `✓ Exported ${result.successCount}/${result.totalRecords} records` +
+      } else if (result.zipBlob) {
+        const zipFilename = `${result.batchName}_export.zip`;
+        downloadZip(result.zipBlob, zipFilename);
+        setExportStep(
+          `✓ Exported ${result.successCount}/${result.totalRecords} records` +
             (result.failedCount > 0 ? ` (${result.failedCount} failed)` : '')
-          );
-
-          // Close modal after delay
-          setTimeout(() => {
-            setShowOptions(false);
-            setExportStep('');
-            setBatchProgress({ current: 0, total: 0 });
-          }, 3000);
-        }
+        );
+        setTimeout(() => {
+          setShowOptions(false);
+          setExportStep('');
+          setBatchProgress({ current: 0, total: 0 });
+        }, 3000);
       }
     } catch (error) {
       console.error('Batch export failed:', error);
@@ -272,11 +306,17 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
     }
   };
 
+  const templateBg = template?.backgroundColor;
+  const aspect = (templateWidth / templateHeight).toFixed(2);
+
   return (
     <>
       <button
         onClick={() => setShowOptions(true)}
-        className={className || 'px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm'}
+        className={
+          className ||
+          'rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50'
+        }
         disabled={isExporting}
         title="Export template"
       >
@@ -284,210 +324,253 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
       </button>
 
       {showOptions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Template</h3>
-            <p className="text-sm text-gray-600 mb-4">{templateName}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Export Template</h3>
+            <p className="text-sm text-gray-600">{templateName}</p>
 
-            <div className="space-y-4">
-              {/* Export Mode Selection */}
+            <div className="mt-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Export Mode</label>
+                <label className="mb-2 block text-sm font-medium text-gray-900">Export Mode</label>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setExportMode('single')}
                     disabled={isExporting}
-                    className={`flex-1 px-4 py-2 rounded ${exportMode === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} disabled:opacity-50`}
+                    className={`flex-1 rounded px-4 py-2 ${
+                      exportMode === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
+                    } disabled:opacity-50`}
                   >
                     Single
                   </button>
                   <button
+                    type="button"
                     onClick={() => setExportMode('batch')}
                     disabled={isExporting}
-                    className={`flex-1 px-4 py-2 rounded ${exportMode === 'batch' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} disabled:opacity-50`}
+                    className={`flex-1 rounded px-4 py-2 ${
+                      exportMode === 'batch' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
+                    } disabled:opacity-50`}
                   >
                     Batch
                   </button>
                 </div>
               </div>
 
-              {/* Batch Selection (only in batch mode) */}
               {exportMode === 'batch' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Select Batch</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-900">Select Batch</label>
                   {loadingBatches ? (
                     <div className="flex items-center justify-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600" />
                       <span className="ml-2 text-sm text-gray-600">Loading batches...</span>
                     </div>
                   ) : batches.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-2">No batches available</p>
+                    <p className="py-2 text-sm text-gray-500">No batches available</p>
                   ) : (
                     <select
                       value={selectedBatchId}
                       onChange={(e) => setSelectedBatchId(e.target.value)}
                       disabled={isExporting}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       <option value="">-- Select a batch --</option>
                       {batches.map((batch) => (
                         <option key={batch.id} value={batch.id}>
-                          {batch.fileName} ({new Date(batch.createdAt).toLocaleDateString()}) - {batch.recordsCount || 0} records
+                          {batch.fileName} ({new Date(batch.createdAt).toLocaleDateString()}) —{' '}
+                          {batch.recordsCount || 0} records
                         </option>
                       ))}
                     </select>
                   )}
                 </div>
               )}
-              {/* Format */}
+
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Format</label>
+                <label className="mb-2 block text-sm font-medium text-gray-900">Format</label>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setFormat('png')}
-                    className={`px-4 py-2 rounded ${format === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}
+                    className={`rounded px-4 py-2 ${
+                      format === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
+                    }`}
                   >
                     PNG
                   </button>
                   <button
+                    type="button"
                     onClick={() => setFormat('jpg')}
-                    className={`px-4 py-2 rounded ${format === 'jpg' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}
+                    className={`rounded px-4 py-2 ${
+                      format === 'jpg' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'
+                    }`}
                   >
                     JPG
                   </button>
                 </div>
               </div>
 
-              {/* Export Dimensions and Transparency */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-900">Export Dimensions</label>
+              <div className="rounded border border-gray-200 bg-gray-50 p-3">
+                <p className="text-sm font-medium text-gray-900">Export size (base width)</p>
+                <p className="text-xs text-gray-500">
+                  Value is in <span className="font-medium text-gray-700">{unitLabel(displayUnit)}</span> (same as Canvas
+                  Settings when this template is open). Change the unit in the canvas bar; final output is always
+                  pixels.
+                </p>
+                <div className="mt-2">
+                  <input
+                    type="number"
+                    value={fromPixels(width, displayUnit)}
+                    onChange={(e) => onBaseWidthInput(parseFloat(e.target.value) || 0)}
+                    disabled={isExporting}
+                    className="w-full max-w-xs rounded border border-gray-300 px-2 py-2 text-gray-900"
+                    min={0.01}
+                    step="any"
+                  />
+                </div>
+                <p className="mt-2 text-sm text-gray-800">
+                  <span className="font-semibold">Export: {width}×{calculatedHeight} px</span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  ≈ {fromPixels(width, 'in').toFixed(3)}×{fromPixels(calculatedHeight, 'in').toFixed(3)} in ·{' '}
+                  {fromPixels(width, 'cm').toFixed(1)}×{fromPixels(calculatedHeight, 'cm').toFixed(1)} cm (96 px/in)
+                </p>
+              </div>
 
-                  {/* Transparency Toggle */}
-                  <label className="flex items-center gap-2 cursor-pointer">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-900">Export Dimensions</label>
+                  <label className="flex cursor-pointer items-center gap-2">
                     <span className="text-sm text-gray-700">Transparent</span>
                     <div className="relative">
                       <input
                         type="checkbox"
                         checked={transparentBackground}
                         onChange={(e) => setTransparentBackground(e.target.checked)}
-                        className="sr-only peer"
+                        className="peer sr-only"
                       />
-                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                      <div className="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
                     </div>
                   </label>
                 </div>
 
-                {/* Dimensions Display */}
-                <div className={`border rounded-lg p-3 mb-3 ${transparentBackground ? 'bg-gray-50 border-gray-300' : 'bg-blue-50 border-blue-200'}`}>
+                <div
+                  className={`mb-3 rounded-lg border p-3 ${
+                    transparentBackground ? 'border-gray-300 bg-gray-50' : 'border-blue-200 bg-blue-50'
+                  }`}
+                >
                   <div className="flex items-center justify-center gap-2">
                     <div className="text-center">
-                      <div className={`text-2xl font-bold ${transparentBackground ? 'text-gray-700' : 'text-blue-600'}`}>{width}</div>
+                      <div
+                        className={`text-2xl font-bold ${
+                          transparentBackground ? 'text-gray-700' : 'text-blue-600'
+                        }`}
+                      >
+                        {width}
+                      </div>
                       <div className="text-xs text-gray-600">Width (px)</div>
                     </div>
-                    <div className="text-gray-400 text-2xl">×</div>
+                    <div className="text-2xl text-gray-400">×</div>
                     <div className="text-center">
-                      <div className={`text-2xl font-bold ${transparentBackground ? 'text-gray-700' : 'text-blue-600'}`}>{calculatedHeight}</div>
+                      <div
+                        className={`text-2xl font-bold ${
+                          transparentBackground ? 'text-gray-700' : 'text-blue-600'
+                        }`}
+                      >
+                        {calculatedHeight}
+                      </div>
                       <div className="text-xs text-gray-600">Height (px)</div>
                     </div>
                   </div>
-                  <div className="text-center text-xs text-gray-500 mt-2">
-                    Aspect ratio: {(templateWidth / templateHeight).toFixed(2)}:1
-                  </div>
-                  {!transparentBackground && (
-                    <div className="text-center text-xs text-gray-600 mt-1">
-                      Background: White
-                    </div>
-                  )}
-                  {transparentBackground && (
-                    <div className="text-center text-xs text-gray-600 mt-1">
-                      Background: Transparent
+                  <div className="mt-2 text-center text-xs text-gray-500">Aspect ratio: {aspect}:1 (canvas)</div>
+                  {transparentBackground ? (
+                    <div className="mt-1 text-center text-xs text-gray-600">Background: Transparent (PNG)</div>
+                  ) : (
+                    <div className="mt-1 text-center text-xs text-gray-600">
+                      Background: {backgroundLabel(templateBg)}
                     </div>
                   )}
                 </div>
 
-                {/* Width Slider */}
                 <input
                   type="range"
-                  min="600"
-                  max="5000"
-                  step="100"
+                  min={100}
+                  max={10000}
+                  step={10}
                   value={width}
-                  onChange={(e) => setWidth(Number(e.target.value))}
+                  onChange={(e) => updateExportWidthPx(Number(e.target.value))}
+                  disabled={isExporting}
                   className="w-full"
                 />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>600px</span>
-                  <span>5000px</span>
+                <div className="mt-1 flex justify-between text-xs text-gray-500">
+                  <span>100px</span>
+                  <span>10000px</span>
                 </div>
               </div>
 
-              {/* Quality (JPG only) */}
               {format === 'jpg' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-900">
                     Quality: {Math.round(quality * 100)}%
                   </label>
                   <input
                     type="range"
-                    min="0.1"
-                    max="1.0"
-                    step="0.1"
+                    min={0.1}
+                    max={1.0}
+                    step={0.1}
                     value={quality}
                     onChange={(e) => setQuality(Number(e.target.value))}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="mt-1 flex justify-between text-xs text-gray-500">
                     <span>10%</span>
                     <span>100%</span>
                   </div>
                 </div>
               )}
 
-              {/* Progress */}
               {isExporting && (
                 <div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                  <div className="mb-2 h-2 w-full rounded-full bg-gray-200">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="h-2 rounded-full bg-blue-600 transition-all duration-300"
                       style={{ width: `${exportProgress * 100}%` }}
                     />
                   </div>
                   <p className="text-sm text-gray-600">{exportStep}</p>
                   {exportMode === 'batch' && batchProgress.total > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-gray-500">
                       Progress: {batchProgress.current}/{batchProgress.total} records
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Status message */}
-              {!isExporting && exportStep && (
-                <p className="text-sm text-gray-600">{exportStep}</p>
-              )}
+              {!isExporting && exportStep && <p className="text-sm text-gray-600">{exportStep}</p>}
             </div>
 
-            <div className="flex gap-2 mt-6">
+            <div className="mt-6 flex gap-2">
               <button
+                type="button"
                 onClick={handleExport}
                 disabled={isExporting || (exportMode === 'batch' && !selectedBatchId)}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {isExporting ? 'Exporting...' : exportMode === 'batch' ? 'Export Batch' : 'Export'}
+                {isExporting ? 'Exporting…' : exportMode === 'batch' ? 'Export Batch' : 'Export'}
               </button>
               {isExporting && exportMode === 'batch' && (
                 <button
+                  type="button"
                   onClick={handleCancelExport}
-                  className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+                  className="rounded bg-orange-600 px-4 py-2 text-white hover:bg-orange-700"
                 >
                   Cancel
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => setShowOptions(false)}
                 disabled={isExporting}
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                className="rounded bg-gray-200 px-4 py-2 hover:bg-gray-300 disabled:opacity-50"
               >
                 {isExporting ? 'Close' : 'Cancel'}
               </button>
@@ -496,33 +579,32 @@ export function OffscreenExportButton({ templateId, template, templateName, clas
         </div>
       )}
 
-      {/* Cancellation Dialog */}
       {showCancelDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cancel Batch Export?</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              The batch export is in progress. What would you like to do?
-            </p>
-
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Cancel batch export?</h3>
+            <p className="mb-6 text-sm text-gray-600">The batch export is in progress. What do you want to do?</p>
             <div className="space-y-2">
               <button
+                type="button"
                 onClick={() => confirmCancel('continue')}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="w-full rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
               >
-                Continue Export
+                Continue export
               </button>
               <button
+                type="button"
                 onClick={() => confirmCancel('partial')}
-                className="w-full px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+                className="w-full rounded bg-orange-600 px-4 py-2 text-white hover:bg-orange-700"
               >
-                Cancel & Download Partial ZIP
+                Cancel &amp; download partial ZIP
               </button>
               <button
+                type="button"
                 onClick={() => confirmCancel('discard')}
-                className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="w-full rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
               >
-                Cancel & Discard All
+                Cancel &amp; discard all
               </button>
             </div>
           </div>

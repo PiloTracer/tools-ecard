@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Template, TemplateElement } from '../types';
+import type { LengthUnit } from '../utils/lengthUnits';
 
 interface TemplateState {
   // Current template
@@ -17,7 +18,9 @@ interface TemplateState {
   // Canvas settings
   canvasWidth: number;
   canvasHeight: number;
-  exportWidth: number; // Target width for export (canvas scales to this)
+  exportWidth: number; // target export width in px
+  /** Display unit for canvas W/H and export base width in the UI */
+  canvasSizeUnit: LengthUnit;
 
   // History for undo/redo
   history: TemplateElement[][];
@@ -32,6 +35,7 @@ interface TemplateState {
   updateBackgroundColor: (backgroundColor: string) => void;
   setCanvasDimensions: (width: number, height: number) => void;
   setExportWidth: (width: number) => void;
+  setCanvasSizeUnit: (unit: LengthUnit) => void;
   setSaveMetadata: (projectName: string, templateName: string) => void;
   markAsSaved: () => void;
   markAsChanged: () => void;
@@ -74,6 +78,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   canvasWidth: 800,
   canvasHeight: 600,
   exportWidth: 1920, // Default export width
+  canvasSizeUnit: 'px',
   history: [[]],
   historyIndex: 0,
   maxHistory: 50,
@@ -85,6 +90,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       name,
       width,
       height,
+      exportWidth: 1920,
+      canvasSizeUnit: 'px',
       backgroundColor: '#ffffff', // Default white background
       elements: [],
       createdAt: new Date(),
@@ -95,6 +102,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       elements: [],
       canvasWidth: width,
       canvasHeight: height,
+      exportWidth: 1920,
+      canvasSizeUnit: 'px',
       history: [[]],
       historyIndex: 0,
     });
@@ -158,6 +167,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       elements: template.elements,
       canvasWidth: template.width,
       canvasHeight: template.height,
+      exportWidth: template.exportWidth ?? 1920,
+      canvasSizeUnit: template.canvasSizeUnit ?? template.exportBaseWidthUnit ?? 'px',
       history: [JSON.parse(JSON.stringify(template.elements))],
       historyIndex: 0,
     });
@@ -173,11 +184,41 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         width,
         height,
         updatedAt: new Date(),
-      }
+      },
+      hasUnsavedChanges: true,
     };
   }),
 
-  setExportWidth: (exportWidth) => set({ exportWidth }),
+  setExportWidth: (exportWidth) => set((state) => {
+    if (!state.currentTemplate) {
+      return { exportWidth };
+    }
+    return {
+      exportWidth,
+      hasUnsavedChanges: true,
+      currentTemplate: {
+        ...state.currentTemplate,
+        exportWidth,
+        updatedAt: new Date(),
+      },
+    };
+  }),
+
+  setCanvasSizeUnit: (unit) => set((state) => {
+    if (!state.currentTemplate) {
+      return { canvasSizeUnit: unit };
+    }
+    return {
+      canvasSizeUnit: unit,
+      hasUnsavedChanges: true,
+      currentTemplate: {
+        ...state.currentTemplate,
+        canvasSizeUnit: unit,
+        exportBaseWidthUnit: unit,
+        updatedAt: new Date(),
+      },
+    };
+  }),
 
   updateTemplateName: (name) => set((state) => {
     if (!state.currentTemplate) return state;
