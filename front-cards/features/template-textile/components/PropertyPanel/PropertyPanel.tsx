@@ -363,6 +363,7 @@ export function PropertyPanel() {
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">X</label>
                   <NumericStringInput
+                    withStepper
                     value={selectedElement.x}
                     roundDisplay
                     resetKey={selectedElementId}
@@ -378,12 +379,12 @@ export function PropertyPanel() {
                       }
                     }}
                     disabled={selectedElement.locked}
-                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">Y</label>
                   <NumericStringInput
+                    withStepper
                     value={selectedElement.y}
                     roundDisplay
                     resetKey={selectedElementId}
@@ -399,7 +400,6 @@ export function PropertyPanel() {
                       }
                     }}
                     disabled={selectedElement.locked}
-                    className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                   />
                 </div>
               </div>
@@ -414,6 +414,7 @@ export function PropertyPanel() {
                     <div>
                       <label className="mb-1 block text-xs text-gray-600">Width</label>
                       <NumericStringInput
+                        withStepper
                         value={selectedElement.width!}
                         roundDisplay
                         min={1}
@@ -459,7 +460,6 @@ export function PropertyPanel() {
                           }
                         }}
                         disabled={selectedElement.locked}
-                        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       />
                     </div>
                   )}
@@ -467,6 +467,7 @@ export function PropertyPanel() {
                     <div>
                       <label className="mb-1 block text-xs text-gray-600">Height</label>
                       <NumericStringInput
+                        withStepper
                         value={selectedElement.height!}
                         roundDisplay
                         min={1}
@@ -512,7 +513,6 @@ export function PropertyPanel() {
                           }
                         }}
                         disabled={selectedElement.locked}
-                        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       />
                     </div>
                   )}
