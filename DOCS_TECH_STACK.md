@@ -6,7 +6,7 @@ Quick reference guide for the E-Cards application stack, organized by service.
 
 ## Frontend Service (`front-cards`)
 
-**Environment variables:** Only the **monorepo root** files — **`.env`** (local dev, final), **`.env.prd`** (production), templates **`.env.dev.example`** / **`.env.prd.example`**. There is no `front-cards/.env.local`. Docker injects root `.env` via `env_file` on `ecards-frontend`; host `npm run dev` / `npm run build` in `front-cards/` uses `scripts/preload-root-env.cjs` to load the same root `.env` before Next (without overwriting variables already set).
+**Environment variables:** Only the **monorepo root** files — **`.env`** (local dev, final), **`.env.prd`** (production), templates **`.env.dev.example`** / **`.env.prd.example`**. There is no `front-cards/.env.local`. **Stack identity:** `TD_APP_CODE`, `TD_STACK_SUFFIX`, `COMPOSE_PROJECT_NAME` = `tools_dashboard` + suffix (e.g. `tools_dashboard_dev_tcrd` — see examples). Docker injects root `.env` via `env_file` on the `front-cards` service; host `npm run dev` / `npm run build` in `front-cards/` uses `scripts/preload-root-env.cjs` to load the same root `.env` before Next (without overwriting variables already set).
 
 **Framework:** Next.js 16 (App Router, React Server Components)
 **Language:** TypeScript

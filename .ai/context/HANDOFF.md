@@ -10,6 +10,7 @@
 |------|------|--------|
 | Improvement plan work | 2026-04-22 | **Shipped:** `GET /api/batches/:id` in `batch-upload` (`getBatchDetail` + Cassandra `recordsCount`); **`batch-import`** registered at `/api/batch-import`** in `app.ts`; **removed** broken `api-server/src/features/template-designer/` tree. **Docs/plan:** `.claude/plans/20260422-ecards-application-improvement-priorities.md` and `.claude/features/render-worker/` updated. |
 | Baseline CI / full build | _pending_ | Run **§4** after `npm ci` + `npm run db:generate` in `api-server`; local `tsc` had many **pre-existing** errors unrelated to the batch-detail change—use **CI log** as gate. |
+| Stack identity / `.env` | 2026-04-25 | `TD_APP_CODE` / `TD_STACK_SUFFIX` / `COMPOSE_PROJECT_NAME=tools_dashboard_*_tcrd`; **`bin/start.sh`**, compose, and **`init-cassandra.sh`** use `-p` + service names. `.claude/fixes` / some runbooks may still show old `ecards-*` container names — use compose exec. |
 
 ---
 
@@ -53,9 +54,9 @@
 
 | File | Role |
 |------|------|
-| **Repo root** `.env` | **Preferred** local dev + Docker **`env_file`** for **`api-server`** and **`ecards-frontend`** (`docker-compose.dev.yml`). Copy from **`.env.dev.example`** (repo root only — **no** `api-server/.env`, **`api-server/.env.example`**, or **`front-cards/.env.local`**). |
+| **Repo root** `.env` | **Preferred** local dev + Docker **`env_file`** for **`api-server`**, **`front-cards`**, etc. (`docker-compose.dev.yml`). Copy from **`.env.dev.example`**. Set **`TD_APP_CODE`**, **`TD_STACK_SUFFIX`**, **`COMPOSE_PROJECT_NAME`** (see example — `tools_dashboard_*_tcrd`). **No** `api-server/.env` or `front-cards/.env.local`. |
 | **Repo root** `.env.dev` | Optional alternate for **`bin/start.sh`** compose interpolation when `.env` is missing; host `npm run dev` in `front-cards/` may load it via **`front-cards/scripts/preload-root-env.cjs`** only if `.env` does not exist. Docker `env_file` still expects **`.env`** at repo root for dev containers — keep `.env` present or symlink it to your active file. |
-| **Repo root** `.env.prd` | Production stack; copy from **`.env.prd.example`**. Gitignored. **`docker-compose.prd.yml`** `ecards-frontend` uses `env_file: .env.prd`. |
+| **Repo root** `.env.prd` | Production stack; copy from **`.env.prd.example`**. Gitignored. **`docker-compose.prd.yml`** `front-cards` uses `env_file: .env.prd`. |
 | **`api-server/scripts/preload-root-env.cjs`** | Loads repo-root `.env` for **Prisma CLI** and **Jest** when run from `api-server/`. App also loads root `.env` via config (see `api-server/src/core/config/`). |
 | **`front-cards/scripts/preload-root-env.cjs`** | Before **`next dev` / `next build` / `next start`**, loads repo-root **`.env`** (or **`.env.dev`** if `.env` missing). Same keys as Docker dev when you use root `.env`. |
 
@@ -87,18 +88,21 @@ Update the **Last verified** table when you run these for real.
 
 ## 5) Docker dev (names that matter)
 
-From **`docker-compose.dev.yml`**:
+**Compose project / volumes** come from **`.env`**: `COMPOSE_PROJECT_NAME` = `tools_dashboard` + `TD_STACK_SUFFIX` (e.g. `tools_dashboard_dev_tcrd`).
 
-| Container | Role |
-|-----------|------|
-| `ecards-frontend` | `front-cards` (7300 → 3000) |
-| `ecards-api` | `api-server` (7400 → 4000); **env** from root **`env_file: .env`** |
-| `ecards-postgres` | PostgreSQL (7432) |
-| `ecards-cassandra` | Cassandra (7042) |
-| `ecards-redis` | Redis (7379) |
-| `ecards-render-worker` | `render-worker` |
+| Compose **service** | Container name pattern (example dev) | Role |
+|---------------------|--------------------------------------|------|
+| `front-cards` | `tools_dashboard_dev_tcrd-frontend` | Next (7300 → 3000) |
+| `api-server` | `…-api` | API (7400 → 4000); **env** root **`.env`** |
+| `postgres` | `…-postgres` | PostgreSQL (7432) |
+| `cassandra` | `…-cassandra` | Cassandra (7042) |
+| `redis` | `…-redis` | Redis (7379) |
+| `render-worker` | `…-render-worker` | worker |
 
-Production stack: **`docker-compose.prd.yml`**, images build from **`Dockerfile.prd`** per service; nginx: **`deploy/nginx/ecards.prd.conf`**.
+**Exec by service (no hardcoded container):** `docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.dev.yml --env-file .env exec api-server …` (see **`./bin/start.sh`** which passes `-p`).
+
+Production stack: **`docker-compose.prd.yml`**, images from **`Dockerfile.prd`**; nginx: **`deploy/nginx/ecards.prd.conf`**; container prefix `tools_dashboard_prd_tcrd-*` when using default **`.env.prd.example`**.
+
 
 ---
 

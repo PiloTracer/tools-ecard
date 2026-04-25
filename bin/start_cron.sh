@@ -44,18 +44,35 @@ fi
 
 if [ -d "/mnt/data" ]; then BACKUP_BASE="/mnt/data"; else BACKUP_BASE="/data"; fi
 
-# Postgres container name (fixed in docker-compose.dev.yml; override via env if needed)
-POSTGRES_CONTAINER="ecards-postgres"
-if grep -qE '^[[:space:]]*POSTGRES_BACKUP_CONTAINER=' "$ENV_FILE" 2>/dev/null; then
-  POSTGRES_CONTAINER=$(grep -E '^[[:space:]]*POSTGRES_BACKUP_CONTAINER=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
+# Stack identity (must match docker-compose.dev.yml container_name and bin/start.sh)
+TD_STACK_SUFFIX_VAL=""
+if grep -qE '^[[:space:]]*TD_STACK_SUFFIX=' "$ENV_FILE" 2>/dev/null; then
+  TD_STACK_SUFFIX_VAL=$(grep -E '^[[:space:]]*TD_STACK_SUFFIX=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
 fi
+if [ -z "$TD_STACK_SUFFIX_VAL" ]; then
+  TD_STACK_SUFFIX_VAL="_dev_tcrd"
+  echo "WARN: TD_STACK_SUFFIX missing in $ENV_FILE — using _dev_tcrd" >&2
+fi
+if ! echo "$TD_STACK_SUFFIX_VAL" | grep -qE '^_dev_'; then
+  echo "ERROR: cron backup supports dev only; set TD_STACK_SUFFIX like _dev_tcrd in $ENV_FILE" >&2
+  exit 1
+fi
+TD_COMPOSE_ID="tools_dashboard${TD_STACK_SUFFIX_VAL}"
 
 PROJ_NAME=""
 if grep -qE '^[[:space:]]*COMPOSE_PROJECT_NAME=' "$ENV_FILE" 2>/dev/null; then
   PROJ_NAME=$(grep -E '^[[:space:]]*COMPOSE_PROJECT_NAME=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
 fi
-if [ -z "$PROJ_NAME" ]; then
-  PROJ_NAME=$(basename "$PROJECT_ROOT")
+if [ -n "$PROJ_NAME" ] && [ "$PROJ_NAME" != "$TD_COMPOSE_ID" ]; then
+  echo "ERROR: COMPOSE_PROJECT_NAME must be tools_dashboard + TD_STACK_SUFFIX = ${TD_COMPOSE_ID} (fix $ENV_FILE)" >&2
+  exit 1
+fi
+PROJ_NAME="$TD_COMPOSE_ID"
+
+# Postgres: tools_dashboard${TD_STACK_SUFFIX}-postgres; override with POSTGRES_BACKUP_CONTAINER if needed
+POSTGRES_CONTAINER="tools_dashboard${TD_STACK_SUFFIX_VAL}-postgres"
+if grep -qE '^[[:space:]]*POSTGRES_BACKUP_CONTAINER=' "$ENV_FILE" 2>/dev/null; then
+  POSTGRES_CONTAINER=$(grep -E '^[[:space:]]*POSTGRES_BACKUP_CONTAINER=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
 fi
 
 VOL_PREFIX="${PROJ_NAME}_"
@@ -63,7 +80,7 @@ PG_VOLUME="${VOL_PREFIX}postgres_data"
 REDIS_VOLUME="${VOL_PREFIX}redis_data"
 CASSANDRA_VOLUME="${VOL_PREFIX}cassandra_data"
 BACKUP_DIR="${BACKUP_BASE}/backups_cron_${PROJ_NAME}"
-CRON_SCRIPT_PATH="${SCRIPT_DIR}/_backup_cron_generated.sh"
+CRON_SCRIPT_PATH="${BACKUP_DIR}/stack_volume_backup.sh"
 LOG_FILE="${BACKUP_DIR}/backup_cron.log"
 
 GREEN='\033[0;32m'

@@ -54,6 +54,11 @@ Environment:
   ECARDS_START_NO_CLEAR=1   Skip clearing the terminal when opening the interactive menu
   ECARDS_START_LOG_TAIL_ALL=1   With diagnostics: tail logs for all services (default: api, postgres, cassandra, redis, db-init)
 
+Stack identity (in the env file; Tools Dashboard naming; keeps this stack separate on a shared host):
+  TD_APP_CODE               e.g. tcrd
+  TD_STACK_SUFFIX             e.g. _dev_tcrd or _prd_tcrd (use _prd_tcrd for production)
+  COMPOSE_PROJECT_NAME      Must equal tools_dashboard + TD_STACK_SUFFIX, e.g. tools_dashboard_dev_tcrd. start.sh passes -p.
+
 Build output:
   After up-build, rebuild, reset, force-rebuild, or restore+up — full transcript is written to:
     <repo-root>/build.log   (same path as rebuild; re-run overwrites the file)
@@ -156,14 +161,65 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-# --- Compose project name & published ports -----------------------------------
+# --- Compose project name, stack suffix (host-safe isolation) & published ports
 PROJ_NAME=""
 if grep -qE '^[[:space:]]*COMPOSE_PROJECT_NAME=' "$ENV_FILE" 2>/dev/null; then
   PROJ_NAME=$(grep -E '^[[:space:]]*COMPOSE_PROJECT_NAME=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
 fi
-if [ -z "$PROJ_NAME" ]; then
-  PROJ_NAME=$(basename "$PROJECT_ROOT")
-  echo "INFO: COMPOSE_PROJECT_NAME not set in $ENV_FILE — Docker project name: $PROJ_NAME"
+
+TD_APP_CODE_VAL=""
+if grep -qE '^[[:space:]]*TD_APP_CODE=' "$ENV_FILE" 2>/dev/null; then
+  TD_APP_CODE_VAL=$(grep -E '^[[:space:]]*TD_APP_CODE=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
+fi
+
+TD_STACK_SUFFIX_VAL=""
+if grep -qE '^[[:space:]]*TD_STACK_SUFFIX=' "$ENV_FILE" 2>/dev/null; then
+  TD_STACK_SUFFIX_VAL=$(grep -E '^[[:space:]]*TD_STACK_SUFFIX=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
+fi
+if [ -z "$TD_STACK_SUFFIX_VAL" ]; then
+  case "$TARGET_ENV" in
+    dev) TD_STACK_SUFFIX_VAL="_dev_tcrd" ;;
+    prd) TD_STACK_SUFFIX_VAL="_prd_tcrd" ;;
+    stg) TD_STACK_SUFFIX_VAL="_stg_tcrd" ;;
+    *) TD_STACK_SUFFIX_VAL="_dev_tcrd" ;;
+  esac
+  echo "WARN: TD_STACK_SUFFIX missing in $ENV_FILE — using ${TD_STACK_SUFFIX_VAL} (set in .env for multi-stack hosts)" >&2
+fi
+case "$TARGET_ENV" in
+  dev)
+    if ! echo "$TD_STACK_SUFFIX_VAL" | grep -qE '^_dev_'; then
+      echo "ERROR: dev stack expects TD_STACK_SUFFIX like _dev_tcrd (got: ${TD_STACK_SUFFIX_VAL})" >&2
+      exit 1
+    fi
+    ;;
+  prd)
+    if ! echo "$TD_STACK_SUFFIX_VAL" | grep -qE '^_prd_'; then
+      echo "ERROR: prd stack expects TD_STACK_SUFFIX like _prd_tcrd (got: ${TD_STACK_SUFFIX_VAL})" >&2
+      exit 1
+    fi
+    ;;
+  stg)
+    if ! echo "$TD_STACK_SUFFIX_VAL" | grep -qE '^_stg_'; then
+      echo "ERROR: stg stack expects TD_STACK_SUFFIX like _stg_tcrd (got: ${TD_STACK_SUFFIX_VAL})" >&2
+      exit 1
+    fi
+    ;;
+esac
+# COMPOSE_PROJECT_NAME and Docker: tools_dashboard + TD_STACK_SUFFIX => e.g. tools_dashboard_dev_tcrd
+TD_COMPOSE_ID="tools_dashboard${TD_STACK_SUFFIX_VAL}"
+if [ -n "$PROJ_NAME" ] && [ "$PROJ_NAME" != "$TD_COMPOSE_ID" ]; then
+  echo "ERROR: COMPOSE_PROJECT_NAME ($PROJ_NAME) must equal tools_dashboard + TD_STACK_SUFFIX = ${TD_COMPOSE_ID} (fix $ENV_FILE)" >&2
+  exit 1
+fi
+PROJ_NAME="$TD_COMPOSE_ID"
+if [ -n "$TD_APP_CODE_VAL" ] && [ -n "$TD_STACK_SUFFIX_VAL" ]; then
+  case "$TD_STACK_SUFFIX_VAL" in
+    *_"${TD_APP_CODE_VAL}") ;;
+    *)
+      echo "ERROR: TD_STACK_SUFFIX (${TD_STACK_SUFFIX_VAL}) must end with _\${TD_APP_CODE} (TD_APP_CODE=${TD_APP_CODE_VAL})" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 VOL_PREFIX="${PROJ_NAME}_"
@@ -214,7 +270,8 @@ else
 fi
 
 run_compose() {
-  "${DOCKER_COMPOSE[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  # -p: always use validated PROJ_NAME (tools_dashboard + TD_STACK_SUFFIX) so this script and compose stay aligned.
+  "${DOCKER_COMPOSE[@]}" -p "$PROJ_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
 # Full transcript of image builds / `up --build` (requires set -o pipefail).
@@ -306,21 +363,6 @@ ensure_volumes_info() {
       echo "  — $v (not created yet — start the stack)"
     fi
   done
-}
-
-prune_anonymous_volumes() {
-  echo "Pruning dangling anonymous volumes (keeping ${PROJ_NAME}_*)..."
-  local list
-  list=$(docker volume ls -q -f dangling=true 2>/dev/null || true)
-  while IFS= read -r volume_name; do
-    [ -z "$volume_name" ] && continue
-    case "$volume_name" in
-      "${PROJ_NAME}_"*) continue ;;
-    esac
-    echo "  Removing: $volume_name"
-    docker volume rm "$volume_name" 2>/dev/null || true
-  done <<< "$list"
-  echo "Done."
 }
 
 wait_for_api_ready() {
@@ -433,9 +475,9 @@ print_stack_urls() {
   echo ""
   echo "  SeaweedFS (optional; not in this compose):  SEAWEEDFS_ENDPOINT=${seaweed}"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  ${DOCKER_COMPOSE[*]} -f $(basename "$COMPOSE_FILE") exec -it postgres psql -U ecards_user -d ecards_db"
-  echo "  ${DOCKER_COMPOSE[*]} -f $(basename "$COMPOSE_FILE") exec -it redis redis-cli"
-  echo "  ${DOCKER_COMPOSE[*]} -f $(basename "$COMPOSE_FILE") exec -it cassandra cqlsh"
+  echo "  ${DOCKER_COMPOSE[*]} -p $PROJ_NAME -f $(basename "$COMPOSE_FILE") --env-file $(basename "$ENV_FILE") exec -it postgres psql -U ecards_user -d ecards_db"
+  echo "  ${DOCKER_COMPOSE[*]} -p $PROJ_NAME -f $(basename "$COMPOSE_FILE") --env-file $(basename "$ENV_FILE") exec -it redis redis-cli"
+  echo "  ${DOCKER_COMPOSE[*]} -p $PROJ_NAME -f $(basename "$COMPOSE_FILE") --env-file $(basename "$ENV_FILE") exec -it cassandra cqlsh"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "CLI: $0 $TARGET_ENV logs | down | restart | rebuild | reset"
   echo ""
@@ -448,7 +490,6 @@ cmd_up_quick() {
     compose_failure_context
     return 1
   fi
-  prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 120)"; then
     echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
     return 1
@@ -461,7 +502,6 @@ cmd_up_build() {
   if ! run_compose_up_build_logged; then
     return 1
   fi
-  prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
     return 1
@@ -472,7 +512,6 @@ cmd_up_build() {
 cmd_down() {
   echo "Stopping stack..."
   run_compose down --remove-orphans
-  prune_anonymous_volumes
   echo "Stopped."
 }
 
@@ -485,6 +524,7 @@ cmd_status() {
   echo "Environment:        $TARGET_ENV"
   echo "Compose file:       $COMPOSE_FILE"
   echo "Env file:           $ENV_FILE"
+  echo "Stack suffix:       $TD_STACK_SUFFIX_VAL  (container: tools_dashboard${TD_STACK_SUFFIX_VAL}-…)"
   echo "Docker project:     $PROJ_NAME"
   echo "Backup directory:   $BACKUP_DIR"
   ensure_volumes_info
@@ -521,7 +561,6 @@ cmd_rebuild_stack() {
     compose_failure_context
     return 1
   fi
-  prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
@@ -545,7 +584,6 @@ cmd_reset_stack() {
     compose_failure_context
     return 1
   fi
-  prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
@@ -564,7 +602,6 @@ cmd_force_rebuild() {
     compose_failure_context
     return 1
   fi
-  prune_anonymous_volumes
   if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
@@ -572,16 +609,15 @@ cmd_force_rebuild() {
 }
 
 run_cleanup() {
-  echo "Down + prune containers/networks (volumes preserved)..."
+  # Only this compose project — never run host-wide docker prune (other stacks on the same machine).
+  echo "Stopping stack; pruning stopped containers for project ${PROJ_NAME} only (volumes preserved)..."
   run_compose down --remove-orphans
-  docker container prune -f >/dev/null 2>&1 || true
-  docker network prune -f >/dev/null 2>&1 || true
+  docker container prune -f --filter "label=com.docker.compose.project=${PROJ_NAME}" >/dev/null 2>&1 || true
 }
 
 run_full_cleanup() {
   echo "Down and remove images built by this compose project (volumes preserved)..."
   run_compose down --rmi local --remove-orphans
-  prune_anonymous_volumes
 }
 
 mount_and_start() {
@@ -616,7 +652,6 @@ mount_and_start() {
     pause_after_error
     return 1
   fi
-  prune_anonymous_volumes
   echo "Restore complete."
   pause
 }
@@ -675,7 +710,7 @@ echo "========================================="
 echo "   tools-ecards — Docker manager"
 echo "========================================="
 echo "Environment:    $TARGET_ENV"
-echo "Project name:   $PROJ_NAME"
+echo "Stack suffix:   $TD_STACK_SUFFIX_VAL  (project $PROJ_NAME)"
 echo "Volumes:        $PG_VOLUME / $REDIS_VOLUME / $CASSANDRA_VOLUME"
 echo "Backup dir:     $BACKUP_DIR"
 echo "Compose file:   $COMPOSE_FILE"
@@ -697,7 +732,7 @@ while true; do
   echo "  1. Up (quick — no image rebuild)"
   echo "  2. Up (build & start)"
   echo "  3. Down"
-  echo "  4. Cleanup (prune containers/networks, volumes kept)"
+  echo "  4. Cleanup (down; prune stopped containers for this project only, volumes kept)"
   echo "  5. Force rebuild (no cache)"
   echo "  6. Restart"
   echo "  7. Rebuild stack (down → build → up, keeps data; log: build.log)"

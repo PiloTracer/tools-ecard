@@ -14,6 +14,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecards_db}
@@ -38,6 +39,7 @@ services:
 
   cassandra:
     image: cassandra:5.0
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-cassandra
     restart: unless-stopped
     environment:
       CASSANDRA_CLUSTER_NAME: ${CASSANDRA_CLUSTER_NAME:-ecards_cluster}
@@ -64,6 +66,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-redis
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -83,6 +86,7 @@ services:
 
   db-init:
     image: cassandra:5.0
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-db-init
     networks:
       - ecards-prd
     depends_on:
@@ -110,6 +114,7 @@ services:
       context: ./api-server
       dockerfile: Dockerfile.prd
     image: ${ECARDS_API_IMAGE:-ecards-api:prd}
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-api
     restart: unless-stopped
     command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/server.js"]
     environment:
@@ -193,6 +198,7 @@ services:
       context: ./render-worker
       dockerfile: Dockerfile.prd
     image: ${ECARDS_WORKER_IMAGE:-ecards-render-worker:prd}
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-render-worker
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -236,6 +242,7 @@ services:
       context: ./front-cards
       dockerfile: Dockerfile.prd
     image: ${ECARDS_FRONT_IMAGE:-ecards-front:prd}
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-frontend
     restart: unless-stopped
     env_file:
       - .env.prd
@@ -271,6 +278,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-nginx
     restart: unless-stopped
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"

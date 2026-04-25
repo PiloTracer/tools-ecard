@@ -1163,11 +1163,11 @@ docker-compose -f docker-compose.dev.yml up --build
 psql -h localhost -p 7432 -U ecards_user -d ecards_db
 # Password: ecards_dev_password
 
-# Cassandra
-docker exec -it ecards-cassandra cqlsh
+# Cassandra (project name from .env COMPOSE_PROJECT_NAME, e.g. tools_dashboard_dev_tcrd)
+docker compose -p tools_dashboard_dev_tcrd -f docker-compose.dev.yml --env-file .env exec -it cassandra cqlsh
 
 # Redis
-docker exec -it ecards-redis redis-cli
+docker compose -p tools_dashboard_dev_tcrd -f docker-compose.dev.yml --env-file .env exec -it redis redis-cli
 ```
 
 ### Folder Structure

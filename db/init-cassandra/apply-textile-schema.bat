@@ -6,14 +6,16 @@ REM
 REM Purpose: Apply the template-textile schema to a running Cassandra instance
 REM Usage: apply-textile-schema.bat [container_name]
 REM
-REM Default container name: ecards-cassandra
+REM Default: COMPOSE_PROJECT_NAME from repo .env + "-cassandra" (e.g. tools_dashboard_dev_tcrd-cassandra), or pass [container_name]
 REM ============================================================
 
 setlocal enabledelayedexpansion
 
-REM Set container name (default: ecards-cassandra)
-set CONTAINER_NAME=%1
-if "%CONTAINER_NAME%"=="" set CONTAINER_NAME=ecards-cassandra
+set "CONTAINER_NAME=%~1"
+if not defined CONTAINER_NAME (
+  for /f "usebackq tokens=2 delims==" %%V in (`findstr /B /C:"COMPOSE_PROJECT_NAME=" "..\..\.env" 2^>nul`) do set "PROJ=%%V"
+  if defined PROJ (set "CONTAINER_NAME=!PROJ!-cassandra") else (set "CONTAINER_NAME=tools_dashboard_dev_tcrd-cassandra")
+)
 
 set SCHEMA_FILE=03-template-textile-tables.cql
 

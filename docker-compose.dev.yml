@@ -2,7 +2,7 @@ services:
   # PostgreSQL - Normalized relational database
   postgres:
     image: postgres:16-alpine
-    container_name: ecards-postgres
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecards_db}
       POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
@@ -24,7 +24,7 @@ services:
   # Cassandra - Canonical database for high-scale event/log data
   cassandra:
     image: cassandra:5.0
-    container_name: ecards-cassandra
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-cassandra
     environment:
       CASSANDRA_CLUSTER_NAME: ${CASSANDRA_CLUSTER_NAME:-ecards_cluster}
       CASSANDRA_DC: ${CASSANDRA_DC:-dc1}
@@ -61,7 +61,7 @@ services:
   # Redis - Job queue and cache
   redis:
     image: redis:7-alpine
-    container_name: ecards-redis
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-redis
     ports:
       - "0.0.0.0:${REDIS_HOST_PORT:-7379}:${REDIS_PORT:-6379}"
     volumes:
@@ -81,7 +81,7 @@ services:
     build:
       context: ./front-cards
       dockerfile: Dockerfile.dev
-    container_name: ecards-frontend
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-frontend
     ports:
       - "0.0.0.0:${FRONTEND_HOST_PORT:-7300}:${FRONTEND_PORT:-3000}"
     volumes:
@@ -130,7 +130,7 @@ services:
     build:
       context: ./api-server
       dockerfile: Dockerfile.dev
-    container_name: ecards-api
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-api
     ports:
       - "0.0.0.0:${API_PORT:-7400}:${API_INTERNAL_PORT:-4000}"
     volumes:
@@ -167,7 +167,7 @@ services:
     build:
       context: ./render-worker
       dockerfile: Dockerfile.dev
-    container_name: ecards-render-worker
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-render-worker
     volumes:
       - ./render-worker:/app
       - /app/node_modules
@@ -216,7 +216,7 @@ services:
   # Database Initialization - Runs once on startup to create Cassandra keyspace
   db-init:
     image: cassandra:5.0
-    container_name: ecards-db-init
+    container_name: tools_dashboard${TD_STACK_SUFFIX:-_dev_tcrd}-db-init
     networks:
       - ecards-network
     depends_on:

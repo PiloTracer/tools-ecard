@@ -7,7 +7,7 @@
 # Purpose: Apply the template-textile schema to a running Cassandra instance
 # Usage: ./apply-textile-schema.sh [container_name]
 #
-# Default container name: ecards-cassandra
+# Default: ${COMPOSE_PROJECT_NAME}-cassandra from repo root .env (e.g. tools_dashboard_dev_tcrd-cassandra)
 # ============================================================
 
 # Colors for output
@@ -16,8 +16,16 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Container name (default: ecards-cassandra)
-CONTAINER_NAME="${1:-ecards-cassandra}"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ENV_FILE="$REPO_ROOT/.env"
+if [ -f "$ENV_FILE" ]; then
+  PROJ_NAME=$(grep -E '^[[:space:]]*COMPOSE_PROJECT_NAME=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//" | xargs)
+  DEFAULT_CONTAINER="${PROJ_NAME}-cassandra"
+else
+  DEFAULT_CONTAINER="tools_dashboard_dev_tcrd-cassandra"
+fi
+# Container name (override: pass first arg)
+CONTAINER_NAME="${1:-$DEFAULT_CONTAINER}"
 SCHEMA_FILE="03-template-textile-tables.cql"
 
 echo -e "${YELLOW}📦 Template-Textile Schema Application${NC}"
