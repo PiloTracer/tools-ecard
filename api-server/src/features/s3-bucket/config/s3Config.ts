@@ -4,6 +4,8 @@
  * This module handles the configuration for connecting to SeaweedFS
  * using the S3-compatible API. SeaweedFS is treated as an external/remote
  * service, not part of the Docker network.
+ *
+ * Browser-facing object URLs: use `resolvePublicObjectUrl` from `src/core/storage`, not this endpoint string.
  */
 
 import { z } from 'zod';

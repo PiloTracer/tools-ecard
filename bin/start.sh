@@ -428,7 +428,7 @@ print_stack_urls() {
   ext_sub_ws="$(read_env_value EXTERNAL_SUBSCRIPTION_WS 'ws://dev.aiepic.app/admin/ws')"
   sub_url="$(read_env_value NEXT_PUBLIC_USER_SUBSCRIPTION_URL "")"
   [ -z "$sub_url" ] && sub_url="$(read_env_value USER_SUBSCRIPTION_URL 'https://dev.aiepic.app/app/features/user-subscription')"
-  seaweed="$(read_env_value SEAWEEDFS_ENDPOINT 'http://host.docker.internal:8333')"
+  seaweed="$(read_env_value SEAWEEDFS_ENDPOINT 'http://host.docker.internal:18333')"
   api_pub="$(read_env_value NEXT_PUBLIC_API_URL "http://${H}:${ECARDS_API_PUBLISHED_PORT}")"
   ws_pub="$(read_env_value NEXT_PUBLIC_WS_URL "ws://${H}:${ECARDS_API_PUBLISHED_PORT}")"
   oauth_redirect="$(read_env_value OAUTH_REDIRECT_URI "http://${H}:${ECARDS_FRONT_PORT}/oauth/complete")"

@@ -8,6 +8,7 @@ import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
 import multipart from '@fastify/multipart';
 import { appConfig } from './core/config';
+import { getAppLibraryStorageIntegrationStatus } from './core/storage';
 import { errorHandler } from './core/middleware/errorHandler';
 import { authMiddleware } from './core/middleware/authMiddleware';
 import { createLogger } from './core/utils/logger';
@@ -108,6 +109,7 @@ export async function buildApp() {
       status: 'ok',
       timestamp: new Date().toISOString(),
       env: appConfig.env,
+      appLibraryStorage: getAppLibraryStorageIntegrationStatus(),
     };
   });
 

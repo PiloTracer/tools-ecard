@@ -14,11 +14,21 @@ import { initCassandraSchema } from './core/cassandra/init';
 import { batchParsingWorker } from './features/batch-parsing';
 import { loadGoogleFonts } from './features/font-management/startup/loadGoogleFonts';
 import { createLogger } from './core/utils/logger';
+import {
+  ensureAppLibraryStorageIntegrationReady,
+  isAppLibraryStorageIntegrationEnabled,
+} from './core/storage';
 
 const log = createLogger('Server');
 
 async function start() {
   try {
+    // Load Tools Dashboard storage metadata before routes/plugins run (public URL resolution uses cache).
+    if (isAppLibraryStorageIntegrationEnabled()) {
+      log.info('Loading Tools Dashboard app-library storage integration');
+      await ensureAppLibraryStorageIntegrationReady();
+    }
+
     // Build Fastify app
     const app = await buildApp();
 

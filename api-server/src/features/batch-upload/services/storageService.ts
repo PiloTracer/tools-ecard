@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { Readable } from 'stream';
 import fs from 'fs/promises';
 import path from 'path';
+import { resolvePublicObjectUrl } from '../../../core/storage';
 import { SeaweedFSUploadResult, BatchUploadError } from '../types';
 import { sanitizeEmailForPath, sanitizeFileName } from '../validators/batchValidators';
 
@@ -125,7 +126,7 @@ export class StorageService {
 
     await this.s3Client.send(command);
 
-    const url = `${process.env.SEAWEEDFS_ENDPOINT}/${this.bucket}/${filePath}`;
+    const url = resolvePublicObjectUrl(this.bucket, filePath);
 
     return {
       filePath,

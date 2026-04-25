@@ -126,6 +126,8 @@ services:
   # This is the E-Cards application's own API server for internal operations
   # All runtime configuration comes from the monorepo root .env (same as bin/start.sh --env-file);
   # copy .env.dev.example → .env and align hostnames for Compose (e.g. postgres, cassandra, redis).
+  # SeaweedFS is not in this compose: SEAWEEDFS_ENDPOINT targets the host (e.g. host.docker.internal:18333 when
+  # the other stack maps host 18333 → container 8333). extra_hosts makes host.docker.internal resolve on Linux.
   api-server:
     build:
       context: ./api-server
@@ -141,6 +143,11 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       OAUTH_DEV_INSECURE_TLS: ${OAUTH_DEV_INSECURE_TLS:-}
+      # Same keys as docker-compose.prd.yml api-server (values from project `.env` / host env for interpolation).
+      TOOLS_DASHBOARD_ORIGIN: ${TOOLS_DASHBOARD_ORIGIN:-}
+      APP_LIBRARY_STORAGE_INTEGRATION_KEY: ${APP_LIBRARY_STORAGE_INTEGRATION_KEY:-}
+      STORAGE_USE_DASHBOARD_PUBLIC_BASE: ${STORAGE_USE_DASHBOARD_PUBLIC_BASE:-false}
+      STORAGE_PUBLIC_BUCKETS: ${STORAGE_PUBLIC_BUCKETS:-}
     env_file:
       - .env
     networks:
@@ -171,6 +178,11 @@ services:
     volumes:
       - ./render-worker:/app
       - /app/node_modules
+    # Same as api-server: SEAWEEDFS_ENDPOINT often uses host.docker.internal (Seaweed on host / other compose).
+    # Without this, Linux containers do not resolve host.docker.internal by default.
+    extra_hosts:
+      - "dev.aiepic.app:host-gateway"
+      - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       # PostgreSQL
@@ -188,9 +200,9 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # SeaweedFS (Remote - Client Configuration)
+      # SeaweedFS (Remote - Client Configuration). Default matches .env.dev.example (host-published S3 gateway).
       USE_LOCAL_STORAGE: ${USE_LOCAL_STORAGE:-true}
-      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://localhost:8333}
+      SEAWEEDFS_ENDPOINT: ${SEAWEEDFS_ENDPOINT:-http://host.docker.internal:18333}
       SEAWEEDFS_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY:-your_seaweedfs_access_key}
       SEAWEEDFS_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY:-your_seaweedfs_secret_key}
       SEAWEEDFS_BUCKET: ${SEAWEEDFS_BUCKET}

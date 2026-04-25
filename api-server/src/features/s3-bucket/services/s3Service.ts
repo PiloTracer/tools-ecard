@@ -57,6 +57,11 @@ import {
   S3Error
 } from '../types';
 import { LocalStorageService } from './localStorageService';
+import {
+  isAppLibraryStorageIntegrationEnabled,
+  isAppLibraryStoragePublicBaseReady,
+  resolvePublicObjectUrl,
+} from '../../../core/storage';
 
 const slog = createLogger('S3Service');
 
@@ -466,9 +471,13 @@ export class S3Service implements IS3Service {
   }
 
   getPublicUrl(bucket: string, key: string): string {
-    // Construct the public URL based on the endpoint
-    const endpoint = this.config.endpoint.replace(/\/$/, '');
-    return `${endpoint}/${bucket}/${key}`;
+    if (isAppLibraryStorageIntegrationEnabled() && !isAppLibraryStoragePublicBaseReady()) {
+      slog.warn(
+        { bucket, keyPrefix: key.slice(0, 40) },
+        'App library storage integration enabled but public base not loaded; using SEAWEEDFS_ENDPOINT for URL',
+      );
+    }
+    return resolvePublicObjectUrl(bucket, key);
   }
 
   async copyObject(
