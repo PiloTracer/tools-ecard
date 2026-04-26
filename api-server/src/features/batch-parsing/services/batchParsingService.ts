@@ -90,9 +90,10 @@ export class BatchParsingService {
           ...process.env,
           // Ensure Python has access to SeaweedFS config
           SEAWEEDFS_ENDPOINT: process.env.SEAWEEDFS_ENDPOINT || '',
-          SEAWEEDFS_BUCKET: process.env.SEAWEEDFS_BUCKET || 'files',
+          SEAWEEDFS_BUCKET: process.env.SEAWEEDFS_BUCKET || 'repositories',
           SEAWEEDFS_ACCESS_KEY: process.env.SEAWEEDFS_ACCESS_KEY || '',
           SEAWEEDFS_SECRET_KEY: process.env.SEAWEEDFS_SECRET_KEY || '',
+          SEAWEEDFS_REGION: process.env.SEAWEEDFS_REGION || 'us-east-1',
           LOCAL_STORAGE_PATH: process.env.LOCAL_STORAGE_PATH || '/app/uploads'
         }
       });

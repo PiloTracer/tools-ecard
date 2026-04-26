@@ -8,6 +8,7 @@ This directory contains Claude Code project-specific context and documentation.
 .claude/
 ├── README.md              # This file - directory overview
 ├── SESSION_STARTERS.md    # Quick-start prompts for new sessions
+├── tutorials/             # Setup guides: E-Cards+Tools Dashboard storage; generic Seaweed S3 for other apps
 └── features/              # Feature specifications
     ├── README.md          # Feature directory purpose
     ├── feature-order.md   # Development sequence guide

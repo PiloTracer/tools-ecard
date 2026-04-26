@@ -40,7 +40,7 @@ class StorageClient:
                 aws_access_key_id=os.getenv('SEAWEEDFS_ACCESS_KEY', 'admin'),
                 aws_secret_access_key=os.getenv('SEAWEEDFS_SECRET_KEY', 'admin'),
                 config=Config(signature_version='s3v4'),
-                region_name='us-east-1'  # SeaweedFS doesn't care about region
+                region_name=os.getenv('SEAWEEDFS_REGION', 'us-east-1'),
             )
             self.bucket_name = os.getenv('SEAWEEDFS_BUCKET', 'repositories')
             logger.info(f"Initialized SeaweedFS client: endpoint={os.getenv('SEAWEEDFS_ENDPOINT')}, bucket={self.bucket_name}")

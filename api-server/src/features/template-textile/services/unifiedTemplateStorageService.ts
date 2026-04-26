@@ -4,6 +4,7 @@ import { templateOperations, resourceOperations, projectOperations } from '../..
 import { fallbackStorageService } from './fallbackStorageService';
 import { resourceDeduplicationService } from './resourceDeduplicationService';
 import { modeDetectionService, StorageMode } from './modeDetectionService';
+import { appConfig } from '../../../core/config';
 import { getS3Service } from '../../s3-bucket/services/s3Service';
 import type { Request } from 'express';
 import { decodeBase64Data } from '../utils/base64Helper';
@@ -455,8 +456,8 @@ class UnifiedTemplateStorageService {
 
     // Convert S3 URLs in templateData to HTTP URLs
     if (templateData && templateData.elements) {
-      // Use public endpoint for browser access (not the Docker-internal endpoint)
-      const apiEndpoint = process.env.API_PUBLIC_ENDPOINT || 'http://localhost:7400';
+      // Browser must call this API (auth + private objects); same base as front-cards NEXT_PUBLIC_API_URL.
+      const apiEndpoint = appConfig.publicApi.baseUrl;
       templateData.elements = templateData.elements.map((element: any) => {
         if (element.type === 'image' && element.imageUrl && element.imageUrl.startsWith('s3://')) {
           // Convert s3://bucket/key to http://localhost:7400/api/v1/template-textile/resource/bucket/key

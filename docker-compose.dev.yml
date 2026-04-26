@@ -148,6 +148,8 @@ services:
       APP_LIBRARY_STORAGE_INTEGRATION_KEY: ${APP_LIBRARY_STORAGE_INTEGRATION_KEY:-}
       STORAGE_USE_DASHBOARD_PUBLIC_BASE: ${STORAGE_USE_DASHBOARD_PUBLIC_BASE:-false}
       STORAGE_PUBLIC_BUCKETS: ${STORAGE_PUBLIC_BUCKETS:-}
+      # Same as front-cards: api-server rewrites s3:// image URLs to this base for the resource proxy.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
     env_file:
       - .env
     networks:

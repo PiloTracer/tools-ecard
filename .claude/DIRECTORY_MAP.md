@@ -45,6 +45,12 @@ Pre-written conversation starters for resuming work on specific features.
 - **Place here**: Context prompts to quickly onboard to a feature
 - **Naming**: `{feature-name}-starter.md`
 
+### `tutorials/`
+Step-by-step guides and integration checklists (cross-cutting setup, not a single feature spec).
+- **Place here**: Onboarding tutorials, env/compose integration walkthroughs
+- **Naming**: `{TOPIC}_INTEGRATION.md` or `{TOPIC}_GUIDE.md`
+- **Examples**: `STORAGE_SEAWEED_AND_TOOLS_DASHBOARD_INTEGRATION.md` (E-Cards + Tools Dashboard), `SEAWEEDFS_S3_INTEGRATION_FOR_EXTERNAL_APPS.md` (any app using Seaweed S3)
+
 ### `decisions/`
 Architectural decision records (ADRs) explaining why choices were made.
 - **Place here**: Design decisions, trade-off analysis, rationale
@@ -78,3 +84,4 @@ Architectural decision records (ADRs) explaining why choices were made.
 | Adding an agent role | `agents/` |
 | Writing a session starter | `prompts/` |
 | Recording a design decision | `decisions/` |
+| Integration / setup tutorial | `tutorials/` |

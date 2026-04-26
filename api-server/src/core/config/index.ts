@@ -101,6 +101,15 @@ export const appConfig = {
     userApi: process.env.EXTERNAL_USER_API || '',
   },
 
+  /** Base URL browsers use to reach this API (resource proxy, etc.). Align with front-cards `NEXT_PUBLIC_API_URL`. */
+  publicApi: {
+    baseUrl: (
+      process.env.API_PUBLIC_ENDPOINT ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:7400'
+    ).replace(/\/+$/, ''),
+  },
+
   // Rate Limiting
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),

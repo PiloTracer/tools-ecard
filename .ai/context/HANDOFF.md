@@ -2,15 +2,18 @@
 
 **Purpose:** One screen so a **new agent or human** can resume without prior chat. Depth lives in **`.claude/`** and `DOCS_CONTEXT.md`.
 
-**Freshness:** Updated **2026-04-22**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
+**Freshness:** Updated **2026-04-25**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
+
+**Session closed 2026-04-25:** Seaweed/Tools Dashboard storage work and tutorials landed (see **Last verified** row below). No open blocker from that track; next owner picks up from **§0** / **§7** as usual.
 
 ### Last verified (update when you run checks)
 
 | Area | Date | Notes |
 |------|------|--------|
-| Improvement plan work | 2026-04-22 | **Shipped:** `GET /api/batches/:id` in `batch-upload` (`getBatchDetail` + Cassandra `recordsCount`); **`batch-import`** registered at `/api/batch-import`** in `app.ts`; **removed** broken `api-server/src/features/template-designer/` tree. **Docs/plan:** `.claude/plans/20260422-ecards-application-improvement-priorities.md` and `.claude/features/render-worker/` updated. |
+| Improvement plan work | 2026-04-22 | **Shipped:** `GET /api/batches/:id` in `batch-upload` (`getBatchDetail` + Cassandra `recordsCount`); **`batch-import`** registered at `/api/batch-import` in `app.ts`; **removed** broken `api-server/src/features/template-designer/` tree. **Docs/plan:** `.claude/plans/20260422-ecards-application-improvement-priorities.md` and `.claude/features/render-worker/` updated. |
 | Baseline CI / full build | _pending_ | Run **§4** after `npm ci` + `npm run db:generate` in `api-server`; local `tsc` had many **pre-existing** errors unrelated to the batch-detail change—use **CI log** as gate. |
 | Stack identity / `.env` | 2026-04-25 | `TD_APP_CODE` / `TD_STACK_SUFFIX` / `COMPOSE_PROJECT_NAME=tools_dashboard_*_tcrd`; **`bin/start.sh`**, compose, and **`init-cassandra.sh`** use `-p` + service names. `.claude/fixes` / some runbooks may still show old `ecards-*` container names — use compose exec. |
+| Seaweed + Tools Dashboard storage | 2026-04-25 | **Code:** `api-server/src/core/storage/index.ts` (contract), `…/integrations/appLibraryStorageIntegration.ts` (GET + `resolvePublicObjectUrl` + `STORAGE_USE_DASHBOARD_PUBLIC_BASE` / `STORAGE_PUBLIC_BUCKETS`). **Compose:** `docker-compose.dev.yml` / `prd` — `api-server` gets dashboard + storage vars + `NEXT_PUBLIC_API_URL`; `render-worker` dev has `host.docker.internal` + default Seaweed port **18333**. **Fixes:** batch Python spawn uses bucket default **`repositories`**, passes `SEAWEEDFS_REGION`; template `s3://` → HTTP uses **`appConfig.publicApi.baseUrl`**. **Docs:** `.claude/tutorials/STORAGE_SEAWEED_AND_TOOLS_DASHBOARD_INTEGRATION.md`, `SEAWEEDFS_S3_INTEGRATION_FOR_EXTERNAL_APPS.md`; **`.claude/DIRECTORY_MAP.md`** lists `tutorials/`. **Unverified here:** full `npm run build` / CI green. |
 
 ---
 
@@ -34,7 +37,7 @@
 
 1. **`.cursorrules`** — project rules, protected areas, verify-before-done, no cross-repo assumptions.
 2. **`DOCS_TECH_STACK.md`** — services, ports, containers, commands (canonical).
-3. **`.claude/DIRECTORY_MAP.md`** — plans, features, fixes.
+3. **`.claude/DIRECTORY_MAP.md`** — plans, features, fixes, **`tutorials/`** (Seaweed + external-app S3 guides).
 4. **`.claude/plans/20260422-ecards-application-improvement-priorities.md`** — if you are continuing the improvement track.
 5. **`.claude/FEATURES_INDEX.md`** → **`.claude/features/<name>/`** on demand.
 6. **`DOCS_CONTEXT.md`** — broad / cross-cutting architecture only.
@@ -111,6 +114,7 @@ Production stack: **`docker-compose.prd.yml`**, images from **`Dockerfile.prd`**
 | Need | Path |
 |------|------|
 | Feature specs, plans, runbooks | **`.claude/`** |
+| Seaweed / storage integration tutorials | **`.claude/tutorials/`** |
 | Stack one-pager | `DOCS_TECH_STACK.md` |
 | Full architecture | `DOCS_CONTEXT.md` |
 | Root pointers | `CONTEXT.md` |
