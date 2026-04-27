@@ -10,12 +10,16 @@
  * `STORAGE_USE_DASHBOARD_PUBLIC_BASE` / `STORAGE_PUBLIC_BUCKETS`). Default is private objects →
  * URLs use `SEAWEEDFS_ENDPOINT` path shape; use presigned GET for browser downloads of private objects.
  *
+ * Startup GET uses `oauthServerFetch` (same dev TLS rules as OAuth: relaxed in non-production unless
+ * `OAUTH_DEV_INSECURE_TLS` is off; strict `fetch` in production, or use `NODE_EXTRA_CA_CERTS`).
+ *
  * S3-compatible upload/download still use SEAWEEDFS_*; this flow does not replace those credentials.
  *
  * **Contract:** import public URL helpers from `core/storage` (re-exports `resolvePublicObjectUrl`, etc.).
  */
 
 import { z } from 'zod';
+import { oauthServerFetch } from '../oauthFetch';
 import { createLogger, serializeError } from '../utils/logger';
 
 const log = createLogger('AppLibraryStorageIntegration');
@@ -76,7 +80,7 @@ async function loadFromToolsDashboard(): Promise<void> {
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await oauthServerFetch(url, {
       method: 'GET',
       headers: { Authorization: `Bearer ${key}` },
     });

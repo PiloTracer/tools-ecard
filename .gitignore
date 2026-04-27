@@ -174,3 +174,4 @@ SUBAGENTS/
 .db.misc/
 .misc/
 *.log
+credentials/

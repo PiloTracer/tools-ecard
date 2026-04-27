@@ -184,3 +184,4 @@ SUBAGENTS/
 .misc/
 *.log
 .claude/
+credentials/

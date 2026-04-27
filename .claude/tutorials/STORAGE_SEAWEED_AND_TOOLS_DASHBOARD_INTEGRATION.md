@@ -37,8 +37,8 @@ Canonical contract comment: `api-server/src/core/storage/index.ts`.
 2. In **E-Cards** `.env`:
    - `TOOLS_DASHBOARD_ORIGIN=https://dev.aiepic.app` (no trailing slash; prod: your prod origin).
    - `APP_LIBRARY_STORAGE_INTEGRATION_KEY=tdsk_…`
-3. **api-server** startup calls `GET {TOOLS_DASHBOARD_ORIGIN}/api/integrations/app-library/storage` with `Authorization: Bearer …` **before** the app listens. Failure **exits the process** (misconfigured key or unreachable dashboard).
-4. **Compose:** `docker-compose.dev.yml` and **`docker-compose.prd.yml`** pass the same keys on **`api-server`** `environment:` as in **`.env`** (including `NEXT_PUBLIC_API_URL` for server-side template URL rewriting).
+3. **api-server** startup calls `GET {TOOLS_DASHBOARD_ORIGIN}/api/integrations/app-library/storage` with `Authorization: Bearer …` **before** the app listens. Failure **exits the process** (misconfigured key or unreachable dashboard). The GET uses **`oauthServerFetch`**: in **development** it follows the same TLS rules as OAuth (relaxed by default; see `OAUTH_DEV_INSECURE_TLS` / `NODE_EXTRA_CA_CERTS` in **`DOCS_TECH_STACK.md`**). In **production** TLS is strict; use a public CA on the dashboard or set **`NODE_EXTRA_CA_CERTS`** on **`api-server`** if you use a private CA.
+4. **Compose:** `docker-compose.dev.yml` and **`docker-compose.prd.yml`** pass the same keys on **`api-server`** `environment:` as in **`.env`**, including **`NODE_EXTRA_CA_CERTS`** when needed (and `NEXT_PUBLIC_API_URL` for server-side template URL rewriting).
 
 ### Step C — Public URL policy (private by default)
 

@@ -143,6 +143,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       OAUTH_DEV_INSECURE_TLS: ${OAUTH_DEV_INSECURE_TLS:-}
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
       # Same keys as docker-compose.prd.yml api-server (values from project `.env` / host env for interpolation).
       TOOLS_DASHBOARD_ORIGIN: ${TOOLS_DASHBOARD_ORIGIN:-}
       APP_LIBRARY_STORAGE_INTEGRATION_KEY: ${APP_LIBRARY_STORAGE_INTEGRATION_KEY:-}

@@ -175,7 +175,7 @@ When **`/etc/hosts`** maps **`dev.aiepic.app`** to loopback, E-Cards containers 
 Also:
 
 - **`host.docker.internal:host-gateway`** — SeaweedFS and other host URLs on Linux.
-- **TLS (mkcert):** Node often cannot verify the host’s `https://dev.aiepic.app` certificate. In **non-`production`**, OAuth server calls use a relaxed HTTPS client by default (`shared/server/oauth-fetch.ts` / `api-server/src/core/oauthFetch.ts`). Set **`OAUTH_DEV_INSECURE_TLS=0`** (or `false` / `off`) to force strict verification, then use **`NODE_EXTRA_CA_CERTS`** with a mounted CA bundle if needed.
+- **TLS (mkcert):** Node often cannot verify the host’s `https://dev.aiepic.app` certificate. In **non-`production`**, OAuth server calls and the **Tools Dashboard app-library** startup GET (`api-server/src/core/integrations/appLibraryStorageIntegration.ts` via `oauthServerFetch`) use the same relaxed HTTPS client by default (`shared/server/oauth-fetch.ts` / `api-server/src/core/oauthFetch.ts`). Set **`OAUTH_DEV_INSECURE_TLS=0`** (or `false` / `off`) to force strict verification, then use **`NODE_EXTRA_CA_CERTS`** with a mounted CA bundle if needed. In **`production`**, those calls use strict TLS; use a publicly trusted cert on the dashboard or **`NODE_EXTRA_CA_CERTS`** on **`api-server`** if you must trust a private CA.
 
 **Public-only dev (no hosts override):** If you do **not** map `dev.aiepic.app` to loopback, you can remove the `dev.aiepic.app:host-gateway` lines via a small **compose override** so containers use public DNS only.
 
