@@ -58,7 +58,18 @@ export function DesignCanvas() {
   const objectsAtLastClick = useRef<fabric.Object[]>([]);
   const [cycleInfo, setCycleInfo] = useState<{ current: number; total: number } | null>(null);
 
-  const { zoom, showGrid, snapToGrid, gridSize, backgroundColor, setSelectedElement, setSelectedElements, setFabricCanvas, selectedElementIds } = useCanvasStore();
+  const {
+    zoom,
+    showGrid,
+    snapToGrid,
+    gridSize,
+    backgroundColor,
+    setSelectedElement,
+    setSelectedElements,
+    setFabricCanvas,
+    selectedElementIds,
+    canvasRebindNonce,
+  } = useCanvasStore();
   const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, removeElements, duplicateElement, exportWidth, lastUndoRedoTimestamp } = useTemplateStore();
   const selectedElementId = selectedElementIds[0] ?? null;
   const copiedElement = useRef<TemplateElement | null>(null);
@@ -631,6 +642,19 @@ export function DesignCanvas() {
       return;
     }
 
+    const rebindIds = useCanvasStore.getState().pendingCanvasRebindIds;
+    if (rebindIds && rebindIds.length > 0) {
+      for (const id of rebindIds) {
+        const fo = fabricObjectsMap.current.get(id);
+        if (fo && fo.canvas === canvas) {
+          canvas.remove(fo);
+        }
+        fabricObjectsMap.current.delete(id);
+        addedElementIds.current.delete(id);
+      }
+      useCanvasStore.getState().clearPendingCanvasRebind();
+    }
+
     // Preserve the active object(s) to prevent deselection during property updates
     const activeElementIds = getElementIdsFromActiveObjects(canvas);
 
@@ -1195,7 +1219,7 @@ export function DesignCanvas() {
       }
       canvas.renderAll();
     }
-  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds]);
+  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds, canvasRebindNonce]);
 
   // 3) Handle zoom
   useEffect(() => {

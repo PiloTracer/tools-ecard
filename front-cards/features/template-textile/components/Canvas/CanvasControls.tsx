@@ -9,6 +9,7 @@ import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
 import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
 import { OffscreenExportButton } from '../OffscreenExport/OffscreenExportButton';
+import { ElementsLayerManagerModal } from './ElementsLayerManagerModal';
 import { templateService } from '../../services/templateService';
 import { templatePackageService } from '../../services/templatePackageService';
 import type { Template, ImageElement } from '../../types';
@@ -129,6 +130,7 @@ export function CanvasControls() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
+  const [showElementsLayerModal, setShowElementsLayerModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // File input ref for importing templates
@@ -1056,6 +1058,21 @@ export function CanvasControls() {
         >
         </div>
 
+        <button
+          type="button"
+          onClick={() => setShowElementsLayerModal(true)}
+          className="min-h-8 shrink-0 rounded border border-slate-500 bg-slate-800 px-2 text-xs font-medium text-slate-100 hover:border-slate-400 hover:bg-slate-700"
+          title="View all elements: find hidden or off-canvas items and remove them"
+        >
+          Elements
+        </button>
+
+        <div
+          className="hidden h-5 w-px self-center bg-slate-600 sm:mx-0.5 sm:block"
+          aria-hidden
+        >
+        </div>
+
         {/* Grid + snap */}
         <div className="inline-flex shrink-0 items-center gap-1.5 sm:gap-2">
           <span className="shrink-0 text-xs text-slate-500" title="Pixel grid on the canvas">
@@ -1172,6 +1189,11 @@ export function CanvasControls() {
         </div>
         </div>
       </div>
+
+      <ElementsLayerManagerModal
+        open={showElementsLayerModal}
+        onClose={() => setShowElementsLayerModal(false)}
+      />
     </Fragment>
   );
 }

@@ -22,6 +22,10 @@ interface CanvasState {
   // Fabric canvas reference
   fabricCanvas: Canvas | null;
 
+  /** Ids to drop from DesignCanvas internal maps so the next sync re-adds Fabric objects (heals desync). */
+  pendingCanvasRebindIds: string[] | null;
+  canvasRebindNonce: number;
+
   // Actions
   setDimensions: (width: number, height: number) => void;
   setZoom: (zoom: number) => void;
@@ -35,6 +39,8 @@ interface CanvasState {
   setSelectedElement: (id: string | null) => void;
   setSelectedElements: (ids: string[]) => void;
   setFabricCanvas: (canvas: Canvas | null) => void;
+  requestCanvasRebindForElementIds: (ids: string[]) => void;
+  clearPendingCanvasRebind: () => void;
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -48,6 +54,8 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   backgroundColor: '#ffffff',
   selectedElementIds: [],
   fabricCanvas: null,
+  pendingCanvasRebindIds: null,
+  canvasRebindNonce: 0,
 
   // Actions
   setDimensions: (width, height) => set({ width, height }),
@@ -76,4 +84,12 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   setSelectedElements: (ids) => set({ selectedElementIds: ids }),
 
   setFabricCanvas: (fabricCanvas) => set({ fabricCanvas }),
+
+  requestCanvasRebindForElementIds: (ids) =>
+    set((s) => ({
+      pendingCanvasRebindIds: ids.length ? [...ids] : null,
+      canvasRebindNonce: s.canvasRebindNonce + 1,
+    })),
+
+  clearPendingCanvasRebind: () => set({ pendingCanvasRebindIds: null }),
 }));
