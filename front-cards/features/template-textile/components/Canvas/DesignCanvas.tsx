@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as fabric from 'fabric';
 import QRCode from 'qrcode';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -44,7 +44,8 @@ export function DesignCanvas() {
   const activelyInteracting = useRef<Set<string>>(new Set()); // Track which elements are being actively manipulated (scaling, moving, rotating)
   const loadingImages = useRef<Set<string>>(new Set()); // Track which images are currently loading
   const systemUpdating = useRef<Set<string>>(new Set()); // Track when SYSTEM is updating fabric objects (not user) - prevents object:modified from firing
-  const [globalSyncLock, setGlobalSyncLock] = useState(false); // NUCLEAR: Global lock to prevent ALL sync operations during ANY interaction
+  /** Ref (not state): sync effect must read the current lock synchronously; state would stay stale for one render after canvas dispose/unlock. */
+  const globalSyncLockRef = useRef(false);
 
   // Panning state
   const [isPanning, setIsPanning] = useState(false);
@@ -121,8 +122,8 @@ export function DesignCanvas() {
     }
   };
 
-  // 1) Initialize Fabric canvas - ONLY width/height in deps
-  useEffect(() => {
+  // 1) Initialize Fabric canvas — useLayoutEffect so ref + zoom + store ref exist before paint (avoids empty/wrong-size frame on resize).
+  useLayoutEffect(() => {
     if (!canvasRef.current) return;
 
     const canvas = new fabric.Canvas(canvasRef.current, {
@@ -135,6 +136,11 @@ export function DesignCanvas() {
       selectionColor: 'rgba(0, 102, 204, 0.1)',
       selectionFullyContained: false,
     });
+
+    const z = useCanvasStore.getState().zoom;
+    canvas.setZoom(z);
+    canvas.setWidth(width * z);
+    canvas.setHeight(height * z);
 
     fabricCanvasRef.current = canvas;
     setFabricCanvas(canvas);
@@ -193,7 +199,7 @@ export function DesignCanvas() {
       const elementId = (target as any).elementId;
       if (elementId) {
         activelyInteracting.current.add(elementId);
-        setGlobalSyncLock(true); // LOCK ALL SYNC
+        globalSyncLockRef.current = true; // LOCK ALL SYNC
         console.log(`[INTERACTION] Started scaling ${elementId} - GLOBAL SYNC LOCKED`);
 
         // CRITICAL: Update dimensions in REAL-TIME during scaling
@@ -252,7 +258,7 @@ export function DesignCanvas() {
       const elementId = (target as any).elementId;
       if (elementId) {
         activelyInteracting.current.add(elementId);
-        setGlobalSyncLock(true); // LOCK ALL SYNC
+        globalSyncLockRef.current = true; // LOCK ALL SYNC
         console.log(`[INTERACTION] Started moving ${elementId} - GLOBAL SYNC LOCKED`);
       }
     });
@@ -263,7 +269,7 @@ export function DesignCanvas() {
       const elementId = (target as any).elementId;
       if (elementId) {
         activelyInteracting.current.add(elementId);
-        setGlobalSyncLock(true); // LOCK ALL SYNC
+        globalSyncLockRef.current = true; // LOCK ALL SYNC
         console.log(`[INTERACTION] Started rotating ${elementId} - GLOBAL SYNC LOCKED`);
       }
     });
@@ -302,7 +308,7 @@ export function DesignCanvas() {
               activelyInteracting.current.delete(id);
             }
           });
-          setGlobalSyncLock(false);
+          globalSyncLockRef.current = false;
         }, 300);
         return;
       }
@@ -334,7 +340,7 @@ export function DesignCanvas() {
       setTimeout(() => {
         processingModification.current.delete(elementId);
         activelyInteracting.current.delete(elementId);
-        setGlobalSyncLock(false);
+        globalSyncLockRef.current = false;
         console.log(`[INTERACTION] Cleared modification flags and unlocked sync for ${elementId}`);
       }, 300); // 300ms delay - long enough to prevent sync during interaction, short enough to not block updates
 
@@ -583,11 +589,21 @@ export function DesignCanvas() {
 
     // Cleanup
     return () => {
+      globalSyncLockRef.current = false;
+      // dispose() removes all Fabric objects, but these refs still think elements exist — sync would skip
+      // addElementToCanvas and the canvas would look empty until full remount. Clear so the next canvas resyncs.
+      addedElementIds.current.clear();
+      fabricObjectsMap.current.clear();
+      loadingImages.current.clear();
+      processingModification.current.clear();
+      activelyInteracting.current.clear();
+      systemUpdating.current.clear();
       canvas.dispose();
       fabricCanvasRef.current = null;
+      setFabricCanvas(null);
       setIsReady(false);
     };
-  }, [width, height, setSelectedElements]); // canvas recreated on size change; selection sync uses setSelectedElements
+  }, [width, height, setFabricCanvas, setSelectedElements]); // canvas recreated on size change; selection sync uses setSelectedElements
 
   // Apply zoom to Fabric.js canvas
   useEffect(() => {
@@ -636,7 +652,7 @@ export function DesignCanvas() {
 
     // CRITICAL: Early return if global sync is locked (during user interactions)
     // This prevents the sync effect from running AT ALL during scaling/moving/rotating
-    if (globalSyncLock) {
+    if (globalSyncLockRef.current) {
       console.log('[SYNC] BLOCKED - Global sync lock is active, skipping entire sync');
       canvas.renderAll(); // Keep rendering what's already on canvas
       return;
@@ -683,7 +699,7 @@ export function DesignCanvas() {
         }
 
         // CRITICAL FIX: Skip if currently being modified OR actively interacting to prevent disappearance
-        if (processingModification.current.has(element.id) || activelyInteracting.current.has(element.id) || globalSyncLock) {
+        if (processingModification.current.has(element.id) || activelyInteracting.current.has(element.id) || globalSyncLockRef.current) {
           console.log(`[IMAGE-RECREATE] BLOCKED for ${element.id} - being modified or interacting or global sync locked`);
           return;
         }
@@ -731,7 +747,7 @@ export function DesignCanvas() {
               // Also check if scale is not 1 (group was scaled and needs reset)
               const isScaled = Math.abs((fabricObj.scaleX || 1) - 1) > 0.01 || Math.abs((fabricObj.scaleY || 1) - 1) > 0.01;
 
-              if ((fontSizeChanged || isScaled) && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
+              if ((fontSizeChanged || isScaled) && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLockRef.current) {
                 console.log(`[TEXT-RECREATE] Recreating multi-color group ${element.id} - fontSize changed: ${fontSizeChanged}, isScaled: ${isScaled}`);
 
                 // Preserve current position and rotation from Fabric object (canvas is source of truth)
@@ -764,7 +780,7 @@ export function DesignCanvas() {
               const isBeingModified = processingModification.current.has(element.id);
               const isBeingInteracted = activelyInteracting.current.has(element.id);
 
-              if (!isBeingModified && !isBeingInteracted && !globalSyncLock) {
+              if (!isBeingModified && !isBeingInteracted && !globalSyncLockRef.current) {
                 console.log(`[TEXT-CONVERSION] Converting single-color to multi-color for ${element.id}`);
                 // Need to replace single-color text with multi-color group
                 // Preserve current position from Fabric object (canvas is source of truth)
@@ -784,7 +800,7 @@ export function DesignCanvas() {
                 fabricObjectsMap.current.set(element.id, newMultiColorText);
                 addedElementIds.current.add(element.id);
               } else {
-                console.log(`[TEXT-CONVERSION] BLOCKED conversion for ${element.id} - being modified:${isBeingModified} or interacting:${isBeingInteracted} or globalLock:${globalSyncLock}`);
+                console.log(`[TEXT-CONVERSION] BLOCKED conversion for ${element.id} - being modified:${isBeingModified} or interacting:${isBeingInteracted} or globalLock:${globalSyncLockRef.current}`);
               }
             } else {
               // Update standard single-color text
@@ -906,7 +922,7 @@ export function DesignCanvas() {
           const isUndoRedo = lastUndoRedoTimestamp !== lastKnownUndoRedoTimestamp.current;
 
           // Only sync position during undo/redo operations AND not during active interaction
-          if (isUndoRedo && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
+          if (isUndoRedo && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLockRef.current) {
             // Undo/Redo: Force sync position from store to canvas
             const positionDiffX = Math.abs((fabricObj.left || 0) - element.x);
             const positionDiffY = Math.abs((fabricObj.top || 0) - element.y);
@@ -957,7 +973,7 @@ export function DesignCanvas() {
         const fabricObj = fabricObjectsMap.current.get(elementId);
         if (fabricObj) {
           // SAFETY CHECK: Don't remove if actively interacting (shouldn't happen, but extra safety)
-          if (activelyInteracting.current.has(elementId) || globalSyncLock) {
+          if (activelyInteracting.current.has(elementId) || globalSyncLockRef.current) {
             console.warn(`[REMOVE] BLOCKED removal of ${elementId} - actively interacting or sync locked`);
             return;
           }
@@ -977,7 +993,7 @@ export function DesignCanvas() {
         const qrEl = element as QRElement;
         const fabricObj = fabricObjectsMap.current.get(element.id);
 
-        if (fabricObj && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLock) {
+        if (fabricObj && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLockRef.current) {
           const currentQRData = (fabricObj as any)._qrData;
           const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
           const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
@@ -1219,7 +1235,7 @@ export function DesignCanvas() {
       }
       canvas.renderAll();
     }
-  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds, canvasRebindNonce]);
+  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds, canvasRebindNonce, width, height]);
 
   // 3) Handle zoom
   useEffect(() => {
@@ -1643,7 +1659,7 @@ export function DesignCanvas() {
         const ids = getElementIdsFromActiveObjects(canvas);
         if (
           ids.length > 0 &&
-          !ids.some((id) => activelyInteracting.current.has(id) || globalSyncLock)
+          !ids.some((id) => activelyInteracting.current.has(id) || globalSyncLockRef.current)
         ) {
           e.preventDefault();
           removeElements(ids);
