@@ -547,8 +547,10 @@ export function PropertyPanel() {
             {/* Rotation */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-gray-700">Rotation</h3>
-              <div className="relative">
+              <div className="relative w-full">
                 <NumericStringInput
+                  withStepper
+                  step={1}
                   value={selectedElement.rotation || 0}
                   roundDisplay
                   resetKey={selectedElementId}
@@ -564,9 +566,14 @@ export function PropertyPanel() {
                     }
                   }}
                   disabled={selectedElement.locked}
-                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-slate-800 font-medium disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
+                  className="pr-8"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">°</span>
+                <span
+                  className="pointer-events-none absolute right-10 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                  aria-hidden
+                >
+                  °
+                </span>
               </div>
             </div>
 
