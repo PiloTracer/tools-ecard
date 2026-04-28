@@ -418,8 +418,15 @@ export function DesignCanvas() {
         const rectGeomDrift =
           isRectLikeShape &&
           (Math.abs(effW - element.width) > 0.5 || Math.abs(effH - element.height) > 0.5);
+        // QR is a fabric.Image: same Fabric 6 quirk — scale may already be ~1 when `object:modified` runs.
+        const qrElForDrift = element.type === 'qr' ? (element as QRElement) : null;
+        const qrStoreW = qrElForDrift ? qrElForDrift.width || qrElForDrift.size : 0;
+        const qrStoreH = qrElForDrift ? qrElForDrift.height || qrElForDrift.size : 0;
+        const qrGeomDrift =
+          !!qrElForDrift &&
+          (Math.abs(effW - qrStoreW) > 0.5 || Math.abs(effH - qrStoreH) > 0.5);
 
-        if (scalesNonUnity || rectGeomDrift) {
+        if (scalesNonUnity || rectGeomDrift || qrGeomDrift) {
           // Handle special cases for circles and ellipses
           if (element.type === 'shape') {
             const shapeEl = element as any;
@@ -518,9 +525,9 @@ export function DesignCanvas() {
               updates.width = newWidth;
               updates.height = newHeight;
               (updates as any).size = newWidth; // QR codes are square, use width as size
-              // Reset scale to 1 after applying to width/height
-              target.set({ scaleX: 1, scaleY: 1 });
-              // Force coordinate recalculation
+              // Do not set scaleX/scaleY to 1 here without rebaking dimensions — that snaps the Image
+              // back to intrinsic bitmap size (same class of bug as rectangle). Store is updated above;
+              // the fabric object already matches the drag until sync/regenerate if needed.
               target.setCoords();
             } else {
               // Non-image, non-QR elements: apply scale to dimensions and reset scale
