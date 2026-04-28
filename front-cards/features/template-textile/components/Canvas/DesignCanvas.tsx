@@ -402,8 +402,24 @@ export function DesignCanvas() {
         // For QR elements OR elements with width/height defined
         const scaleX = target.scaleX || 1;
         const scaleY = target.scaleY || 1;
-        // Only update if object was scaled
-        if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
+        // Fabric 6 may normalize scale back to ~1 before `object:modified` while width/height already
+        // reflect the new size — relying only on scale !== 1 skips the store update. Then the sync
+        // effect reapplies stale element.width/height and the rect snaps back (circles/ellipses bake
+        // radius/rx/ry in the same handler, so they did not hit this path).
+        const scalesNonUnity =
+          Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01;
+        const shapeAny = element.type === 'shape' ? (element as ShapeElement) : null;
+        const isRectLikeShape =
+          !!shapeAny && shapeAny.shapeType !== 'circle' && shapeAny.shapeType !== 'ellipse';
+        const baseW = (target as fabric.Object).width ?? element.width;
+        const baseH = (target as fabric.Object).height ?? element.height;
+        const effW = Math.round(Math.abs(Number(baseW) * scaleX));
+        const effH = Math.round(Math.abs(Number(baseH) * scaleY));
+        const rectGeomDrift =
+          isRectLikeShape &&
+          (Math.abs(effW - element.width) > 0.5 || Math.abs(effH - element.height) > 0.5);
+
+        if (scalesNonUnity || rectGeomDrift) {
           // Handle special cases for circles and ellipses
           if (element.type === 'shape') {
             const shapeEl = element as any;
@@ -433,11 +449,15 @@ export function DesignCanvas() {
               // Force coordinate recalculation
               target.setCoords();
             } else {
-              // Other shapes use width/height directly
-              updates.width = Math.round((target.width || element.width) * scaleX);
-              updates.height = Math.round((target.height || element.height) * scaleY);
-              // Reset scale and update coordinates
-              target.set({ scaleX: 1, scaleY: 1 });
+              // Rectangle / line: bake display size into width/height and reset scale (same idea as circle radius).
+              updates.width = effW;
+              updates.height = effH;
+              target.set({
+                width: updates.width,
+                height: updates.height,
+                scaleX: 1,
+                scaleY: 1,
+              });
               target.setCoords();
             }
           } else {
