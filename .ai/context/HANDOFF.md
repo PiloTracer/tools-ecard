@@ -2,7 +2,9 @@
 
 **Purpose:** One screen so a **new agent or human** can resume without prior chat. Depth lives in **`.claude/`** and `DOCS_CONTEXT.md`.
 
-**Freshness:** Updated **2026-04-25**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
+**Freshness:** Updated **2026-04-28**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
+
+**Session closed 2026-04-28 — template-textile / designer canvas:** **Bring** in **Canvas elements** modal now re-adds Fabric objects when store and canvas are out of sync (`requestCanvasRebindForElementIds` in `canvasStore.ts`, consumed at start of sync in `DesignCanvas.tsx`, called from `ElementsLayerManagerModal.tsx`). **Canvas resize:** dispose cleanup clears `addedElementIds` / `fabricObjectsMap` (and related refs); sync lock is **`globalSyncLockRef`** (not `useState`); sync effect deps include **`width`/`height`** so elements re-add after dimension-only changes; canvas init uses **`useLayoutEffect`** + immediate zoom/size from store; cleanup calls **`setFabricCanvas(null)`**. **UI:** Elements button + modal strings moved to **English** (`CanvasControls.tsx`, `ElementsLayerManagerModal.tsx`). **Suggested commit subject:** `fix: canvas Bring rebind + English Elements modal` (or split if you commit resize separately). **Not re-run here:** full `front-cards` `npm run build` / CI — treat CI as gate.
 
 **Session closed 2026-04-25:** Seaweed/Tools Dashboard storage work and tutorials landed (see **Last verified** row below). No open blocker from that track; next owner picks up from **§0** / **§7** as usual.
 
@@ -10,6 +12,7 @@
 
 | Area | Date | Notes |
 |------|------|--------|
+| Template designer (Fabric) — canvas / modal | 2026-04-28 | **Code:** `front-cards/features/template-textile/components/Canvas/DesignCanvas.tsx`, `ElementsLayerManagerModal.tsx`, `CanvasControls.tsx`; `stores/canvasStore.ts` (rebind queue). **Verify in browser:** resize canvas with existing elements; open **Elements** → **Bring** on “no object on canvas” rows. **Unverified here:** `front-cards` full build (repo `tsc` has unrelated noise). |
 | Improvement plan work | 2026-04-22 | **Shipped:** `GET /api/batches/:id` in `batch-upload` (`getBatchDetail` + Cassandra `recordsCount`); **`batch-import`** registered at `/api/batch-import` in `app.ts`; **removed** broken `api-server/src/features/template-designer/` tree. **Docs/plan:** `.claude/plans/20260422-ecards-application-improvement-priorities.md` and `.claude/features/render-worker/` updated. |
 | Baseline CI / full build | _pending_ | Run **§4** after `npm ci` + `npm run db:generate` in `api-server`; local `tsc` had many **pre-existing** errors unrelated to the batch-detail change—use **CI log** as gate. |
 | Stack identity / `.env` | 2026-04-25 | `TD_APP_CODE` / `TD_STACK_SUFFIX` / `COMPOSE_PROJECT_NAME=tools_dashboard_*_tcrd`; **`bin/start.sh`**, compose, and **`init-cassandra.sh`** use `-p` + service names. `.claude/fixes` / some runbooks may still show old `ecards-*` container names — use compose exec. |
@@ -125,6 +128,7 @@ Prefer **one** `.claude/features/<name>/` folder over re-reading all of `DOCS_CO
 
 ## 7) Open threads (optional — trim when stale)
 
+- **Template-textile designer (2026-04-28):** If you touch `DesignCanvas.tsx` again, smoke **canvas resize** (elements stay visible) and **Elements → Bring** for desynced rows; confirm **CI** for `front-cards` if you change exports or Fabric paths.
 - **`api-server` `npm run build` (tsc):** CI is intended to enforce this. If CI fails, triage from the log: missing `node_modules` / run `npm run db:generate`; per-route `AuthenticatedRequest` vs global `FastifyRequest['user']`; Prisma schema vs `Project` types; AWS SDK typings — **not** from memory. The obsolete **`api-server/src/features/template-designer/`** stub was **removed** (2026-04); do not resurrect unless intentionally reintroducing an alias to **template-textile**.
 - **`batch-upload` `deleteBatch`:** Confirm whether deletes must also clear **Cassandra** batch records ( **`batch-view` service** had that path; verify parity with live **`batch-upload`** delete).
 - **Do not paste** real `.env` / `.env.prd` contents into chats or handoff; use **`.env.*.example`** for key names only.
