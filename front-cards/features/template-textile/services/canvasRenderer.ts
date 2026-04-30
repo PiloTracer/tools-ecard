@@ -8,6 +8,7 @@
 import * as fabric from 'fabric';
 import type { TemplateElement, TextElement, ImageElement, ShapeElement, QRElement } from '../types';
 import { createMultiColorText } from '../utils/multiColorText';
+import { applyPersistedTemplateGeometry } from '../utils/fabricTemplateGeometry';
 import QRCode from 'qrcode';
 
 export interface CanvasRendererOptions {
@@ -102,14 +103,13 @@ function createTextElement(element: TextElement): fabric.Object {
   const fontSize = isNaN(element.fontSize) ? 16 : (element.fontSize || 16);
   const strokeWidth = isNaN(element.strokeWidth ?? 0) ? 0 : (element.strokeWidth ?? 0);
 
+  let obj: fabric.Object;
   if (hasMultipleColors) {
-    // Use multi-color text group
-    return createMultiColorText(element);
+    obj = createMultiColorText(element);
   } else {
-    // Standard single-color text
-    return new fabric.IText(element.text ?? 'Text', {
-      left: element.x,
-      top: element.y,
+    obj = new fabric.IText(element.text ?? 'Text', {
+      left: 0,
+      top: 0,
       fontSize: fontSize,
       fontFamily: element.fontFamily || 'Arial',
       fill: element.color || element.colors?.[0] || '#000000',
@@ -119,7 +119,6 @@ function createTextElement(element: TextElement): fabric.Object {
       stroke: element.stroke || '',
       strokeWidth: strokeWidth,
       textAlign: element.textAlign || 'left',
-      angle: element.rotation || 0,
       opacity: element.opacity || 1,
       selectable: true,
       evented: true,
@@ -131,6 +130,8 @@ function createTextElement(element: TextElement): fabric.Object {
       excludeFromExport: element.excludeFromExport || false,
     });
   }
+  applyPersistedTemplateGeometry(obj as fabric.FabricObject, element.x, element.y, element.rotation ?? 0);
+  return obj;
 }
 
 /**

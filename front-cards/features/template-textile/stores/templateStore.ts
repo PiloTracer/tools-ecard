@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Template, TemplateElement } from '../types';
 import type { LengthUnit } from '../utils/lengthUnits';
+import { useCanvasStore } from './canvasStore';
 
 interface TemplateState {
   // Current template
@@ -163,6 +164,10 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
 
     // Wait for all fonts to load before setting template state
     await Promise.all(loadPromises);
+
+    // Force DesignCanvas to drop Fabric↔store maps and re-add every element from JSON.
+    // Same element IDs across open/save would otherwise skip `addElementToCanvas` and keep stale geometry.
+    useCanvasStore.getState().bumpTemplateFabricBindingEpoch();
 
     set({
       currentTemplate: template,

@@ -8,6 +8,29 @@ import { resourceManager } from './resourceManager';
 import type { Template, TemplateElement } from '../types';
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
+/**
+ * Calls same-origin `/api/*` (or proxied API). On 401, tries POST `/api/auth/refresh-token`
+ * then repeats once — fixes expired access tokens while ecards_refresh is still valid.
+ */
+async function apiFetchWithRefresh(input: string, init: RequestInit): Promise<Response> {
+  const first = await fetch(input, { ...init, credentials: 'include' });
+  if (first.status !== 401) {
+    return first;
+  }
+
+  const refreshUrl = `${getApiBaseUrl()}/api/auth/refresh-token`;
+  const refresh = await fetch(refreshUrl, {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  if (!refresh.ok) {
+    return first;
+  }
+
+  return fetch(input, { ...init, credentials: 'include' });
+}
+
 export type StorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
 
 export interface SaveTemplateRequest {
@@ -44,9 +67,8 @@ class TemplateService {
    */
   async getStorageMode(): Promise<StorageMode> {
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/mode`, {
+      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/mode`, {
         method: 'GET',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         }
@@ -115,9 +137,8 @@ class TemplateService {
 
     try {
       // Try to save to server
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile`, {
+      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -145,7 +166,13 @@ class TemplateService {
         return metadata;
       }
 
-      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      const authHint =
+        response.status === 401
+          ? ' Session expired or not signed in — sign in again or check you use the same host as login (e.g. localhost vs 127.0.0.1).'
+          : '';
+      throw new Error(
+        `Server returned ${response.status}: ${response.statusText}.${authHint}`
+      );
     } catch (error) {
       console.error('Failed to save to server:', error);
 
@@ -212,9 +239,8 @@ class TemplateService {
     if (mode !== 'LOCAL_ONLY') {
       try {
         // Try to load from server
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
+        const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
           method: 'GET',
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
           }
@@ -300,9 +326,8 @@ class TemplateService {
 
     try {
       // Try to list from server
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile`, {
+      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile`, {
         method: 'GET',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         }
@@ -371,9 +396,8 @@ class TemplateService {
 
     if (mode === 'FULL') {
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
+        const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
           method: 'DELETE',
-          credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
           }

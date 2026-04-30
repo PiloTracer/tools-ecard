@@ -26,6 +26,13 @@ interface CanvasState {
   pendingCanvasRebindIds: string[] | null;
   canvasRebindNonce: number;
 
+  /**
+   * Incremented when a full template document is loaded into the store (`loadTemplate`).
+   * DesignCanvas must drop `addedElementIds` / `fabricObjectsMap` and re-add from JSON — otherwise
+   * reopening the same template reuses stale Fabric instances (ids match) and geometry never refreshes.
+   */
+  templateFabricBindingEpoch: number;
+
   // Actions
   setDimensions: (width: number, height: number) => void;
   setZoom: (zoom: number) => void;
@@ -41,6 +48,7 @@ interface CanvasState {
   setFabricCanvas: (canvas: Canvas | null) => void;
   requestCanvasRebindForElementIds: (ids: string[]) => void;
   clearPendingCanvasRebind: () => void;
+  bumpTemplateFabricBindingEpoch: () => void;
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -56,6 +64,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   fabricCanvas: null,
   pendingCanvasRebindIds: null,
   canvasRebindNonce: 0,
+  templateFabricBindingEpoch: 0,
 
   // Actions
   setDimensions: (width, height) => set({ width, height }),
@@ -92,4 +101,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     })),
 
   clearPendingCanvasRebind: () => set({ pendingCanvasRebindIds: null }),
+
+  bumpTemplateFabricBindingEpoch: () =>
+    set((s) => ({ templateFabricBindingEpoch: s.templateFabricBindingEpoch + 1 })),
 }));

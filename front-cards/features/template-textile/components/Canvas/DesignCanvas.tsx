@@ -7,6 +7,7 @@ import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 import { createMultiColorText, updateMultiColorText, shouldUseMultiColor } from '../../utils/multiColorText';
+import { applyPersistedTemplateGeometry, readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
 
 /**
  * Fabric 6: ActiveSelection extends Group — `type` is often `'group'`, not `'activeSelection'`.
@@ -70,11 +71,14 @@ export function DesignCanvas() {
     setFabricCanvas,
     selectedElementIds,
     canvasRebindNonce,
+    templateFabricBindingEpoch,
   } = useCanvasStore();
   const { canvasWidth: width, canvasHeight: height, elements, updateElement, removeElement, removeElements, duplicateElement, exportWidth, lastUndoRedoTimestamp } = useTemplateStore();
   const selectedElementId = selectedElementIds[0] ?? null;
   const copiedElement = useRef<TemplateElement | null>(null);
   const lastKnownUndoRedoTimestamp = useRef<number>(0);
+  /** When `templateFabricBindingEpoch` changes, maps must reset so elements re-add from JSON (reopen template). */
+  const lastTemplateFabricBindingEpochRef = useRef(0);
 
   // Handle drag over and drop for vCard fields
   const handleDragOver = (e: React.DragEvent) => {
@@ -349,13 +353,12 @@ export function DesignCanvas() {
       const element = currentElements.find(el => el.id === elementId);
       if (!element) return;
 
-      const finalX = Math.round(target.left || element.x);
-      const finalY = Math.round(target.top || element.y);
+      const geom = readPersistedTemplateGeometry(target as fabric.FabricObject);
 
       const updates: Partial<TemplateElement> = {
-        rotation: target.angle || element.rotation,
-        x: finalX,
-        y: finalY,
+        rotation: geom.rotation,
+        x: geom.x,
+        y: geom.y,
       };
 
       console.log(`[MODIFY] Element ${elementId} type=${element.type}, has width=${element.width !== undefined}, has height=${element.height !== undefined}`);
@@ -658,6 +661,19 @@ export function DesignCanvas() {
       return;
     }
 
+    const epoch = templateFabricBindingEpoch;
+    if (epoch !== lastTemplateFabricBindingEpochRef.current) {
+      lastTemplateFabricBindingEpochRef.current = epoch;
+      addedElementIds.current.clear();
+      fabricObjectsMap.current.clear();
+      for (const o of [...canvas.getObjects()]) {
+        const any = o as any;
+        if (any.elementId && !any.isGrid) {
+          canvas.remove(o);
+        }
+      }
+    }
+
     const rebindIds = useCanvasStore.getState().pendingCanvasRebindIds;
     if (rebindIds && rebindIds.length > 0) {
       for (const id of rebindIds) {
@@ -876,8 +892,10 @@ export function DesignCanvas() {
                   fabricObj.setCoords();
                 }
               }
-            } else if (element.type !== 'qr' && element.type !== 'image') {
-              // For non-shape, non-QR, non-image elements (text), use width/height
+            } else if (element.type !== 'qr' && element.type !== 'image' && element.type !== 'text') {
+              // For non-shape, non-QR, non-image, non-text elements, use width/height.
+              // Text (IText / multi-color group) must not be forced to stored width/height — that
+              // desyncs layout vs font metrics on reopen when stale dimensions exist in JSON.
               // QR elements are excluded because they manage their own scaling during regeneration
               // Image elements are excluded because they maintain full resolution and use scale
               const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
@@ -923,14 +941,15 @@ export function DesignCanvas() {
 
           // Only sync position during undo/redo operations AND not during active interaction
           if (isUndoRedo && !processingModification.current.has(element.id) && !activelyInteracting.current.has(element.id) && !globalSyncLockRef.current) {
-            // Undo/Redo: Force sync position from store to canvas
-            const positionDiffX = Math.abs((fabricObj.left || 0) - element.x);
-            const positionDiffY = Math.abs((fabricObj.top || 0) - element.y);
+            // Undo/Redo: Force sync position from store to canvas (same anchor as save/load)
+            const cur = readPersistedTemplateGeometry(fabricObj as fabric.FabricObject);
+            const positionDiffX = Math.abs(cur.x - element.x);
+            const positionDiffY = Math.abs(cur.y - element.y);
+            const rotationDiff = Math.abs(cur.rotation - (element.rotation ?? 0));
 
-            if (positionDiffX > 0.1 || positionDiffY > 0.1) {
-              console.log(`[UNDO/REDO] Syncing position for ${element.id}: canvas=(${fabricObj.left},${fabricObj.top}) store=(${element.x},${element.y})`);
-              fabricObj.set({ left: element.x, top: element.y });
-              fabricObj.setCoords();
+            if (positionDiffX > 0.1 || positionDiffY > 0.1 || rotationDiff > 0.1) {
+              console.log(`[UNDO/REDO] Syncing geometry for ${element.id}: canvas=(${cur.x},${cur.y},${cur.rotation}) store=(${element.x},${element.y},${element.rotation ?? 0})`);
+              applyPersistedTemplateGeometry(fabricObj as fabric.FabricObject, element.x, element.y, element.rotation ?? 0);
             }
           }
           // For all other cases: DO NOT sync position - canvas owns the position during normal operations
@@ -1235,7 +1254,7 @@ export function DesignCanvas() {
       }
       canvas.renderAll();
     }
-  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds, canvasRebindNonce, width, height]);
+  }, [elements, isReady, lastUndoRedoTimestamp, selectedElementIds, canvasRebindNonce, templateFabricBindingEpoch, width, height]);
 
   // 3) Handle zoom
   useEffect(() => {
@@ -1803,7 +1822,8 @@ export function DesignCanvas() {
           } else {
             const id = (activeObject as any).elementId;
             if (id) {
-              updateElement(id, { x: activeObject.left || 0, y: activeObject.top || 0 });
+              const g = readPersistedTemplateGeometry(activeObject as fabric.FabricObject);
+              updateElement(id, { x: g.x, y: g.y, rotation: g.rotation });
             }
           }
         }
@@ -1832,8 +1852,8 @@ export function DesignCanvas() {
           const fontWeight = textEl.fontWeight === 'bold' ? 700 : (textEl.fontWeight === 'normal' ? 400 : textEl.fontWeight || 400);
 
           fabricObject = new fabric.IText(textEl.text || 'Text', {
-            left: textEl.x,
-            top: textEl.y,
+            left: 0,
+            top: 0,
             fontSize: textEl.fontSize,
             fontFamily: textEl.fontFamily,
             fill: textEl.color || textEl.colors?.[0] || '#000000',
@@ -1843,7 +1863,6 @@ export function DesignCanvas() {
             stroke: textEl.stroke || '',
             strokeWidth: textEl.strokeWidth || 0,
             textAlign: textEl.textAlign || 'left',
-            angle: textEl.rotation || 0,
             opacity: textEl.opacity || 1,
             selectable: true,
             evented: true,
@@ -1855,6 +1874,12 @@ export function DesignCanvas() {
             excludeFromExport: textEl.excludeFromExport || false,
           });
         }
+        applyPersistedTemplateGeometry(
+          fabricObject as fabric.FabricObject,
+          textEl.x,
+          textEl.y,
+          textEl.rotation ?? 0
+        );
         break;
       }
 

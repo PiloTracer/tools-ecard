@@ -14,6 +14,7 @@ import { templateService } from '../../services/templateService';
 import { templatePackageService } from '../../services/templatePackageService';
 import type { Template, ImageElement } from '../../types';
 import type { LengthUnit } from '../../utils/lengthUnits';
+import { readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
 
 /**
  * Merges live store dimensions/units into the template object so saves and ZIP exports
@@ -45,6 +46,49 @@ function templateSnapshotForPersistence(
     canvasSizeUnit: unit,
     exportBaseWidthUnit: unit,
     updatedAt: new Date(),
+  };
+}
+
+/**
+ * Overwrite element x/y/rotation from the live Fabric canvas before persist.
+ * The store is not always updated (e.g. focus/blur, race with object:modified, or desync);
+ * without this, save/reopen can show text and shapes in old positions.
+ */
+function mergeLiveCanvasGeometryIntoTemplate(
+  template: Template,
+  canvas: fabric.Canvas | null
+): Template {
+  if (!canvas) {
+    return template;
+  }
+
+  const live = new Map<string, { x: number; y: number; rotation: number }>();
+
+  for (const obj of canvas.getObjects()) {
+    const elementId = (obj as { elementId?: string }).elementId;
+    if (!elementId) continue;
+
+    const fo = obj as fabric.FabricObject;
+    const g = readPersistedTemplateGeometry(fo);
+    live.set(elementId, { x: g.x, y: g.y, rotation: g.rotation });
+  }
+
+  if (live.size === 0) {
+    return template;
+  }
+
+  return {
+    ...template,
+    elements: template.elements.map((el) => {
+      const pos = live.get(el.id);
+      if (!pos) return el;
+      return {
+        ...el,
+        x: pos.x,
+        y: pos.y,
+        rotation: pos.rotation,
+      };
+    }),
   };
 }
 
@@ -213,7 +257,7 @@ export function CanvasControls() {
     setIsSaving(true);
 
     try {
-      const toPersist = templateSnapshotForPersistence(
+      let toPersist = templateSnapshotForPersistence(
         currentTemplate,
         canvasWidth,
         canvasHeight,
@@ -221,6 +265,7 @@ export function CanvasControls() {
         canvasSizeUnit,
         templateName
       );
+      toPersist = mergeLiveCanvasGeometryIntoTemplate(toPersist, fabricCanvas);
       // Rasterize all images before saving to avoid SVG corruption
       const processedTemplate = await rasterizeImages(toPersist, fabricCanvas);
 
@@ -229,6 +274,24 @@ export function CanvasControls() {
         name: templateName,
         templateData: processedTemplate,
       });
+
+      // Store may still hold stale x/y/rotation; align so same-session edit matches what was saved
+      const syncGeom = useTemplateStore.getState();
+      for (const el of processedTemplate.elements) {
+        const prev = syncGeom.elements.find((e) => e.id === el.id);
+        if (
+          prev &&
+          (prev.x !== el.x ||
+            prev.y !== el.y ||
+            (prev.rotation ?? 0) !== (el.rotation ?? 0))
+        ) {
+          syncGeom.updateElement(el.id, {
+            x: el.x,
+            y: el.y,
+            rotation: el.rotation,
+          });
+        }
+      }
 
       // Update store with saved metadata
       setSaveMetadata(projectName, templateName);
@@ -703,7 +766,7 @@ export function CanvasControls() {
         (currentTemplate.name && currentTemplate.name.trim() !== '' ? currentTemplate.name : null) ||
         'template';
 
-      const toPackage = templateSnapshotForPersistence(
+      let toPackage = templateSnapshotForPersistence(
         currentTemplate,
         canvasWidth,
         canvasHeight,
@@ -711,6 +774,7 @@ export function CanvasControls() {
         canvasSizeUnit,
         displayName
       );
+      toPackage = mergeLiveCanvasGeometryIntoTemplate(toPackage, fabricCanvas);
 
       // Export as complete ZIP package with all resources
       const zipBlob = await templatePackageService.exportPackage(toPackage);
