@@ -8,8 +8,7 @@ import JSZip from 'jszip';
 import { Template, ImageElement, TextElement, TemplateElement } from '../types';
 import { fontService } from './fontService';
 import { apiClient } from '@/shared/lib/api-client';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 interface PackageMetadata {
   version: '1.0';
@@ -302,7 +301,7 @@ export class TemplatePackageService {
    * Includes credentials to allow access to user-uploaded fonts
    */
   private async fetchFontFile(fontId: string): Promise<Blob> {
-    const url = `${API_URL}/api/v1/fonts/${fontId}/file`;
+    const url = `${getApiBaseUrl()}/api/v1/fonts/${fontId}/file`;
     console.log(`[PackageExport] Fetching font file from: ${url}`);
 
     const response = await fetch(url, {

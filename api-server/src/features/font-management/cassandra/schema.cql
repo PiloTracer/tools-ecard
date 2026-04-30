@@ -6,7 +6,7 @@ USE ecards_canonical;
 -- Fonts table (partitioned by user_id for isolation)
 CREATE TABLE IF NOT EXISTS fonts (
     font_id text,              -- UUID for the font
-    user_id text,              -- User who uploaded (NULL for global fonts)
+    user_id text,              -- User who uploaded, or "GLOBAL" for system fonts (Cassandra partition key; not null)
     font_name text,            -- Display name (e.g., "Montserrat Bold")
     font_family text,          -- CSS font-family value (e.g., "Montserrat")
     font_category text,        -- 'serif', 'sans-serif', 'display', 'handwriting', 'monospace'
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS fonts (
     PRIMARY KEY ((user_id), font_id)
 ) WITH CLUSTERING ORDER BY (font_id ASC);
 
--- Index for querying global fonts (user_id = null)
+-- Index for querying global fonts (is_system_font)
 CREATE INDEX IF NOT EXISTS fonts_system_idx ON fonts (is_system_font);
 
 -- Index for category filtering

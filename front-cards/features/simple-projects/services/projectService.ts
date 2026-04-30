@@ -11,7 +11,7 @@ import type {
   SelectedProjectResponse
 } from '../types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 class ProjectService {
   private async fetchWithAuth(url: string, options?: RequestInit) {
@@ -47,13 +47,17 @@ class ProjectService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[ProjectService] Error response:', errorText);
-      let error;
-      try {
-        error = JSON.parse(errorText);
-      } catch {
-        error = { error: errorText || 'Request failed' };
+      let parsed: { error?: string } = {};
+      if (errorText.trim()) {
+        try {
+          parsed = JSON.parse(errorText) as { error?: string };
+        } catch {
+          parsed = { error: errorText };
+        }
       }
-      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+      const statusPart = `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
+      const msg = parsed.error?.trim() || errorText.trim() || statusPart;
+      throw new Error(msg);
     }
 
     const responseText = await response.text();
@@ -71,7 +75,7 @@ class ProjectService {
    * Get all projects for the current user
    */
   async getProjects(): Promise<ProjectsResponse> {
-    const response = await this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects`);
+    const response = await this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects`);
     console.log('[ProjectService.getProjects] Response with phone fields:', response);
     return response;
   }
@@ -80,7 +84,7 @@ class ProjectService {
    * Create a new project
    */
   async createProject(data: CreateProjectRequest): Promise<Project> {
-    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects`, {
+    return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -90,14 +94,14 @@ class ProjectService {
    * Get the currently selected project
    */
   async getSelectedProject(): Promise<SelectedProjectResponse> {
-    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects/selected`);
+    return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/selected`);
   }
 
   /**
    * Update the selected project
    */
   async updateSelectedProject(data: UpdateSelectedProjectRequest): Promise<{ success: boolean; projectId: string }> {
-    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects/selected`, {
+    return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/selected`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -107,7 +111,7 @@ class ProjectService {
    * Ensure default project exists (called after login)
    */
   async ensureDefaultProject(): Promise<Project> {
-    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects/ensure-default`, {
+    return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/ensure-default`, {
       method: 'POST',
       body: JSON.stringify({}),
     });
@@ -117,7 +121,7 @@ class ProjectService {
    * Update project settings (phone prefixes)
    */
   async updateProject(projectId: string, data: UpdateProjectRequest): Promise<Project> {
-    return this.fetchWithAuth(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+    return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/${projectId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });

@@ -6,7 +6,7 @@
 import { browserStorageService } from './browserStorageService';
 import { createHash } from 'crypto';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 export interface Resource {
   type: string; // 'image', 'font', 'icon', etc.
@@ -206,7 +206,7 @@ class ResourceManager {
       templateName?: string;
     }
   ): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/template-textile/resources`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/resources`, {
       method: 'POST',
       credentials: 'include',
       headers: {

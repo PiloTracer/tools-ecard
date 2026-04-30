@@ -6,8 +6,7 @@
 import { browserStorageService, type CachedTemplate } from './browserStorageService';
 import { resourceManager } from './resourceManager';
 import type { Template, TemplateElement } from '../types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 export type StorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
 
@@ -45,7 +44,7 @@ class TemplateService {
    */
   async getStorageMode(): Promise<StorageMode> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/template-textile/mode`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/mode`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -116,7 +115,7 @@ class TemplateService {
 
     try {
       // Try to save to server
-      const response = await fetch(`${API_BASE_URL}/api/v1/template-textile`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -213,7 +212,7 @@ class TemplateService {
     if (mode !== 'LOCAL_ONLY') {
       try {
         // Try to load from server
-        const response = await fetch(`${API_BASE_URL}/api/v1/template-textile/${templateId}`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -301,7 +300,7 @@ class TemplateService {
 
     try {
       // Try to list from server
-      const response = await fetch(`${API_BASE_URL}/api/v1/template-textile`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -372,7 +371,7 @@ class TemplateService {
 
     if (mode === 'FULL') {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/template-textile/${templateId}`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
           method: 'DELETE',
           credentials: 'include',
           headers: {

@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 export type StorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
 
@@ -18,8 +19,6 @@ interface UseStorageModeOptions {
   refreshInterval?: number; // milliseconds, 0 to disable auto-refresh
   onModeChange?: (mode: StorageMode) => void;
 }
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
 
 export function useStorageMode(options: UseStorageModeOptions = {}) {
   const { refreshInterval = 30000, onModeChange } = options; // Default 30 seconds
@@ -40,7 +39,7 @@ export function useStorageMode(options: UseStorageModeOptions = {}) {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/template-textile/mode`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/mode`, {
         method: 'GET',
         credentials: 'include',
         headers: {

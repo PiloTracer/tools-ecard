@@ -5,7 +5,7 @@
 
 import { apiClient } from '@/shared/lib/api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 export interface Font {
   fontId: string;
@@ -76,7 +76,7 @@ class FontService {
       return; // Already loaded
     }
 
-    const fontUrl = `${API_URL}/api/v1/fonts/${font.fontId}/file${
+    const fontUrl = `${getApiBaseUrl()}/api/v1/fonts/${font.fontId}/file${
       font.userId ? `?userId=${font.userId}` : ''
     }`;
 
@@ -123,7 +123,7 @@ class FontService {
       formData.append(key, String(value));
     });
 
-    const response = await fetch(`${API_URL}/api/v1/fonts`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/fonts`, {
       method: 'POST',
       body: formData,
       credentials: 'include',

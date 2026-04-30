@@ -7,7 +7,7 @@ import {
   BatchStatus,
 } from '../types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7400';
+import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 
 class BatchService {
   private getAuthHeaders(): HeadersInit {
@@ -35,7 +35,7 @@ class BatchService {
     formData.append('projectId', projectId);
     formData.append('projectName', projectName);
 
-    const response = await fetch(`${API_URL}/api/batches/upload`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/batches/upload`, {
       method: 'POST',
       credentials: 'include', // Include cookies for auth
       body: formData,
@@ -51,7 +51,7 @@ class BatchService {
   }
 
   async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {
-    const response = await fetch(`${API_URL}/api/batches/${batchId}/status`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}/status`, {
       credentials: 'include', // Include cookies for auth
       headers: {
         'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ class BatchService {
       queryParams.append('limit', params.limit.toString());
     }
 
-    const url = `${API_URL}/api/batches${queryParams.toString() ? `?${queryParams}` : ''}`;
+    const url = `${getApiBaseUrl()}/api/batches${queryParams.toString() ? `?${queryParams}` : ''}`;
 
     const response = await fetch(url, {
       headers: {
@@ -101,7 +101,7 @@ class BatchService {
   }
 
   async deleteBatch(batchId: string): Promise<void> {
-    const response = await fetch(`${API_URL}/api/batches/${batchId}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}`, {
       method: 'DELETE',
       headers: {
         ...this.getAuthHeaders(),
@@ -116,7 +116,7 @@ class BatchService {
   }
 
   async retryBatch(batchId: string): Promise<BatchUploadResponse> {
-    const response = await fetch(`${API_URL}/api/batches/${batchId}/retry`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}/retry`, {
       method: 'POST',
       headers: {
         ...this.getAuthHeaders(),
@@ -133,7 +133,7 @@ class BatchService {
   }
 
   async getBatchStats(): Promise<BatchStats> {
-    const response = await fetch(`${API_URL}/api/batches/stats`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/batches/stats`, {
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
@@ -149,7 +149,7 @@ class BatchService {
   }
 
   async getRecentBatches(limit: number = 5): Promise<Batch[]> {
-    const response = await fetch(`${API_URL}/api/batches/recent?limit=${limit}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/batches/recent?limit=${limit}`, {
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',

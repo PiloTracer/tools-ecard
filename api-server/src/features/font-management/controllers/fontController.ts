@@ -242,6 +242,9 @@ export class FontController {
       reply.code(200).send(fontBuffer);
     } catch (error) {
       console.error('[FontController] Error getting font file:', error);
+      if (error instanceof Error && error.message === 'Font not found') {
+        return reply.code(404).send({ error: 'Font not found' });
+      }
       reply.code(500).send({ error: 'Failed to get font file' });
     }
   }

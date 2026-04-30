@@ -34,13 +34,25 @@ declare module 'fastify' {
   }
 }
 
+function getAccessToken(request: FastifyRequest): string | undefined {
+  const fromCookie = request.cookies[COOKIE_CONFIG.accessToken.name];
+  if (fromCookie) {
+    return fromCookie;
+  }
+  const auth = request.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    const token = auth.slice(7).trim();
+    return token || undefined;
+  }
+  return undefined;
+}
+
 /**
- * Auth middleware - extracts user from cookie and fetches user info
+ * Auth middleware - extracts user from cookie or Bearer token and fetches user info
  */
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   try {
-    // Get access token from cookie
-    const accessToken = request.cookies[COOKIE_CONFIG.accessToken.name];
+    const accessToken = getAccessToken(request);
 
     if (!accessToken) {
       // No token - request will proceed without user (controllers can decide if auth is required)

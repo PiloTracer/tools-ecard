@@ -107,6 +107,8 @@ services:
       OAUTH_DEV_INSECURE_TLS: ${OAUTH_DEV_INSECURE_TLS:-}
       # Defaults mirror .env.dev.example so a partial root `.env` still gets browser + OAuth URLs in the container.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
+      # Same-origin `/api/*` Route Handlers proxy this URL server-side; inside Docker use the api-server service, not localhost:7400.
+      INTERNAL_API_URL: http://api-server:${API_INTERNAL_PORT:-4000}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:7400}
       NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}
       NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:-ecards_app_dev}

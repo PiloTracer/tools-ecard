@@ -339,10 +339,10 @@ export class FontService {
         }
       }
 
-      // Try global fonts
+      // Try global fonts (partition key is GLOBAL_USER_ID — Cassandra cannot use null in PK lookup)
       const globalResult = await cassandraClient['client']!.execute(
         'SELECT * FROM fonts WHERE user_id = ? AND font_id = ?',
-        [null, fontId],
+        [GLOBAL_USER_ID, fontId],
         { prepare: true }
       );
 
