@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useProjects } from '../contexts/ProjectsContext';
+import { ProjectsIssueAlert } from './ProjectsIssueAlert';
 
 export function ProjectSelector() {
   const {
@@ -71,15 +72,10 @@ export function ProjectSelector() {
 
   if (error) {
     return (
-      <div className="flex items-center space-x-3 mb-6">
-        <label className="text-sm font-medium text-gray-700 min-w-fit">
-          Project:
-        </label>
-        <div className="flex items-center space-x-2 flex-1">
-          <div className="px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
-            Error: {error}
-          </div>
-        </div>
+      <div className="mb-6 space-y-2">
+        <p className="text-sm font-medium text-gray-900">Workspace (project)</p>
+        <ProjectsIssueAlert alert={error} variant="inline" />
+        <p className="text-xs text-gray-500">The same summary appears in the amber bar at the top of the page.</p>
       </div>
     );
   }

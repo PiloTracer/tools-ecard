@@ -13,7 +13,7 @@ import { initializeDatabase } from './core/database/init';
 import { initCassandraSchema } from './core/cassandra/init';
 import { batchParsingWorker } from './features/batch-parsing';
 import { loadGoogleFonts } from './features/font-management/startup/loadGoogleFonts';
-import { createLogger } from './core/utils/logger';
+import { createLogger, serializeError } from './core/utils/logger';
 import {
   ensureAppLibraryStorageIntegrationReady,
   isAppLibraryStorageIntegrationEnabled,
@@ -91,7 +91,7 @@ async function start() {
     process.on('SIGINT', () => shutdown('SIGINT'));
 
   } catch (error) {
-    log.error({ error }, 'Failed to start server');
+    log.error({ err: serializeError(error) }, 'Failed to start server');
     process.exit(1);
   }
 }

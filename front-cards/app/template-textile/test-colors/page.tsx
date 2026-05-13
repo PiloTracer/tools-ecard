@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useAuth } from '@/features/auth';
 import { ProjectsProvider } from '@/features/simple-projects';
 import { TemplateDesigner } from '@/features/template-textile';
 import { useTemplateStore } from '@/features/template-textile/stores/templateStore';
 import type { TextElement } from '@/features/template-textile/types';
 
 export default function TestColorsPage() {
+  const { user } = useAuth();
   useEffect(() => {
     // Add a test text element with multiple colors when the page loads
     const testElement: TextElement = {
@@ -60,7 +62,7 @@ export default function TestColorsPage() {
           <li>"This Is A Test" in blue (last color applies to remaining words)</li>
         </ul>
       </div>
-      <ProjectsProvider>
+      <ProjectsProvider sessionUserId={user?.id}>
         <TemplateDesigner />
       </ProjectsProvider>
     </div>

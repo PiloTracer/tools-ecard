@@ -12,25 +12,46 @@ import { ProtectedRoute } from '@/features/auth';
 import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
 import { ProjectSelector, ProjectSettings, ProjectsProvider, useProjects } from '@/features/simple-projects';
 import { QuickActions } from '@/features/simple-quick-actions';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 function DashboardInner() {
   const { user, logout } = useAuth();
-  const { ensureDefaultProject, selectedProjectId } = useProjects();
+  const { ensureDefaultProject, selectedProjectId, loading: projectsLoading, error: projectsError } = useProjects();
   const router = useRouter();
+  /** Prevents infinite loop: ensureDefault → loadProjects → loading false triggers this effect again. */
+  const defaultEnsureDoneRef = useRef(false);
+  const defaultEnsureInFlightRef = useRef(false);
 
   // Log when selectedProjectId changes
   useEffect(() => {
     console.log('[DashboardContent] selectedProjectId changed to:', selectedProjectId);
   }, [selectedProjectId]);
 
-  // Ensure user has a default project on first login
   useEffect(() => {
-    if (user) {
-      ensureDefaultProject();
+    defaultEnsureDoneRef.current = false;
+    defaultEnsureInFlightRef.current = false;
+  }, [user?.id]);
+
+  // Once per authenticated user session, after projects list loads OK — not on every loading=false edge.
+  useEffect(() => {
+    if (!user?.id || projectsLoading || projectsError) {
+      return;
     }
-  }, [user, ensureDefaultProject]);
+    if (defaultEnsureDoneRef.current || defaultEnsureInFlightRef.current) {
+      return;
+    }
+    defaultEnsureInFlightRef.current = true;
+    void ensureDefaultProject()
+      .then((ok) => {
+        if (ok) {
+          defaultEnsureDoneRef.current = true;
+        }
+      })
+      .finally(() => {
+        defaultEnsureInFlightRef.current = false;
+      });
+  }, [user?.id, projectsLoading, projectsError, ensureDefaultProject]);
 
   if (!user) {
     return null;
@@ -285,8 +306,9 @@ function DashboardInner() {
 }
 
 function DashboardContent() {
+  const { user } = useAuth();
   return (
-    <ProjectsProvider>
+    <ProjectsProvider sessionUserId={user?.id}>
       <DashboardInner />
     </ProjectsProvider>
   );

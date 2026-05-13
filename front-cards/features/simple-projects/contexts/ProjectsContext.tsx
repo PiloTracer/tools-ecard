@@ -1,8 +1,11 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { ProjectsIssueAlert } from '../components/ProjectsIssueAlert';
 import { projectService } from '../services/projectService';
-import type { Project, ProjectsResponse, UpdateProjectRequest } from '../types';
+import { projectsErrorDisplayFromCaught } from '../services/projectsApiUserError';
+import type { Project, UpdateProjectRequest } from '../types';
+import type { ProjectsErrorDisplay } from '../types/errors';
 
 const SELECTED_PROJECT_KEY = 'ecards_selected_project';
 
@@ -11,21 +14,53 @@ interface ProjectsContextType {
   selectedProjectId: string | null;
   selectedProject: Project | undefined;
   loading: boolean;
-  error: string | null;
+  /** Structured message for banners and selectors (null when there is nothing to surface). */
+  error: ProjectsErrorDisplay | null;
   createProject: (name: string) => Promise<Project | null>;
   selectProject: (projectId: string) => Promise<void>;
   updateProject: (projectId: string, data: UpdateProjectRequest) => Promise<Project | null>;
-  reloadProjects: () => Promise<void>;
-  ensureDefaultProject: () => Promise<void>;
+  reloadProjects: () => Promise<boolean>;
+  /** Ensures backend default workspace exists; refreshes project list on success. */
+  ensureDefaultProject: () => Promise<boolean>;
 }
 
 const ProjectsContext = createContext<ProjectsContextType | undefined>(undefined);
 
-export function ProjectsProvider({ children }: { children: ReactNode }) {
+function ProjectsConnectivityRibbon() {
+  const ctx = useContext(ProjectsContext);
+  if (!ctx) {
+    return null;
+  }
+  const { error, loading } = ctx;
+
+  if (loading || !error) {
+    return null;
+  }
+
+  return (
+    <div className="sticky top-0 z-40 border-b border-amber-200 bg-amber-50 shadow-sm" aria-live="polite">
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+        <ProjectsIssueAlert alert={error} variant="ribbon" />
+      </div>
+    </div>
+  );
+}
+
+export type ProjectsProviderProps = {
+  children: ReactNode;
+  /**
+   * Auth user id from the parent (e.g. `user?.id`). Keeps this feature free of `@/features/auth`.
+   * `undefined` / `null`: no session — clears in-memory project state (logout / signed-out shell).
+   */
+  sessionUserId: string | undefined | null;
+};
+
+export function ProjectsProvider({ children, sessionUserId }: ProjectsProviderProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ProjectsErrorDisplay | null>(null);
+  const prevSessionUserIdRef = useRef<string | undefined>(undefined);
 
   // Sync selected project with localStorage
   useEffect(() => {
@@ -35,7 +70,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedProjectId]);
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (): Promise<boolean> => {
     try {
       setLoading(true);
       setError(null);
@@ -57,16 +92,34 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         setSelectedProjectId(defaultProject.id);
         await projectService.updateSelectedProject({ projectId: defaultProject.id });
       }
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
+      setError(projectsErrorDisplayFromCaught(err));
+      return false;
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Load when the signed-in user identity changes, including re-login after logout with the same account.
   useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+    if (sessionUserId === undefined || sessionUserId === null) {
+      prevSessionUserIdRef.current = undefined;
+      setLoading(false);
+      setError(null);
+      setProjects([]);
+      setSelectedProjectId(null);
+      return;
+    }
+
+    if (prevSessionUserIdRef.current !== sessionUserId) {
+      setError(null);
+      setProjects([]);
+      setSelectedProjectId(null);
+      void loadProjects();
+    }
+    prevSessionUserIdRef.current = sessionUserId;
+  }, [sessionUserId, loadProjects]);
 
   const createProject = useCallback(async (name: string): Promise<Project | null> => {
     try {
@@ -77,7 +130,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       await projectService.updateSelectedProject({ projectId: newProject.id });
       return newProject;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create project');
+      setError(projectsErrorDisplayFromCaught(err));
       return null;
     }
   }, []);
@@ -92,7 +145,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       console.log('[ProjectsContext.selectProject] Complete');
     } catch (err) {
       console.error('[ProjectsContext.selectProject] ERROR:', err);
-      setError(err instanceof Error ? err.message : 'Failed to select project');
+      setError(projectsErrorDisplayFromCaught(err));
       const storedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
       if (storedProjectId) {
         setSelectedProjectId(storedProjectId);
@@ -107,35 +160,40 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
       return updatedProject;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update project');
+      setError(projectsErrorDisplayFromCaught(err));
       return null;
     }
   }, []);
 
-  const ensureDefaultProject = useCallback(async () => {
+  const ensureDefaultProject = useCallback(async (): Promise<boolean> => {
     try {
       await projectService.ensureDefaultProject();
-      await loadProjects();
+      return await loadProjects();
     } catch (err) {
       console.error('Failed to ensure default project:', err);
+      setError(projectsErrorDisplayFromCaught(err));
+      return false;
     }
   }, [loadProjects]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
   return (
-    <ProjectsContext.Provider value={{
-      projects,
-      selectedProjectId,
-      selectedProject,
-      loading,
-      error,
-      createProject,
-      selectProject,
-      updateProject,
-      reloadProjects: loadProjects,
-      ensureDefaultProject
-    }}>
+    <ProjectsContext.Provider
+      value={{
+        projects,
+        selectedProjectId,
+        selectedProject,
+        loading,
+        error,
+        createProject,
+        selectProject,
+        updateProject,
+        reloadProjects: loadProjects,
+        ensureDefaultProject,
+      }}
+    >
+      <ProjectsConnectivityRibbon />
       {children}
     </ProjectsContext.Provider>
   );

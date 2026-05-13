@@ -36,6 +36,9 @@ __pycache__/
 .pytest_cache/
 .covers/
 
+# TypeScript incremental build (do not commit)
+*.tsbuildinfo
+
 # Node.js
 node_modules/
 npm-debug.log*

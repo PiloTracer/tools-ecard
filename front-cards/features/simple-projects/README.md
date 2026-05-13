@@ -10,14 +10,17 @@ Main dropdown component for selecting and creating projects.
 
 **Usage:**
 ```tsx
-import { ProjectSelector } from '@/features/simple-projects';
+import { useAuth } from '@/features/auth';
+import { ProjectSelector, ProjectsProvider } from '@/features/simple-projects';
 
 function Dashboard() {
+  const { user } = useAuth();
   return (
-    <div>
-      <ProjectSelector />
-      {/* Other dashboard content */}
-    </div>
+    <ProjectsProvider sessionUserId={user?.id}>
+      <div>
+        <ProjectSelector />
+      </div>
+    </ProjectsProvider>
   );
 }
 ```
@@ -25,9 +28,24 @@ function Dashboard() {
 ## Hooks
 
 ### useProjects
-Hook for managing projects state and operations.
+
+Use **`import { useProjects, ProjectsProvider } from '@/features/simple-projects'`** and render **`ProjectsProvider`** above any component that calls **`useProjects()`**. Pass **`sessionUserId={user?.id}`** from auth so the provider can reload after logout / re-login without importing auth internally. State and API calls live in **`contexts/ProjectsContext.tsx`** (there is no separate standalone hook file).
 
 **Usage:**
+
+```tsx
+import { useAuth } from '@/features/auth';
+import { ProjectsProvider, useProjects } from '@/features/simple-projects';
+
+function Shell() {
+  const { user } = useAuth();
+  return (
+    <ProjectsProvider sessionUserId={user?.id}>
+      <ChildThatCallsUseProjects />
+    </ProjectsProvider>
+  );
+}
+```
 ```tsx
 import { useProjects } from '@/features/simple-projects';
 

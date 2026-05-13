@@ -95,7 +95,11 @@ async function loadFromToolsDashboard(): Promise<void> {
       { status: res.status, bodyPreview: body.slice(0, 240) },
       'App library storage integration GET failed',
     );
-    throw new Error(`App library storage integration: HTTP ${res.status}`);
+    let hint =
+      res.status === 401 || res.status === 403
+        ? ' (invalid/revoked key: clear APP_LIBRARY_STORAGE_INTEGRATION_KEY in repo-root .env to skip integration, or mint a new key in Tools Dashboard → Application library → app → Storage)'
+        : '';
+    throw new Error(`App library storage integration: HTTP ${res.status}${hint}`);
   }
 
   let json: unknown;
