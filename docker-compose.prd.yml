@@ -56,7 +56,7 @@ services:
       - ecards-prd
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
       retries: 5
       start_period: 90s
@@ -94,17 +94,7 @@ services:
         condition: service_healthy
     volumes:
       - ./db/init-cassandra:/scripts:ro
-    command: >
-      bash -c '
-      echo "Initializing Cassandra (prd)...";
-      for script in /scripts/*.cql; do
-        if [ -f "$$script" ]; then
-          echo "Running $$script...";
-          cqlsh cassandra -f "$$script" || { echo "Failed $$script"; exit 1; };
-        fi;
-      done;
-      echo "Cassandra init complete.";
-      '
+    command: ["bash", "/scripts/wait-and-run-cql.sh"]
     restart: "no"
     mem_limit: 256m
     logging: *default-logging

@@ -26,7 +26,17 @@ async function start() {
     // Load Tools Dashboard storage metadata before routes/plugins run (public URL resolution uses cache).
     if (isAppLibraryStorageIntegrationEnabled()) {
       log.info('Loading Tools Dashboard app-library storage integration');
-      await ensureAppLibraryStorageIntegrationReady();
+      try {
+        await ensureAppLibraryStorageIntegrationReady();
+      } catch (error) {
+        if (appConfig.env === 'production') {
+          throw error;
+        }
+        log.warn(
+          { err: serializeError(error) },
+          'App library storage integration unavailable at startup; continuing without dashboard public URLs (development only). Fix TOOLS_DASHBOARD_ORIGIN / key or clear APP_LIBRARY_STORAGE_INTEGRATION_KEY, then restart api-server.',
+        );
+      }
     }
 
     // Build Fastify app

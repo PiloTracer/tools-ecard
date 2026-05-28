@@ -48,10 +48,10 @@ services:
       - ecards-network
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
     # Memory limit: Heap (2G) + Direct (1G) + OS overhead (1G) = 4G total
     # This prevents Docker OOM killer from terminating the container
     mem_limit: 4g
@@ -241,17 +241,7 @@ services:
         condition: service_healthy
     volumes:
       - ./db/init-cassandra:/scripts
-    command: >
-      bash -c '
-      echo "Initializing Cassandra...";
-      for script in /scripts/*.cql; do
-        if [ -f "$$script" ]; then
-          echo "Running $$script...";
-          cqlsh cassandra -f "$$script" || { echo "Failed to run $$script"; exit 1; };
-        fi
-      done;
-      echo "Cassandra initialization complete!";
-      '
+    command: ["bash", "/scripts/wait-and-run-cql.sh"]
     restart: "no"
     mem_limit: 128m
 
