@@ -2,9 +2,11 @@
 
 **Purpose:** One screen so a **new agent or human** can resume without prior chat. Depth lives in **`.claude/`** and `DOCS_CONTEXT.md`.
 
-**Freshness:** Updated **2026-04-30**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
+**Freshness:** Updated **2026-05-28**. After `git pull`, skim **§7** and run one check from **§4** before claiming a release.
 
-**Session closed 2026-04-30 — template-textile save / reopen (text layout):** Fixed texts **shifting after save → close → reopen** while the designer stays mounted. **Root cause:** `fabricCanvas.clear()` (open/import) removed Fabric objects but `addedElementIds` / `fabricObjectsMap` still held the same element UUIDs, so the sync effect skipped `addElementToCanvas` and never reapplied JSON geometry. **Fix:** `templateFabricBindingEpoch` + `bumpTemplateFabricBindingEpoch()` in `canvasStore.ts`, called from `templateStore.ts` `loadTemplate` before `set()`; `DesignCanvas.tsx` sync clears maps, strips objects with `elementId` (not grid), then re-adds all elements. **Also:** shared `readPersistedTemplateGeometry` / `applyPersistedTemplateGeometry` in `utils/fabricTemplateGeometry.ts` (save merge + `object:modified` + keyboard nudge + IText create in `DesignCanvas` / `canvasRenderer.ts`); sync no longer forces `width`/`height` onto **text** from stale JSON. **Suggested commit subject:** `fix: template-textile reopen — Fabric geometry sync + binding epoch reset`. **Not re-run here:** full `front-cards` build / CI — use CI as gate.
+**Session closed 2026-05-28 — Docker dev stability (Cassandra + API startup):** **`db-init` race on stack restart** — `Connection refused` to `cassandra:9042` while CQL was still down (~15–20s after container restart); stale Docker **healthy** could start `db-init` too early. **Fix:** `db/init-cassandra/wait-and-run-cql.sh` (poll CQL up to 120s, then run `*.cql`); `docker-compose.dev.yml` / `prd` `db-init` uses it; Cassandra healthcheck **interval 10s**, dev **start_period 90s**. **API “Cannot connect to E-Cards API” (port 7400)** — `api-server` exited on startup when Tools Dashboard app-library GET failed (**502** / **401** with `APP_LIBRARY_STORAGE_INTEGRATION_KEY` set). **Fix:** `api-server/src/server.ts` — integration load **non-fatal in development** (production still fails fast); object URLs fall back to `SEAWEEDFS_ENDPOINT`. **Commit:** `6fe93d9` — `fix: wait for Cassandra before db-init; allow API dev startup without TD storage`. **Verified:** `curl http://localhost:7400/health` → ok; `db-init` exit 0 after `restart cassandra` + `run --rm db-init`. **Unverified:** CI; mint/refresh TD storage key for `appLibraryStorage.loaded: true`.
+
+**Earlier (2026-04-30) — template-textile save / reopen (text layout):** Fixed texts **shifting after save → close → reopen** (`templateFabricBindingEpoch`, `fabricTemplateGeometry.ts`). Smoke save → open without full reload if you touch Fabric sync.
 
 **Earlier (2026-04-28) — template-textile canvas:** Bring-rebind (`requestCanvasRebindForElementIds`), resize/sync lock (`globalSyncLockRef`, `width`/`height` deps), `useLayoutEffect` init, Elements modal EN strings — still relevant; smoke **Elements → Bring** + resize if you touch that area.
 
@@ -16,6 +18,8 @@
 
 | Area | Date | Notes |
 |------|------|--------|
+| Docker dev — `db-init` / Cassandra restart | 2026-05-28 | **Code:** `db/init-cassandra/wait-and-run-cql.sh`, `docker-compose.dev.yml` + `prd` `db-init` command, Cassandra healthcheck tuning. **Verify:** `./bin/start.sh dev up` or `compose restart cassandra` then `compose run --rm db-init` → exit 0; keyspace `ecards_canonical` present. |
+| Docker dev — `api-server` startup + health | 2026-05-28 | **Code:** `api-server/src/server.ts` (dev soft-fail TD storage integration). **Verify:** `curl -sf http://localhost:7400/health` → `status: ok`; logs show `API Server started` (WARN if TD key invalid/unreachable). **Follow-up:** fix or clear `APP_LIBRARY_STORAGE_INTEGRATION_KEY` in root `.env` if you need dashboard public URLs at startup. |
 | Template designer (Fabric) — save / reopen / geometry | 2026-04-30 | **Code:** `DesignCanvas.tsx` (epoch reset at sync start, geometry helpers), `canvasStore.ts` (`templateFabricBindingEpoch`, `bumpTemplateFabricBindingEpoch`), `templateStore.ts` (`loadTemplate` bumps epoch), `utils/fabricTemplateGeometry.ts`, `CanvasControls.tsx` (merge uses read helper), `services/canvasRenderer.ts`. **Verify in browser:** edit/move text → **Save** → **Open** same template **without** full page reload — positions match JSON; import JSON same check. **Unverified here:** `front-cards` full `npm run build` / CI (host `tsc` has unrelated noise). |
 | Improvement plan work | 2026-04-22 | **Shipped:** `GET /api/batches/:id` in `batch-upload` (`getBatchDetail` + Cassandra `recordsCount`); **`batch-import`** registered at `/api/batch-import` in `app.ts`; **removed** broken `api-server/src/features/template-designer/` tree. **Docs/plan:** `.claude/plans/20260422-ecards-application-improvement-priorities.md` and `.claude/features/render-worker/` updated. |
 | Baseline CI / full build | _pending_ | Run **§4** after `npm ci` + `npm run db:generate` in `api-server`; local `tsc` had many **pre-existing** errors unrelated to the batch-detail change—use **CI log** as gate. |
@@ -108,6 +112,7 @@ Update the **Last verified** table when you run these for real.
 | `cassandra` | `…-cassandra` | Cassandra (7042) |
 | `redis` | `…-redis` | Redis (7379) |
 | `render-worker` | `…-render-worker` | worker |
+| `db-init` | `…-db-init` | One-shot Cassandra CQL (`wait-and-run-cql.sh`); **exited 0** is normal |
 
 **Exec by service (no hardcoded container):** `docker compose -p "$COMPOSE_PROJECT_NAME" -f docker-compose.dev.yml --env-file .env exec api-server …` (see **`./bin/start.sh`** which passes `-p`).
 
@@ -132,6 +137,7 @@ Prefer **one** `.claude/features/<name>/` folder over re-reading all of `DOCS_CO
 
 ## 7) Open threads (optional — trim when stale)
 
+- **Tools Dashboard storage integration (2026-05-28):** With `APP_LIBRARY_STORAGE_INTEGRATION_KEY` set, startup GET may return **401** or **502** — API still runs in **dev** but `GET /health` shows `appLibraryStorage.loaded: false`. Mint a new key in TD → Application library → Storage, or clear the key in root `.env` to skip. **Production** still requires a successful GET when the key is set.
 - **Template-textile designer (2026-04-30):** After changes to save/load/sync, smoke **save → open same template** (no reload) and **import** for text alignment. Still smoke **canvas resize**, **Elements → Bring** if you touch `DesignCanvas.tsx` / modal; **CI** for `front-cards` if Fabric/export paths change.
 - **`api-server` `npm run build` (tsc):** CI is intended to enforce this. If CI fails, triage from the log: missing `node_modules` / run `npm run db:generate`; per-route `AuthenticatedRequest` vs global `FastifyRequest['user']`; Prisma schema vs `Project` types; AWS SDK typings — **not** from memory. The obsolete **`api-server/src/features/template-designer/`** stub was **removed** (2026-04); do not resurrect unless intentionally reintroducing an alias to **template-textile**.
 - **`batch-upload` `deleteBatch`:** Confirm whether deletes must also clear **Cassandra** batch records ( **`batch-view` service** had that path; verify parity with live **`batch-upload`** delete).
