@@ -2,13 +2,13 @@
 
 ## Session status
 
-**Open:** -
+**Open:** 2026-04-27 — goal: migrate .claude/ content to .work/ layout, fill .cursorrules REPLACE tokens
 
-**Updated:** YYYY-MM-DD
+**Updated:** 2026-04-27
 
-**Closed:** -
+**Closed:** 2026-04-27 — .claude → .work migration complete; .cursorrules configured
 
-**Repository state:** Greenfield / planning / implementation - describe briefly.
+**Repository state:** `.work/` populated from `.claude/`, `.cursorrules` configured, `.claude.deprecated/` archived. Awaiting foundation planning.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -53,7 +53,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | Date | Session | Artifacts |
 |------|---------|-----------|
-| YYYY-MM-DD | | |
+| 2026-04-27 | Claude → Agent OS migration | `.work/features/from-claude/`, `.work/plans/proposals/from-claude/`, `.work/operations/fixes+implementations/`, `.work/prompts/from-claude/`, `.work/analysis/`, `.work/features/specs/`, `.ai/docs/guides/from-claude-tutorials/`, `.ai/docs/integration/from-claude-remote-server/`, `.cursorrules` REPLACE tokens resolved, `.ai/standards/` merged with project-specific content, `.claude.deprecated/` archived |
 
 ---
 

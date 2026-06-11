@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** YYYY-MM-DD
+**Updated:** 2026-04-27
 
 ---
 
@@ -9,6 +9,10 @@
 | Item | Artifact |
 |------|----------|
 | Agent OS bootstrap | `.work/` skeleton, `.cursorrules` from template |
+| .claude → .work migration | All content migrated: features, plans, fixes, implementations, prompts, specs, tutorials, analysis, remote_server_reference |
+| .cursorrules configured | All REPLACE tokens resolved to project paths |
+| .work/docs/ populated | Project-specific standards, directory map, remote server reference, tutorials |
+| .claude archived | Renamed to `.claude.deprecated/` with `.gitignore` entry |
 
 ---
 
