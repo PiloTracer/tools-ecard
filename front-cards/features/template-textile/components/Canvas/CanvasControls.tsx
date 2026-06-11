@@ -295,6 +295,13 @@ export function CanvasControls() {
         }
       }
 
+      // CRITICAL: Update currentTemplate.id with the server's DB UUID.
+      // The server generates its own id (uuidv4) on save, which differs from
+      // the client-generated id (crypto.randomUUID). Without this update,
+      // delete and other operations that reference currentTemplate.id would
+      // send the wrong ID and fail with "Template not found".
+      useTemplateStore.getState().updateTemplateId(metadata.id);
+
       // Update store with saved metadata
       setSaveMetadata(projectName, templateName);
       markAsSaved();

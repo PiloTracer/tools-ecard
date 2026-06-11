@@ -37,6 +37,7 @@ interface TemplateState {
   setCanvasDimensions: (width: number, height: number) => void;
   setExportWidth: (width: number) => void;
   setCanvasSizeUnit: (unit: LengthUnit) => void;
+  updateTemplateId: (id: string) => void;
   setSaveMetadata: (projectName: string, templateName: string) => void;
   markAsSaved: () => void;
   markAsChanged: () => void;
@@ -250,6 +251,13 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         updatedAt: new Date(),
       },
       hasUnsavedChanges: true
+    };
+  }),
+
+  updateTemplateId: (id) => set((state) => {
+    if (!state.currentTemplate) return state;
+    return {
+      currentTemplate: { ...state.currentTemplate, id },
     };
   }),
 
