@@ -5,6 +5,7 @@
 import { Worker } from 'bullmq';
 import { workerConfig } from './core/config';
 import { processRenderCard } from './jobs/render-card';
+import { connectDatabase, disconnectDatabase } from './core/database';
 
 const connection = {
   host: workerConfig.redis.host,
@@ -12,6 +13,8 @@ const connection = {
 };
 
 async function start() {
+  // Connect to database
+  await connectDatabase();
   // Create worker
   const worker = new Worker(
     'card-rendering',
@@ -51,6 +54,7 @@ async function start() {
   const shutdown = async (signal: string) => {
     console.log(`${signal} received, shutting down render worker...`);
     await worker.close();
+    await disconnectDatabase();
     process.exit(0);
   };
 

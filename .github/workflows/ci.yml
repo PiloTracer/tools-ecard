@@ -81,7 +81,7 @@ jobs:
       - name: TypeScript compile
         run: npm run build
       - name: Tests
-        run: npm test -- --ci --passWithNoTests
+        run: npm test -- --ci --coverage
 
   front-cards:
     name: front-cards (build + test)
@@ -117,7 +117,7 @@ jobs:
           NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: /dashboard
         run: npm run build
       - name: Tests
-        run: npm test -- --ci --passWithNoTests
+        run: npm test -- --ci --coverage
 
   shared-types:
     name: shared-types (build)

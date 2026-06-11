@@ -1,12 +1,10 @@
 import { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { batchImportService } from './services/batchImportService';
 import { BatchImportError } from './types';
+import type { AuthenticatedUser } from '../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 const batchImportRoutes: FastifyPluginAsync = async (fastify) => {
@@ -40,7 +38,7 @@ const batchImportRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send({
         success: true,
         data: result,
-        message: 'Batch import initiated (placeholder)',
+        message: `Batch import complete: ${result.recordsImported} imported, ${result.recordsFailed} failed`,
       });
     } catch (error) {
       if (error instanceof BatchImportError) {
