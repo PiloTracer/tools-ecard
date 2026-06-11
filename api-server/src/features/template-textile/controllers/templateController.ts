@@ -157,6 +157,7 @@ export class TemplateController {
         });
       }
 
+      console.log(`[DELETE] Template ID: "${id}", User ID: "${userId}"`);
       await unifiedTemplateStorageService.deleteTemplate(id, request as any);
 
       return reply.status(200).send({

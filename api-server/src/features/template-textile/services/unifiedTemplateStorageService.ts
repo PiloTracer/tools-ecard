@@ -566,9 +566,11 @@ class UnifiedTemplateStorageService {
       try {
         const dbTemplate = await templateOperations.getTemplate(templateId, userId);
         if (!dbTemplate) {
+          console.error(`[DELETE SERVICE] getTemplate returned null — templateId="${templateId}", userId="${userId}"`);
           throw new Error('Template not found');
         }
 
+        console.log(`[DELETE SERVICE] Found template: id="${dbTemplate.id}", name="${dbTemplate.name}", dbUserId="${dbTemplate.userId}", requestUserId="${userId}"`);
         metadata = {
           id: dbTemplate.id,
           userId: dbTemplate.userId,
@@ -582,6 +584,7 @@ class UnifiedTemplateStorageService {
         };
 
         if (metadata.userId !== userId) {
+          console.error(`[DELETE SERVICE] Ownership mismatch: metadata.userId="${metadata.userId}" !== requestUserId="${userId}"`);
           throw new Error('Unauthorized');
         }
       } catch (error) {
