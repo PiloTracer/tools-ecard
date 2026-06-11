@@ -317,6 +317,14 @@ export function CanvasControls() {
       // Load template from service
       const loadedTemplate = await templateService.loadTemplate(templateId);
 
+      // CRITICAL: Override the template data's id with the database UUID.
+      // The server generates its own id when saving (uuidv4), which differs from
+      // the client-generated id (crypto.randomUUID) stored inside the S3 template data.
+      // Without this fix, currentTemplate.id would be the client UUID, causing
+      // delete and other operations to fail with "Template not found" since the
+      // server looks up by the database UUID.
+      loadedTemplate.data.id = loadedTemplate.id;
+
       // Clear current canvas
       if (fabricCanvas) {
         fabricCanvas.clear();
