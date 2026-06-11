@@ -26,6 +26,7 @@ export interface AuthenticatedUser {
   email: string;
   username: string;
   displayName: string;
+  oauthId?: string; // OAuth provider's ID (optional)
 }
 
 declare module 'fastify' {
@@ -67,7 +68,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     });
 
     if (userResponse.ok) {
-      const userData = await userResponse.json();
+      const userData = (await userResponse.json()) as Record<string, any>;
 
       // Populate request.user with authenticated user info
       // Use email as the primary ID for database operations
@@ -79,26 +80,29 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
         oauthId: userData.id?.toString() // Store OAuth provider's ID separately if needed
       };
 
+      const user = request.user;
       log.debug({
-        userId: request.user.id,
-        email: request.user.email,
-        username: request.user.username
+        userId: user!.id,
+        email: user!.email,
+        username: user!.username
       }, 'User authenticated');
 
       // Ensure user exists in database
-      try {
-        await userOperations.upsertUser({
-          id: request.user.id,
-          email: request.user.email,
-          name: request.user.displayName,
-          oauthId: userData.oauth_id || userData.id?.toString()
-        });
+      if (user) {
+        try {
+          await userOperations.upsertUser({
+            id: user.id,
+            email: user.email,
+            name: user.displayName,
+            oauthId: userData.oauth_id || userData.id?.toString()
+          });
 
-        // Ensure user has a default project
-        await projectOperations.ensureDefaultProject(request.user.id);
-      } catch (dbError) {
-        log.error({ error: dbError, userId: request.user.id }, 'Failed to sync user to database');
-        // Continue even if DB sync fails
+          // Ensure user has a default project
+          await projectOperations.ensureDefaultProject(user.id);
+        } catch (dbError) {
+          log.error({ error: dbError, userId: user.id }, 'Failed to sync user to database');
+          // Continue even if DB sync fails
+        }
       }
     } else {
       log.warn({ status: userResponse.status }, 'Failed to fetch user info - token may be expired or invalid');

@@ -125,13 +125,11 @@ export const templateOperations = {
   /**
    * Delete template
    */
-  async deleteTemplate(id: string, userId: string) {
+  async deleteTemplate(id: string, _userId: string) {
     // This will cascade delete resources, versions, and shares
+    // Note: id is the unique primary key; userId is already verified by the caller
     return prisma.templateMetadata.delete({
-      where: {
-        id,
-        userId
-      }
+      where: { id }
     });
   },
 

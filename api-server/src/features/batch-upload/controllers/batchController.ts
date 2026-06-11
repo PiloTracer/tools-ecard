@@ -50,6 +50,8 @@ export const batchController = {
         file: req.file,
         userId: req.user.id,
         userEmail: req.user.email,
+        projectId: req.body?.projectId || 'default',
+        projectName: req.body?.projectName || 'Default Project',
       });
 
       res.status(201).json(result);

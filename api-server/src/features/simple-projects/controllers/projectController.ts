@@ -2,16 +2,13 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { createLogger, serializeError } from '../../../core/utils/logger';
 import { projectService } from '../services/projectService';
 import type { CreateProjectDto, UpdateSelectedProjectDto, UpdateProjectDto } from '../types';
+import type { AuthenticatedUser } from '../../../core/middleware/authMiddleware';
 
 const log = createLogger('Projects');
 
 // Extended Request type with user
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-    name?: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 export const projectController = {

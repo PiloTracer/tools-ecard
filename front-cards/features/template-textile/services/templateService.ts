@@ -403,6 +403,12 @@ class TemplateService {
       });
 
       if (!response.ok) {
+        // 404 means the template is already gone — that's success for us
+        if (response.status === 404) {
+          console.log(`Template ${templateId} already deleted on server`);
+          return;
+        }
+
         // Try to read the server error message from the response body
         let serverError = response.statusText;
         try {

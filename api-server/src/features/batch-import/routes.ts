@@ -5,7 +5,8 @@ import { authMiddleware } from '@/core/middleware/authMiddleware';
 const router = Router();
 
 // All routes require authentication
-router.use(authMiddleware);
+// NOTE: authMiddleware is Fastify middleware; Express routes are unused.
+router.use(authMiddleware as any);
 
 /**
  * Batch Import Routes (Placeholder)

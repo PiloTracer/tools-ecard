@@ -6,12 +6,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { fontService } from '../services/fontService';
 import type { FontListFilters } from '../types';
+import type { AuthenticatedUser } from '../../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 interface ListFontsQuerystring {

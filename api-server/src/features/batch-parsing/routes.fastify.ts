@@ -5,12 +5,10 @@
 
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { batchRecordRepository } from './repositories/batchRecordRepository';
+import type { AuthenticatedUser } from '../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 interface SearchRecordsQuery {

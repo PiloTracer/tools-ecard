@@ -5,7 +5,6 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import fetch from 'node-fetch';
 import { cassandraClient, StorageMode } from '../../../core/cassandra/client';
 import { checkDatabaseHealth } from '../../../core/prisma/client';
 import { getS3Service } from '../../s3-bucket/services/s3Service';

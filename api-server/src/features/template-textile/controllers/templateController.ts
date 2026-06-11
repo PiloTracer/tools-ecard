@@ -166,7 +166,12 @@ export class TemplateController {
       });
     } catch (error) {
       console.error('Error deleting template:', error);
-      const statusCode = error instanceof Error && error.message === 'Unauthorized' ? 403 : 500;
+      let statusCode = 500;
+      if (error instanceof Error) {
+        if (error.message === 'Unauthorized') statusCode = 403;
+        else if (error.message === 'Template not found') statusCode = 404;
+        else if (error.message === 'User not authenticated') statusCode = 401;
+      }
       return reply.status(statusCode).send({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to delete template'

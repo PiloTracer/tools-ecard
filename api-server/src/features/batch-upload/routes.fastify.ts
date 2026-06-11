@@ -8,19 +8,15 @@ import {
   deleteBatchSchema,
 } from './validators/batchValidators';
 import { BatchUploadError } from './types';
+import type { AuthenticatedUser } from '../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
   // Upload a new batch file
-  fastify.post<{
-    Request: AuthenticatedRequest;
-  }>('/upload', async (request, reply) => {
+  fastify.post('/upload', async (request, reply) => {
     try {
       // Check authentication
       if (!request.user) {
@@ -271,9 +267,7 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get batch statistics
-  fastify.get<{
-    Request: AuthenticatedRequest;
-  }>('/stats', async (request, reply) => {
+  fastify.get('/stats', async (request, reply) => {
     try {
       if (!request.user) {
         throw new BatchUploadError(

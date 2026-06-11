@@ -124,10 +124,6 @@ class CassandraClient {
       },
       pooling: {
         coreConnectionsPerHost: {
-          [CassandraTypes.distance.local]: 2,
-          [CassandraTypes.distance.remote]: 1
-        },
-        maxConnectionsPerHost: {
           [CassandraTypes.distance.local]: 8,
           [CassandraTypes.distance.remote]: 2
         }

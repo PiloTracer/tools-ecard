@@ -6,12 +6,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { batchViewService } from '../services/batchViewService';
 import { BatchStatus } from '@prisma/client';
+import type { AuthenticatedUser } from '../../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 interface ListBatchesQuery {

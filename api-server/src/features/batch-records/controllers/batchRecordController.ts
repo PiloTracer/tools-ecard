@@ -6,12 +6,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { batchRecordService } from '../services/batchRecordService';
 import { RecordUpdateInput } from '../validators/recordValidator';
+import type { AuthenticatedUser } from '../../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: string;
-    email: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 interface GetRecordsQuery {

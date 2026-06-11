@@ -263,6 +263,7 @@ class UnifiedTemplateStorageService {
                 id: uuidv4(),
                 templateId,
                 name: resource.hash || `resource-${i}`,
+                hash: resource.hash || `resource-${i}`,
                 type: resource.type,
                 storageUrl: resourceUrls[i],
                 storageMode,
@@ -300,17 +301,16 @@ class UnifiedTemplateStorageService {
     if (storageMode === 'full' || storageMode === 'fallback') {
       try {
         await cassandraClient.logTemplateEvent({
-          eventId: uuidv4(),
           templateId,
           userId: emailToUuid(userEmail), // Convert email to UUID for Cassandra
           eventType: 'TEMPLATE_CREATED',
+          storageMode,
           eventData: JSON.stringify({
             name: input.name,
             storageMode,
             resourceCount: resourceUrls.length,
             userEmail // Keep email in event data for reference
           }),
-          timestamp
         });
       } catch (error) {
         log.error({
@@ -356,15 +356,15 @@ class UnifiedTemplateStorageService {
           userId: dbTemplate.userId,
           name: dbTemplate.name,
           storageUrl: dbTemplate.storageUrl,
-          storageMode: dbTemplate.storageMode,
-          resourceUrls: dbTemplate.resources?.map(r => r.storageUrl) || [],
+          storageMode: dbTemplate.storageMode as StorageMode,
+          resourceUrls: dbTemplate.resources?.map((r: any) => r.storageUrl).filter(Boolean) || [],
           version: dbTemplate.version || 1,
           createdAt: dbTemplate.createdAt,
           updatedAt: dbTemplate.updatedAt
         };
 
         // Verify ownership
-        if (metadata.userId !== userId) {
+        if (metadata && metadata.userId !== userId) {
           throw new Error('Unauthorized');
         }
       } catch (error) {
@@ -476,14 +476,13 @@ class UnifiedTemplateStorageService {
     if (storageMode === 'full' || storageMode === 'fallback') {
       try {
         await cassandraClient.logTemplateEvent({
-          eventId: uuidv4(),
           templateId,
           userId: emailToUuid(userEmail), // Convert email to UUID for Cassandra
           eventType: 'TEMPLATE_LOADED',
+          storageMode,
           eventData: JSON.stringify({
             userEmail // Keep email in event data for reference
           }),
-          timestamp: new Date()
         });
       } catch (error) {
         log.error({
@@ -527,8 +526,8 @@ class UnifiedTemplateStorageService {
           userId: t.userId,
           name: t.name,
           storageUrl: t.storageUrl,
-          storageMode: t.storageMode,
-          resourceUrls: t.resources?.map(r => r.storageUrl) || [],
+          storageMode: t.storageMode as StorageMode,
+          resourceUrls: t.resources?.map((r: any) => r.storageUrl).filter(Boolean) || [],
           version: t.version || 1,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt
@@ -576,14 +575,14 @@ class UnifiedTemplateStorageService {
           userId: dbTemplate.userId,
           name: dbTemplate.name,
           storageUrl: dbTemplate.storageUrl,
-          storageMode: dbTemplate.storageMode,
-          resourceUrls: dbTemplate.resources?.map(r => r.storageUrl) || [],
+          storageMode: dbTemplate.storageMode as StorageMode,
+          resourceUrls: dbTemplate.resources?.map((r: any) => r.storageUrl).filter(Boolean) || [],
           version: dbTemplate.version || 1,
           createdAt: dbTemplate.createdAt,
           updatedAt: dbTemplate.updatedAt
         };
 
-        if (metadata.userId !== userId) {
+        if (metadata && metadata.userId !== userId) {
           console.error(`[DELETE SERVICE] Ownership mismatch: metadata.userId="${metadata.userId}" !== requestUserId="${userId}"`);
           throw new Error('Unauthorized');
         }
@@ -646,14 +645,13 @@ class UnifiedTemplateStorageService {
     if (storageMode === 'full' || storageMode === 'fallback') {
       try {
         await cassandraClient.logTemplateEvent({
-          eventId: uuidv4(),
           templateId,
           userId: emailToUuid(userEmail), // Convert email to UUID for Cassandra
           eventType: 'TEMPLATE_DELETED',
+          storageMode,
           eventData: JSON.stringify({
             userEmail // Keep email in event data for reference
           }),
-          timestamp: new Date()
         });
       } catch (error) {
         log.error({
