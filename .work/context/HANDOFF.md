@@ -6,7 +6,7 @@
 
 **Updated:** 2026-04-27
 
-**Closed:** 2026-04-27 — all 3 milestones delivered: M1 render pipeline (canvas+S3+status), M2 batch import (real DB-backed), M3 hardening (runbook+threat model+CI coverage)
+**Closed:** 2026-04-27 — all 3 milestones delivered + Delete Template button added to template designer toolbar
 
 **Repository state:** Implementation-ready (brownfield). Master plan **Approved** (all 25 sections + appendices). Foundation docs 01+04, 6 ADRs, registries in place. Ready for `@code-implementation plan - M1`.
 
@@ -61,6 +61,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-04-27 | @plan-master integrity | Phase 5 integrity pass with waivers; ADRs 003–006 formalized; master plan §8 synced; plan-master-ready certified |
 | 2026-04-27 | @plan-master continue → Approved | Master plan approved (25 sections + appendices); implementation-ready |
 | 2026-04-27 | @code-implementation (M1-M3) | M1: render pipeline (canvas renderer, S3 storage, status tracking, E2E test doc) · M2: batch import service (real DB-backed, field mapping) · M3: ops runbook, threat model, CI coverage config, render-worker unit tests |
+| 2026-04-27 | Delete Template feature | Added Delete button + confirmation modal to template designer toolbar; calls existing DELETE API; deleted templates not shown in Open modal |
 
 ---
 

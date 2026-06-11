@@ -174,6 +174,8 @@ export function CanvasControls() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showElementsLayerModal, setShowElementsLayerModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -371,6 +373,48 @@ export function CanvasControls() {
     setShowCloseConfirmModal(false);
 
     console.log('Template closed, new template created');
+  };
+
+  const handleDeleteTemplate = () => {
+    // Always show confirmation modal before deleting
+    setShowDeleteConfirmModal(true);
+  };
+
+  const executeDeleteTemplate = async () => {
+    const templateId = currentTemplate?.id;
+    if (!templateId) {
+      setShowDeleteConfirmModal(false);
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      // Call the delete API — removes from server + local cache
+      await templateService.deleteTemplate(templateId);
+
+      // Close the current template (same as executeCloseTemplate)
+      if (fabricCanvas) {
+        fabricCanvas.clear();
+        fabricCanvas.backgroundColor = '#ffffff';
+      }
+
+      const { setDimensions } = useCanvasStore.getState();
+      createTemplate('Untitled Template', 800, 600);
+      setDimensions(800, 600);
+
+      setSaveMetadata(
+        selectedProject?.name ?? 'Default Project',
+        'Untitled Template'
+      );
+
+      console.log(`Template ${templateId} deleted successfully`);
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirmModal(false);
+    }
   };
 
   const handleExportPNG = async () => {
@@ -941,6 +985,53 @@ export function CanvasControls() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Template</h3>
+                <p className="text-sm text-gray-600">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="mb-6 text-sm text-gray-700">
+              Are you sure you want to delete <strong>{currentTemplateName || 'this template'}</strong>?
+              It will be permanently removed from the server and will no longer appear in the Open dialog.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirmModal(false)}
+                disabled={isDeleting}
+                className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeDeleteTemplate}
+                disabled={isDeleting}
+                className="flex items-center gap-2 rounded border border-red-600 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Project / file row + scrollable view & export bar */}
       <div className="border-b border-slate-800 bg-slate-900/95 px-2 py-1.5 sm:px-3">
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -1013,6 +1104,28 @@ export function CanvasControls() {
             </svg>
             Close
           </button>
+
+          {/* Delete Button */}
+          {currentTemplate && (
+            <button
+              onClick={handleDeleteTemplate}
+              disabled={isDeleting}
+              className="inline-flex min-h-[2rem] items-center gap-1.5 rounded border border-red-800 bg-red-900/50 px-2 py-1 text-xs font-medium text-red-300 transition-colors hover:border-red-600 hover:bg-red-800 hover:text-red-200 sm:px-2.5 sm:py-1.5 sm:text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              title="Delete current template permanently"
+            >
+              {isDeleting ? (
+                <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              )}
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
 
           {/* Batch Export Button */}
           {currentTemplate && currentTemplateName && (
