@@ -13,6 +13,10 @@
 | .cursorrules configured | All REPLACE tokens resolved to project paths |
 | .work/docs/ populated | Project-specific standards, directory map, remote server reference, tutorials |
 | .claude archived | Renamed to `.claude.deprecated/` with `.gitignore` entry |
+| @plan-repair brownfield (foundation) | Doc 01 (scope) + doc 04 (architecture) synthesized; 6 ADRs written |
+| @plan-repair brownfield (master) | Draft master plan with M1-M3 milestones; registries populated |
+| @plan-master integrity | Phase 5 pass with waivers; plan-master-ready: yes |
+| @plan-master continue → Approved | Master plan set to Approved; sections 20–25 + appendices added |
 
 ---
 
@@ -28,9 +32,7 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | `@plan-foundation greenfield` | Creates foundation docs 01–04 if not present |
-| **1** | `@plan-foundation certify plan-master-ready` | After P0–P6 complete |
-| **2** | `@plan-master greenfield` | Master plan after foundation ready |
+| **0** | `@code-implementation plan - M1` | Start M1: replace mock rendering with real Canvas/Sharp logic |
 
 ---
 

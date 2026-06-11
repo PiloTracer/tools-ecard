@@ -5,8 +5,8 @@ BullMQ worker process that consumes **`card-rendering`** jobs from Redis.
 ## Current implementation (2026-04)
 
 - **Entry:** `render-worker/src/worker.ts` — registers a BullMQ `Worker` on queue name `card-rendering`.
-- **Job handler:** `render-worker/src/jobs/render-card.ts` — **stub**: logs job payload, simulates delay; TODO list in file for real canvas/storage/DB integration.
-- **Config:** `render-worker/src/core/config/index.ts` — includes `worker.renderEngine` defaulting to **`canvas`** via `RENDER_ENGINE` env (not yet read by the stub handler).
+- **Job handler:** `render-worker/src/jobs/render-card.ts` — **mock**: logs job payload, simulates delay with setTimeout; TODO list in file for real canvas/storage/DB integration.
+- **Config:** `render-worker/src/core/config/index.ts` — includes `worker.renderEngine` defaulting to **`canvas`** via `RENDER_ENGINE` env (not yet read by the mock handler).
 - **Queue connection:** `render-worker/src/core/queue/index.ts`
 
 ## Dependencies (package vs code)

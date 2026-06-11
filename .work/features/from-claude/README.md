@@ -2,13 +2,13 @@
 
 **Purpose:** Authoritative feature documentation for the E-Cards (tools-ecards) monorepo. Read on demand; start from the index below.
 
-**Last verified against codebase:** 2026-04-22
+**Last verified against codebase:** 2026-04-27 (brownfield audit)
 
 ---
 
 ## Canonical feature packages (README + feature.yaml)
 
-These map directly to shipped or in-progress code under `front-cards`, `api-server`, and `render-worker`. The master index with summaries is [`.claude/FEATURES_INDEX.md`](../FEATURES_INDEX.md).
+These map directly to shipped or in-progress code under `front-cards`, `api-server`, and `render-worker`. Legacy index at `.claude.deprecated/FEATURES_INDEX.md`.
 
 | Directory | Scope |
 |-----------|--------|
@@ -18,11 +18,11 @@ These map directly to shipped or in-progress code under `front-cards`, `api-serv
 | [batch-parsing/](batch-parsing/README.md) | Bull worker, Python parser integration, `/api/batch-records` search APIs, diagnostics |
 | [batch-records/](batch-records/README.md) | CRUD for records under `/api/batches/:batchId/records` |
 | [batch-view/](batch-view/README.md) | Frontend batch listing and navigation |
-| [batch-import/](batch-import/README.md) | Post-parse import / mapping (placeholder service; routes not mounted in `api-server` `app.ts`) |
+| [batch-import/](batch-import/README.md) | Post-parse import / mapping (placeholder; routes mounted at `/api/batch-import`, controller returns placeholder) |
 | [s3-bucket/](s3-bucket/README.md) | S3-compatible storage (SeaweedFS), presigned URLs |
 | [font-management/](font-management/README.md) | Google Fonts and upload APIs |
 | [dashboard/](dashboard/README.md) | Dashboard route shell |
-| [render-worker/](render-worker/README.md) | BullMQ `card-rendering` worker (stub job handler today) |
+| [render-worker/](render-worker/README.md) | BullMQ `card-rendering` worker (mock rendering — worker infra exists, Canvas/Sharp logic is mocked) |
 | [authentication/](authentication/README.md) | Next.js auth routes, `AuthProvider`, cookies; API `authMiddleware` |
 | [simple-quick-actions/](simple-quick-actions/README.md) | Dashboard quick actions (project-gated); composes batch-upload |
 
@@ -70,6 +70,13 @@ These files predate the `*/README.md` + `feature.yaml` layout. Prefer the **dire
 
 ---
 
+## Undocumented features (code exists, no feature doc)
+
+| Feature | Location | Notes |
+|---------|----------|-------|
+| Diagnostics / queue monitoring | `api-server` routes at `/api/diagnostics` | Worker queue monitoring endpoints; no feature README |
+| template-designer (api-server) | `api-server/src/features/template-designer/` | All subdirs empty — **deprecated/removed**. Superseded by `template-textile` |
+
 ## Conventions
 
-Feature doc structure is defined in [`.claude/FEATURE_STANDARD.md`](../FEATURE_STANDARD.md).
+Feature doc structure was defined in `.claude.deprecated/FEATURE_STANDARD.md`. The Agent OS standard is at `.ai/standards/20260517-FEATURE_STANDARD.md`.

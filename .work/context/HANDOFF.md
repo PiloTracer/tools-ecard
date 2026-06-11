@@ -2,13 +2,13 @@
 
 ## Session status
 
-**Open:** 2026-04-27 — goal: migrate .claude/ content to .work/ layout, fill .cursorrules REPLACE tokens
+**Open:** 2026-04-27 — goal: brownfield planning — synthesize foundation docs, ADRs, master plan; certify plan-master-ready
 
 **Updated:** 2026-04-27
 
-**Closed:** 2026-04-27 — .claude → .work migration complete; .cursorrules configured
+**Closed:** 2026-04-27 — full brownfield pass: foundation docs, 6 ADRs, approved master plan (M1-M3), codebase doc audit, plan-master-ready certified
 
-**Repository state:** `.work/` populated from `.claude/`, `.cursorrules` configured, `.claude.deprecated/` archived. Awaiting foundation planning.
+**Repository state:** Implementation-ready (brownfield). Master plan **Approved** (all 25 sections + appendices). Foundation docs 01+04, 6 ADRs, registries in place. Ready for `@code-implementation plan - M1`.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -45,7 +45,10 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | # | Action | Blocks | Owner |
 |---|--------|--------|-------|
-| - | (none) | | |
+| 1 | Review foundation doc 01 **Inference** items (audience, assumptions) | Plan-master-ready certification | owner |
+| 2 | Confirm/reject draft master plan M1-M3 milestones | Implementation start | owner |
+| 3 | Choose CI platform (U2) | M3-T1 pipeline setup | eng |
+| 4 | Select test coverage targets (U5) | M3-T2 | eng |
 
 ---
 
@@ -53,7 +56,10 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | Date | Session | Artifacts |
 |------|---------|-----------|
-| 2026-04-27 | Claude → Agent OS migration | `.work/features/from-claude/`, `.work/plans/proposals/from-claude/`, `.work/operations/fixes+implementations/`, `.work/prompts/from-claude/`, `.work/analysis/`, `.work/features/specs/`, `.ai/docs/guides/from-claude-tutorials/`, `.ai/docs/integration/from-claude-remote-server/`, `.cursorrules` REPLACE tokens resolved, `.ai/standards/` merged with project-specific content, `.claude.deprecated/` archived |
+| 2026-04-27 | Claude → Agent OS migration | `.work/` populated from `.claude/`; `.cursorrules` configured; `.claude.deprecated/` archived |
+| 2026-04-27 | @plan-repair brownfield | Foundation doc 01 (scope) + doc 04 (architecture); ADRs 001–002; draft master plan with M1–M3 milestones; ASSUMPTIONS/RISK_REGISTRY/UNKNOWNS populated; NEXT.md updated |
+| 2026-04-27 | @plan-master integrity | Phase 5 integrity pass with waivers; ADRs 003–006 formalized; master plan §8 synced; plan-master-ready certified |
+| 2026-04-27 | @plan-master continue → Approved | Master plan approved (25 sections + appendices); implementation-ready |
 
 ---
 
@@ -61,7 +67,11 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | ID | Summary | Blocks |
 |----|---------|--------|
-| - | | |
+| U1 | Stack pins not finalized in DOCS_TECH_STACK.md | M3 infrastructure |
+| U2 | CI platform choice | M3-T1 |
+| U3 | Is project active dev or maintenance mode? | Priority decisions |
+| U4 | Production deployment target? | M3 infrastructure |
+| U5 | Test coverage targets | M3-T2 |
 
 ---
 

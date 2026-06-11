@@ -25,7 +25,7 @@ Pairs with: `DOCS_TECH_STACK.md`, `.work/features/`, ADRs under `.work/decisions
 ## 4. Databases
 
 - **PostgreSQL:** Prisma is the source of truth for the relational schema; migrations are normal Prisma flows (`api-server/prisma/`).
-- **Cassandra:** Schema in `db/init-cassandra/*.cql`; changes require coordinated init script updates and awareness of Cassandra 5 constraints (see fix history at `.work/docs/from-claude-remote-server/` for MV issues).
+- **Cassandra:** Schema in `db/init-cassandra/*.cql`; changes require coordinated init script updates and awareness of Cassandra 5 constraints (see fix history at `.work/operations/fixes/from-claude/` for MV issues).
 
 ## 5. API and auth
 
