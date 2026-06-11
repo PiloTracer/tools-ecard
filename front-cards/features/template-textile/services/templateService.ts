@@ -389,29 +389,28 @@ class TemplateService {
    * Delete a template
    */
   async deleteTemplate(templateId: string): Promise<void> {
-    const mode = await this.getStorageMode();
-
     // Always delete from local cache
     await browserStorageService.deleteTemplate(templateId);
 
-    if (mode === 'FULL') {
-      try {
-        const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete: ${response.statusText}`);
+    // Always attempt server delete regardless of mode.
+    // Previously gated behind mode === 'FULL', which caused the template to
+    // reappear in listTemplates() since it fetches from the server and merges.
+    try {
+      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
         }
-      } catch (error) {
-        console.error('Failed to delete from server:', error);
-        throw error;
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete: ${response.statusText}`);
       }
-    } else if (mode === 'FALLBACK') {
-      console.warn('Template deleted locally only (fallback mode)');
+    } catch (error) {
+      console.error('Failed to delete from server:', error);
+      // Don't throw — local cache is already clean, and listTemplates will
+      // merge server + local results. The template may reappear if the server
+      // still has it, but that's better than breaking the UI.
     }
   }
 
