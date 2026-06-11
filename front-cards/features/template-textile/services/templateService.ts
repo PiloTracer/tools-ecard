@@ -398,13 +398,22 @@ class TemplateService {
     try {
       const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        // No Content-Type header — DELETE with no body doesn't need it,
+        // and Fastify may reject an empty body with Content-Type: application/json
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to delete: ${response.statusText}`);
+        // Try to read the server error message from the response body
+        let serverError = response.statusText;
+        try {
+          const body = await response.json();
+          if (body?.error) {
+            serverError = body.error;
+          }
+        } catch {
+          // Response body isn't JSON — use statusText
+        }
+        throw new Error(`Failed to delete: ${serverError}`);
       }
     } catch (error) {
       console.error('Failed to delete from server:', error);
