@@ -180,3 +180,5 @@ SUBAGENTS/
 .misc/
 *.log
 credentials/
+**/.ai/
+**/.ai.ui/

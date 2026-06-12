@@ -2,9 +2,9 @@
 
 ## Session status
 
-**Open:** 2026-04-27 — goal: implement M1-M3 milestones (render worker, batch workflow, hardening)
+**Closed:** 2026-06-11 — fixed backup/restore (options 9 and 10) in bin/start.sh: production volume names, stopped-stack consistency, stripped config-file backup, added CLI restore command
 
-**Updated:** 2026-04-27
+**Updated:** 2026-06-11
 
 **Closed:** 2026-04-27 — all 3 milestones delivered + Delete Template button added to template designer toolbar
 
@@ -62,6 +62,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-04-27 | @plan-master continue → Approved | Master plan approved (25 sections + appendices); implementation-ready |
 | 2026-04-27 | @code-implementation (M1-M3) | M1: render pipeline (canvas renderer, S3 storage, status tracking, E2E test doc) · M2: batch import service (real DB-backed, field mapping) · M3: ops runbook, threat model, CI coverage config, render-worker unit tests |
 | 2026-04-27 | Delete Template feature | Added Delete button + confirmation modal to template designer toolbar; calls existing DELETE API; deleted templates not shown in Open modal |
+| 2026-06-11 | Backup/Restore fix | `bin/start.sh`: fixed production volume name resolution (postgres_prd_data etc.), stopped stack for consistent backup, removed config-file backup, added CLI `restore` command, verified syntax OK |
 
 ---
 

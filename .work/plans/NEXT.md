@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-04-27
+**Updated:** 2026-06-11
 
 ---
 
@@ -17,6 +17,7 @@
 | @plan-repair brownfield (master) | Draft master plan with M1-M3 milestones; registries populated |
 | @plan-master integrity | Phase 5 pass with waivers; plan-master-ready: yes |
 | @plan-master continue → Approved | Master plan set to Approved; sections 20–25 + appendices added |
+| Backup/Restore fix in `bin/start.sh` | Fixed production volume names, stopped-stack consistency, stripped config-file backup, added CLI `restore` command |
 
 ---
 

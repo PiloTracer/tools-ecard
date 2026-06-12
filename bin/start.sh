@@ -46,6 +46,7 @@ Commands:
   rebuild       Down → build → up — keeps named volumes (build tee’d to repo-root build.log)
   reset         Down -v (deletes compose volumes/data) → build → up — destructive (same build.log)
   force-rebuild Down → build --no-cache → up — keeps volumes (same build.log)
+  restore       Restore volumes + config from backups, then up — builds (same build.log)
   menu          Open interactive menu
   help, -h      Show this help
 
@@ -88,7 +89,7 @@ if [ "${#}" -ge 2 ]; then
   fi
   ECARDS_CLI_CMD="$(echo "$2" | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
   case "$ECARDS_CLI_CMD" in
-    up | up-build | down | logs | status | restart | rebuild | reset | force-rebuild | menu | help | -h | --help) ;;
+    up | up-build | down | logs | status | restart | rebuild | reset | force-rebuild | restore | menu | help | -h | --help) ;;
     *)
       echo "Unknown command: $2" >&2
       usage >&2
@@ -132,16 +133,25 @@ case "$TARGET_ENV" in
       ENV_FILE="$PROJECT_ROOT/.env.dev"
     fi
     if [ -d "/mnt/data" ]; then BACKUP_BASE="/mnt/data"; else BACKUP_BASE="/data"; fi
+    PG_VOLUME_NAME="postgres_data"
+    REDIS_VOLUME_NAME="redis_data"
+    CASSANDRA_VOLUME_NAME="cassandra_data"
     ;;
   stg)
     COMPOSE_FILE="$PROJECT_ROOT/docker-compose.stg.yml"
     ENV_FILE="$PROJECT_ROOT/.env.stg"
     BACKUP_BASE="/data"
+    PG_VOLUME_NAME="postgres_data"
+    REDIS_VOLUME_NAME="redis_data"
+    CASSANDRA_VOLUME_NAME="cassandra_data"
     ;;
   prd)
     COMPOSE_FILE="$PROJECT_ROOT/docker-compose.prd.yml"
     ENV_FILE="$PROJECT_ROOT/.env.prd"
     BACKUP_BASE="/data"
+    PG_VOLUME_NAME="postgres_prd_data"
+    REDIS_VOLUME_NAME="redis_prd_data"
+    CASSANDRA_VOLUME_NAME="cassandra_prd_data"
     ;;
 esac
 
@@ -223,9 +233,9 @@ if [ -n "$TD_APP_CODE_VAL" ] && [ -n "$TD_STACK_SUFFIX_VAL" ]; then
 fi
 
 VOL_PREFIX="${PROJ_NAME}_"
-PG_VOLUME="${VOL_PREFIX}postgres_data"
-REDIS_VOLUME="${VOL_PREFIX}redis_data"
-CASSANDRA_VOLUME="${VOL_PREFIX}cassandra_data"
+PG_VOLUME="${VOL_PREFIX}${PG_VOLUME_NAME}"
+REDIS_VOLUME="${VOL_PREFIX}${REDIS_VOLUME_NAME}"
+CASSANDRA_VOLUME="${VOL_PREFIX}${CASSANDRA_VOLUME_NAME}"
 BACKUP_DIR="${BACKUP_BASE}/backups_${PROJ_NAME}"
 
 read_env_port() {
@@ -621,15 +631,19 @@ run_full_cleanup() {
 }
 
 mount_and_start() {
-  clear || true
-  echo "DANGER: restore from backup tarballs into named volumes"
+  if [ -z "${ECARDS_CLI_CMD:-}" ]; then clear || true; fi
+  echo "DANGER: restore from backup into named volumes"
   echo "  Volumes: $PG_VOLUME, $REDIS_VOLUME, $CASSANDRA_VOLUME"
   echo "  Backup dir: $BACKUP_DIR"
-  read -r -p "Type yes to continue: " confirm
-  if [ "$confirm" != "yes" ]; then echo "Cancelled."; pause; return 0; fi
+  if [ -n "${ECARDS_CLI_CMD:-}" ]; then
+    echo "  CLI mode: skipping confirmation prompt."
+  else
+    read -r -p "Type yes to continue: " confirm
+    if [ "$confirm" != "yes" ]; then echo "Cancelled."; pause; return 0; fi
+  fi
 
-  [ -f "$BACKUP_DIR/_backup_pg.tar.gz" ] || { echo "Missing $BACKUP_DIR/_backup_pg.tar.gz"; pause; return 0; }
-  [ -f "$BACKUP_DIR/_backup_redis.tar.gz" ] || { echo "Missing $BACKUP_DIR/_backup_redis.tar.gz"; pause; return 0; }
+  [ -f "$BACKUP_DIR/_backup_pg.tar.gz" ] || { echo "Missing $BACKUP_DIR/_backup_pg.tar.gz"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
+  [ -f "$BACKUP_DIR/_backup_redis.tar.gz" ] || { echo "Missing $BACKUP_DIR/_backup_redis.tar.gz"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
   [ -f "$BACKUP_DIR/_backup_cassandra.tar.gz" ] && echo "Cassandra backup found" || echo "Optional: _backup_cassandra.tar.gz not found — Cassandra volume will be empty after restore"
 
   run_compose down
@@ -648,20 +662,32 @@ mount_and_start() {
     docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/_backup_cassandra.tar.gz -C /data"
   fi
 
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "WARNING: SeaweedFS data is NOT included in this backup."
+  echo "SeaweedFS is a remote/external service. If you rely on templates,"
+  echo "generated cards, or assets stored in SeaweedFS, back it up separately."
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+
   if ! run_compose_up_build_logged; then
     pause_after_error
     return 1
   fi
   echo "Restore complete."
-  pause
+  if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi
 }
 
 backup() {
-  clear || true
+  if [ -z "${ECARDS_CLI_CMD:-}" ]; then clear || true; fi
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-  echo "Manual volume backup: $TIMESTAMP"
+  echo "Backup: $TIMESTAMP"
   mkdir -p "$BACKUP_DIR"
 
+  echo "Stopping stack for consistent backup..."
+  run_compose down --remove-orphans
+
+  echo "Backing up volumes..."
   docker run --rm -v "${REDIS_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar czf /backup/redis_${TIMESTAMP}.tar.gz -C /data ."
   docker run --rm -v "${PG_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar czf /backup/pg_${TIMESTAMP}.tar.gz -C /data ."
   docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar czf /backup/cassandra_${TIMESTAMP}.tar.gz -C /data ." \
@@ -676,9 +702,18 @@ backup() {
   find "$BACKUP_DIR" -maxdepth 1 -name "pg_*.tar.gz" -mtime +"$RETENTION_DAYS" -delete 2>/dev/null || true
   find "$BACKUP_DIR" -maxdepth 1 -name "cassandra_*.tar.gz" -mtime +"$RETENTION_DAYS" -delete 2>/dev/null || true
 
+  echo "Restarting stack after backup..."
+  if ! run_compose up -d; then
+    echo "Warning: failed to restart stack after backup." >&2
+    compose_failure_context
+  fi
+  echo "Waiting for API health after restart..."
+  wait_for_api_ready "$(compose_api_wait_secs 120)" || true
+
+  echo ""
   echo "Backup complete."
   ls -lh "$BACKUP_DIR" | grep "$TIMESTAMP" || ls -lh "$BACKUP_DIR"
-  pause
+  if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi
 }
 
 view_logs() {
@@ -701,6 +736,7 @@ if [ -n "${ECARDS_CLI_CMD:-}" ] && [ "$ECARDS_CLI_CMD" != "menu" ]; then
     rebuild) cmd_rebuild_stack || exit 1 ;;
     reset) cmd_reset_stack || exit 1 ;;
     force-rebuild) cmd_force_rebuild || exit 1 ;;
+    restore) mount_and_start || exit 1 ;;
   esac
   exit 0
 fi
