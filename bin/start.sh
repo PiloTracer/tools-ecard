@@ -642,10 +642,20 @@ mount_and_start() {
     if [ "$confirm" != "yes" ]; then echo "Cancelled."; pause; return 0; fi
   fi
 
-  [ -f "$BACKUP_DIR/_backup_pg.tar.gz" ] || { echo "Missing $BACKUP_DIR/_backup_pg.tar.gz"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
-  [ -f "$BACKUP_DIR/_backup_redis.tar.gz" ] || { echo "Missing $BACKUP_DIR/_backup_redis.tar.gz"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
-  [ -f "$BACKUP_DIR/_backup_cassandra.tar.gz" ] && echo "Cassandra backup found" || echo "Optional: _backup_cassandra.tar.gz not found — Cassandra volume will be empty after restore"
+  # Read the latest backup timestamp
+  LATEST=""
+  [ -f "$BACKUP_DIR/.latest" ] && LATEST=$(cat "$BACKUP_DIR/.latest" | tr -d ' \n')
+  if [ -z "$LATEST" ]; then
+    # Fallback: scan for most recent timestamped archive
+    LATEST=$(ls "$BACKUP_DIR"/pg_*.tar.gz 2>/dev/null | sort | tail -1 | sed 's/.*pg_\([0-9_]*\)\.tar\.gz/\1/')
+  fi
+  [ -z "$LATEST" ] && { echo "No backup found in $BACKUP_DIR"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
 
+  [ -f "$BACKUP_DIR/pg_${LATEST}.tar.gz" ] || { echo "Missing $BACKUP_DIR/pg_${LATEST}.tar.gz"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
+  [ -f "$BACKUP_DIR/redis_${LATEST}.tar.gz" ] || { echo "Missing $BACKUP_DIR/redis_${LATEST}.tar.gz"; if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi; return 0; }
+  [ -f "$BACKUP_DIR/cassandra_${LATEST}.tar.gz" ] && echo "Cassandra backup found" || echo "Optional: Cassandra backup not found — volume will be empty after restore"
+
+  echo "Restoring from backup: $LATEST"
   run_compose down
 
   for v in "$PG_VOLUME" "$REDIS_VOLUME" "$CASSANDRA_VOLUME"; do
@@ -654,12 +664,12 @@ mount_and_start() {
   done
 
   echo "Restoring PostgreSQL volume..."
-  docker run --rm -v "${PG_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/_backup_pg.tar.gz -C /data"
+  docker run --rm -v "${PG_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/pg_${LATEST}.tar.gz -C /data"
   echo "Restoring Redis volume..."
-  docker run --rm -v "${REDIS_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/_backup_redis.tar.gz -C /data"
-  if [ -f "$BACKUP_DIR/_backup_cassandra.tar.gz" ]; then
+  docker run --rm -v "${REDIS_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/redis_${LATEST}.tar.gz -C /data"
+  if [ -f "$BACKUP_DIR/cassandra_${LATEST}.tar.gz" ]; then
     echo "Restoring Cassandra volume..."
-    docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/_backup_cassandra.tar.gz -C /data"
+    docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar xzf /backup/cassandra_${LATEST}.tar.gz -C /data"
   fi
 
   echo ""
@@ -693,9 +703,8 @@ backup() {
   docker run --rm -v "${CASSANDRA_VOLUME}:/data" -v "$BACKUP_DIR:/backup" busybox sh -c "tar czf /backup/cassandra_${TIMESTAMP}.tar.gz -C /data ." \
     || echo "Warning: Cassandra backup step failed (empty volume?)"
 
-  ln -sf "$BACKUP_DIR/redis_${TIMESTAMP}.tar.gz" "$BACKUP_DIR/_backup_redis.tar.gz"
-  ln -sf "$BACKUP_DIR/pg_${TIMESTAMP}.tar.gz" "$BACKUP_DIR/_backup_pg.tar.gz"
-  ln -sf "$BACKUP_DIR/cassandra_${TIMESTAMP}.tar.gz" "$BACKUP_DIR/_backup_cassandra.tar.gz" 2>/dev/null || true
+  # Pointer files so restore can find the latest backup without symlinks
+  echo "$TIMESTAMP" > "$BACKUP_DIR/.latest"
 
   RETENTION_DAYS=7
   find "$BACKUP_DIR" -maxdepth 1 -name "redis_*.tar.gz" -mtime +"$RETENTION_DAYS" -delete 2>/dev/null || true
