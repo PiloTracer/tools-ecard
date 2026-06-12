@@ -2,11 +2,9 @@
 
 ## Session status
 
-**Closed:** 2026-06-11 — fixed backup/restore (options 9 and 10) in bin/start.sh: production volume names, stopped-stack consistency, stripped config-file backup, added CLI restore command
+**Closed:** 2026-06-11 — fixed backup/restore (options 9 and 10) in bin/start.sh
 
 **Updated:** 2026-06-11
-
-**Closed:** 2026-04-27 — all 3 milestones delivered + Delete Template button added to template designer toolbar
 
 **Repository state:** Implementation-ready (brownfield). Master plan **Approved** (all 25 sections + appendices). Foundation docs 01+04, 6 ADRs, registries in place. Ready for `@code-implementation plan - M1`.
 
