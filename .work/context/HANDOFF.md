@@ -2,11 +2,11 @@
 
 ## Session status
 
-**Closed:** 2026-06-11 — backup/restore fix: `bin/start.sh` production volume names, stopped-stack consistency, volume-only backup, CLI `restore` command; full audit review
+**Closed:** 2026-06-12 — production readiness: credentials, configs, render-worker fixes, nginx TLS, SeaweedFS sync
 
-**Updated:** 2026-06-11
+**Updated:** 2026-06-12
 
-**Repository state:** Implementation-ready (brownfield). Master plan **Approved** (all 25 sections + appendices). Foundation docs 01+04, 6 ADRs, registries in place. Ready for `@code-implementation plan - M1`.
+**Repository state:** Production-ready configs applied. Credentials generated and rotated. Both dev and prd compose configs validate. `start.sh` works for both envs. Render-worker has HEALTHCHECK and Redis password support. Nginx TLS-ready with commented SSL block. Frontend fontService import fixed.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -61,6 +61,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-04-27 | @code-implementation (M1-M3) | M1: render pipeline (canvas renderer, S3 storage, status tracking, E2E test doc) · M2: batch import service (real DB-backed, field mapping) · M3: ops runbook, threat model, CI coverage config, render-worker unit tests |
 | 2026-04-27 | Delete Template feature | Added Delete button + confirmation modal to template designer toolbar; calls existing DELETE API; deleted templates not shown in Open modal |
 | 2026-06-11 | Backup/Restore fix | `bin/start.sh`: fixed production volume name resolution (postgres_prd_data etc.), stopped stack for consistent backup, removed config-file backup, added CLI `restore` command, verified syntax OK |
+| 2026-06-12 | Production readiness | Generated credentials; updated .env/.env.prd; fixed render-worker Redis password + HEALTHCHECK + Prisma schema; nginx TLS-ready; SeaweedFS credentials synced with tools-dashboard; frontend fontService import fix; host tuning added to runbook; both compose configs validate; start.sh verified for dev+prd |
 
 ---
 

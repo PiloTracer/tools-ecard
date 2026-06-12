@@ -33,8 +33,10 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | `@code-implementation plan - M3` | Start M3: hardening (CI/CD, test coverage, observability, runbooks) |
-| **1** | Run M1 + M2 E2E tests | Verify full upload → parse → import → edit → render → download pipeline |
+| **0** | Deploy production stack | `cp .env.prd.example .env.prd`, verify OAUTH_CLIENT_SECRET, `./bin/start.sh prd up` |
+| **1** | Resolve render-worker Prisma client in dev | Pre-existing Alpine vs Debian lib conflict — works in production (Debian) |
+| **2** | Set up monitoring | Prometheus/Grafana/Sentry — nothing configured |
+| **3** | Wire automated backups | `bin/start_cron.sh` exists, no host cron or k8s CronJob wired |
 
 ---
 
