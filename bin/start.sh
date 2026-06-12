@@ -619,15 +619,46 @@ cmd_force_rebuild() {
 }
 
 run_cleanup() {
-  # Only this compose project — never run host-wide docker prune (other stacks on the same machine).
-  echo "Stopping stack; pruning stopped containers for project ${PROJ_NAME} only (volumes preserved)..."
-  run_compose down --remove-orphans
-  docker container prune -f --filter "label=com.docker.compose.project=${PROJ_NAME}" >/dev/null 2>&1 || true
-}
+  # Full project teardown: containers, images, networks — scoped ONLY to this compose project.
+  # Data volumes (postgres, redis, cassandra) are preserved.
+  # Other Docker stacks on the same host are NEVER touched.
+  echo ""
+  echo "=== Full project cleanup ==="
+  echo "Target project: ${PROJ_NAME}"
+  echo "Data volumes preserved: ${PG_VOLUME}, ${REDIS_VOLUME}, ${CASSANDRA_VOLUME}"
+  echo "Other stacks on this host: untouched"
+  echo ""
 
-run_full_cleanup() {
-  echo "Down and remove images built by this compose project (volumes preserved)..."
-  run_compose down --rmi local --remove-orphans
+  # 1. Tear down the compose stack — removes all containers + networks, and ALL images
+  #    (both built-from-Dockerfile AND pulled-from-registry). On next up they re-pull.
+  run_compose down --rmi all --remove-orphans
+
+  # 2. Belt-and-suspenders: prune any stopped containers with this project's label
+  docker container prune -f --filter "label=com.docker.compose.project=${PROJ_NAME}" >/dev/null 2>&1 || true
+
+  # 3. Prune unused networks created by this project
+  docker network prune -f --filter "label=com.docker.compose.project=${PROJ_NAME}" >/dev/null 2>&1 || true
+
+  # 4. Optional: clear BuildKit build cache (affects ALL stacks on this host — next builds will be cold)
+  if [ -n "${ECARDS_CLI_CMD:-}" ]; then
+    echo ""
+    echo "  CLI mode: build cache not pruned."
+  else
+    echo ""
+    read -r -p "Do you want to clear all cached builds? [y/N]: " clean_cache
+    case "$(echo "${clean_cache:-}" | tr '[:upper:]' '[:lower:]')" in
+      y | yes)
+        echo "Clearing BuildKit cache..."
+        docker builder prune -af
+        echo "Build cache cleared."
+        ;;
+      *)
+        echo "Build cache kept."
+        ;;
+    esac
+  fi
+
+  echo "=== Cleanup complete ==="
 }
 
 mount_and_start() {
@@ -777,7 +808,7 @@ while true; do
   echo "  1. Up (quick — no image rebuild)"
   echo "  2. Up (build & start)"
   echo "  3. Down"
-  echo "  4. Cleanup (down; prune stopped containers for this project only, volumes kept)"
+  echo "  4. Cleanup (down --rmi all; prune containers+networks for this project only; volumes kept)"
   echo "  5. Force rebuild (no cache)"
   echo "  6. Restart"
   echo "  7. Rebuild stack (down → build → up, keeps data; log: build.log)"
@@ -785,8 +816,7 @@ while true; do
   echo "  9. Restore from volume backups (overwrites DB volumes)"
   echo " 10. Backup volumes (Postgres, Redis, Cassandra)"
   echo " 11. View logs"
-  echo " 12. Full cleanup (down --rmi local)"
-  echo " 13. Status (volumes + compose ps)"
+  echo " 12. Status (volumes + compose ps)"
   echo "  0. Exit"
   echo "-----------------------------------------"
   echo "CLI: $0 $TARGET_ENV up | up-build | down | logs | status | restart | rebuild | reset | force-rebuild"
@@ -805,8 +835,7 @@ while true; do
     9) mount_and_start ;;
     10) backup ;;
     11) view_logs || true ;;
-    12) run_full_cleanup; pause ;;
-    13) cmd_status; pause ;;
+    12) cmd_status; pause ;;
     0) exit 0 ;;
     *) ;;
   esac
