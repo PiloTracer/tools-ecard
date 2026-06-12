@@ -7,7 +7,7 @@
     "build": "node ./scripts/run-next.cjs build",
     "start": "node ./scripts/run-next.cjs start",
     "lint": "eslint",
-    "test": "jest"
+    "test": "node node_modules/jest/bin/jest.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.11",
@@ -26,7 +26,10 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/fabric": "^5.3.10",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
@@ -35,7 +38,10 @@
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.11",
     "typescript": "^5"
   }
 }

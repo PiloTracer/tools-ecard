@@ -10,14 +10,14 @@ import '@testing-library/jest-dom';
 import { QuickActions } from './QuickActions';
 
 // Mock the useProjects hook
-jest.mock('@/features/simple-projects', () => ({
+jest.mock('../../simple-projects', () => ({
   useProjects: jest.fn()
 }));
 
-import { useProjects } from '@/features/simple-projects';
+import { useProjects } from '../../simple-projects';
 
 // Mock the batch-upload component
-jest.mock('@/features/batch-upload', () => ({
+jest.mock('../../batch-upload', () => ({
   UploadBatchComponent: () => <div data-testid="upload-batch-component">Upload Batch Component</div>
 }));
 
