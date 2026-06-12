@@ -8,6 +8,7 @@ import { workerConfig } from '../config';
 const connection = {
   host: workerConfig.redis.host,
   port: workerConfig.redis.port,
+  ...(workerConfig.redis.password && { password: workerConfig.redis.password }),
 };
 
 // Render job queue

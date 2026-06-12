@@ -182,3 +182,5 @@ SUBAGENTS/
 credentials/
 **/.ai/
 **/.ai.ui/
+
+.env.backup

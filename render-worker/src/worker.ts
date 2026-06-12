@@ -10,6 +10,7 @@ import { connectDatabase, disconnectDatabase } from './core/database';
 const connection = {
   host: workerConfig.redis.host,
   port: workerConfig.redis.port,
+  ...(workerConfig.redis.password && { password: workerConfig.redis.password }),
 };
 
 async function start() {

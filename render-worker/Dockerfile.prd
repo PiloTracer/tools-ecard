@@ -24,7 +24,9 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 COPY . .
 
-RUN npm run build:docker
+COPY prisma/ ./prisma/
+
+RUN ./node_modules/.bin/prisma generate && npm run build:docker
 RUN npm prune --omit=dev
 
 FROM node:20-bookworm-slim AS runner
@@ -52,5 +54,8 @@ RUN groupadd --system --gid 1001 nodejs \
     && chown -R worker:nodejs /app
 
 USER worker
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD pgrep -f "node dist/worker.js" || exit 1
 
 CMD ["npm", "start"]

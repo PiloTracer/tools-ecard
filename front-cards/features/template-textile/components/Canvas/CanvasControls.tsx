@@ -909,7 +909,7 @@ export function CanvasControls() {
         }
         if (usedFonts.size > 0) {
           // Pre-populate font cache before rendering
-          const { fontService } = await import('../services/fontService');
+          const { fontService } = await import('../../services/fontService');
           const available = await fontService.listFonts('all');
           const availableFamilies = new Set(available.map(f => f.fontFamily));
           const missing = [...usedFonts].filter(f => !availableFamilies.has(f));

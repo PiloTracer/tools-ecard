@@ -142,6 +142,24 @@ docker compose exec api bash -c "cd /app && npm run db:migrate"
 
 ### Production
 
+## Host Tuning
+
+Required sysctl settings on the Docker host before production deployment:
+
+```bash
+# Redis — prevent background save failures under low memory
+sudo sysctl -w vm.overcommit_memory=1
+echo "vm.overcommit_memory=1" | sudo tee -a /etc/sysctl.conf
+
+# Cassandra — prevent OOM under load (memory-mapped files)
+sudo sysctl -w vm.max_map_count=1048575
+echo "vm.max_map_count=1048575" | sudo tee -a /etc/sysctl.conf
+
+# Cassandra — disable swap (degrades performance)
+sudo swapoff -a
+# Also comment out swap lines in /etc/fstab
+```
+
 Production deployment uses `docker-compose.prd.yml` with an Nginx proxy. See remote server reference at `.work/docs/from-claude-remote-server/` for the production topology (`dev.aiepic.app`).
 
 ```bash

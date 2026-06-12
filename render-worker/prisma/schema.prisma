@@ -1,0 +1,235 @@
+// Prisma schema for E-Cards PostgreSQL database
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - represents authenticated users
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  oauthId   String?  @unique @map("oauth_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projects          Project[]
+  projectSelection  UserProjectSelection?
+  templates         TemplateMetadata[]
+  batches           Batch[]
+
+  @@map("users")
+}
+
+// Project model - containers for organizing templates and batches
+model Project {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Phone formatting configuration for batch parsing
+  workPhonePrefix     String? @map("work_phone_prefix")    // e.g., "2222" for Costa Rica landlines
+  defaultCountryCode  String? @map("default_country_code") // e.g., "+(506)" for Costa Rica
+
+  // Relations
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  selectedBy        UserProjectSelection[]
+  templates         TemplateMetadata[]
+
+  // Ensure unique project names per user
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([isDefault])
+  @@map("projects")
+}
+
+// UserProjectSelection - tracks which project is currently selected by a user
+model UserProjectSelection {
+  userId     String   @id @map("user_id")
+  projectId  String   @map("project_id")
+  selectedAt DateTime @default(now()) @map("selected_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("user_project_selections")
+}
+
+// TemplateMetadata - Normalized template metadata with multi-mode storage support
+model TemplateMetadata {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  projectId    String   @map("project_id")
+  projectName  String   @map("project_name")
+  name         String
+  width        Int
+  height       Int
+  exportWidth  Int      @map("export_width")
+  exportHeight Int      @map("export_height")
+  storageUrl   String   @map("storage_url") // S3 URL or local path
+  storageMode  String   @map("storage_mode") // 'seaweedfs' | 'local' | 'browser'
+  elementCount Int      @default(0) @map("element_count")
+  thumbnailUrl String?  @map("thumbnail_url")
+  isPublic     Boolean  @default(false) @map("is_public")
+  syncStatus   String   @default("synced") @map("sync_status") // 'synced' | 'pending' | 'failed'
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  resources TemplateResource[]
+  versions  TemplateVersion[]
+  shares    TemplateShare[]
+
+  @@unique([userId, projectName, name])
+  @@index([userId])
+  @@index([projectId])
+  @@index([storageMode])
+  @@index([syncStatus])
+  @@index([updatedAt])
+  @@map("template_metadata")
+}
+
+// TemplateResource - Deduplicated resources with hash-based storage
+model TemplateResource {
+  id          String   @id @default(uuid())
+  templateId  String   @map("template_id")
+  name        String
+  type        String // 'IMAGE' | 'FONT' | 'SVG' | 'VIDEO' | 'AUDIO'
+  storageUrl  String   @map("storage_url") // S3 URL or local path
+  storageMode String   @map("storage_mode") // 'seaweedfs' | 'local' | 'browser'
+  hash        String   // Content hash for deduplication
+  size        Int
+  mimeType    String   @map("mime_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  template TemplateMetadata @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([hash])
+  @@index([templateId])
+  @@index([storageMode])
+  @@map("template_resources")
+}
+
+// TemplateVersion - Version history for templates
+model TemplateVersion {
+  id         String   @id @default(uuid())
+  templateId String   @map("template_id")
+  version    Int
+  storageUrl String   @map("storage_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  template TemplateMetadata @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@map("template_versions")
+}
+
+// TemplateShare - Sharing permissions for templates
+model TemplateShare {
+  id             String   @id @default(uuid())
+  templateId     String   @map("template_id")
+  sharedWithId   String?  @map("shared_with_id") // User ID or null for public
+  permission     String   @default("view") // 'view' | 'edit' | 'admin'
+  shareToken     String?  @unique @map("share_token") // For public sharing
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  template TemplateMetadata @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([sharedWithId])
+  @@index([shareToken])
+  @@map("template_shares")
+}
+
+// Batch - Tracks uploaded batch files for card generation
+model Batch {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  userEmail     String    @map("user_email")
+  projectId     String    @map("project_id")
+  projectName   String    @map("project_name")
+  fileName      String    @map("file_name")
+  fileSize      Int       @map("file_size")
+  filePath      String    @map("file_path")
+  status        BatchStatus @default(UPLOADED)
+  errorMessage  String?   @map("error_message")
+  processedAt   DateTime? @map("processed_at")
+
+  // Parsing tracking fields
+  recordsCount       Int?      @map("records_count")
+  recordsProcessed   Int?      @map("records_processed")
+  parsingStartedAt   DateTime? @map("parsing_started_at")
+  parsingCompletedAt DateTime? @map("parsing_completed_at")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  records BatchRecord[]
+
+  @@index([userId])
+  @@index([userEmail])
+  @@index([projectId])
+  @@index([projectName])
+  @@index([status])
+  @@index([createdAt])
+  @@map("batches")
+}
+
+// BatchRecord - Searchable contact records in PostgreSQL
+// Links to complete contact data in Cassandra via batch_record_id
+// Field names strictly match front-cards/features/template-textile/utils/vcardFields.ts
+model BatchRecord {
+  id          String   @id @default(uuid())
+  batchId     String   @map("batch_id")
+
+  // 5 searchable fields from vcardFields.ts
+  fullName     String? @map("full_name")
+  workPhone    String? @map("work_phone")
+  mobilePhone  String? @map("mobile_phone")
+  email        String?
+  businessName String? @map("business_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([email])
+  @@index([fullName])
+  @@index([businessName])
+  @@index([workPhone])
+  @@index([mobilePhone])
+  @@index([createdAt])
+  @@map("batch_records")
+}
+
+// Batch status enumeration
+enum BatchStatus {
+  UPLOADED
+  PARSING
+  PARSED
+  LOADED
+  ERROR
+
+  @@map("batch_status")
+}
