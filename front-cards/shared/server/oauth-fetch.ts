@@ -2,6 +2,11 @@
  * Server-side HTTP(S) for OAuth identity URLs only.
  * In non-production, uses Node http(s) so mkcert / http:// env URLs do not go through undici fetch()
  * (which can follow redirects to https and then fail TLS verification).
+ *
+ * SAFETY: In production (NODE_ENV === 'production'), this function ALWAYS uses
+ * the standard secure fetch() API with proper TLS certificate validation.
+ * The insecure Node.js agent with rejectUnauthorized: false is ONLY used in
+ * development environments.
  */
 import * as http from 'node:http';
 import * as https from 'node:https';

@@ -49,12 +49,6 @@ export const appConfig = {
     bucket: process.env.SEAWEEDFS_BUCKET || 'repositories',
   },
 
-  // JWT
-  jwt: {
-    secret: process.env.JWT_SECRET || 'dev_secret',
-    expiry: process.env.JWT_EXPIRY || '7d',
-  },
-
   // LLM Configuration (Name Parsing)
   llm: {
     enabled: process.env.LLM_ENABLED === 'true',

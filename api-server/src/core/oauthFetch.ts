@@ -1,6 +1,12 @@
 /**
  * Server-side HTTP(S) for OAuth identity URLs in dev (mkcert, http:// env, etc.).
  * Mirrors front-cards/shared/server/oauth-fetch.ts.
+ *
+ * SAFETY: In production (NODE_ENV === 'production'), this function ALWAYS uses
+ * the standard secure fetch() API with proper TLS certificate validation.
+ * The insecure Node.js http/https client with rejectUnauthorized: false is
+ * ONLY used in development environments where mkcert CA may not be mounted
+ * inside Docker containers.
  */
 import * as http from 'node:http';
 import * as https from 'node:https';

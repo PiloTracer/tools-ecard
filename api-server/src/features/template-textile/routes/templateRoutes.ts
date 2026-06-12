@@ -6,14 +6,14 @@
 import { FastifyPluginAsync } from 'fastify';
 import { templateController } from '../controllers/templateController';
 import { resourceProxyController } from '../controllers/resourceProxyController';
-import { authMiddleware } from '../../../core/middleware/authMiddleware';
+import { requireAuth } from '../../../core/middleware/authMiddleware';
 
 const templateRoutes: FastifyPluginAsync = async (fastify) => {
   // Resource proxy (public read access) - NO AUTH
   fastify.get('/api/v1/template-textile/resource/:bucket/*', resourceProxyController.getResource.bind(resourceProxyController));
 
-  // Apply auth middleware to other routes
-  fastify.addHook('preHandler', authMiddleware);
+  // Apply strict auth middleware to other routes
+  fastify.addHook('preHandler', requireAuth);
 
   // Save or update a template
   fastify.post('/api/v1/template-textile', templateController.saveTemplate.bind(templateController));

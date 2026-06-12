@@ -2,9 +2,9 @@
 
 ## Session status
 
-**Closed:** 2026-06-11 — fixed backup/restore (options 9 and 10) in bin/start.sh
+**Closed:** 2026-06-12 — production auth hardening: token caching, fail-closed middleware, dead config cleanup
 
-**Updated:** 2026-06-11
+**Updated:** 2026-06-12
 
 **Repository state:** Implementation-ready (brownfield). Master plan **Approved** (all 25 sections + appendices). Foundation docs 01+04, 6 ADRs, registries in place. Ready for `@code-implementation plan - M1`.
 
