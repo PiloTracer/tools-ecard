@@ -46,7 +46,7 @@ Commands:
   rebuild       Down → build → up — keeps named volumes (build tee’d to repo-root build.log)
   reset         Down -v (deletes compose volumes/data) → build → up — destructive (same build.log)
   force-rebuild Down → build --no-cache → up — keeps volumes (same build.log)
-  restore       Restore volumes + config from backups, then up — builds (same build.log)
+  restore       Restore volumes from backups, then up — builds (same build.log)
   menu          Open interactive menu
   help, -h      Show this help
 
