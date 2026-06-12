@@ -392,40 +392,23 @@ class TemplateService {
     // Always delete from local cache
     await browserStorageService.deleteTemplate(templateId);
 
-    // Always attempt server delete regardless of mode.
-    // Previously gated behind mode === 'FULL', which caused the template to
-    // reappear in listTemplates() since it fetches from the server and merges.
+    // Attempt server delete — silently handle any error since local cache is clean.
+    // The server response is advisory: if it fails, listTemplates() may return the
+    // template from the server, but a subsequent delete will retry with the same ID.
     try {
       const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
         method: 'DELETE',
-        // No Content-Type header — DELETE with no body doesn't need it,
-        // and Fastify may reject an empty body with Content-Type: application/json
       });
 
-      if (!response.ok) {
-        // 404 means the template is already gone — that's success for us
-        if (response.status === 404) {
-          console.log(`Template ${templateId} already deleted on server`);
-          return;
-        }
-
-        // Try to read the server error message from the response body
-        let serverError = response.statusText;
-        try {
-          const body = await response.json();
-          if (body?.error) {
-            serverError = body.error;
-          }
-        } catch {
-          // Response body isn't JSON — use statusText
-        }
-        throw new Error(`Failed to delete: ${serverError}`);
+      if (!response.ok && response.status !== 404) {
+        const body = await response.json().catch(() => null);
+        console.warn(
+          `Server returned ${response.status} on delete — template removed locally:`,
+          body?.error || response.statusText
+        );
       }
-    } catch (error) {
-      console.error('Failed to delete from server:', error);
-      // Don't throw — local cache is already clean, and listTemplates will
-      // merge server + local results. The template may reappear if the server
-      // still has it, but that's better than breaking the UI.
+    } catch {
+      // Network error — local cache is already clean
     }
   }
 

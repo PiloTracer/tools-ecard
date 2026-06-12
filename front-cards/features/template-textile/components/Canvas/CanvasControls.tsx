@@ -897,6 +897,28 @@ export function CanvasControls() {
 
       console.log('[Import] Created new template with ID:', newTemplate.id);
 
+      // Check that all fonts used by text elements are available on the server.
+      // Fonts are stored as fontFamily strings only (not embedded in JSON),
+      // so they must be loaded from the server at render time.
+      if (newTemplate.elements) {
+        const usedFonts = new Set<string>();
+        for (const el of newTemplate.elements) {
+          if (el.type === 'text' && (el as any).fontFamily) {
+            usedFonts.add((el as any).fontFamily);
+          }
+        }
+        if (usedFonts.size > 0) {
+          // Pre-populate font cache before rendering
+          const { fontService } = await import('../services/fontService');
+          const available = await fontService.listFonts('all');
+          const availableFamilies = new Set(available.map(f => f.fontFamily));
+          const missing = [...usedFonts].filter(f => !availableFamilies.has(f));
+          if (missing.length > 0) {
+            console.warn(`[Import] Fonts not found on server, will use fallback: ${missing.join(', ')}`);
+          }
+        }
+      }
+
       // Clear current canvas
       if (fabricCanvas) {
         fabricCanvas.clear();
@@ -905,7 +927,11 @@ export function CanvasControls() {
       }
 
       // Load template into store (this will trigger canvas re-render)
-      loadTemplate(newTemplate);
+      // IMPORTANT: await is required — loadTemplate preloads fonts and images
+      // before rendering. Without await, fonts would load asynchronously and
+      // the canvas would render with fallback fonts first, then flash when
+      // fonts arrive (FOUT — Flash of Unstyled Text).
+      await loadTemplate(newTemplate);
 
       // Update save metadata
       setSaveMetadata(selectedProject?.name ?? 'Default Project', newTemplate.name);
