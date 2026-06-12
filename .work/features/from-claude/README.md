@@ -25,6 +25,7 @@ These map directly to shipped or in-progress code under `front-cards`, `api-serv
 | [render-worker/](render-worker/README.md) | BullMQ `card-rendering` worker (mock rendering — worker infra exists, Canvas/Sharp logic is mocked) |
 | [authentication/](authentication/README.md) | Next.js auth routes, `AuthProvider`, cookies; API `authMiddleware` |
 | [simple-quick-actions/](simple-quick-actions/README.md) | Dashboard quick actions (project-gated); composes batch-upload |
+| [diagnostics/](diagnostics/README.md) | Queue and worker monitoring endpoints |
 
 ---
 
@@ -70,12 +71,11 @@ These files predate the `*/README.md` + `feature.yaml` layout. Prefer the **dire
 
 ---
 
-## Undocumented features (code exists, no feature doc)
+## Deprecated features
 
 | Feature | Location | Notes |
 |---------|----------|-------|
-| Diagnostics / queue monitoring | `api-server` routes at `/api/diagnostics` | Worker queue monitoring endpoints; no feature README |
-| template-designer (api-server) | `api-server/src/features/template-designer/` | All subdirs empty — **deprecated/removed**. Superseded by `template-textile` |
+| template-designer (api-server) | `api-server/src/features/template-designer/` | **Removed**. Superseded by `template-textile` |
 
 ## Conventions
 
