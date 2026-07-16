@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16
+**Updated:** 2026-07-16 (post-M4 verify close)
 
 ---
 
@@ -14,6 +14,7 @@
 | Backup/Restore + prod readiness | `bin/start.sh`, compose/env hardening |
 | Thin-client migration | Removed vendored `.ai/` / `.ai.ui`; source pointers; `.work/standards/`; carriers reconciled |
 | M4 Demo + prd restore | SPEC, ADR 007, Demo adapters, API write guard, runbook, `bin/verify-prd-env.sh` |
+| M4 post-verify fixes | Demo batch export + package export paths; BFF proxy test; jest `maxWorkers:1` |
 
 ---
 
@@ -36,7 +37,7 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Clean public Demo deploy | Both `DEMO_MODE` + `NEXT_PUBLIC_DEMO_MODE`; empty volumes; verify Network tab |
+| **0** | Production deploy cutover | `./bin/start.sh prd up` (fresh or restore); DNS/TLS; confirm health. For Demo: both flags + empty volumes |
 | **1** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
 | **2** | Document `/api/diagnostics` (U6) | Or fold into ops runbook |
 | **3** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |

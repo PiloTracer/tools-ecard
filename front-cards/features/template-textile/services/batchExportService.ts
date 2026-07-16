@@ -8,6 +8,9 @@ import { exportTemplate } from './exportService';
 import type { ExportOptions, ExportResult } from './exportService';
 import type { Template, TemplateElement, TextElement, QRElement } from '../types';
 import { apiClient } from '@/shared/lib/api-client';
+import { batchRecordService } from '@/features/batch-records/services/batchRecordService';
+import type { ContactRecord } from '@/features/batch-records/types';
+import { isDemoMode } from '@/features/demo/isDemoMode';
 import { generateVCardFromRecord } from './vcardGenerator';
 import { createOriginalPositionMap, applyLineCompaction, type PositionMap } from './lineCompactionService';
 
@@ -120,6 +123,14 @@ const MEMORY_WARNING_THRESHOLD = 1000;
 const MEMORY_MAX_LIMIT = 2000;
 const CHUNK_SIZE = 100;
 
+function contactToBatchRecord(record: ContactRecord): BatchRecord {
+  return {
+    ...record,
+    createdAt: new Date(record.createdAt),
+    updatedAt: new Date(record.updatedAt),
+  };
+}
+
 /**
  * Fetch all batch records (handles pagination)
  */
@@ -131,17 +142,20 @@ export async function fetchBatchRecords(batchId: string): Promise<{ records: Bat
 
   try {
     while (hasMore) {
-      const url = `/api/batches/${batchId}/records?page=${page}&pageSize=500`;
-      console.log('[BatchExport] Fetching batch records:', url);
+      console.log('[BatchExport] Fetching batch records:', { batchId, page, demo: isDemoMode() });
 
-      const data = await apiClient.get<BatchRecordsResponse>(url);
+      const data = isDemoMode()
+        ? await batchRecordService.fetchRecordsForBatch(batchId, { page, pageSize: 500 })
+        : await apiClient.get<BatchRecordsResponse>(
+            `/api/batches/${batchId}/records?page=${page}&pageSize=500`
+          );
       console.log('[BatchExport] Batch records response:', data);
 
       if (!data.success || !data.data) {
         throw new Error('Invalid API response format');
       }
 
-      allRecords.push(...data.data.records);
+      allRecords.push(...data.data.records.map(contactToBatchRecord));
       batchName = data.data.batchFileName;
 
       // Check if there are more pages

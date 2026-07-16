@@ -1,6 +1,8 @@
 /** @type {import('jest').Config} */
 module.exports = {
   testEnvironment: 'node',
+  // Dev containers are memory-tight; parallel workers OOM and can SIGKILL the api-server process.
+  maxWorkers: 1,
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
   transform: {

@@ -2,13 +2,13 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 — M4 Demo browser-only persistence + production restore-from-backup; public-Demo write barriers hardened (apiClient + Next BFF + api-server). Owner will use a clean Demo deploy with both Demo env flags.
+**Closed:** 2026-07-16 — x-director final M4 verification; demo export/package gaps fixed; jest OOM guard; production readiness assessed (code ready; DNS/TLS + deploy path operator-owned).
 
 **Updated:** 2026-07-16
 
 Treat the next chat as a **new session**: do not assume unwritten goals from prior threads unless they appear in this file or linked artifacts.
 
-**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete**. Demo mode + prd restore runbook + triple write barriers. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs.
+**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete** (incl. post-M4 verify fixes). Demo mode + prd restore runbook + triple write barriers. `.env.prd` passes `bin/verify-prd-env.sh`. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -74,6 +74,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-06-12 | Production readiness + option 4 cleanup | creds/configs; `bin/start.sh` teardown |
 | 2026-07-16 | Thin-client context verify + close | Removed `.ai/` + `.ai.ui` submodule; `.work/standards/`; lean `.cursorrules`; carriers |
 | 2026-07-16 | M4 Demo + prd restore + verify | ADR 007; SPEC + amendment 01; Demo adapters; triple write barriers; runbook; `bin/verify-prd-env.sh` |
+| 2026-07-16 | x-director final verify + close | Demo batch export/package fixes; BFF proxy test; jest `maxWorkers:1`; prd readiness gate |
 
 ---
 
@@ -90,12 +91,46 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ---
 
+## Cross-framework action (@x-director)
+
+**Date:** 2026-07-16  
+**Request:** "perform full verification of all changes done today; verify Demo mode (DEMO_MODE=false/true); resolve/fix issues"  
+**Frameworks involved:** .ai  
+**Classified framework bucket(s):** engineering (cross-cutting verify + repair)  
+**Routing confidence:** high  
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz no | .ai.soc scaffold only  
+
+**Executed:**
+1. `@code-verify` (milestone/last) on M4 commit `74517b1` — SPEC R1–R12 matrix, compose tests, live API probes  
+2. `@code-repair` — demo gaps in `batchExportService`, `templatePackageService`; BFF proxy integration test; jest `maxWorkers: 1` (api-server + front-cards)  
+
+**Coordination notes:** UI layer verified via front-cards unit tests + service wiring audit; no `.work.ui` writes.  
+
+**Verification evidence:**
+- `DEMO_MODE=false`: health `demoMode:false`; POST `/api/v1/projects` → 201; front-cards `:7300` → 200  
+- `DEMO_MODE=true`: `demoModeGuard` unit tests pass; tsx inline `isDemoModeEnabled()` → true; BFF `proxyRequestToApiServer` POST → 403 `demo_mode_readonly` (new test)  
+- api-server: 13 suites / 137 tests pass (`NODE_OPTIONS=--max-old-space-size=768` in tight dev container)  
+- front-cards: 11 suites / 93 tests pass (`--runInBand` / `maxWorkers:1`)  
+
+**Fixes applied (uncommitted):**
+- `batchExportService.fetchBatchRecords` routes through `batchRecordService` in demo (was hitting api-server)  
+- `templatePackageService` reads demo blobs/fonts for `demo-blob://` URLs and demo font IDs  
+- `proxy-to-api-server.test.ts` asserts POST blocked before upstream  
+- `jest.config.js` `maxWorkers:1` on api-server and front-cards (prevents SIGKILL/OOM killing dev servers during `npm test`)  
+
+**Blockers:** none for dev verification; owner clean public Demo deploy (both env flags) still pending for prod cutover  
+
+**Next recommended:** `@session-control start` → owner clean Demo deploy; or `@code-implementation plan` for M1/M2 residual gaps  
+
+---
+
 ## Latest action (@session-control close)
 
 **Date:** 2026-07-16  
-**Request:** `@session-control close commit push` (after noting clean Demo deploy)  
-**Session result:** Closed; M4 committed and pushed  
-**Blockers remaining:** U6; DNS/TLS; owner clean Demo deploy  
+**Request:** `@session-control close commit push` (after final production verification)  
+**Session result:** Closed; M4 verify fixes committed and pushed  
+**Production readiness:** Engineering **ready** for `./bin/start.sh prd up` per runbook when operator owns DNS/TLS and deploy path (fresh or restore). Public Demo requires both `DEMO_MODE` flags on clean host.  
+**Blockers remaining:** U6; DNS/TLS; owner deploy cutover  
 
 ---
 

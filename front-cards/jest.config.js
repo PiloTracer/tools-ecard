@@ -1,6 +1,8 @@
 /** @type {import('jest').Config} */
 module.exports = {
   testEnvironment: 'jest-environment-jsdom',
+  // Dev containers are memory-tight; parallel workers can SIGKILL the Next dev server.
+  maxWorkers: 1,
   roots: ['<rootDir>/'],
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   transform: {

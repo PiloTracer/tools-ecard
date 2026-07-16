@@ -9,6 +9,8 @@ import { Template, ImageElement, TextElement, TemplateElement } from '../types';
 import { fontService } from './fontService';
 import { apiClient } from '@/shared/lib/api-client';
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoStore } from '@/features/demo/demoStore';
 
 interface PackageMetadata {
   version: '1.0';
@@ -245,6 +247,13 @@ export class TemplatePackageService {
       const response = await fetch(url);
       const blob = await response.blob();
       return { blob, type: blob.type };
+    } else if (url.startsWith('demo-blob://')) {
+      const id = url.replace('demo-blob://', '');
+      const stored = await demoStore.getBlob(id);
+      if (!stored) throw new Error(`Demo image not found: ${id}`);
+      const response = await fetch(stored.data);
+      const blob = await response.blob();
+      return { blob, type: stored.mimeType || blob.type };
     } else {
       // HTTP URL - fetch from server
       const response = await fetch(url);
@@ -301,6 +310,13 @@ export class TemplatePackageService {
    * Includes credentials to allow access to user-uploaded fonts
    */
   private async fetchFontFile(fontId: string): Promise<Blob> {
+    if (isDemoMode()) {
+      const stored = await demoStore.getBlob(`font:${fontId}`);
+      if (!stored) throw new Error(`Demo font not found: ${fontId}`);
+      const response = await fetch(stored.data);
+      return await response.blob();
+    }
+
     const url = `${getApiBaseUrl()}/api/v1/fonts/${fontId}/file`;
     console.log(`[PackageExport] Fetching font file from: ${url}`);
 
