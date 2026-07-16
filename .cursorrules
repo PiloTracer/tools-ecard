@@ -6,7 +6,7 @@ You are a senior staff engineer and tech lead on **tools-ecards**. You own corre
 
 # AI Agent Rules — tools-ecards
 
-> **Thin-client.** Framework assets resolve from source pointers below. Local `.ai/` / `.ai.ui/` trees (if present) are fat-client leftovers — ignore them when sources are set. Refresh: `bash /mnt/work/Projects/.ai/scripts/deploy-basic.sh /mnt/data/Projects/EPIC/tools-ecards --update` (and UI counterpart under `.ai.ui/scripts/`).
+> **Thin-client.** Framework assets resolve from source pointers below. Local `.ai/` / `.ai.ui/` trees (if present) are fat-client leftovers — ignore them when sources are set. Refresh: `bash /data/Projects/.ai/scripts/deploy-basic.sh /data/Projects/EPIC/tools-ecards --update` (and UI counterpart under `.ai.ui/scripts/`).
 
 ## Core Principles (ALWAYS APPLY — override all else, non-negotiable)
 
@@ -26,8 +26,8 @@ Default to **minimal diffs**. Run before commit / `@code-implementation complete
 
 | Gate | Command | Fail when |
 |------|---------|-----------|
-| Touch scope | `bash /mnt/work/Projects/.ai/scripts/touch-scope-verify.sh` | File outside `.work/touch-scope` or iteration **Files** |
-| Blast radius | `bash /mnt/work/Projects/.ai/scripts/blast-radius-check.sh` | `risk: high` |
+| Touch scope | `bash /data/Projects/.ai/scripts/touch-scope-verify.sh` | File outside `.work/touch-scope` or iteration **Files** |
+| Blast radius | `bash /data/Projects/.ai/scripts/blast-radius-check.sh` | `risk: high` |
 | Protected surfaces | `.work/PROTECTED_SURFACES.json` + §Protected Files | High-blast path without owner approval |
 | Tests | container commands in §Docker | Non-zero exit |
 
@@ -43,16 +43,16 @@ Default to **minimal diffs**. Run before commit / `@code-implementation complete
 
 | Framework | Director | Path |
 |-----------|----------|------|
-| `.ai` (Agent OS) | `@ai-director` | `/mnt/work/Projects/.ai` |
-| `.ai.ui` (UI Design OS) | `@ui-director` | `/mnt/work/Projects/.ai.ui` |
-| `.ai.biz` (Business OS) | `@biz-director` | `/mnt/work/Projects/.ai.biz` |
-| `.ai.soc` (Security OS) | `@soc-director` | `/mnt/work/Projects/.ai.soc` |
+| `.ai` (Agent OS) | `@ai-director` | `/data/Projects/.ai` |
+| `.ai.ui` (UI Design OS) | `@ui-director` | `/data/Projects/.ai.ui` |
+| `.ai.biz` (Business OS) | `@biz-director` | `/data/Projects/.ai.biz` |
+| `.ai.soc` (Security OS) | `@soc-director` | `/data/Projects/.ai.soc` |
 
 Before routing, verify dir + `skills/README.md`; if absent → `@ai-director` with `[degraded: <framework> not installed]`.
 
 ### Source resolution — Agent OS (thin-client)
 
-AGENT_OS_SOURCE=/mnt/work/Projects/.ai
+AGENT_OS_SOURCE=/data/Projects/.ai
 
 **Rule (before reading any `.ai/...` path):**
 1. `.cursorrules` + `.work/**` — always local.
@@ -191,7 +191,7 @@ One-off scripts under **`bin/`**; run from container WORKDIR.
 - NEVER delete files without explicit permission.
 - NEVER `git commit` / `git push` unless requested in the same message.
 - **`@session-control close commit` / `close commit push`:** MUST run `git add` + `git commit` (default safe tree scope) per session-control § C4b; `push` only when requested. Show SHA + `git status -sb`.
-- No `Co-authored-by:` / agent signatures. Hooks: `bash /mnt/work/Projects/.ai/scripts/install-git-hooks.sh`.
+- No `Co-authored-by:` / agent signatures. Hooks: `bash /data/Projects/.ai/scripts/install-git-hooks.sh`.
 
 ---
 
@@ -230,7 +230,7 @@ Plain text, no wrapping quotes. Subject ≤72 chars imperative: `type: descripti
 
 **Coexistence:** `$AI_UI_SOURCE/COHABITATION.md` — UI skills write `.work.ui/` only.
 
-AI_UI_SOURCE=/mnt/work/Projects/.ai.ui
+AI_UI_SOURCE=/data/Projects/.ai.ui
 
 **Rule:** `.cursorrules` + `.work.ui/**` + `front-cards/` local; other `.ai.ui/<path>` → `$AI_UI_SOURCE/<path>`; unreachable → stop (`ui-design-os source unreachable`).
 
@@ -256,7 +256,7 @@ AI_UI_SOURCE=/mnt/work/Projects/.ai.ui
 
 ## Security OS (thin-client)
 
-SOC_SOURCE=/mnt/work/Projects/.ai.soc
+SOC_SOURCE=/data/Projects/.ai.soc
 
 Resolve `.ai.soc/<path>` from `$SOC_SOURCE`. Project SOC memory: `.work.soc/` (`HANDOFF_SOC.md`, `NEXT_SOC.md`, `UNKNOWNS_SOC.md`). Sessions: `@session-soc`. Full skills: `$SOC_SOURCE/skills/README.md`.
 
