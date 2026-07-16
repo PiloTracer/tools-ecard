@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (post-M4 verify close)
+**Updated:** 2026-07-16 (session close — clone diagnosis; no deploy)
 
 ---
 
@@ -15,6 +15,7 @@
 | Thin-client migration | Removed vendored `.ai/` / `.ai.ui`; source pointers; `.work/standards/`; carriers reconciled |
 | M4 Demo + prd restore | SPEC, ADR 007, Demo adapters, API write guard, runbook, `bin/verify-prd-env.sh` |
 | M4 post-verify fixes | Demo batch export + package export paths; BFF proxy test; jest `maxWorkers:1` |
+| Clone-size diagnosis (2026-07-16) | Confirmed ignored local `node_modules` (~9GB+) and absent `.opencode` are not in git; GitHub ~3MB |
 
 ---
 
@@ -30,6 +31,7 @@
 |---|------|-------|
 | 1 | U6 `/api/diagnostics` docs | Optional fold into ops runbook |
 | 2 | DNS/TLS ownership for prod hostname | Procedure documented; host still operator-owned |
+| 3 | Clean public Demo deploy (both env flags) | Internet Demo cutover |
 
 ---
 

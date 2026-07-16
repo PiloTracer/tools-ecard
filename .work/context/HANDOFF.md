@@ -2,13 +2,13 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 — x-director final M4 verification; demo export/package gaps fixed; jest OOM guard; production readiness assessed (code ready; DNS/TLS + deploy path operator-owned).
+**Closed:** 2026-07-16 — Session opened for prod-deploy pick-up; diagnosed slow clone (local `node_modules` ~9GB+ / `.opencode` not in git; GitHub pack ~3MB). No deploy cutover performed.
 
 **Updated:** 2026-07-16
 
 Treat the next chat as a **new session**: do not assume unwritten goals from prior threads unless they appear in this file or linked artifacts.
 
-**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete** (incl. post-M4 verify fixes). Demo mode + prd restore runbook + triple write barriers. `.env.prd` passes `bin/verify-prd-env.sh`. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs.
+**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete**. Demo + prd restore path ready. Engineering ready for `./bin/start.sh prd up` when operator owns DNS/TLS. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs. Local working tree ~11GB (ignored `node_modules`) — does not affect `git clone` size.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -75,6 +75,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | Thin-client context verify + close | Removed `.ai/` + `.ai.ui` submodule; `.work/standards/`; lean `.cursorrules`; carriers |
 | 2026-07-16 | M4 Demo + prd restore + verify | ADR 007; SPEC + amendment 01; Demo adapters; triple write barriers; runbook; `bin/verify-prd-env.sh` |
 | 2026-07-16 | x-director final verify + close | Demo batch export/package fixes; BFF proxy test; jest `maxWorkers:1`; prd readiness gate |
+| 2026-07-16 | session-control start → clone diagnosis → close | Confirmed `node_modules` / `.opencode` not in git; GitHub ~3MB; local tree ~11GB ignored deps; no code changes |
 
 ---
 
@@ -127,10 +128,10 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 ## Latest action (@session-control close)
 
 **Date:** 2026-07-16  
-**Request:** `@session-control close commit push` (after final production verification)  
-**Session result:** Closed; M4 verify fixes committed and pushed  
-**Production readiness:** Engineering **ready** for `./bin/start.sh prd up` per runbook when operator owns DNS/TLS and deploy path (fresh or restore). Public Demo requires both `DEMO_MODE` flags on clean host.  
-**Blockers remaining:** U6; DNS/TLS; owner deploy cutover  
+**Request:** `@session-control close commit push`  
+**Session result:** Closed; no product code changes. Clone-size diagnosis only (local deps ≠ git).  
+**Production readiness:** Unchanged — engineering ready for `./bin/start.sh prd up` when operator owns DNS/TLS and deploy path.  
+**Blockers remaining:** U6; DNS/TLS; owner deploy / Demo cutover  
 
 ---
 
