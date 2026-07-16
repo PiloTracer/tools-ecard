@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (post Demo card-generation reliability fix)
+**Updated:** 2026-07-16 (post flexible field-mapping + import-persistence fix)
 
 ---
 
@@ -17,6 +17,7 @@
 | M4 post-verify fixes | Demo batch export + package export paths; BFF proxy test; jest `maxWorkers:1` |
 | Clone-size diagnosis (2026-07-16) | Confirmed ignored local `node_modules` (~9GB+) and absent `.opencode` are not in git; GitHub ~3MB |
 | Demo card-generation reliability fix | Font preload (`exportService.ts`, both modes); XLSX self-closing-cell regex bug + per-field name fallback (`demoSpreadsheetParser.ts`); legacy-cols/updateRecord field-loss fixes (`batchRecordService.ts`); verified against user's real `.xlsx` |
+| Flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext value reconciliation in both `demoSpreadsheetParser.ts` and `api-server/batch-parsing` (`data_normalizer.py`/`parser.py`); CSV/paste header-row detection + delimiter auto-detect (`file_parser.py`); `CanvasControls.tsx` import now auto-persists via `templateService.saveTemplate` instead of only updating in-memory state; new `test_batch_parsing.py` (17 tests, no prior Python test infra existed) |
 
 ---
 
@@ -40,7 +41,7 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Manual browser click-through of Demo fix | Enter Demo mode, upload a real `.xlsx`, run batch export, visually confirm name + font on output PNG — not yet performed by an agent this session |
+| **0** | Manual browser click-through: import-persistence + Demo fix | (a) Import a `.zip`/`.json` design (Demo + Normal), close tab without Save, reopen, confirm it survived; (b) enter Demo mode, upload a real `.xlsx`, run batch export, visually confirm name + font on output PNG — neither performed by an agent yet (no IndexedDB in this repo's jest/jsdom setup blocks (a); (b) has no browser tooling in this session) |
 | **1** | Production deploy cutover | `./bin/start.sh prd up` (fresh or restore); DNS/TLS; confirm health. For Demo: both flags + empty volumes |
 | **2** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
 | **3** | Document `/api/diagnostics` (U6) | Or fold into ops runbook |

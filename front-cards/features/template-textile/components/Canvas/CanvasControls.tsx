@@ -935,10 +935,35 @@ export function CanvasControls() {
 
       // Update save metadata
       setSaveMetadata(selectedProject?.name ?? 'Default Project', newTemplate.name);
-      markAsSaved();
 
-      console.log('[Import] Template imported successfully:', newTemplate.name);
-      alert(`Template "${newTemplate.name}" imported successfully!`);
+      // Persist immediately so the import survives across sessions without a
+      // separate manual Save. Previously, import only updated the in-memory
+      // Zustand store and called markAsSaved() to suppress the "unsaved
+      // changes" prompt — closing the tab (or navigating away) before an
+      // explicit Save silently discarded the imported design in both Demo
+      // and Normal mode. Deliberately persist `newTemplate` as parsed
+      // (already fully resolved: ZIP images are embedded data URLs, legacy
+      // JSON keeps its original references) rather than reusing
+      // handleSaveTemplate's live-canvas snapshot, which reads canvasWidth/
+      // exportWidth/currentTemplate from this render's (stale) closure and
+      // would not yet reflect the just-imported template.
+      try {
+        const metadata = await templateService.saveTemplate({
+          name: newTemplate.name,
+          templateData: newTemplate,
+        });
+        useTemplateStore.getState().updateTemplateId(metadata.id);
+        markAsSaved();
+        console.log('[Import] Template imported and saved successfully:', newTemplate.name);
+        alert(`Template "${newTemplate.name}" imported successfully!`);
+      } catch (persistError) {
+        console.error('[Import] Imported template could not be auto-saved:', persistError);
+        alert(
+          `Template "${newTemplate.name}" was imported but could not be saved automatically ` +
+            `(${persistError instanceof Error ? persistError.message : 'unknown error'}). ` +
+            `It is only in this editor session — use Save before closing this tab.`
+        );
+      }
     } catch (error) {
       console.error('[Import] Failed to import template:', error);
 

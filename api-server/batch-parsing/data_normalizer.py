@@ -6,7 +6,7 @@ Extracted from __script_v9.py
 
 import re
 import unicodedata
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pandas as pd
 import phonenumbers
@@ -59,6 +59,65 @@ FIELD_MAPPING = {
     "personal_bio": ["personal_bio", "notes", "comments", "description", "notas", "comentarios", "bio", "biography"],
     "personal_birthday": ["personal_birthday", "birthday", "dob", "cumpleaños", "fecha nacimiento"]
 }
+
+# Minimum alias-token length considered for substring (fuzzy) header matching. Keeps
+# short tokens like "x"/"li"/"fb" restricted to exact-token matches only, avoiding false
+# positives on unrelated headers that merely contain those letters.
+FUZZY_MIN_ALIAS_LEN = 4
+
+
+def _normalize_header_token(text: str) -> str:
+    """Lowercase, strip accents, collapse punctuation to single spaces — for fuzzy header
+    token matching (mirrors demoSpreadsheetParser.ts normalizeHeaderKey, but keeps word
+    boundaries as spaces instead of underscores)."""
+    text = str(text).lower().strip()
+    text = ''.join(
+        c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn'
+    )
+    return re.sub(r'[^a-z0-9]+', ' ', text).strip()
+
+
+def _alias_tokens(aliases) -> set:
+    tokens = set()
+    for alias in aliases:
+        tokens.update(_normalize_header_token(alias).split(' '))
+    tokens.discard('')
+    return tokens
+
+
+def find_fuzzy_field_match(header: str) -> Optional[str]:
+    """
+    Fallback for headers that don't exactly match a `FIELD_MAPPING` alias — e.g. "Teléfono
+    Oficina 2", "Cel./WhatsApp", "Correo Electrónico Personal". Splits the normalized
+    header into tokens; each token is checked first for an exact hit against any field's
+    alias tokens, then (for tokens >= FUZZY_MIN_ALIAS_LEN) for substring containment
+    against the full alias strings. If tokens end up pointing at more than one distinct
+    target field — a genuinely compound header like "Nombre y Apellido" — returns None so
+    the caller's own positional/name-splitting fallback handles it instead of guessing.
+    """
+    tokens = [t for t in _normalize_header_token(header).split(' ') if t]
+    if not tokens:
+        return None
+
+    matched_fields = set()
+    for token in tokens:
+        direct_hit = False
+        for field, aliases in FIELD_MAPPING.items():
+            if token in _alias_tokens(aliases):
+                matched_fields.add(field)
+                direct_hit = True
+        if direct_hit or len(token) < FUZZY_MIN_ALIAS_LEN:
+            continue
+        for field, aliases in FIELD_MAPPING.items():
+            for alias in aliases:
+                alias_norm = _normalize_header_token(alias)
+                if len(alias_norm) < FUZZY_MIN_ALIAS_LEN:
+                    continue
+                if token in alias_norm or alias_norm in token:
+                    matched_fields.add(field)
+
+    return next(iter(matched_fields)) if len(matched_fields) == 1 else None
+
 
 class DataNormalizer:
     """
@@ -278,6 +337,48 @@ class DataNormalizer:
         else:
             # No country code configured, use simple format: "XXXX-XXXX"
             return f"{digits[:4]}-{digits[4:]}"
+
+    @staticmethod
+    def _digits_only(value: Any) -> str:
+        return ''.join(filter(str.isdigit, str(value))) if value else ''
+
+    def _looks_like_extension(self, value: Any) -> bool:
+        if not value or str(value).strip().startswith('+'):
+            return False
+        digits = self._digits_only(value)
+        return 0 < len(digits) <= 5
+
+    def _looks_like_phone_number(self, value: Any) -> bool:
+        if not value:
+            return False
+        if str(value).strip().startswith('+'):
+            return True
+        return len(self._digits_only(value)) >= 7
+
+    def reconcile_phone_and_extension(self, mapped: Dict[str, Any]) -> None:
+        """
+        Some sheets label columns "Teléfono"/"Extensión" correctly but the VALUES are
+        swapped — a full number sits under "Ext" and a 2-5 digit extension sits under
+        "Teléfono". Header-based mapping alone can't catch this (both headers matched
+        correctly); reclassify by value shape instead. Conservative on purpose: only
+        acts on clearly short (<=5 digit) vs clearly long (>=7 digit, or E.164 "+...")
+        values, leaves the ambiguous middle (6-digit local numbers) alone. Must run
+        BEFORE `normalize_phone` so the value that ends up in `work_phone` still gets
+        formatted normally.
+        """
+        phone = mapped.get("work_phone")
+        ext = mapped.get("work_phone_ext")
+        phone_is_ext_shaped = self._looks_like_extension(phone)
+        ext_is_phone_shaped = self._looks_like_phone_number(ext)
+
+        if phone_is_ext_shaped and ext_is_phone_shaped:
+            mapped["work_phone"], mapped["work_phone_ext"] = ext, phone
+        elif phone_is_ext_shaped and not ext:
+            mapped["work_phone_ext"] = phone
+            mapped["work_phone"] = None
+        elif ext_is_phone_shaped and not phone:
+            mapped["work_phone"] = ext
+            mapped["work_phone_ext"] = None
 
     def parse_name(self, full_name: str) -> Dict[str, str]:
         """

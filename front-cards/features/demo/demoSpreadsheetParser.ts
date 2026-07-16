@@ -115,6 +115,87 @@ const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
   notas: 'personalBio',
 };
 
+/** Minimum alias length considered for substring (fuzzy) header matching — keeps short
+ *  aliases like "ext"/"url"/"tel" restricted to exact-token matches only, avoiding false
+ *  positives on unrelated headers that merely contain those letters. */
+const FUZZY_MIN_ALIAS_LEN = 4;
+
+/**
+ * Fuzzy fallback for headers that don't exactly match a known alias — e.g. "Teléfono
+ * Oficina 2", "Cel./WhatsApp", "Correo Electrónico Personal". Splits the normalized key
+ * into tokens and looks for a known field via exact-token lookup first, then substring
+ * containment for longer alias keywords. If tokens point to more than one distinct
+ * field (a genuinely compound header like "Nombre y Apellido"), returns null so the
+ * existing positional-name fallback handles it instead of guessing wrong.
+ */
+function findFuzzyFieldMatch(normalizedKey: string): keyof DemoContactFields | null {
+  const tokens = normalizedKey.split('_').filter(Boolean);
+  const matchedFields = new Set<keyof DemoContactFields>();
+
+  for (const token of tokens) {
+    const direct = HEADER_ALIASES[token];
+    if (direct) {
+      matchedFields.add(direct);
+      continue;
+    }
+    // Below the length floor, only an exact-token hit (above) counts — a short
+    // token like "de" would otherwise substring-match into unrelated long
+    // aliases (e.g. "de" is contained in "department"/"departamento").
+    if (token.length < FUZZY_MIN_ALIAS_LEN) continue;
+    for (const aliasKey of HEADER_KEYWORDS) {
+      if (aliasKey.length < FUZZY_MIN_ALIAS_LEN) continue;
+      if (token.includes(aliasKey) || aliasKey.includes(token)) {
+        matchedFields.add(HEADER_ALIASES[aliasKey]);
+      }
+    }
+  }
+
+  return matchedFields.size === 1 ? [...matchedFields][0] : null;
+}
+
+function digitsOnly(value?: string | null): string {
+  return (value || '').replace(/\D/g, '');
+}
+
+/** Value looks like a short extension rather than a full phone number. */
+function looksLikeExtension(value?: string | null): boolean {
+  if (!value || value.trim().startsWith('+')) return false;
+  const digits = digitsOnly(value);
+  return digits.length > 0 && digits.length <= 5;
+}
+
+/** Value looks like a full phone number rather than a short extension. */
+function looksLikePhoneNumber(value?: string | null): boolean {
+  if (!value) return false;
+  if (value.trim().startsWith('+')) return true;
+  return digitsOnly(value).length >= 7;
+}
+
+/**
+ * Some sheets label columns "Teléfono"/"Extensión" but the VALUES are swapped — a full
+ * number sits under "Ext" and a 2-4 digit extension sits under "Teléfono". Header-based
+ * mapping alone can't catch this (both headers matched correctly); reclassify by value
+ * shape afterward. Conservative on purpose: only acts on clearly short (<=5 digit) vs
+ * clearly long (>=7 digit, or E.164 "+...") values, leaves the ambiguous middle alone.
+ */
+function reconcilePhoneAndExtension(fields: DemoContactFields): void {
+  const phone = fields.workPhone;
+  const ext = fields.workPhoneExt;
+  const phoneIsExtShaped = looksLikeExtension(phone);
+  const extIsPhoneShaped = looksLikePhoneNumber(ext);
+
+  if (phoneIsExtShaped && extIsPhoneShaped) {
+    fields.workPhone = ext;
+    fields.workPhoneExt = phone;
+  } else if (phoneIsExtShaped && !ext) {
+    fields.workPhoneExt = phone;
+    delete fields.workPhone;
+  } else if (extIsPhoneShaped && !phone) {
+    fields.workPhone = ext;
+    delete fields.workPhoneExt;
+  }
+}
+
 function normalizeHeaderKey(raw: string): string {
   return raw
     .trim()
@@ -419,15 +500,35 @@ export function mapRowToContactFields(
   const allowPositionalFallback = options.allowPositionalFallback !== false;
   const fields: DemoContactFields = {};
   let mappedFromHeaders = 0;
+  const unmatchedHeaderIdx: number[] = [];
   headers.forEach((header, i) => {
     const key = HEADER_ALIASES[normalizeHeaderKey(header)];
-    if (!key) return;
+    if (!key) {
+      unmatchedHeaderIdx.push(i);
+      return;
+    }
     const value = cols[i]?.trim();
     if (value) {
       fields[key] = value;
       mappedFromHeaders += 1;
     }
   });
+
+  // Fuzzy fallback: headers that didn't exactly match a known alias (label
+  // mismatches like "Teléfono Oficina 2", "Cel./WhatsApp") get a second look
+  // via token-based partial matching, without ever overwriting a field a
+  // real header already claimed.
+  for (const i of unmatchedHeaderIdx) {
+    const normalizedKey = normalizeHeaderKey(headers[i]);
+    if (!normalizedKey) continue;
+    const value = cols[i]?.trim();
+    if (!value) continue;
+    const fuzzyField = findFuzzyFieldMatch(normalizedKey);
+    if (fuzzyField && !fields[fuzzyField]) {
+      fields[fuzzyField] = value;
+      mappedFromHeaders += 1;
+    }
+  }
 
   // Name fallback: applied per-field, independent of whether OTHER columns
   // (email, title, ...) matched a known header. Without this, a sheet with
@@ -462,6 +563,8 @@ export function mapRowToContactFields(
   if (fields.email && !fields.email.includes('@')) {
     delete fields.email;
   }
+
+  reconcilePhoneAndExtension(fields);
 
   return fields;
 }

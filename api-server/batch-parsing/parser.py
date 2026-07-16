@@ -23,7 +23,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 # Import parsing logic (will be in same directory)
-from data_normalizer import DataNormalizer, FIELD_MAPPING
+from data_normalizer import DataNormalizer, FIELD_MAPPING, find_fuzzy_field_match
 from file_parser import FileParser
 from storage_client import StorageClient
 
@@ -245,33 +245,50 @@ class BatchParser:
 
         # Normalize row keys
         row_keys = {str(k).lower().strip(): k for k in row.index}
+        matched_keys = set()
 
-        # Map fields based on FIELD_MAPPING
+        def _assign(target_field: str, val) -> bool:
+            """Clean + format a raw cell value and store it under target_field.
+            Returns False (and leaves target_field unset) for blank/zero cells so the
+            caller's own not-found handling (or a later fuzzy match) still applies."""
+            if pd.isna(val):
+                return False
+            val_str = str(val).strip()
+            # Remove trailing .0 from Excel float conversion
+            if val_str.endswith('.0'):
+                val_str = val_str[:-2]
+            if val_str == "" or val_str == "0":
+                return False
+            # Don't format name fields yet - parse_name needs original casing
+            if target_field in ["first_name", "last_name", "full_name"]:
+                mapped[target_field] = val_str
+            else:
+                mapped[target_field] = self.normalizer.format_field(target_field, val_str)
+            return True
+
+        # Pass 1: map fields based on FIELD_MAPPING's exact aliases
         for target_field, aliases in FIELD_MAPPING.items():
             found = False
             for alias in aliases:
                 alias_lower = alias.lower()
                 if alias_lower in row_keys:
-                    val = row[row_keys[alias_lower]]
-                    if not pd.isna(val):
-                        val_str = str(val).strip()
-
-                        # Remove trailing .0 from Excel float conversion
-                        if val_str.endswith('.0'):
-                            val_str = val_str[:-2]
-
-                        if val_str == "" or val_str == "0":
-                            continue
-
-                        # Don't format name fields yet - parse_name needs original casing
-                        if target_field in ["first_name", "last_name", "full_name"]:
-                            mapped[target_field] = val_str
-                        else:
-                            mapped[target_field] = self.normalizer.format_field(target_field, val_str)
+                    if _assign(target_field, row[row_keys[alias_lower]]):
+                        matched_keys.add(alias_lower)
                         found = True
                         break
+                    matched_keys.add(alias_lower)
             if not found:
                 mapped[target_field] = None
+
+        # Pass 2: fuzzy fallback for headers that didn't exactly match any alias
+        # (label mismatches like "Teléfono Oficina 2", "Cel./WhatsApp"). Never
+        # overwrites a field a real alias already claimed.
+        for header_key, original_key in row_keys.items():
+            if header_key in matched_keys:
+                continue
+            fuzzy_field = find_fuzzy_field_match(header_key)
+            if fuzzy_field and not mapped.get(fuzzy_field):
+                _assign(fuzzy_field, row[original_key])
 
         # Special handling: Name splitting
         if mapped.get("first_name") and not mapped.get("last_name"):
@@ -281,6 +298,11 @@ class BatchParser:
                 mapped["first_name"] = parsed_name["first_name"]
                 mapped["last_name"] = parsed_name["last_name"]
                 mapped["full_name"] = parsed_name["full_name"]
+
+        # Some sheets have "Teléfono"/"Ext" values swapped even though both headers
+        # matched correctly (a full number under "Ext", a short extension under
+        # "Teléfono") — reclassify by value shape before normalizing/formatting phones.
+        self.normalizer.reconcile_phone_and_extension(mapped)
 
         # Normalize phones with project-specific configuration
         if mapped.get("mobile_phone"):

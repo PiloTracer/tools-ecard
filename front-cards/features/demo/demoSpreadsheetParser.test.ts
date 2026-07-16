@@ -99,6 +99,83 @@ describe('demoSpreadsheetParser', () => {
       // overwrite them with the raw first-name value as a "full name".
       expect(fields.fullName).toBe('Ada Lovelace');
     });
+
+    describe('fuzzy header fallback (label mismatches)', () => {
+      it('maps a header that only partially matches a known alias', () => {
+        const headers = ['Nombre', 'Correo', 'Teléfono Oficina 2'];
+        const fields = mapRowToContactFields(headers, [
+          'Ada Lovelace',
+          'ada@example.com',
+          '2222-1111',
+        ]);
+        expect(fields.workPhone).toBe('2222-1111');
+      });
+
+      it('resolves a header via exact-token match even when not the whole string', () => {
+        const headers = ['Nombre', 'Numero de Extension'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '105']);
+        expect(fields.workPhoneExt).toBe('105');
+      });
+
+      it('does not guess on a genuinely ambiguous/compound header', () => {
+        // "nombre" (firstName) and "apellido" (lastName) tokens both present —
+        // must stay ambiguous so the existing positional-name fallback (not a
+        // wrong guess) is what resolves it, same as before this feature.
+        const headers = ['Nombre y Apellido', 'Correo'];
+        const fields = mapRowToContactFields(headers, ['Juan Perez', 'juan@example.com']);
+        expect(fields.fullName).toBe('Juan Perez');
+      });
+
+      it('does not overwrite a field already set by an exact header match', () => {
+        const headers = ['Phone', 'Teléfono Oficina'];
+        const fields = mapRowToContactFields(headers, ['2222-1111', '8888-9999']);
+        expect(fields.workPhone).toBe('2222-1111');
+      });
+
+      it('never maps an unrelated short/unknown header', () => {
+        const headers = ['Nombre', 'Fax'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '2222-3333']);
+        expect(fields.workPhone).toBeUndefined();
+        expect(fields.workPhoneExt).toBeUndefined();
+      });
+    });
+
+    describe('phone/extension value reconciliation', () => {
+      it('swaps a phone and extension that were entered under the wrong header', () => {
+        const headers = ['Nombre', 'Teléfono', 'Ext'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '105', '22334455']);
+        expect(fields.workPhone).toBe('22334455');
+        expect(fields.workPhoneExt).toBe('105');
+      });
+
+      it('moves a short phone-column value into extension when extension is empty', () => {
+        const headers = ['Nombre', 'Teléfono'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '105']);
+        expect(fields.workPhone).toBeUndefined();
+        expect(fields.workPhoneExt).toBe('105');
+      });
+
+      it('moves a long extension-column value into phone when phone is empty', () => {
+        const headers = ['Nombre', 'Ext'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '22334455']);
+        expect(fields.workPhone).toBe('22334455');
+        expect(fields.workPhoneExt).toBeUndefined();
+      });
+
+      it('leaves ambiguous middle-length values (e.g. 6-digit local numbers) untouched', () => {
+        const headers = ['Nombre', 'Teléfono'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '123456']);
+        expect(fields.workPhone).toBe('123456');
+        expect(fields.workPhoneExt).toBeUndefined();
+      });
+
+      it('never reclassifies an E.164-formatted phone number', () => {
+        const headers = ['Nombre', 'Teléfono', 'Ext'];
+        const fields = mapRowToContactFields(headers, ['Ada Lovelace', '+50622334455', '105']);
+        expect(fields.workPhone).toBe('+50622334455');
+        expect(fields.workPhoneExt).toBe('105');
+      });
+    });
   });
 
   describe('parseDemoSpreadsheetFile', () => {

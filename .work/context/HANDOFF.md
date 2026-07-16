@@ -2,13 +2,13 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 - Demo mode card-generation reliability bugs found and fixed (font preload, XLSX self-closing-cell regex bug, name-field mapping); verified against user's real file; not yet manually clicked-through in browser. (Separately this same day: clone-size diagnosis session confirmed `node_modules`/`.opencode` are not in git and GitHub pack is small; no deploy cutover performed.)
+**Closed:** 2026-07-16 - flexible field-mapping (fuzzy headers + phone/ext value reconciliation, Excel/CSV/paste, Demo + Normal) and import-persistence fix (imports now auto-save) landed and verified (jest/eslint/tsc diffed against baseline, zero regressions); no live-browser click-through performed (see Open owner actions).
 
 **Updated:** 2026-07-16
 
 Treat the next chat as a **new session**: do not assume unwritten goals from prior threads unless they appear in this file or linked artifacts. Treat prior closed sessions as historical only; see "What this cycle produced" below.
 
-**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete** (incl. post-M4 verify fixes + this session's Demo reliability fixes). Demo mode + prd restore runbook + triple write barriers. `.env.prd` passes `bin/verify-prd-env.sh`. Engineering ready for `./bin/start.sh prd up` when operator owns DNS/TLS. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs, live-browser click-through of today's Demo fixes still pending. Local working tree ~11GB (ignored `node_modules`) — does not affect `git clone` size. Source pointers: `/data/Projects/.ai` (+ `.ai.ui` / `.ai.soc`).
+**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete** (incl. post-M4 verify fixes + Demo reliability fixes + this session's field-mapping/import-persistence fixes). Demo mode + prd restore runbook + triple write barriers. `.env.prd` passes `bin/verify-prd-env.sh`. Engineering ready for `./bin/start.sh prd up` when operator owns DNS/TLS. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs, live-browser click-through of Demo fixes (this session's + prior session's) still pending. Local working tree ~11GB (ignored `node_modules`) — does not affect `git clone` size. Source pointers: `/data/Projects/.ai` (+ `.ai.ui` / `.ai.soc`).
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -60,8 +60,9 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 1 | Clean public Demo deploy with both Demo env flags | Internet Demo cutover | owner |
 | 2 | DNS/TLS ownership for prod hostname | Public cutover | owner |
 | 3 | Document `/api/diagnostics` (U6) | Docs | eng |
-| 4 | Manual browser click-through of today's Demo fixes (upload real `.xlsx`, run batch export, visually confirm name + font on output PNG) | Confidence in Demo fix | eng/owner |
+| 4 | Manual browser click-through of Demo fixes (upload real `.xlsx`, run batch export, visually confirm name + font on output PNG) | Confidence in Demo fix | eng/owner |
 | 5 | Pre-existing `traceability-verify.sh` gap: FR1-FR4, FR7-FR10 not mapped to `M{N}-T{N}` tasks in master plan (unrelated to this session's work; found while running the close pre-check) | Plan hygiene | eng |
+| 6 | Manual browser click-through of import-persistence fix (import a `.zip`/`.json` design in Demo + Normal, close tab without Save, reopen, confirm it's listed in Open Template and loads correctly) — could not be unit-tested because `demoStore`/`browserStorageService` need `indexedDB`, unavailable in this repo's jsdom jest setup with no polyfill installed | Confidence in import-persistence fix | eng/owner |
 
 ---
 
@@ -79,6 +80,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | x-director final verify + close | Demo batch export/package fixes; BFF proxy test; jest `maxWorkers:1`; prd readiness gate |
 | 2026-07-16 | session-control start → clone diagnosis → close | Confirmed `node_modules` / `.opencode` not in git; GitHub ~3MB; local tree ~11GB ignored deps; no code changes |
 | 2026-07-16 | x-director Demo card-generation reliability fix | `exportService.ts` font preload (`preloadTemplateFonts`, both modes); `demoSpreadsheetParser.ts` XLSX self-closing-cell regex fix + per-field name fallback; `batchRecordService.ts` legacy-cols/updateRecord fixes; 3 new/updated test files (10 new tests); verified against user's real `.xlsx` file inside the running container |
+| 2026-07-16 | x-director flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext value reconciliation (`demoSpreadsheetParser.ts`, `data_normalizer.py`/`parser.py`); CSV/paste header-row + delimiter detection (`file_parser.py`); `CanvasControls.tsx` import now auto-persists (`templateService.saveTemplate`); new `test_batch_parsing.py` (17 tests); 16 new demo-parser tests; verified via container jest/python unittest + `git stash`-diffed eslint/tsc (zero new issues) |
 
 ---
 
@@ -173,6 +175,46 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 **Blockers:** none
 
 **Still not done (explicitly deferred, needs owner/human):** a live browser click-through (enter Demo mode → upload a real .xlsx → run batch export → visually confirm the PNG) has still not been performed by an agent in this session; all verification is at the parser/unit level against the actual real file's bytes. Recommend the user (or a session with browser tooling) do one manual pass before considering this fully closed.
+
+---
+
+## Cross-framework action (@x-director) — 2026-07-16 flexible field-mapping + import persistence
+
+**Date:** 2026-07-16
+**Request:** "1- make sure the system is flexible and able to locate data in the different scenarios considered, including excel, text, and copy-paste. Sometimes the labels do not match, sometimes even the phone might be an extension, and an extension might be a phone... this should be already built into the application, same with other fields. 2- make sure that when the user imports a design, it remains available across multiple sessions unless the user removes it or else."
+**Frameworks involved:** .ai
+**Classified bucket(s):** engineering
+**Routing confidence:** high
+
+**Explored first (two parallel read-only subagents) — findings:**
+- Demo (`demoSpreadsheetParser.ts`) and Normal (`api-server/batch-parsing/data_normalizer.py` `FIELD_MAPPING`) each maintain their own **exact-match-only** header-alias dictionary; neither had any fuzzy/partial fallback for the actual field assignment (only header-ROW detection scoring used partial matching, not column-to-field mapping). Value-based phone↔extension reclassification existed only in the Python vertical-`.txt` parser, nowhere else.
+- Import of a design (`CanvasControls.tsx` `handleImportJSON`) only updated the in-memory Zustand store and called `markAsSaved()` — it never called `templateService.saveTemplate`. Closing the tab (or navigating away) right after Import silently discarded the design in both Demo and Normal mode; only a separate, manual Save persisted it.
+
+**Executed:**
+1. **Fuzzy header fallback** (label mismatches like "Teléfono Oficina 2", "Cel./WhatsApp", "Numero de Extension"): added token-based partial matching, tried only for headers that don't exactly match a known alias, never overwriting a field a real alias already claimed, and returning "no match" (not a guess) when tokens point at more than one distinct field (e.g. compound headers like "Nombre y Apellido" still fall through to the existing positional-name fallback). Added to `demoSpreadsheetParser.ts` (`findFuzzyFieldMatch`) and `data_normalizer.py`/`parser.py` (`find_fuzzy_field_match`, wired into `BatchParser.map_row`).
+2. **Phone ↔ extension value reconciliation:** some sheets have the headers right but the values swapped (a full number under "Ext", a 2-5 digit extension under "Teléfono"). Added `reconcilePhoneAndExtension` (Demo) / `DataNormalizer.reconcile_phone_and_extension` (Normal, called before `normalize_phone` in `map_row`) — swaps or moves values based on digit-length shape (`<=5` digits ⇒ extension-shaped, `>=7` digits or leading `+` ⇒ phone-shaped), deliberately leaving the ambiguous 6-digit middle untouched.
+3. **CSV/paste flexibility (Normal mode):** `.csv` previously always assumed row 0 was the header (no preamble/title-row skipping, unlike Excel); fixed to run the same `find_header_row` detection CSV uses for Excel. Pasted plain text (`.txt` fallback, used for copy-paste) previously only tried tab-delimited; added comma/semicolon/tab auto-detection (`_detect_delimiter`, mirrors Demo's `detectDelimiter`) plus the same header-row detection. Both now read the raw pre-scan via `csv.reader` (not `pd.read_csv(header=None)`) because ragged preamble rows (fewer columns than the data rows) previously raised a hard "Expected N fields, saw M" tokenizer error.
+4. **Import now persists immediately** (`CanvasControls.tsx` `handleImportJSON`): after `loadTemplate(newTemplate)`, calls `templateService.saveTemplate({ name, templateData: newTemplate })` (routes to `demoTemplateRepository` in Demo, to the DB/S3-backed endpoint in Normal — both already mint a fresh persisted ID), then `updateTemplateId(metadata.id)` + `markAsSaved()`. On persistence failure, the import still succeeds in-editor but the user is explicitly warned it is session-only. Deliberately does **not** reuse `handleSaveTemplate`'s live-canvas snapshot (`canvasWidth`/`currentTemplate` closures would still hold the *previous* template immediately after import, since Zustand `getState()` updates don't retroactively fix an already-captured closure) — persists the freshly-imported `Template` object directly instead, which is already fully resolved (ZIP images as embedded data URLs, legacy JSON as originally saved).
+5. Added regression tests: `demoSpreadsheetParser.test.ts` (+16 new, incl. one that caught a real bug below), `api-server/batch-parsing/test_batch_parsing.py` (new, 17 tests — no pre-existing Python test infra existed for batch-parsing before this).
+
+**Bug caught by the new tests (fixed before completion):** the TS fuzzy matcher's substring pass had no minimum length check on the *header token* itself (only on the alias being matched against), so a short token like `"de"` (from "Numero de Extension") substring-matched into unrelated long aliases (`"department"`/`"departamento"` both contain "de"), creating false ambiguity that suppressed a valid match. Fixed by skipping the substring pass entirely for tokens shorter than the length floor (the Python version already had this guard correctly).
+
+**Verification (inside the running dev containers, no host node/python commands used):**
+- `docker compose ... exec api-server ... python3 -m unittest test_batch_parsing -v` → **17/17 passed**.
+- `docker compose ... exec front-cards ... npx jest` (full suite) → **13 suites / 114 tests passed**, 0 failed. (Global coverage-threshold gate still fails — confirmed via `git stash` baseline this is **pre-existing** (29.2%→31.2% stmts, i.e. this session's changes *raised* coverage; the repo-wide 40% gate was already failing before this session, unrelated to this work).
+- `npx eslint` on all touched files: diffed against `git stash` baseline for `CanvasControls.tsx` — **byte-identical output** (26 pre-existing problems, 0 new); demo parser files: 0 errors.
+- `npx tsc --noEmit` (one-off `docker compose run` with `NODE_OPTIONS=--max-old-space-size=460` to avoid the container's memory-cap OOM): diffed against `git stash` baseline — **identical 15 pre-existing errors** (DesignCanvas.tsx/PropertyPanel.tsx/ElementsLayerManagerModal.tsx/batchExportService.ts/recordSearcher.test.ts/demoSpreadsheetParser.test.ts blob-type warnings), zero new errors.
+- No Python lint config exists in this repo (`ast.parse` syntax-checked the 3 changed files instead).
+
+**Blockers:** none
+
+**Residual / unverified (not covered by this pass):**
+- **No live browser click-through** for the import-persistence fix: could not unit-test `demoTemplateRepository.saveTemplate`/`templateService.saveTemplate` directly because both paths touch `indexedDB`, which jsdom (this repo's jest environment) does not implement, and no `fake-indexeddb`-style polyfill dependency exists in the project — adding one was out of scope without asking. Verified by code reading + `tsc`/`eslint` only. **Recommended manual check:** import a `.zip`/`.json` design (Demo and Normal), close the tab immediately without clicking Save, reopen in a new tab/session, confirm the design appears in Open Template and loads correctly.
+- Fuzzy header matching and phone/ext reconciliation are deliberately conservative (skip on ambiguity/mid-range digit counts) — by design, to avoid ever silently corrupting a field that was already correct; a small number of real-world label variants may still fall through unmapped rather than being guessed.
+- This is layered on top of, not a replacement for, the pre-existing per-field alias lists — genuinely novel/very short field labels (e.g. bare "Fax", not in either alias list at all) are still unmapped, unchanged from before.
+- Uncommitted: this entire change set is still in the working tree, not committed or pushed (see git status in Session status above).
+
+**Next recommended:** manual browser click-through per above; then `@session-control close commit` when the user is ready to persist this work into git history (push only if explicitly requested).
 
 ---
 

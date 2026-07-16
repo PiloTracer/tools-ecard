@@ -4,6 +4,7 @@ Handles parsing of various file formats: CSV, XLS, XLSX, TXT, JSON
 Extracted from __script_v9.py
 """
 
+import csv
 import os
 import json
 import logging
@@ -77,6 +78,42 @@ class FileParser:
 
         logger.debug(f"Found header row at index {header_idx} with {max_matches} matches")
         return header_idx
+
+    def _detect_delimiter(self, file_path: str, encoding: str) -> str:
+        """
+        Detect the most likely column delimiter for plain-text tabular data (paste from
+        Excel/Sheets/Numbers can arrive as tab-, comma-, or semicolon-delimited). Mirrors
+        demoSpreadsheetParser.ts detectDelimiter so Demo and Normal mode behave the same
+        way for the same pasted content.
+        """
+        try:
+            with open(file_path, 'r', encoding=encoding, errors='replace') as f:
+                sample = ''.join(f.readline() for _ in range(5))
+        except OSError:
+            sample = ''
+        counts = {'\t': sample.count('\t'), ',': sample.count(','), ';': sample.count(';')}
+        best_delim = max(counts, key=lambda d: counts[d])
+        return best_delim if counts[best_delim] > 0 else '\t'
+
+    def _read_raw_matrix(self, file_path: str, encoding: str, delimiter: str) -> pd.DataFrame:
+        """
+        Read the first 20 rows as a raw, header-less grid for header-row scoring only.
+        Uses csv.reader (not pd.read_csv) because real-world exports routinely have a
+        preamble/title row with far fewer columns than the data rows below it — pandas'
+        C parser raises "Expected N fields, saw M" on that shape when header=None,
+        whereas csv.reader tolerates ragged rows and pd.DataFrame() pads them with NaN.
+        """
+        rows: List[List[str]] = []
+        try:
+            with open(file_path, 'r', encoding=encoding, errors='replace', newline='') as f:
+                reader = csv.reader(f, delimiter=delimiter)
+                for i, row in enumerate(reader):
+                    if i >= 20:
+                        break
+                    rows.append(row)
+        except OSError:
+            return pd.DataFrame()
+        return pd.DataFrame(rows)
 
     def _parse_vertical_txt(self, file_path: str, encoding: str) -> pd.DataFrame:
         """
@@ -180,7 +217,14 @@ class FileParser:
 
         try:
             if ext == '.csv':
-                df = pd.read_csv(file_path, encoding=encoding)
+                # Detect the header row the same way Excel does below — real-world CSV
+                # exports routinely have a title/preamble row (e.g. "BASE DE DATOS") or
+                # blank rows before the actual column headers, which would otherwise be
+                # misread as the header itself.
+                df_temp = self._read_raw_matrix(file_path, encoding, delimiter=',')
+                header_idx = self.find_header_row(df_temp)
+                logger.debug(f"Reading CSV with header at row {header_idx}")
+                df = pd.read_csv(file_path, encoding=encoding, header=header_idx)
 
             elif ext in ['.xls', '.xlsx']:
                 # Try openpyxl first, fallback to xlrd
@@ -200,11 +244,21 @@ class FileParser:
                     df = pd.read_excel(file_path, engine='xlrd', header=header_idx)
 
             elif ext == '.txt':
-                # Try vertical format first
+                # Try vertical format first (e.g. Name/Title/Email/Phone stacked per contact)
                 df = self._parse_vertical_txt(file_path, encoding)
                 if df.empty:
-                    # Fallback to CSV-like parsing
-                    df = pd.read_csv(file_path, encoding=encoding, sep='\t')
+                    # Fallback to delimited parsing. Pasted tabular text (copy-paste from
+                    # Excel/Sheets) can be tab-, comma-, or semicolon-delimited — detect
+                    # it instead of assuming tab — and apply the same header-row
+                    # detection used for CSV/Excel so preamble/title rows aren't
+                    # mistaken for column headers.
+                    delimiter = self._detect_delimiter(file_path, encoding)
+                    df_temp = self._read_raw_matrix(file_path, encoding, delimiter=delimiter)
+                    header_idx = self.find_header_row(df_temp)
+                    logger.debug(f"Reading TXT with delimiter {delimiter!r}, header at row {header_idx}")
+                    df = pd.read_csv(
+                        file_path, encoding=encoding, sep=delimiter, header=header_idx, engine='python'
+                    )
 
             elif ext == '.json':
                 with open(file_path, 'r', encoding=encoding) as f:
