@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "/mnt/work/Projects/.ai/START_HERE.md",
+    "/mnt/work/Projects/.ai/PROCESS_ROUTER.md"
+  ],
+  "references": {
+    "ai": {
+      "path": "/mnt/work/Projects/.ai",
+      "description": "Agent OS: skills, standards, concepts, workflow guides"
+    }
+  },
+  "skills": {
+    "paths": [
+      "/mnt/work/Projects/.ai/skills"
+    ]
+  },
+  "mcp": {
+    "tools-project": {
+      "type": "local",
+      "command": [
+        "python3",
+        ".opencode/mcp/project-mcp/mcp_server.py"
+      ],
+      "enabled": true
+    }
+  }
+}

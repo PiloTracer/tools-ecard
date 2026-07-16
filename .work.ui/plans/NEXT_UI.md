@@ -2,7 +2,7 @@
 
 > **Path:** `<repo-root>/.work.ui/plans/NEXT_UI.md` · **`@ui-component-build`** owns `## Current UI iteration`.
 
-**Updated:** YYYY-MM-DD
+**Updated:** 2026-07-16
 
 ---
 

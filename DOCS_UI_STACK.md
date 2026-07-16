@@ -2,7 +2,7 @@
 
 > **Bootstrap:** Created by `@ui-bootstrap init` when missing. Customize pins; link from `.cursorrules` as `DOCS_UI_STACK.md`.
 
-**Updated:** 2025-06-11
+**Updated:** 2026-07-16
 
 ## Runtime
 
@@ -41,5 +41,6 @@
 
 ## Design references
 
-- Inputs: `.ai.ui/inputs/`
+- Inputs: `$AI_UI_SOURCE/inputs/` (thin-client; ignore local `.ai.ui/` leftovers)
 - Screen SPECs: `.work.ui/screens/`
+- Framework standards: `$AI_UI_SOURCE/standards/`

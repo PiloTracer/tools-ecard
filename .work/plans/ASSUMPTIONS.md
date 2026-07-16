@@ -1,27 +1,28 @@
 # ASSUMPTIONS - planning registry
 
-**Updated:** 2026-04-27 · **Maintained by:** plan-foundation / plan-master
+**Updated:** 2026-07-16 · **Maintained by:** plan-foundation / plan-master / session-control
 
 Label every entry: **Confirmed** | **Inference** | **Unverified** | **Rejected**
 
 | ID | Assumption | Label | Source | Notes |
 |----|------------|-------|--------|-------|
-| A1 | Primary users are card designers + batch operators | **Inference** | Foundation doc 01 | Not explicitly stated in any README |
-| A2 | Dev workflow follows Docker Compose (7 services) | **Confirmed** | `.cursorrules`, docker-compose.dev.yml | All services containerized |
-| A3 | Render worker needs rendering logic (infra exists: BullMQ Worker + job handler wired, rendering mocked) | **Confirmed** | Code audit: `render-worker/src/worker.ts` + `jobs/render-card.ts` | M1 reduced scope — replace mock, not build from scratch |
-| A4 | Project uses TypeScript strict mode | **Confirmed** | CONVENTIONS.md | Enforced per project conventions |
+| A1 | Primary users are card designers + batch operators | **Inference** | Foundation doc 01 | Not explicitly stated in README |
+| A2 | Dev workflow follows Docker Compose | **Confirmed** | `docker-compose.dev.yml` | Services: postgres, cassandra, redis, front-cards, api-server, render-worker, db-init |
+| A3 | Render worker needs fuller Fabric→canvas rendering | **Confirmed** | `render-worker/src/services/renderer.ts` | Canvas used; Fabric JSON parse still TODO |
+| A4 | Project uses TypeScript strict mode | **Confirmed** | `.work/standards/CONVENTIONS.md` | Enforced per conventions |
 | A5 | Monorepo with 3 apps + shared packages | **Confirmed** | Code tree | front-cards, api-server, render-worker, packages/shared-types |
-| A6 | Missing CI/CD is acceptable for current dev workflow | **Unverified** | UNKNOWNS U2 | Pipeline design is open |
-| A7 | Batch import mapping is placeholder (routes ARE mounted at /api/batch-import, controller returns placeholder) | **Confirmed** | Code audit: `api-server/src/app.ts` registers batchImportRoutesFastify | M2 reduced scope — replace controller logic, not build routes |
+| A6 | Missing CI/CD is acceptable | **Rejected** | `.github/workflows/ci.yml` | CI exists (was Unverified via U2) |
+| A7 | Batch import mapping still incomplete at HTTP layer | **Confirmed** | `batchImportController.ts` | Service may exist; controller still returns placeholder messages |
 
 ## Rejected
 
 | ID | Assumption | Reason |
 |----|------------|--------|
-| - | (none) | |
+| A6 | Missing CI acceptable | CI workflow present |
 
 ## Review log
 
 | Date | Reviewer | Action |
 |------|----------|--------|
-| 2026-04-27 | brownfield synthesis | Initial population from code + feature docs |
+| 2026-04-27 | brownfield synthesis | Initial population |
+| 2026-07-16 | session context verify | A6 rejected; A3/A7 reworded to match current code |

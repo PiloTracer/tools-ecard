@@ -2,40 +2,51 @@
 
 ## Session status
 
-**Closed:** 2026-06-12 — production readiness: credentials, configs, render-worker fixes, nginx TLS, SeaweedFS sync
+**Closed:** 2026-07-16 — Thin-client migration complete: removed vendored `.ai/` / `.ai.ui`, lean `.cursorrules` with source pointers, carriers/registries reconciled for reliable sessions.
 
-**Updated:** 2026-06-12
+**Updated:** 2026-07-16
 
-**Repository state:** Production-ready configs applied. Credentials generated and rotated. Both dev and prd compose configs validate. `start.sh` works for both envs. Render-worker has HEALTHCHECK and Redis password support. Nginx TLS-ready with commented SSL block. Frontend fontService import fixed.
+**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; M3 complete. Local framework trees deleted. Residual product gaps: Fabric render TODO, batch-import placeholder HTTP layer. Owner still owns U3/U4.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
-**Lost or new?** Read `.ai/START_HERE.md` (from repo root).
+**Lost or new?** Read `.ai/START_HERE.md` (via `$AGENT_OS_SOURCE=/mnt/work/Projects/.ai`).
+
+### UI layer (see `.work.ui/`)
+
+- UI foundation: not started (`ui-foundation-complete: no`)
+- NEXT_UI: `.work.ui/plans/NEXT_UI.md`
+- Tokens: `front-cards/app/globals.css`
+
+### SOC layer (see `.work.soc/`)
+
+- Scaffold present; use `@session-soc` for security work.
 
 ---
 
 ## Fresh start - what the next session should do first
 
-1. Run **`@session-control start`** (or follow the manual list in `session-control` skill).
-2. Read **`.cursorrules`**.
-3. Read **P0 initial scope** when present: `.work/plans/foundation/*-01-*-initial-scope.md`.
+1. Run **`@session-control start`**.
+2. Read **`.cursorrules`** (thin-client pointers + compose service names).
+3. Read **P0 initial scope:** `.work/plans/foundation/*-01-*-initial-scope.md`.
 4. Read **this file** through §Fresh start, then §Open owner actions.
 5. Read `.work/plans/NEXT.md`.
 6. Read `.work/plans/ASSUMPTIONS.md`, `RISK_REGISTRY.md`, `UNKNOWNS.md`.
 
 End with **`@session-control close`** (add `commit` / `commit push` only when requested).
 
-### Conditional reads (customize per project)
+### Conditional reads
 
 | If the task touches… | Read first |
 |----------------------|------------|
 | Product scope / foundation | `.work/plans/foundation/*-01-*.md` … `*-04-*.md` |
-| Any code or new feature | `.ai/standards/*CONVENTIONS*`, `*FEATURE_STANDARD*` |
-| External integration | `*-02-*.md`, `.ai/docs/integration/MANIFEST.txt` (if any) |
-| Security | `.ai/standards/*threat-model*` |
-| Stack / topology | `REPLACE:TECH_STACK_DOC` |
+| Any code or new feature | `.work/standards/CONVENTIONS.md`, `.ai/standards/*FEATURE_STANDARD*` |
+| External integration | foundation `*-02-*.md`, `.work/docs/integration/MANIFEST.txt` (if any) |
+| Security / threat model | `.work/standards/threat-model.md` |
+| Stack / topology | `DOCS_TECH_STACK.md`, `.work/standards/DIRECTORY_MAP.md` |
 | Master plan / milestones | `.work/plans/full/*-full-plan.md` |
 | High-risk feature | Relevant `.work/features/<slug>/*-SPEC.md` |
+| UI | `.work.ui/context/HANDOFF_UI.md`, `DOCS_UI_STACK.md` |
 
 ---
 
@@ -43,10 +54,9 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | # | Action | Blocks | Owner |
 |---|--------|--------|-------|
-| 1 | Review foundation doc 01 **Inference** items (audience, assumptions) | Plan-master-ready certification | owner |
-| 2 | Confirm/reject draft master plan M1-M3 milestones | Implementation start | owner |
-| 3 | Choose CI platform (U2) | M3-T1 pipeline setup | eng |
-| 4 | Select test coverage targets (U5) | M3-T2 | eng |
+| 1 | Confirm active-dev vs maintenance mode (U3) | Priority / NEXT ordering | owner |
+| 2 | Confirm production deployment target (U4) | Prod ops / hosting | owner |
+| 3 | Optional: refine `opencode.json` MCP if unused | Editor config | eng |
 
 ---
 
@@ -54,26 +64,25 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | Date | Session | Artifacts |
 |------|---------|-----------|
-| 2026-04-27 | Claude → Agent OS migration | `.work/` populated from `.claude/`; `.cursorrules` configured; `.claude.deprecated/` archived |
-| 2026-04-27 | @plan-repair brownfield | Foundation doc 01 (scope) + doc 04 (architecture); ADRs 001–002; draft master plan with M1–M3 milestones; ASSUMPTIONS/RISK_REGISTRY/UNKNOWNS populated; NEXT.md updated |
-| 2026-04-27 | @plan-master integrity | Phase 5 integrity pass with waivers; ADRs 003–006 formalized; master plan §8 synced; plan-master-ready certified |
-| 2026-04-27 | @plan-master continue → Approved | Master plan approved (25 sections + appendices); implementation-ready |
-| 2026-04-27 | @code-implementation (M1-M3) | M1: render pipeline (canvas renderer, S3 storage, status tracking, E2E test doc) · M2: batch import service (real DB-backed, field mapping) · M3: ops runbook, threat model, CI coverage config, render-worker unit tests |
-| 2026-04-27 | Delete Template feature | Added Delete button + confirmation modal to template designer toolbar; calls existing DELETE API; deleted templates not shown in Open modal |
-| 2026-06-11 | Backup/Restore fix | `bin/start.sh`: fixed production volume name resolution (postgres_prd_data etc.), stopped stack for consistent backup, removed config-file backup, added CLI `restore` command, verified syntax OK |
-| 2026-06-12 | Production readiness | Generated credentials; updated .env/.env.prd; fixed render-worker Redis password + HEALTHCHECK + Prisma schema; nginx TLS-ready; SeaweedFS credentials synced with tools-dashboard; frontend fontService import fix; host tuning added to runbook; both compose configs validate; start.sh verified for dev+prd |
+| 2026-04-27 | Claude → Agent OS migration | `.work/` populated; `.cursorrules` configured |
+| 2026-04-27 | @plan-repair / @plan-master | Foundation + Approved master plan M1–M3; registries |
+| 2026-04-27 | @code-implementation (M1-M3) | Render/storage/import/hardening artifacts (see RISK for residual gaps) |
+| 2026-06-11 | Backup/Restore fix | `bin/start.sh` restore + volume fixes |
+| 2026-06-12 | Production readiness + option 4 cleanup | creds/configs; `bin/start.sh` teardown |
+| 2026-07-16 | Thin-client context verify + close | Removed `.ai/` + `.ai.ui` submodule; `.work/standards/`; lean `.cursorrules`; HANDOFF/NEXT/UNKNOWNS/RISK/ASSUMPTIONS; `opencode.json`; `.work.soc/` scaffold |
 
 ---
 
 ## Explicit unknowns (promoted from UNKNOWNS)
 
-| ID | Summary | Blocks |
-|----|---------|--------|
-| U1 | Stack pins not finalized in DOCS_TECH_STACK.md | M3 infrastructure |
-| U2 | CI platform choice | M3-T1 |
-| U3 | Is project active dev or maintenance mode? | Priority decisions |
-| U4 | Production deployment target? | M3 infrastructure |
-| U5 | Test coverage targets | M3-T2 |
+| ID | Summary | Blocks | Status |
+|----|---------|--------|--------|
+| U1 | Stack pins in DOCS_TECH_STACK | docs polish | Resolved 2026-07-16 |
+| U2 | CI platform | M3-T1 | Resolved 2026-07-16 |
+| U3 | Active dev vs maintenance | Priority | Open |
+| U4 | Production deployment target | Ops | Open |
+| U5 | Test coverage targets | M3-T2 | Resolved 2026-07-16 |
+| U6 | `/api/diagnostics` undocumented | Docs | Open |
 
 ---
 

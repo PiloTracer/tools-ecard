@@ -1,0 +1,59 @@
+# NEXT_SOC — SOC planning backlog
+
+**Updated:** 2026-07-16
+
+---
+
+## Done
+
+| Item | Artifact |
+|------|----------|
+| SOC bootstrap | `.work.soc/` skeleton |
+| License analysis | `.work.soc/analysis/*LICENSE-ANALYSIS.md` |
+
+---
+
+## Blocked on owner
+
+| # | Item | Notes |
+|---|------|-------|
+| - | (none) | |
+
+---
+
+## Recommended next
+
+| Priority | Item | Notes |
+|----------|------|-------|
+| **0** | Review `.work.soc/context/HANDOFF_SOC.md` | Orient on current state |
+| **1** | Run first SOC assessment | `@soc-assessment run --target <path>` |
+| **2** | Verify skills load from source or parent `.ai/` | Run `@session-soc start`; register via parent `.ai/opencode.json` when co-installed |
+
+---
+
+## Current SOC iteration
+
+```markdown
+## Current iteration — SOC-{N}: <iteration name>
+
+**Status:** planning | in-progress | complete
+**Started:** (none)
+
+### In scope
+- …
+
+### Out of scope
+- …
+
+### Tasks
+| ID | Description | Files | Status | Notes |
+|----|-------------|-------|--------|-------|
+| SOC-{N}-T1 | … | … | pending | |
+
+### Owner blockers
+- none
+
+### Done this iteration
+| Task | Completed | Notes |
+|------|-----------|-------|
+```

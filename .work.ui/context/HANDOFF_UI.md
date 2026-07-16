@@ -6,15 +6,15 @@
 
 **Open:** -
 
-**Updated:** 2025-06-11
+**Updated:** 2026-07-16
 
 **Closed:** -
 
-**UI layer state:** Bootstrap complete — ready for foundation.
+**UI layer state:** Bootstrap complete — ready for foundation. Thin-client: `AI_UI_SOURCE=/mnt/work/Projects/.ai.ui`.
 
 **Recommended pick-up:** `.work.ui/plans/NEXT_UI.md`
 
-**Lost or new?** Read `.ai.ui/START_HERE.md`
+**Lost or new?** Read `.ai.ui/START_HERE.md` (via `$AI_UI_SOURCE`)
 
 ---
 
