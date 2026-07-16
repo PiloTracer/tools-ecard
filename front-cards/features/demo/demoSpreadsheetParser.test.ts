@@ -1,0 +1,212 @@
+import JSZip from 'jszip';
+import {
+  findHeaderRowIndex,
+  isUsefulDemoContactRow,
+  mapRowToContactFields,
+  matrixToTable,
+  parseCsvText,
+  parseDemoSpreadsheetFile,
+} from './demoSpreadsheetParser';
+
+describe('demoSpreadsheetParser', () => {
+  describe('parseCsvText', () => {
+    it('parses comma CSV with header', () => {
+      const table = parseCsvText('fullName,email\nAda Lovelace,ada@example.com\n');
+      expect(table.headers).toEqual(['fullName', 'email']);
+      expect(table.rows).toEqual([['Ada Lovelace', 'ada@example.com']]);
+    });
+
+    it('parses semicolon CSV (locale Excel exports)', () => {
+      const table = parseCsvText('nombre;correo\nAna;ana@ejemplo.com\n');
+      expect(table.headers).toEqual(['nombre', 'correo']);
+      expect(table.rows[0]).toEqual(['Ana', 'ana@ejemplo.com']);
+    });
+
+    it('skips title/section preamble before the real header row', () => {
+      const table = parseCsvText(
+        [
+          'BASE DE DATOS COLABORADORES,,,,',
+          'INFORMACION GENERAL,2,,,',
+          'Nombre Completo,Correo Electrónico,Teléfono,,',
+          'Sofia Rodriguez Oviedo,srodriguez@code-cr.com,555-0100,,',
+          'Ada Lovelace,ada@example.com,555-0101,,',
+        ].join('\n')
+      );
+      expect(table.headers[0]).toMatch(/Nombre Completo/i);
+      expect(table.headers).toEqual(
+        expect.arrayContaining([expect.stringMatching(/Correo/i)])
+      );
+      expect(findHeaderRowIndex([
+        ['BASE DE DATOS COLABORADORES'],
+        ['INFORMACION GENERAL', '2'],
+        ['Nombre Completo', 'Correo Electrónico', 'Teléfono'],
+        ['Sofia Rodriguez Oviedo', 'srodriguez@code-cr.com', '555-0100'],
+      ])).toBe(2);
+
+      const useful = table.rows.filter((cols) =>
+        isUsefulDemoContactRow(table.headers, cols)
+      );
+      expect(useful).toHaveLength(2);
+      expect(useful[0][0]).toBe('Sofia Rodriguez Oviedo');
+    });
+  });
+
+  describe('matrixToTable', () => {
+    it('does not treat section titles as headers', () => {
+      const table = matrixToTable([
+        ['BASE DE DATOS COLABORADORES'],
+        ['INFORMACION GENERAL', '2'],
+        ['fullName', 'email'],
+        ['Sofia Rodriguez Oviedo', 'srodriguez@code-cr.com'],
+      ]);
+      expect(table.headers).toEqual(['fullName', 'email']);
+      expect(table.rows).toEqual([['Sofia Rodriguez Oviedo', 'srodriguez@code-cr.com']]);
+    });
+  });
+
+  describe('mapRowToContactFields', () => {
+    it('maps Spanish headers', () => {
+      const fields = mapRowToContactFields(
+        ['Nombre', 'Apellidos', 'Correo'],
+        ['Ada', 'Lovelace', 'ada@example.com']
+      );
+      expect(fields.firstName).toBe('Ada');
+      expect(fields.lastName).toBe('Lovelace');
+      expect(fields.email).toBe('ada@example.com');
+      expect(fields.fullName).toBe('Ada Lovelace');
+    });
+
+    it('recovers the name positionally when only OTHER headers are recognized', () => {
+      // Regression: "Email"/"Puesto" being recognized used to disable ALL
+      // positional fallback (all-or-nothing gate), so an unrecognized name
+      // column like "Nombre y Apellido" left the contact with no name at
+      // all even though the row clearly has one — cards rendered blank.
+      const headers = ['Nombre y Apellido', 'Email', 'Puesto'];
+      const fields = mapRowToContactFields(headers, [
+        'Juan Perez',
+        'juan@example.com',
+        'Manager',
+      ]);
+      expect(fields.fullName).toBe('Juan Perez');
+      expect(fields.email).toBe('juan@example.com');
+      expect(fields.businessTitle).toBe('Manager');
+    });
+
+    it('does not resurrect positional fallback on rows with recognized name headers', () => {
+      const headers = ['Nombre', 'Apellidos', 'Correo'];
+      const fields = mapRowToContactFields(headers, ['Ada', 'Lovelace', 'ada@example.com']);
+      // firstName/lastName came from headers — positional cols[0] must not
+      // overwrite them with the raw first-name value as a "full name".
+      expect(fields.fullName).toBe('Ada Lovelace');
+    });
+  });
+
+  describe('parseDemoSpreadsheetFile', () => {
+    it('parses a minimal .xlsx via JSZip', async () => {
+      const zip = new JSZip();
+      zip.file(
+        'xl/sharedStrings.xml',
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+         <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="6" uniqueCount="6">
+           <si><t>fullName</t></si><si><t>email</t></si>
+           <si><t>Ada Lovelace</t></si><si><t>ada@example.com</t></si>
+           <si><t>Grace Hopper</t></si><si><t>grace@example.com</t></si>
+         </sst>`
+      );
+      zip.file(
+        'xl/worksheets/sheet1.xml',
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+           <sheetData>
+             <row r="1">
+               <c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>
+             </row>
+             <row r="2">
+               <c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c>
+             </row>
+             <row r="3">
+               <c r="A3" t="s"><v>4</v></c><c r="B3" t="s"><v>5</v></c>
+             </row>
+           </sheetData>
+         </worksheet>`
+      );
+      const blob = await zip.generateAsync({ type: 'uint8array' });
+      const file = new File([blob], 'staff.xlsx', {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      const table = await parseDemoSpreadsheetFile(file);
+      expect(table.headers).toEqual(['fullName', 'email']);
+      expect(table.rows).toEqual([
+        ['Ada Lovelace', 'ada@example.com'],
+        ['Grace Hopper', 'grace@example.com'],
+      ]);
+    });
+
+    it('rejects legacy .xls with a clear error', async () => {
+      const file = new File([new Uint8Array([0xd0, 0xcf])], 'legacy.xls', {
+        type: 'application/vnd.ms-excel',
+      });
+      await expect(parseDemoSpreadsheetFile(file)).rejects.toThrow(/cannot parse legacy \.xls/i);
+    });
+
+    it('does not treat zip binary as CSV rows', async () => {
+      const zip = new JSZip();
+      zip.file('xl/worksheets/sheet1.xml', '<worksheet><sheetData/></worksheet>');
+      const blob = await zip.generateAsync({ type: 'uint8array' });
+      // Misnamed .csv that is actually zip should use xlsx path (empty sheet → empty table)
+      const file = new File([blob], 'bad.csv', { type: 'text/csv' });
+      const table = await parseDemoSpreadsheetFile(file);
+      expect(table.rows).toEqual([]);
+    });
+
+    it('does not lose a header cell that follows self-closing empty cells (real-world export shape)', async () => {
+      // Regression: LibreOffice/Excel routinely emit self-closing cells for
+      // empty-but-styled columns (`<c r="D4" s="2"/>`). The cell-matching
+      // regex used to try the open/close alternative FIRST, so at a
+      // self-closing cell it matched the trailing `/` as part of the
+      // attributes, then its lazy `([\s\S]*?)<\/c>` scanned forward for the
+      // NEXT `</c>` anywhere in the document — silently swallowing every
+      // subsequent self-closing cell PLUS the next real cell's contents
+      // (here, the "Nombre" header two rows down) as if they were "inside"
+      // the empty cell, and skipping them entirely.
+      const zip = new JSZip();
+      zip.file(
+        'xl/sharedStrings.xml',
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+         <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4">
+           <si><t>Nombre</t></si><si><t>Correo</t></si>
+           <si><t>Ada Lovelace</t></si><si><t>ada@example.com</t></si>
+         </sst>`
+      );
+      zip.file(
+        'xl/worksheets/sheet1.xml',
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+           <sheetData>
+             <row r="4"><c r="D4" s="2"/><c r="E4" s="2"/><c r="F4" s="2"/></row>
+             <row r="5"/>
+             <row r="6">
+               <c r="C6" t="s"><v>0</v></c><c r="D6" t="s"><v>1</v></c>
+             </row>
+             <row r="7">
+               <c r="C7" t="s"><v>2</v></c><c r="D7" t="s"><v>3</v></c>
+             </row>
+           </sheetData>
+         </worksheet>`
+      );
+      const blob = await zip.generateAsync({ type: 'uint8array' });
+      const file = new File([blob], 'real.xlsx', {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      const table = await parseDemoSpreadsheetFile(file);
+      expect(table.headers).toEqual(['', '', 'Nombre', 'Correo', '', '']);
+      expect(table.rows).toEqual([['', '', 'Ada Lovelace', 'ada@example.com', '', '']]);
+
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('Ada Lovelace');
+      expect(fields.email).toBe('ada@example.com');
+    });
+  });
+});

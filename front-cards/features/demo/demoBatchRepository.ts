@@ -11,6 +11,11 @@ import {
   type ListBatchesResponse,
 } from '@/features/batch-upload/types';
 import { demoStore, newDemoId } from './demoStore';
+import {
+  isUsefulDemoContactRow,
+  mapRowToContactFields,
+  parseDemoSpreadsheetFile,
+} from './demoSpreadsheetParser';
 
 interface DemoBatchRecord {
   id: string;
@@ -41,17 +46,23 @@ export const demoBatchRepository = {
   async uploadBatch(file: File, projectId: string, projectName: string): Promise<BatchUploadResponse> {
     const id = newDemoId('batch');
     const now = new Date().toISOString();
-    const text = await file.text().catch(() => '');
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    const totalRecords = Math.max(0, lines.length - 1);
+    const table = await parseDemoSpreadsheetFile(file);
+    const dataRows = table.rows.filter((cols) =>
+      isUsefulDemoContactRow(table.headers, cols)
+    );
+    const totalRecords = dataRows.length;
 
-    const records = lines.slice(1).map((line, i) => {
-      const cols = line.split(',');
+    const records = dataRows.map((cols, i) => {
+      const fields = mapRowToContactFields(table.headers, cols);
       return {
         id: newDemoId('rec'),
         batchId: id,
         rowIndex: i,
-        data: { raw: line, cols },
+        data: {
+          headers: table.headers,
+          cols,
+          fields,
+        },
         status: 'completed',
         renderStatus: 'completed',
         renderProgress: 100,

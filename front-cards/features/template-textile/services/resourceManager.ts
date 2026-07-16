@@ -7,10 +7,8 @@ import { browserStorageService } from './browserStorageService';
 import { createHash } from 'crypto';
 
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
-import { isDemoMode } from '@/features/demo/isDemoMode';
 import { demoStore } from '@/features/demo/demoStore';
 import { isDemoMode } from '@/features/demo/isDemoMode';
-import { demoStore, newDemoId } from '@/features/demo/demoStore';
 
 export interface Resource {
   type: string; // 'image', 'font', 'icon', etc.

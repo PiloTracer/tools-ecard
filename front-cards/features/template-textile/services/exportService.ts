@@ -13,7 +13,7 @@ import { templateService } from './templateService';
 import { recreateElements } from './canvasRenderer';
 import { replaceImagesWithHighRes } from '../utils/imageHighResReplacer';
 import { generateVCardFromElements } from './vcardGenerator';
-import type { Template, QRElement } from '../types';
+import type { Template, QRElement, TemplateElement, TextElement } from '../types';
 
 export interface ExportOptions {
   format: 'png' | 'jpg';
@@ -45,6 +45,77 @@ export async function exportTemplateById(
 
   // Step 2: Export using loaded template
   return exportTemplate(loaded.data, options);
+}
+
+/**
+ * Preload every font referenced by the template's text elements and wait for
+ * the browser to actually finish loading them.
+ *
+ * Off-screen export (single or batch) can run without the editor ever having
+ * opened the template, so it cannot rely on `templateStore.loadTemplate`
+ * (editor-only) to have injected the `@font-face` rules. Without this, Fabric
+ * silently falls back to a system font whenever the export is triggered
+ * "cold" (works in Normal mode by ambient chance whenever the editor happened
+ * to preload the same font already? never reliably; always breaks in Demo
+ * mode where the font catalog is local-only and no other flow warms it).
+ */
+export async function preloadTemplateFonts(elements: TemplateElement[]): Promise<void> {
+  const fontKeys = new Set<string>();
+  elements.forEach((element) => {
+    if (element.type !== 'text') return;
+    const textElement = element as TextElement;
+    const variant =
+      textElement.fontWeight === 'bold' && textElement.fontStyle === 'italic' ? 'bold-italic' :
+      textElement.fontWeight === 'bold' ? 'bold' :
+      textElement.fontStyle === 'italic' ? 'italic' :
+      'regular';
+    fontKeys.add(`${textElement.fontFamily || 'Arial'}:${variant}`);
+  });
+
+  if (fontKeys.size === 0) return;
+
+  const { fontService } = await import('./fontService');
+  let cachedFonts = fontService.getCachedFonts();
+  if (cachedFonts.length === 0) {
+    await fontService.listFonts('all');
+    cachedFonts = fontService.getCachedFonts();
+  }
+
+  const families = new Set<string>();
+  await Promise.all(
+    Array.from(fontKeys).map(async (fontKey) => {
+      const [fontFamily, variant] = fontKey.split(':');
+      families.add(fontFamily);
+      const font =
+        cachedFonts.find((f) => f.fontFamily === fontFamily && f.fontVariant === variant) ||
+        cachedFonts.find((f) => f.fontFamily === fontFamily);
+      if (!font) {
+        console.warn(`[Export] Font not found in catalog, will render with fallback: ${fontFamily} (${variant})`);
+        return;
+      }
+      try {
+        await fontService.loadFont(font);
+      } catch (error) {
+        console.error(`[Export] Failed to preload font ${fontFamily} (${variant}):`, error);
+      }
+    })
+  );
+
+  // Injecting @font-face is not enough: the browser may not have actually
+  // fetched/parsed the font file yet, and canvas text does not repaint when
+  // a lazily-loaded font finishes after the initial synchronous render.
+  const fontsApi: FontFaceSet | undefined =
+    typeof document !== 'undefined' ? document.fonts : undefined;
+  if (fontsApi?.load) {
+    try {
+      await Promise.all(
+        Array.from(families).map((family) => fontsApi.load(`16px "${family}"`).catch(() => {}))
+      );
+      await fontsApi.ready;
+    } catch {
+      // Font Loading API unsupported/unavailable — best effort only
+    }
+  }
 }
 
 /**
@@ -101,6 +172,11 @@ export async function exportTemplate(
   if (multiplier * canvasWidth > 10000 || multiplier * canvasHeight > 10000) {
     throw new Error(`Export dimensions exceed maximum (10000px). Requested: ${Math.round(multiplier * canvasWidth)}x${Math.round(multiplier * canvasHeight)}`);
   }
+
+  // Step 0: Preload fonts referenced by the template so they are ready before
+  // Fabric creates text objects (see preloadTemplateFonts doc comment).
+  onProgress?.('Loading fonts', 0.15);
+  await preloadTemplateFonts(templateToExport.elements || []);
 
   // Step 1: Create off-screen canvas
   onProgress?.('Creating canvas', 0.2);

@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (session close — clone diagnosis; no deploy)
+**Updated:** 2026-07-16 (post Demo card-generation reliability fix)
 
 ---
 
@@ -16,6 +16,7 @@
 | M4 Demo + prd restore | SPEC, ADR 007, Demo adapters, API write guard, runbook, `bin/verify-prd-env.sh` |
 | M4 post-verify fixes | Demo batch export + package export paths; BFF proxy test; jest `maxWorkers:1` |
 | Clone-size diagnosis (2026-07-16) | Confirmed ignored local `node_modules` (~9GB+) and absent `.opencode` are not in git; GitHub ~3MB |
+| Demo card-generation reliability fix | Font preload (`exportService.ts`, both modes); XLSX self-closing-cell regex bug + per-field name fallback (`demoSpreadsheetParser.ts`); legacy-cols/updateRecord field-loss fixes (`batchRecordService.ts`); verified against user's real `.xlsx` |
 
 ---
 
@@ -39,11 +40,12 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Production deploy cutover | `./bin/start.sh prd up` (fresh or restore); DNS/TLS; confirm health. For Demo: both flags + empty volumes |
-| **1** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
-| **2** | Document `/api/diagnostics` (U6) | Or fold into ops runbook |
-| **3** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
-| **4** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
+| **0** | Manual browser click-through of Demo fix | Enter Demo mode, upload a real `.xlsx`, run batch export, visually confirm name + font on output PNG — not yet performed by an agent this session |
+| **1** | Production deploy cutover | `./bin/start.sh prd up` (fresh or restore); DNS/TLS; confirm health. For Demo: both flags + empty volumes |
+| **2** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
+| **3** | Document `/api/diagnostics` (U6) | Or fold into ops runbook |
+| **4** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
+| **5** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
 
 ---
 
