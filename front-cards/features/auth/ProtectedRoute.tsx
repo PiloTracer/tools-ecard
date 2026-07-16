@@ -10,6 +10,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthContext';
+import { isDemoMode } from '@/features/demo/isDemoMode';
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -26,7 +27,7 @@ export function ProtectedRoute({
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && !isAuthenticated && !isDemoMode()) {
       // Store current path to redirect back after login
       const currentPath = window.location.pathname + window.location.search;
       sessionStorage.setItem('redirect_after_login', currentPath);
@@ -73,7 +74,7 @@ export function ProtectedRoute({
   }
 
   // Show nothing while redirecting
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isDemoMode()) {
     return null;
   }
 

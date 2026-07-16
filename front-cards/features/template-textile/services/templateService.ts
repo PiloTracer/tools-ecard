@@ -7,6 +7,8 @@ import { browserStorageService, type CachedTemplate } from './browserStorageServ
 import { resourceManager } from './resourceManager';
 import type { Template, TemplateElement } from '../types';
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoTemplateRepository } from '@/features/demo/demoTemplateRepository';
 
 /**
  * Calls same-origin `/api/*` (or proxied API). On 401, tries POST `/api/auth/refresh-token`
@@ -66,6 +68,10 @@ class TemplateService {
    * Get current storage mode from API
    */
   async getStorageMode(): Promise<StorageMode> {
+    if (isDemoMode()) {
+      this.currentMode = 'LOCAL_ONLY';
+      return 'LOCAL_ONLY';
+    }
     try {
       const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/mode`, {
         method: 'GET',
@@ -93,6 +99,9 @@ class TemplateService {
    * Save a template with multi-mode support
    */
   async saveTemplate(request: SaveTemplateRequest): Promise<TemplateMetadata> {
+    if (isDemoMode()) {
+      return demoTemplateRepository.saveTemplate(request) as Promise<TemplateMetadata>;
+    }
     const mode = await this.getStorageMode();
 
     // IMPORTANT: According to the feature documentation, images should be stored
@@ -211,6 +220,9 @@ class TemplateService {
    * Load a template by ID
    */
   async loadTemplate(templateId: string): Promise<LoadedTemplate> {
+    if (isDemoMode()) {
+      return demoTemplateRepository.loadTemplate(templateId) as Promise<LoadedTemplate>;
+    }
     const mode = await this.getStorageMode();
 
     // Check local cache first
@@ -306,6 +318,9 @@ class TemplateService {
    * List all templates
    */
   async listTemplates(): Promise<TemplateMetadata[]> {
+    if (isDemoMode()) {
+      return demoTemplateRepository.listTemplates() as Promise<TemplateMetadata[]>;
+    }
     const mode = await this.getStorageMode();
 
     if (mode === 'LOCAL_ONLY') {
@@ -389,6 +404,10 @@ class TemplateService {
    * Delete a template
    */
   async deleteTemplate(templateId: string): Promise<void> {
+    if (isDemoMode()) {
+      await demoTemplateRepository.deleteTemplate(templateId);
+      return;
+    }
     // Always delete from local cache
     await browserStorageService.deleteTemplate(templateId);
 

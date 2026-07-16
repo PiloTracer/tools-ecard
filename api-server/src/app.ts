@@ -11,6 +11,7 @@ import { appConfig } from './core/config';
 import { getAppLibraryStorageIntegrationStatus } from './core/storage';
 import { errorHandler } from './core/middleware/errorHandler';
 import { authMiddleware } from './core/middleware/authMiddleware';
+import { demoModeGuard, logDemoModeStartupOnce, isDemoModeEnabled } from './core/middleware/demoModeGuard';
 import { createLogger } from './core/utils/logger';
 
 const log = createLogger('App');
@@ -102,6 +103,8 @@ export async function buildApp() {
 
   // Register auth middleware globally
   app.addHook('preHandler', authMiddleware);
+  app.addHook('preHandler', demoModeGuard);
+  logDemoModeStartupOnce();
 
   // Health check endpoint
   app.get('/health', async () => {
@@ -109,6 +112,7 @@ export async function buildApp() {
       status: 'ok',
       timestamp: new Date().toISOString(),
       env: appConfig.env,
+      demoMode: isDemoModeEnabled(),
       appLibraryStorage: getAppLibraryStorageIntegrationStatus(),
     };
   });

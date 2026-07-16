@@ -6,6 +6,8 @@
 import { apiClient } from '@/shared/lib/api-client';
 
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoFontRepository } from '@/features/demo/demoFontRepository';
 
 export interface Font {
   fontId: string;
@@ -37,6 +39,10 @@ class FontService {
    * Falls back to global fonts if authentication fails
    */
   async listFonts(scope: 'global' | 'user' | 'all' = 'all'): Promise<Font[]> {
+    if (isDemoMode()) {
+      this.cachedFonts = await demoFontRepository.listFonts(scope);
+      return this.cachedFonts;
+    }
     try {
       const response = await apiClient.get<{ fonts: Font[] }>(
         `/api/v1/fonts?scope=${scope}`
@@ -70,6 +76,10 @@ class FontService {
    * Load a font dynamically by injecting @font-face
    */
   async loadFont(font: Font): Promise<void> {
+    if (isDemoMode()) {
+      await demoFontRepository.loadFont(font);
+      return;
+    }
     const cacheKey = `${font.fontFamily}-${font.fontWeight}-${font.fontStyle}`;
 
     if (this.loadedFonts.has(cacheKey)) {
@@ -117,6 +127,9 @@ class FontService {
     fontWeight: number;
     fontStyle: string;
   }): Promise<Font> {
+    if (isDemoMode()) {
+      return demoFontRepository.uploadFont(file, metadata);
+    }
     const formData = new FormData();
     formData.append('file', file);
     Object.entries(metadata).forEach(([key, value]) => {
@@ -146,6 +159,10 @@ class FontService {
    * Delete a custom font
    */
   async deleteFont(fontId: string): Promise<void> {
+    if (isDemoMode()) {
+      await demoFontRepository.deleteFont(fontId);
+      return;
+    }
     await apiClient.delete(`/api/v1/fonts/${fontId}`);
   }
 

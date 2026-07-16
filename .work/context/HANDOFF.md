@@ -2,11 +2,13 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 — Thin-client migration complete: removed vendored `.ai/` / `.ai.ui`, lean `.cursorrules` with source pointers, carriers/registries reconciled for reliable sessions.
+**Closed:** 2026-07-16 — M4 Demo browser-only persistence + production restore-from-backup; public-Demo write barriers hardened (apiClient + Next BFF + api-server). Owner will use a clean Demo deploy with both Demo env flags.
 
 **Updated:** 2026-07-16
 
-**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; M3 complete. Local framework trees deleted. Residual product gaps: Fabric render TODO, batch-import placeholder HTTP layer. Owner still owns U3/U4.
+Treat the next chat as a **new session**: do not assume unwritten goals from prior threads unless they appear in this file or linked artifacts.
+
+**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete**. Demo mode + prd restore runbook + triple write barriers. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -31,7 +33,7 @@
 3. Read **P0 initial scope:** `.work/plans/foundation/*-01-*-initial-scope.md`.
 4. Read **this file** through §Fresh start, then §Open owner actions.
 5. Read `.work/plans/NEXT.md`.
-6. Read `.work/plans/ASSUMPTIONS.md`, `RISK_REGISTRY.md`, `UNKNOWNS.md`.
+6. For public Demo: confirm `DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true` on a clean host (see operations runbook).
 
 End with **`@session-control close`** (add `commit` / `commit push` only when requested).
 
@@ -41,6 +43,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 |----------------------|------------|
 | Product scope / foundation | `.work/plans/foundation/*-01-*.md` … `*-04-*.md` |
 | Any code or new feature | `.work/standards/CONVENTIONS.md`, `.ai/standards/*FEATURE_STANDARD*` |
+| Demo / zero server writes | `.work/features/demo-local-persistence/20260716-SPEC.md` + amendment 01 |
 | External integration | foundation `*-02-*.md`, `.work/docs/integration/MANIFEST.txt` (if any) |
 | Security / threat model | `.work/standards/threat-model.md` |
 | Stack / topology | `DOCS_TECH_STACK.md`, `.work/standards/DIRECTORY_MAP.md` |
@@ -54,9 +57,9 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 | # | Action | Blocks | Owner |
 |---|--------|--------|-------|
-| 1 | Confirm active-dev vs maintenance mode (U3) | Priority / NEXT ordering | owner |
-| 2 | Confirm production deployment target (U4) | Prod ops / hosting | owner |
-| 3 | Optional: refine `opencode.json` MCP if unused | Editor config | eng |
+| 1 | Clean public Demo deploy with both Demo env flags | Internet Demo cutover | owner |
+| 2 | DNS/TLS ownership for prod hostname | Public cutover | owner |
+| 3 | Document `/api/diagnostics` (U6) | Docs | eng |
 
 ---
 
@@ -69,7 +72,8 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-04-27 | @code-implementation (M1-M3) | Render/storage/import/hardening artifacts (see RISK for residual gaps) |
 | 2026-06-11 | Backup/Restore fix | `bin/start.sh` restore + volume fixes |
 | 2026-06-12 | Production readiness + option 4 cleanup | creds/configs; `bin/start.sh` teardown |
-| 2026-07-16 | Thin-client context verify + close | Removed `.ai/` + `.ai.ui` submodule; `.work/standards/`; lean `.cursorrules`; HANDOFF/NEXT/UNKNOWNS/RISK/ASSUMPTIONS; `opencode.json`; `.work.soc/` scaffold |
+| 2026-07-16 | Thin-client context verify + close | Removed `.ai/` + `.ai.ui` submodule; `.work/standards/`; lean `.cursorrules`; carriers |
+| 2026-07-16 | M4 Demo + prd restore + verify | ADR 007; SPEC + amendment 01; Demo adapters; triple write barriers; runbook; `bin/verify-prd-env.sh` |
 
 ---
 
@@ -79,10 +83,19 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 |----|---------|--------|--------|
 | U1 | Stack pins in DOCS_TECH_STACK | docs polish | Resolved 2026-07-16 |
 | U2 | CI platform | M3-T1 | Resolved 2026-07-16 |
-| U3 | Active dev vs maintenance | Priority | Open |
-| U4 | Production deployment target | Ops | Open |
+| U3 | Active dev vs maintenance | Priority | Resolved 2026-07-16 — active-dev for M4 |
+| U4 | Production deployment target | Ops | Resolved 2026-07-16 — prd procedure documented; DNS/TLS operator-owned |
 | U5 | Test coverage targets | M3-T2 | Resolved 2026-07-16 |
 | U6 | `/api/diagnostics` undocumented | Docs | Open |
+
+---
+
+## Latest action (@session-control close)
+
+**Date:** 2026-07-16  
+**Request:** `@session-control close commit push` (after noting clean Demo deploy)  
+**Session result:** Closed; M4 committed and pushed  
+**Blockers remaining:** U6; DNS/TLS; owner clean Demo deploy  
 
 ---
 

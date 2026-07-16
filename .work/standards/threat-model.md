@@ -15,6 +15,7 @@
 | A4 | Template designs and assets | IP loss |
 | A5 | Rendered card images (customer-facing output) | Brand integrity if tampered |
 | A6 | SeaweedFS / S3 access credentials | Unauthorized access to all stored assets |
+| A7 | Demo browser-local data (localStorage/IndexedDB) | Shared-browser leakage; mitigated by Clear Demo Data + banner |
 
 ## 2. Trust boundaries
 
@@ -75,6 +76,7 @@
 - **Data breach:** Identify affected records via batch IDs in PostgreSQL
 - **S3 credential leak:** Rotate SeaweedFS access keys, update `.env`
 - **Runbook:** `.work/docs/runbooks/operations-runbook.md`
+- **Demo mode:** When `DEMO_MODE=true`, api-server rejects mutating `/api` writes (`demo_mode_readonly`). Client Demo path must not call mutating APIs (SPEC `.work/features/demo-local-persistence/20260716-SPEC.md`).
 
 ## 7. Review cadence
 

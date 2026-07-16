@@ -1,10 +1,26 @@
 /**
  * Forward authenticated requests from Next Route Handlers to api-server.
+ *
+ * When DEMO_MODE / NEXT_PUBLIC_DEMO_MODE is on, mutating methods are rejected
+ * *before* the body is buffered or forwarded — so user payloads never reach
+ * api-server (and are not held in the BFF beyond the initial request object).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'ecards_auth';
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+function truthyEnv(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const v = value.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+/** Server-side Demo force (public Demo host must set these). */
+export function isServerDemoMode(): boolean {
+  return truthyEnv(process.env.DEMO_MODE) || truthyEnv(process.env.NEXT_PUBLIC_DEMO_MODE);
+}
 
 export function getUpstreamApiBase(): string {
   return (
@@ -29,6 +45,20 @@ export async function proxyRequestToApiServer(
   request: NextRequest,
   apiAbsolutePath: string
 ): Promise<Response> {
+  // Reject mutating Demo traffic before buffering the body for upstream.
+  if (isServerDemoMode() && MUTATING.has(request.method)) {
+    return new Response(
+      JSON.stringify({
+        error: 'Demo mode rejects server writes',
+        code: 'demo_mode_readonly',
+      }),
+      {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
   const url = new URL(request.url);
   const upstreamUrl = `${getUpstreamApiBase()}${apiAbsolutePath}${url.search}`;
 

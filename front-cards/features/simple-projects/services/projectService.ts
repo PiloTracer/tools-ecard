@@ -13,6 +13,8 @@ import type {
 
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 import { ProjectsApiUserError } from './projectsApiUserError';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoProjectRepository } from '@/features/demo/demoProjectRepository';
 
 function throwConnectionProjectsError(url: string, caught: unknown): never {
   const detail =
@@ -189,12 +191,14 @@ class ProjectService {
   }
 
   async getProjects(): Promise<ProjectsResponse> {
+    if (isDemoMode()) return demoProjectRepository.getProjects();
     const response = await this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects`);
     console.log('[ProjectService.getProjects] Response with phone fields:', response);
     return response;
   }
 
   async createProject(data: CreateProjectRequest): Promise<Project> {
+    if (isDemoMode()) return demoProjectRepository.createProject(data);
     return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -202,10 +206,12 @@ class ProjectService {
   }
 
   async getSelectedProject(): Promise<SelectedProjectResponse> {
+    if (isDemoMode()) return demoProjectRepository.getSelectedProject();
     return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/selected`);
   }
 
   async updateSelectedProject(data: UpdateSelectedProjectRequest): Promise<{ success: boolean; projectId: string }> {
+    if (isDemoMode()) return demoProjectRepository.updateSelectedProject(data);
     return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/selected`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -213,6 +219,7 @@ class ProjectService {
   }
 
   async ensureDefaultProject(): Promise<Project> {
+    if (isDemoMode()) return demoProjectRepository.ensureDefaultProject();
     return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/ensure-default`, {
       method: 'POST',
       body: JSON.stringify({}),
@@ -220,6 +227,7 @@ class ProjectService {
   }
 
   async updateProject(projectId: string, data: UpdateProjectRequest): Promise<Project> {
+    if (isDemoMode()) return demoProjectRepository.updateProject(projectId, data);
     return this.fetchWithAuth(`${getApiBaseUrl()}/api/v1/projects/${projectId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

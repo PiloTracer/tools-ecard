@@ -11,6 +11,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import type { User, AuthContext as AuthContextType } from '@/shared/types/auth';
 import { clearOAuthData } from '@/shared/lib/oauth-utils';
 import { OAUTH_CONFIG } from '@/shared/lib/oauth-config';
+import { isDemoMode, exitDemoMode } from '@/features/demo/isDemoMode';
+import { DEMO_USER } from '@/features/demo/demoConstants';
 
 function userFromAuthUserBody(data: unknown): User | null {
   if (!data || typeof data !== 'object') return null;
@@ -41,6 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
+
+      if (isDemoMode()) {
+        setUser({
+          id: DEMO_USER.id,
+          username: 'demo',
+          email: DEMO_USER.email,
+          display_name: DEMO_USER.name,
+        });
+        setIsAuthenticated(true);
+        return;
+      }
 
       const response = await fetch('/api/auth/user', {
         credentials: 'include',
@@ -96,6 +109,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       setIsLoading(true);
+
+      if (isDemoMode()) {
+        setUser(null);
+        setIsAuthenticated(false);
+        exitDemoMode();
+        router.push('/login');
+        return;
+      }
 
       const response = await fetch('/api/auth/logout', {
         method: 'POST',

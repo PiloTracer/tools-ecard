@@ -8,6 +8,8 @@ import {
 } from '../types';
 
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoBatchRepository } from '@/features/demo/demoBatchRepository';
 
 class BatchService {
   private getAuthHeaders(): HeadersInit {
@@ -30,6 +32,7 @@ class BatchService {
   }
 
   async uploadBatch(file: File, projectId: string, projectName: string): Promise<BatchUploadResponse> {
+    if (isDemoMode()) return demoBatchRepository.uploadBatch(file, projectId, projectName);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('projectId', projectId);
@@ -51,6 +54,7 @@ class BatchService {
   }
 
   async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {
+    if (isDemoMode()) return demoBatchRepository.getBatchStatus(batchId);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}/status`, {
       credentials: 'include', // Include cookies for auth
       headers: {
@@ -71,6 +75,7 @@ class BatchService {
     page?: number;
     limit?: number;
   }): Promise<ListBatchesResponse> {
+    if (isDemoMode()) return demoBatchRepository.listBatches(params);
     const queryParams = new URLSearchParams();
 
     if (params?.status) {
@@ -101,6 +106,7 @@ class BatchService {
   }
 
   async deleteBatch(batchId: string): Promise<void> {
+    if (isDemoMode()) return demoBatchRepository.deleteBatch(batchId);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}`, {
       method: 'DELETE',
       headers: {
@@ -116,6 +122,7 @@ class BatchService {
   }
 
   async retryBatch(batchId: string): Promise<BatchUploadResponse> {
+    if (isDemoMode()) return demoBatchRepository.retryBatch(batchId);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}/retry`, {
       method: 'POST',
       headers: {
@@ -133,6 +140,7 @@ class BatchService {
   }
 
   async getBatchStats(): Promise<BatchStats> {
+    if (isDemoMode()) return demoBatchRepository.getBatchStats();
     const response = await fetch(`${getApiBaseUrl()}/api/batches/stats`, {
       headers: {
         ...this.getAuthHeaders(),
@@ -149,6 +157,7 @@ class BatchService {
   }
 
   async getRecentBatches(limit: number = 5): Promise<Batch[]> {
+    if (isDemoMode()) return demoBatchRepository.getRecentBatches(limit);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/recent?limit=${limit}`, {
       headers: {
         ...this.getAuthHeaders(),

@@ -7,6 +7,10 @@ import { browserStorageService } from './browserStorageService';
 import { createHash } from 'crypto';
 
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoStore } from '@/features/demo/demoStore';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoStore, newDemoId } from '@/features/demo/demoStore';
 
 export interface Resource {
   type: string; // 'image', 'font', 'icon', etc.
@@ -206,6 +210,12 @@ class ResourceManager {
       templateName?: string;
     }
   ): Promise<string> {
+    if (isDemoMode()) {
+      const hash = resource.hash || 'demo';
+      const id = `resource:${hash}`;
+      await demoStore.putBlob(id, resource.data, resource.type || 'application/octet-stream');
+      return `demo-blob://${id}`;
+    }
     const response = await fetch(`${getApiBaseUrl()}/api/v1/template-textile/resources`, {
       method: 'POST',
       credentials: 'include',

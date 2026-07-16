@@ -1,6 +1,6 @@
 # Operations Runbook — tools-ecards
 
-**Last updated:** 2026-04-27
+**Last updated:** 2026-07-16
 
 ## Stack lifecycle
 
@@ -140,31 +140,108 @@ docker compose exec api bash -c "cd /app && npm run db:migrate"
 
 ## Deployment
 
-### Production
+### Production overview
 
-## Host Tuning
+Production uses [`docker-compose.prd.yml`](../../../docker-compose.prd.yml) + root [`.env.prd`](../../../.env.prd) (from [`.env.prd.example`](../../../.env.prd.example)) and [`bin/start.sh`](../../../bin/start.sh) with target `prd`. Nginx terminates HTTP on the host (`NGINX_HTTP_PORT`, default 80).
 
-Required sysctl settings on the Docker host before production deployment:
+Compose project / volume names come from `.env.prd` (`COMPOSE_PROJECT_NAME`, typically `tools_dashboard_prd_tcrd`). Volume backups live under:
+
+```text
+/data/backups_<COMPOSE_PROJECT_NAME>/
+  .latest
+  pg_<TIMESTAMP>.tar.gz
+  redis_<TIMESTAMP>.tar.gz
+  cassandra_<TIMESTAMP>.tar.gz   # optional but recommended
+```
+
+**SeaweedFS / S3 is external** and is **not** included in these tar.gz archives. Back up object storage separately before relying on a restore for templates and generated cards.
+
+### Host tuning (before first prd up)
 
 ```bash
-# Redis — prevent background save failures under low memory
 sudo sysctl -w vm.overcommit_memory=1
 echo "vm.overcommit_memory=1" | sudo tee -a /etc/sysctl.conf
 
-# Cassandra — prevent OOM under load (memory-mapped files)
 sudo sysctl -w vm.max_map_count=1048575
 echo "vm.max_map_count=1048575" | sudo tee -a /etc/sysctl.conf
 
-# Cassandra — disable swap (degrades performance)
 sudo swapoff -a
 # Also comment out swap lines in /etc/fstab
 ```
 
-Production deployment uses `docker-compose.prd.yml` with an Nginx proxy. See remote server reference at `.work/docs/from-claude-remote-server/` for the production topology (`dev.aiepic.app`).
+### Path A — Fresh production (empty volumes)
+
+1. Clone/copy the repo onto the host (same compose + `bin/start.sh` revision you intend to run).
+2. `cp .env.prd.example .env.prd` and replace every `CHANGE_ME_*` secret (OAuth, DB, Redis, JWT, SeaweedFS, etc.).
+3. Align public URLs: `API_URL`, `NEXT_PUBLIC_API_URL`, `CORS_ALLOWED_ORIGINS`, `OAUTH_REDIRECT_URI`.
+4. Verify env: `bash bin/verify-prd-env.sh .env.prd` (must exit 0).
+5. Apply host tuning above.
+6. Start: `./bin/start.sh prd up` (builds and waits for API health).
+7. Confirm: `curl -sS http://127.0.0.1:<API_HOST_PORT>/health` (API is loopback-bound in prd) and hit the public nginx URL.
+
+Optional **Demo deploy** (no durable user data on server): set **`DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true`** in `.env.prd`, then up. **Both flags are mandatory** for a public internet Demo. `/demo` alone is not enough for legal/security guarantees.
+
+### Path B — Restore production from `start.sh` tar.gz backups
+
+Use when migrating hosts or recovering Postgres/Redis/Cassandra volumes.
+
+1. On the **source** host (stack previously healthy):
+
+   ```bash
+   ./bin/start.sh prd backup
+   # Archives written to /data/backups_<COMPOSE_PROJECT_NAME>/
+   ls -lh /data/backups_<COMPOSE_PROJECT_NAME>/
+   ```
+
+2. Copy the backup set to the **target** host (preserve names):
+
+   ```bash
+   # Example — adjust COMPOSE_PROJECT_NAME to match .env.prd on the target
+   sudo mkdir -p /data/backups_tools_dashboard_prd_tcrd
+   scp pg_*.tar.gz redis_*.tar.gz cassandra_*.tar.gz .latest \
+     user@target:/data/backups_tools_dashboard_prd_tcrd/
+   ```
+
+3. On the **target** host: install the same repo revision, create `.env.prd` (same `COMPOSE_PROJECT_NAME` / volume naming as the backup dir), run `bash bin/verify-prd-env.sh .env.prd`.
+
+4. Restore volumes and bring the stack up (destructive to existing named volumes):
+
+   ```bash
+   ./bin/start.sh prd restore
+   ```
+
+   This stops the stack, recreates `postgres_prd_data` / `redis_prd_data` / `cassandra_prd_data`, extracts the matching tar.gz files, then `up --build`. Confirm the SeaweedFS warning in the script output — restore object storage out of band if needed.
+
+5. Health-check API and nginx as in Path A.
+
+### Path C — Backup only (no restore)
 
 ```bash
-./bin/start.sh prd up
+./bin/start.sh prd backup
 ```
+
+Stack is stopped briefly for a consistent volume snapshot, archives are written, then the stack is restarted. Retention: archives older than 7 days are deleted by `start.sh`.
+
+### Demo mode (ops note) — public internet Demo
+
+| Flag | Where | Effect |
+|------|-------|--------|
+| `DEMO_MODE=true` | api-server **and** front-cards env | **Required for public Demo.** Rejects mutating `/api/*` with `demo_mode_readonly` (api-server + Next BFF before body forward) |
+| `NEXT_PUBLIC_DEMO_MODE=true` | front-cards | Forces Demo UI + browser repositories for all visitors |
+| `/demo` or `?demo=1` | browser only | Sets `localStorage` flag — **not sufficient alone** for a public legal Demo |
+
+**Hard rule for internet-facing Demo hosts:** set **both** `DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true`. Do not rely on `/demo` alone — without the env flags, a missed client path could still POST to the API.
+
+Defense layers (all required for “user content never persists on the server”):
+1. Service adapters + `apiClient` refuse mutating calls when Demo is on (browser never sends write bodies).
+2. Next.js BFF rejects mutating methods when Demo env is on **before** buffering/forwarding the body to api-server.
+3. api-server `demoModeGuard` rejects mutating `/api` with `403 demo_mode_readonly`.
+
+See SPEC `.work/features/demo-local-persistence/20260716-SPEC.md`.
+
+## Host Tuning
+
+(See **Host tuning** under Production above.)
 
 ## Monitoring
 
