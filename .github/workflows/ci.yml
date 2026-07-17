@@ -1,10 +1,9 @@
 name: CI
 
+# Automatic CI disabled 2026-07-16 — was spamming failure emails on every push.
+# Re-enable push/PR triggers here when CI is green again, or run manually from Actions tab.
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
