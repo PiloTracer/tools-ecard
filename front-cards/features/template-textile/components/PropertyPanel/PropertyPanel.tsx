@@ -1,5 +1,6 @@
 'use client';
 
+import * as fabric from 'fabric';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useTemplateStore } from '../../stores/templateStore';
 import { TextProperties } from './TextProperties';
@@ -21,7 +22,7 @@ export function PropertyPanel() {
     const fromFabric = fabricCanvas
       ? fabricCanvas
           .getActiveObjects()
-          .map((o: { elementId?: string }) => o.elementId)
+          .map((o) => (o as fabric.FabricObject & { elementId?: string }).elementId)
           .filter((id): id is string => Boolean(id))
       : [];
     const ids = fromFabric.length > 0 ? fromFabric : selectedElementIds;

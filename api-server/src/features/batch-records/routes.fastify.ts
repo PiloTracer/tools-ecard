@@ -49,6 +49,72 @@ const batchRecordRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete('/:recordId', batchRecordController.deleteRecord.bind(batchRecordController));
 
   /**
+   * POST /api/batches/:batchId/records/:recordId/render-retry
+   * Re-queue a failed (or missing) render job for one record.
+   */
+  fastify.post<{
+    Params: { batchId: string; recordId: string };
+    Body: { templateId?: string; width?: number; height?: number };
+  }>('/:recordId/render-retry', async (request, reply) => {
+    const { batchId, recordId } = request.params;
+    const { templateId, width, height } = request.body ?? {};
+
+    if (!templateId || typeof templateId !== 'string' || !templateId.trim()) {
+      return reply.code(400).send({
+        success: false,
+        error: 'templateId is required in the request body',
+      });
+    }
+
+    try {
+      const queue = getRenderQueue();
+      const existing = await queue.getJob(recordId);
+
+      if (existing) {
+        const state = await existing.getState();
+        if (state === 'active' || state === 'waiting' || state === 'delayed') {
+          return reply.code(409).send({
+            success: false,
+            error: 'Render job already in progress for this record',
+          });
+        }
+        await existing.remove();
+      }
+
+      const job = await queue.add(
+        'render-card',
+        {
+          templateId: templateId.trim(),
+          recordId,
+          batchId,
+          width,
+          height,
+        },
+        {
+          jobId: recordId,
+          removeOnComplete: 100,
+          removeOnFail: 50,
+        }
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          recordId,
+          jobId: job.id,
+          status: 'queued',
+        },
+      });
+    } catch (error: any) {
+      return reply.code(500).send({
+        success: false,
+        error: 'Failed to queue render retry',
+        message: error.message,
+      });
+    }
+  });
+
+  /**
    * GET /api/batches/:batchId/records/:recordId/render-status
    * Get render job progress for a record
    */
@@ -73,6 +139,7 @@ const batchRecordRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const state = await job.getState();
+      const jobData = job.data as { storageUrl?: string; storageKey?: string };
 
       return reply.send({
         success: true,
@@ -83,6 +150,8 @@ const batchRecordRoutes: FastifyPluginAsync = async (fastify) => {
           progress: job.progress,
           attemptsMade: job.attemptsMade,
           failedReason: job.failedReason,
+          storageUrl: jobData.storageUrl ?? null,
+          storageKey: jobData.storageKey ?? null,
           timestamp: new Date().toISOString(),
         },
       });

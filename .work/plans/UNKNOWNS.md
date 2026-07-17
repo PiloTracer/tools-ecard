@@ -9,7 +9,7 @@
 | U3 | Is the project in active development or maintenance mode? | Priority decisions | owner | **Resolved** 2026-07-16 — active-dev for M4 (Demo + prod restore) per plan ack |
 | U4 | What is the production deployment target? | Ops / deploy | owner | **Resolved** 2026-07-16 — procedure via `.env.prd` + `docker-compose.prd.yml` + `./bin/start.sh prd` (host/DNS still operator-owned; see runbook) |
 | U5 | What test coverage targets are acceptable? | M3-T2 | eng | **Resolved** 2026-07-16 — `render-worker/jest.config.js` global thresholds 40% branches/functions/lines/statements; CI runs `--coverage` |
-| U6 | Diagnostics routes at `/api/diagnostics` undocumented | Documentation | eng | Open |
+| U6 | Diagnostics routes at `/api/diagnostics` undocumented | Documentation | eng | **Resolved** 2026-07-16 — documented in `.work/docs/runbooks/operations-runbook.md` |
 
 ## Review log
 

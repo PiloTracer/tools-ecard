@@ -2,13 +2,11 @@
 
 ## Session status
 
-**Open:** 2026-07-16 - goal: not specified (pick up from NEXT.md — manual browser click-through or next owner priority)
+**Closed:** 2026-07-16 — M5 gap closure + operator feedback (F1–F3, F7–F8, F10–F11) committed and pushed to `main`
 
 **Updated:** 2026-07-16
 
-Treat the next chat as a **new session**: do not assume unwritten goals from prior threads unless they appear in this file or linked artifacts. Treat prior closed sessions as historical only; see "What this cycle produced" below.
-
-**Repository state:** Thin-client Agent OS / UI OS / SOC. Master plan Approved; **M3 + M4 complete** (incl. post-M4 verify fixes + Demo reliability fixes + this session's field-mapping/import-persistence fixes). Demo mode + prd restore runbook + triple write barriers. `.env.prd` passes `bin/verify-prd-env.sh`. Engineering ready for `./bin/start.sh prd up` when operator owns DNS/TLS. Residual: Fabric render TODO, batch-import placeholders, U6 diagnostics docs, live-browser click-through of Demo fixes (this session's + prior session's) still pending. Local working tree ~11GB (ignored `node_modules`) — does not affect `git clone` size. Source pointers: `/data/Projects/.ai` (+ `.ai.ui` / `.ai.soc`).
+**Repository state:** M5 engineering complete and committed. Playwright CI, render-worker PNG, parser golden fixtures, ops runbook, TS fixes, fake-indexeddb test, feedback intake (`.work/feedback/`), batch edit focus fix, export height parity, render-retry API + UI, 1076×380 default canvas, home nav, property steppers. **Verification:** front-cards jest **138/138** pass (container). api-server `tsc` OOM in default container (pre-existing). **Residual:** manual browser click-through (Demo export, import-persistence); owner DNS/TLS/Demo deploy; F4–F6, F9, F12 deferred; M1/M2 Fabric/batch-import placeholders.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -59,7 +57,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 |---|--------|--------|-------|
 | 1 | Clean public Demo deploy with both Demo env flags | Internet Demo cutover | owner |
 | 2 | DNS/TLS ownership for prod hostname | Public cutover | owner |
-| 3 | Document `/api/diagnostics` (U6) | Docs | eng |
+| 3 | Document `/api/diagnostics` (U6) | Docs | **Resolved** — ops runbook |
 | 4 | Manual browser click-through of Demo fixes (upload real `.xlsx`, run batch export, visually confirm name + font on output PNG) | Confidence in Demo fix | eng/owner |
 | 5 | Pre-existing `traceability-verify.sh` gap: FR1-FR4, FR7-FR10 not mapped to `M{N}-T{N}` tasks in master plan (unrelated to this session's work; found while running the close pre-check) | Plan hygiene | eng |
 | 6 | Manual browser click-through of import-persistence fix (import a `.zip`/`.json` design in Demo + Normal, close tab without Save, reopen, confirm it's listed in Open Template and loads correctly) — could not be unit-tested because `demoStore`/`browserStorageService` need `indexedDB`, unavailable in this repo's jsdom jest setup with no polyfill installed | Confidence in import-persistence fix | eng/owner |
@@ -82,6 +80,8 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | x-director Demo card-generation reliability fix | `exportService.ts` font preload (`preloadTemplateFonts`, both modes); `demoSpreadsheetParser.ts` XLSX self-closing-cell regex fix + per-field name fallback; `batchRecordService.ts` legacy-cols/updateRecord fixes; 3 new/updated test files (10 new tests); verified against user's real `.xlsx` file inside the running container |
 | 2026-07-16 | x-director flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext value reconciliation (`demoSpreadsheetParser.ts`, `data_normalizer.py`/`parser.py`); CSV/paste header-row + delimiter detection (`file_parser.py`); `CanvasControls.tsx` import now auto-persists (`templateService.saveTemplate`); new `test_batch_parsing.py` (17 tests); 16 new demo-parser tests; verified via container jest/python unittest + `git stash`-diffed eslint/tsc (zero new issues) |
 | 2026-07-16 | x-director paste/import/font/naming session | KV+multi-section paste parsing + work-phone-prefix (Demo+Normal); font reopen fix (`fontService.preloadFontsForElements`, Regular/regular variant match); import name from filename with `(1)` dedup + Save modal; demo template upsert on re-save; jest 127 + python 22 green |
+| 2026-07-17 | x-director M5 gap closure | Playwright smoke + CI; render-worker PNG (text/shapes/images/QR); parser golden fixtures; ops runbook; TS fixes; fake-indexeddb persistence test; render-status storageUrl; verification green (jest 137, render-worker 13, python 23, tsc 0) |
+| 2026-07-16 | Operator feedback intake + x-director fixes | `.work/feedback/` from ODT; F8 focus fix; F1/F3 export+render-retry; F2/F7 nav+defaults; F10/F11 UI; jest 138 green; `close commit push` |
 
 ---
 
@@ -94,7 +94,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | U3 | Active dev vs maintenance | Priority | Resolved 2026-07-16 — active-dev for M4 |
 | U4 | Production deployment target | Ops | Resolved 2026-07-16 — prd procedure documented; DNS/TLS operator-owned |
 | U5 | Test coverage targets | M3-T2 | Resolved 2026-07-16 |
-| U6 | `/api/diagnostics` undocumented | Docs | Open |
+| U6 | `/api/diagnostics` undocumented | Docs | **Resolved** 2026-07-16 |
 
 ---
 

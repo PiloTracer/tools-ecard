@@ -252,8 +252,48 @@ curl http://localhost:7400/api/batches/:batchId/records/:recordId/render-status
 # Returns: { status: "active"|"completed"|"failed", progress: 0-100 }
 ```
 
-### Queue diagnostics
+## Diagnostics API (U6)
+
+Operational endpoints for queue health and render job status. All require an authenticated session unless noted.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | API liveness + storage mode summary |
+| `GET /api/diagnostics/queue-stats` | BullMQ queue depth / job counts |
+| `GET /api/batches/:batchId/records/:recordId/render-status` | Per-record render progress |
 
 ```bash
-curl http://localhost:7400/api/diagnostics/queue-stats
+# Queue stats (authenticated)
+curl -b cookies.txt http://localhost:7400/api/diagnostics/queue-stats
+
+# Render status for a batch record
+curl -b cookies.txt http://localhost:7400/api/batches/BATCH_ID/records/RECORD_ID/render-status
 ```
+
+## Monitoring and alerting (recommended)
+
+| Layer | Tool | Notes |
+|-------|------|-------|
+| Errors | Sentry (or similar) | Wire `SENTRY_DSN` in api-server, front-cards, render-worker when ready |
+| Metrics | Prometheus + Grafana | Scrape `/health` and queue-stats; chart render-worker job latency |
+| Logs | `docker compose logs -f` | Ship to Loki/CloudWatch in production |
+| Uptime | External ping | Hit `https://<host>/health` every 60s |
+
+## Production cutover checklist
+
+1. Copy `.env.prd.example` → `.env.prd`; run `bin/verify-prd-env.sh` (must pass).
+2. Confirm DNS A/AAAA records point to the host running nginx.
+3. TLS certificates installed (Let's Encrypt or operator-provided).
+4. For **Demo** internet cutover: set `DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true`; start with empty volumes.
+5. `./bin/start.sh prd up` — wait for postgres/redis/cassandra healthy.
+6. Smoke test: `curl https://<host>/health`, login, upload batch, export one card.
+7. Enable volume backups: `bin/start_cron.sh` (dev) or operator cron for prd volume tars under `/data/backups_<COMPOSE_PROJECT_NAME>/`.
+8. Document on-call: link to this runbook + recent deploy SHA.
+
+## Automated dev backups
+
+```bash
+./bin/start_cron.sh dev
+# Installs a daily 01:00 cron that tars postgres/redis/cassandra volumes.
+```
+

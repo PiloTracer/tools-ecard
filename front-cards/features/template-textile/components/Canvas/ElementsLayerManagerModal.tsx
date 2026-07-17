@@ -20,7 +20,7 @@ function elementSummary(el: TemplateElement): string {
   if (isImageElement(el)) return el.imageUrl ? 'Image' : 'Image (no file)';
   if (isQRElement(el)) return 'QR code';
   if (isShapeElement(el)) return `Shape: ${el.shapeType}`;
-  return el.type;
+  return 'Element';
 }
 
 function approxSize(el: TemplateElement): { w: number; h: number } {

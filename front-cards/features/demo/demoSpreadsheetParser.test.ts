@@ -275,7 +275,7 @@ describe('demoSpreadsheetParser', () => {
          </worksheet>`
       );
       const blob = await zip.generateAsync({ type: 'uint8array' });
-      const file = new File([blob], 'staff.xlsx', {
+      const file = new File([new Uint8Array(blob)], 'staff.xlsx', {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
@@ -299,7 +299,7 @@ describe('demoSpreadsheetParser', () => {
       zip.file('xl/worksheets/sheet1.xml', '<worksheet><sheetData/></worksheet>');
       const blob = await zip.generateAsync({ type: 'uint8array' });
       // Misnamed .csv that is actually zip should use xlsx path (empty sheet → empty table)
-      const file = new File([blob], 'bad.csv', { type: 'text/csv' });
+      const file = new File([new Uint8Array(blob)], 'bad.csv', { type: 'text/csv' });
       const table = await parseDemoSpreadsheetFile(file);
       expect(table.rows).toEqual([]);
     });
@@ -340,7 +340,7 @@ describe('demoSpreadsheetParser', () => {
          </worksheet>`
       );
       const blob = await zip.generateAsync({ type: 'uint8array' });
-      const file = new File([blob], 'real.xlsx', {
+      const file = new File([new Uint8Array(blob)], 'real.xlsx', {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 

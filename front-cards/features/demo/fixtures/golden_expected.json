@@ -1,0 +1,18 @@
+{
+  "description": "Shared parser contract: Spanish headers; Python uses snake_case, Demo uses camelCase",
+  "headers": ["Nombre", "Email", "Teléfono", "Ext"],
+  "rows": [
+    {
+      "full_name": "Sofía Rodríguez Oviedo",
+      "email": "sofia@example.com",
+      "work_phone": "+52 55 1234 5678",
+      "work_phone_ext": "101"
+    },
+    {
+      "full_name": "Ada Lovelace",
+      "email": "ada@example.com",
+      "work_phone": "+1 555 0100",
+      "work_phone_ext": null
+    }
+  ]
+}

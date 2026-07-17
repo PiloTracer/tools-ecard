@@ -57,12 +57,13 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Font Size</label>
         <NumericStringInput
           value={element.fontSize || 16}
+          withStepper
           roundDisplay
           resetKey={element.id}
           min={8}
           max={200}
+          step={1}
           onCommit={(n) => handleChange({ fontSize: n })}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
         />
       </div>
 

@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (post paste-parser + font-reopen + import-naming fixes)
+**Updated:** 2026-07-16 (post M5 commit + operator feedback fixes)
 
 ---
 
@@ -19,12 +19,16 @@
 | Demo card-generation reliability fix | Font preload (`exportService.ts`, both modes); XLSX self-closing-cell regex bug + per-field name fallback (`demoSpreadsheetParser.ts`); legacy-cols/updateRecord field-loss fixes (`batchRecordService.ts`); verified against user's real `.xlsx` |
 | Flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext reconciliation (Demo + Normal); CSV/paste delimiter/header detection; import auto-persist via `templateService.saveTemplate`; `test_batch_parsing.py` |
 | Paste parser + font reopen + import naming | KV/multi-section paste; work-phone-prefix; `fontService.preloadFontsForElements`; filename-based import names with `(n)` dedup; demo template upsert; jest 127 + python 22 |
+| M5 x-director improvements | Playwright smoke + CI; render-worker PNG (text/shapes/images/QR); parser golden fixtures; ops runbook U6; TS gate; fake-indexeddb demo persistence test |
+| Operator feedback intake (2026-07-16) | `.work/feedback/README.md`, `20260717-system-observations.md` (12 items from ODT) |
+| Feedback fixes F1–F3, F7–F8, F10–F11 | Export height parity; render-retry API; RecordEditModal focus; 1076×380 defaults; home nav; steppers; multi-delete guard |
 
 ---
 
 ### Intake queue
 
 - 2026-07-16 · cross-cutting · "Prepare prod deploy from tar.gz backups + Demo mode with browser-only persistence" → completed (M4)
+- 2026-07-16 · feedback · F4–F6, F9, F12 → deferred (profile, capitalization, image shapes, units — need SPEC or owner confirm)
 
 ---
 
@@ -32,9 +36,9 @@
 
 | # | Item | Notes |
 |---|------|-------|
-| 1 | U6 `/api/diagnostics` docs | Optional fold into ops runbook |
-| 2 | DNS/TLS ownership for prod hostname | Procedure documented; host still operator-owned |
-| 3 | Clean public Demo deploy (both env flags) | Internet Demo cutover |
+| 1 | DNS/TLS ownership for prod hostname | Procedure documented; host still operator-owned |
+| 2 | Clean public Demo deploy (both env flags) | Internet Demo cutover |
+| 3 | Manual browser click-through (Demo export + import-persistence) | jest covers IndexedDB; live PNG/font still eng/owner |
 
 ---
 
@@ -42,10 +46,10 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Manual browser click-through: import-persistence + Demo fix | (a) Import a `.zip`/`.json` design (Demo + Normal), close tab without Save, reopen, confirm it survived; (b) enter Demo mode, upload a real `.xlsx`, run batch export, visually confirm name + font on output PNG — neither performed by an agent yet (no IndexedDB in this repo's jest/jsdom setup blocks (a); (b) has no browser tooling in this session) |
-| **1** | Production deploy cutover | `./bin/start.sh prd up` (fresh or restore); DNS/TLS; confirm health. For Demo: both flags + empty volumes |
-| **2** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
-| **3** | Document `/api/diagnostics` (U6) | Or fold into ops runbook |
+| **0** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font on PNG; import design, close tab, reopen |
+| **1** | Production deploy cutover | `./bin/start.sh prd up`; DNS/TLS; Demo flags on clean host |
+| **2** | Promote deferred feedback (F9, F12) or start M6 | Image clip shapes; template units — feature SPEC first |
+| **3** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
 | **4** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
 | **5** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
 
@@ -53,7 +57,23 @@
 
 ## Current iteration
 
-*(none active — M4 complete 2026-07-16. Start a new iteration with `@code-implementation plan - M{N}` or feature SPEC before coding.)*
+*(none active — M5 complete 2026-07-16. Start M6 or feature SPEC with `@code-implementation plan`)*
+
+### Completed — M5: x-director recommended improvements
+
+**Status:** complete · **Completed:** 2026-07-16
+
+| ID | Description | Status |
+|----|-------------|--------|
+| M5-T1 | Playwright E2E smoke scaffold + CI job (live `next start`) | done |
+| M5-T2 | Render-worker Fabric JSON → PNG (text/shapes/images/QR + job storageUrl) | done |
+| M5-T3 | Parser golden fixtures (Demo + Python parity) | done |
+| M5-T4 | Ops runbook: diagnostics, monitoring, cutover checklist | done |
+| M5-T5 | Front-cards TS errors fixed; coverage floor 30% interim | done |
+| M5-T6 | fake-indexeddb demo template persistence unit test | done |
+| M5-T7 | Render-status API returns storageUrl from completed jobs | done |
+
+---
 
 ### Prior iteration — M4: Demo mode + production restore-from-backup (complete)
 

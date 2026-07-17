@@ -15,9 +15,14 @@ import type { ContactRecord } from '../types';
 interface RecordsListProps {
   batchId: string;
   onEditRecord: (record: ContactRecord) => void;
+  renderTemplateId?: string;
 }
 
-export const RecordsList: React.FC<RecordsListProps> = ({ batchId, onEditRecord }) => {
+export const RecordsList: React.FC<RecordsListProps> = ({
+  batchId,
+  onEditRecord,
+  renderTemplateId,
+}) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
@@ -172,6 +177,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({ batchId, onEditRecord 
                 onEdit={onEditRecord}
                 onDelete={handleDeleteClick}
                 isDeleting={isDeleting && recordToDelete === record.batchRecordId}
+                renderTemplateId={renderTemplateId}
               />
             ))}
           </div>

@@ -7,12 +7,16 @@
 
 import React, { useState } from 'react';
 import type { ContactRecord } from '../types';
+import { RenderStatusBadge } from './RenderStatusBadge';
+import { isDemoMode } from '@/features/demo/isDemoMode';
 
 interface RecordCardProps {
   record: ContactRecord;
   onEdit: (record: ContactRecord) => void;
   onDelete: (recordId: string) => void;
   isDeleting?: boolean;
+  /** When set, failed server renders show a Retry control (normal mode). */
+  renderTemplateId?: string;
 }
 
 export const RecordCard: React.FC<RecordCardProps> = ({
@@ -20,6 +24,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({
   onEdit,
   onDelete,
   isDeleting = false,
+  renderTemplateId,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -43,6 +48,15 @@ export const RecordCard: React.FC<RecordCardProps> = ({
           <h3 className="text-base font-semibold text-gray-900 truncate">
             {record.fullName || `${record.firstName || ''} ${record.lastName || ''}`.trim() || 'Unnamed Contact'}
           </h3>
+          {!isDemoMode() && renderTemplateId && (
+            <div className="mt-1">
+              <RenderStatusBadge
+                recordId={record.batchRecordId}
+                batchId={record.batchId}
+                templateId={renderTemplateId}
+              />
+            </div>
+          )}
           <div className="mt-1 space-y-0.5">
             {hasField(record.email) && (
               <p className="text-sm text-blue-600 truncate">{record.email}</p>

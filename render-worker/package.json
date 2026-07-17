@@ -11,23 +11,29 @@
     "worker": "tsx src/worker.ts",
     "test": "node node_modules/jest/bin/jest.js"
   },
-  "keywords": ["ecards", "worker", "rendering"],
+  "keywords": [
+    "ecards",
+    "worker",
+    "rendering"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@prisma/client": "^5.8.1",
-    "prisma": "^5.8.1",
     "@aws-sdk/client-s3": "^3.651.0",
+    "@prisma/client": "^5.8.1",
     "bullmq": "^5.1.8",
-    "ioredis": "^5.3.2",
     "canvas": "^2.11.2",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "ioredis": "^5.3.2",
+    "prisma": "^5.8.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.11",
     "@types/node": "^20.10.6",
-    "typescript": "^5.3.3",
-    "tsx": "^4.7.0",
+    "@types/qrcode": "^1.5.6",
     "jest": "^29.7.0",
-    "@types/jest": "^29.5.11"
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
   }
 }

@@ -2,10 +2,53 @@ import { describe, it, expect } from '@jest/globals';
 import { searchRecords } from './recordSearcher';
 import type { ContactRecord } from '../types';
 
+function makeContact(
+  batchRecordId: string,
+  overrides: Partial<ContactRecord> = {}
+): ContactRecord {
+  return {
+    batchRecordId,
+    batchId: 'batch-1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    fullName: null,
+    firstName: null,
+    lastName: null,
+    workPhone: null,
+    workPhoneExt: null,
+    mobilePhone: null,
+    email: null,
+    addressStreet: null,
+    addressCity: null,
+    addressState: null,
+    addressPostal: null,
+    addressCountry: null,
+    socialInstagram: null,
+    socialTwitter: null,
+    socialFacebook: null,
+    businessName: null,
+    businessTitle: null,
+    businessDepartment: null,
+    businessUrl: null,
+    businessHours: null,
+    businessAddressStreet: null,
+    businessAddressCity: null,
+    businessAddressState: null,
+    businessAddressPostal: null,
+    businessAddressCountry: null,
+    businessLinkedin: null,
+    businessTwitter: null,
+    personalUrl: null,
+    personalBio: null,
+    personalBirthday: null,
+    extra: null,
+    ...overrides,
+  };
+}
+
 describe('Record Searcher', () => {
   const mockRecords: ContactRecord[] = [
-    {
-      id: '1',
+    makeContact('1', {
       fullName: 'John Doe',
       firstName: 'John',
       lastName: 'Doe',
@@ -36,9 +79,8 @@ describe('Record Searcher', () => {
       personalUrl: 'https://johndoe.com',
       personalBio: 'Software developer',
       personalBirthday: '1990-01-01',
-    },
-    {
-      id: '2',
+    }),
+    makeContact('2', {
       fullName: 'Jane Smith',
       firstName: 'Jane',
       lastName: 'Smith',
@@ -46,7 +88,7 @@ describe('Record Searcher', () => {
       workPhone: '987-654-3210',
       businessName: 'Beta Inc',
       businessTitle: 'CTO',
-    },
+    }),
   ];
 
   it('should return all records when query is empty', () => {
@@ -143,12 +185,11 @@ describe('Record Searcher', () => {
 
   it('should handle records with minimal fields', () => {
     const minimalRecords: ContactRecord[] = [
-      {
-        id: '3',
+      makeContact('3', {
         fullName: 'Minimal User',
         firstName: 'Minimal',
         lastName: 'User',
-      },
+      }),
     ];
     const result = searchRecords(minimalRecords, 'Minimal');
     expect(result).toHaveLength(1);

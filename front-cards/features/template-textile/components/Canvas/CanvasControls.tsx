@@ -19,6 +19,10 @@ import { templatePackageService } from '../../services/templatePackageService';
 import type { Template, ImageElement } from '../../types';
 import type { LengthUnit } from '../../utils/lengthUnits';
 import { readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
+import {
+  DEFAULT_CANVAS_WIDTH,
+  DEFAULT_CANVAS_HEIGHT,
+} from '../../constants/canvasDefaults';
 
 /**
  * Merges live store dimensions/units into the template object so saves and ZIP exports
@@ -379,8 +383,8 @@ export function CanvasControls() {
 
     // Create a new empty template
     const { setDimensions } = useCanvasStore.getState();
-    createTemplate('Untitled Template', 800, 600);
-    setDimensions(800, 600);
+    createTemplate('Untitled Template', DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
+    setDimensions(DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
 
     // Point metadata at a fresh untitled design under the current dashboard project
     setSaveMetadata(
@@ -419,8 +423,8 @@ export function CanvasControls() {
       }
 
       const { setDimensions } = useCanvasStore.getState();
-      createTemplate('Untitled Template', 800, 600);
-      setDimensions(800, 600);
+      createTemplate('Untitled Template', DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
+      setDimensions(DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
 
       setSaveMetadata(
         selectedProject?.name ?? 'Default Project',

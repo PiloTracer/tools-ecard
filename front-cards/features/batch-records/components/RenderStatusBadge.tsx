@@ -12,6 +12,8 @@ interface RenderStatusProps {
   recordId: string;
   batchId: string;
   apiBaseUrl?: string;
+  /** Required for server-side render retry (normal mode). */
+  templateId?: string;
 }
 
 interface RenderStatusData {
@@ -25,10 +27,16 @@ interface RenderStatusData {
 
 type RenderState = 'idle' | 'loading' | 'active' | 'completed' | 'failed';
 
-export function RenderStatusBadge({ recordId, batchId, apiBaseUrl = '' }: RenderStatusProps) {
+export function RenderStatusBadge({
+  recordId,
+  batchId,
+  apiBaseUrl = '',
+  templateId,
+}: RenderStatusProps) {
   const [state, setState] = useState<RenderState>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const checkStatus = useCallback(async () => {
     try {
@@ -77,6 +85,36 @@ export function RenderStatusBadge({ recordId, batchId, apiBaseUrl = '' }: Render
     }
   }, [state, checkStatus]);
 
+  const handleRetry = useCallback(async () => {
+    if (!templateId?.trim()) {
+      setError('Template ID required to retry render');
+      return;
+    }
+    setRetrying(true);
+    try {
+      const res = await fetch(
+        `${apiBaseUrl}/api/batches/${batchId}/records/${recordId}/render-retry`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId: templateId.trim() }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || json.message || 'Retry failed');
+      }
+      setError(null);
+      setState('active');
+      setProgress(0);
+      void checkStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Retry failed');
+    } finally {
+      setRetrying(false);
+    }
+  }, [apiBaseUrl, batchId, recordId, templateId, checkStatus]);
+
   if (state === 'idle') return null;
 
   if (state === 'active') {
@@ -104,14 +142,26 @@ export function RenderStatusBadge({ recordId, batchId, apiBaseUrl = '' }: Render
 
   if (state === 'failed') {
     return (
-      <span
-        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 cursor-help"
-        title={error || 'Render failed'}
-      >
-        <svg className="-ml-1 mr-1.5 h-3 w-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        Failed
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 cursor-help"
+          title={error || 'Render failed'}
+        >
+          <svg className="-ml-1 mr-1.5 h-3 w-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Failed
+        </span>
+        {templateId && (
+          <button
+            type="button"
+            onClick={() => void handleRetry()}
+            disabled={retrying}
+            className="rounded border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            {retrying ? 'Retrying…' : 'Retry'}
+          </button>
+        )}
       </span>
     );
   }

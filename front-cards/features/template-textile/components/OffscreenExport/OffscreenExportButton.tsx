@@ -239,6 +239,7 @@ export function OffscreenExportButton({
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
+        height: calculatedHeight,
         backgroundColor: transparentBackground
           ? undefined
           : (exportTemplate_data.backgroundColor || '#ffffff'),
@@ -290,6 +291,7 @@ export function OffscreenExportButton({
         format,
         quality: format === 'jpg' ? quality : 1.0,
         width,
+        height: calculatedHeight,
         backgroundColor: finalBackgroundColor,
         onProgress: (current: number, total: number, status: string) => {
           setBatchProgress({ current, total });

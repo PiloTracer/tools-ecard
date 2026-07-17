@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Canvas } from 'fabric';
+import { DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT } from '../constants/canvasDefaults';
 
 interface CanvasState {
   // Canvas dimensions
@@ -53,8 +54,8 @@ interface CanvasState {
 
 export const useCanvasStore = create<CanvasState>((set) => ({
   // Initial state
-  width: 800,
-  height: 600,
+  width: DEFAULT_CANVAS_WIDTH,
+  height: DEFAULT_CANVAS_HEIGHT,
   zoom: 1,
   showGrid: true,
   snapToGrid: false,

@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+
+jest.mock('dotenv', () => ({
+  config: jest.fn(),
+}));
 
 describe('Worker Config', () => {
   const originalEnv = process.env;
@@ -13,19 +17,8 @@ describe('Worker Config', () => {
   });
 
   it('should load default config when no env vars are set', () => {
-    delete process.env.NODE_ENV;
-    delete process.env.POSTGRES_HOST;
-    delete process.env.POSTGRES_PORT;
-    delete process.env.POSTGRES_DB;
-    delete process.env.POSTGRES_USER;
-    delete process.env.POSTGRES_PASSWORD;
-    delete process.env.REDIS_HOST;
-    delete process.env.REDIS_PORT;
-    delete process.env.SEAWEEDFS_ENDPOINT;
-    delete process.env.WORKER_CONCURRENCY;
-    delete process.env.WORKER_MAX_ATTEMPTS;
-    delete process.env.WORKER_TIMEOUT;
-    delete process.env.RENDER_ENGINE;
+    process.env = {};
+    jest.resetModules();
 
     const { workerConfig } = require('../../src/core/config');
 

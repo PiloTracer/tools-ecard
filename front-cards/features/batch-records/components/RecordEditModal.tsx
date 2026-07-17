@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRecordEdit } from '../hooks/useRecordEdit';
 import type { ContactRecord, RecordUpdateInput } from '../types';
 
@@ -81,11 +81,19 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
   const [formData, setFormData] = useState<RecordUpdateInput>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** Avoid re-initializing (and unmounting inputs) when parent re-renders the same record. */
+  const initializedRecordIdRef = useRef<string | null>(null);
 
-  // Initialize form data when modal opens or record changes
+  // Initialize form data when the modal opens for a record (not on every parent render)
   useEffect(() => {
-    if (isOpen && record) {
-      setFormData({
+    if (!isOpen) {
+      initializedRecordIdRef.current = null;
+      return;
+    }
+    if (!record) return;
+    if (initializedRecordIdRef.current === record.batchRecordId) return;
+    initializedRecordIdRef.current = record.batchRecordId;
+    setFormData({
         fullName: record.fullName ?? '',
         firstName: record.firstName ?? '',
         lastName: record.lastName ?? '',
@@ -117,7 +125,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
         personalBio: record.personalBio ?? '',
         personalBirthday: record.personalBirthday ?? '',
       });
-    }
+    setErrors({});
   }, [isOpen, record]);
 
   // Reset on success
@@ -129,17 +137,15 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
     }
   }, [isSuccess, onSuccess, onClose, reset]);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};

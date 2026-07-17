@@ -118,6 +118,51 @@ jobs:
         run: npm run build
       - name: Tests
         run: npm test -- --ci --coverage
+      - name: Batch parsing golden fixtures
+        run: python3 -m unittest test_batch_parsing.GoldenFixtureParityTests -v
+        working-directory: batch-parsing
+
+  front-cards-e2e:
+    name: front-cards (playwright smoke)
+    runs-on: ubuntu-latest
+    needs: [front-cards]
+    defaults:
+      run:
+        working-directory: front-cards
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: front-cards/package-lock.json
+      - name: npm ci
+        run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+      - name: Root .env for Next
+        run: cp ../.env.dev.example ../.env
+      - name: Build Next.js
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:7400
+          NEXT_PUBLIC_WS_URL: ws://localhost:7400
+          NEXT_PUBLIC_OAUTH_CLIENT_ID: ci_dummy
+          NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: http://localhost/oauth/authorize
+          NEXT_PUBLIC_OAUTH_TOKEN_ENDPOINT: http://localhost/oauth/token
+          NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: http://localhost/api/users/me
+          NEXT_PUBLIC_EXTERNAL_AUTH_URL: http://localhost/app
+          NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: /dashboard
+        run: npm run build
+      - name: Playwright smoke
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: |
+          npm run start -- -p 3000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/ >/dev/null && break
+            sleep 2
+          done
+          npx playwright test e2e/smoke.spec.ts
 
   shared-types:
     name: shared-types (build)

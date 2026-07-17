@@ -3,6 +3,11 @@ import type { Template, TemplateElement } from '../types';
 import type { LengthUnit } from '../utils/lengthUnits';
 import { useCanvasStore } from './canvasStore';
 import { preloadTemplateFonts } from '../services/exportService';
+import {
+  DEFAULT_CANVAS_WIDTH,
+  DEFAULT_CANVAS_HEIGHT,
+  DEFAULT_EXPORT_WIDTH,
+} from '../constants/canvasDefaults';
 
 interface TemplateState {
   // Current template
@@ -79,9 +84,9 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   lastSavedAt: null,
   hasUnsavedChanges: false,
   elements: [],
-  canvasWidth: 800,
-  canvasHeight: 600,
-  exportWidth: 1920, // Default export width
+  canvasWidth: DEFAULT_CANVAS_WIDTH,
+  canvasHeight: DEFAULT_CANVAS_HEIGHT,
+  exportWidth: DEFAULT_EXPORT_WIDTH,
   canvasSizeUnit: 'px',
   history: [[]],
   historyIndex: 0,
@@ -94,7 +99,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       name,
       width,
       height,
-      exportWidth: 1920,
+      exportWidth: width >= DEFAULT_EXPORT_WIDTH ? width : DEFAULT_EXPORT_WIDTH,
       canvasSizeUnit: 'px',
       backgroundColor: '#ffffff', // Default white background
       elements: [],
@@ -107,7 +112,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       elements: [],
       canvasWidth: width,
       canvasHeight: height,
-      exportWidth: 1920,
+      exportWidth: width >= DEFAULT_EXPORT_WIDTH ? width : DEFAULT_EXPORT_WIDTH,
       canvasSizeUnit: 'px',
       history: [[]],
       historyIndex: 0,

@@ -10,6 +10,10 @@ import { ElementToolbox } from './Toolbox/ElementToolbox';
 import { PropertyPanel } from './PropertyPanel/PropertyPanel';
 import { useTemplateStore } from '../stores/templateStore';
 import { useCanvasStore } from '../stores/canvasStore';
+import {
+  DEFAULT_CANVAS_WIDTH,
+  DEFAULT_CANVAS_HEIGHT,
+} from '../constants/canvasDefaults';
 
 export function TemplateDesigner() {
   const router = useRouter();
@@ -44,8 +48,8 @@ export function TemplateDesigner() {
   // Initialize with a default template if none exists
   useEffect(() => {
     if (!currentTemplate) {
-      createTemplate('Untitled Template', 800, 600);
-      setDimensions(800, 600);
+      createTemplate('Untitled Template', DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
+      setDimensions(DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
     }
   }, [currentTemplate, createTemplate, setDimensions]);
 
@@ -59,7 +63,7 @@ export function TemplateDesigner() {
       <svg className="h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
       </svg>
-      <span className="whitespace-nowrap text-xs font-medium sm:text-sm">Dashboard</span>
+      <span className="whitespace-nowrap text-xs font-medium sm:text-sm">Inicio</span>
     </button>
   );
 

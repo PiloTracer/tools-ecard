@@ -5,7 +5,7 @@
 
 import type { Job } from 'bullmq';
 import { renderCard } from '../services/renderer';
-import { uploadToStorage, buildCardStorageKey } from '../services/storage';
+import { uploadToStorage, buildCardStorageKey, buildCardUrl } from '../services/storage';
 import { workerConfig } from '../core/config';
 
 export type RenderCardJob = {
@@ -14,6 +14,8 @@ export type RenderCardJob = {
   batchId: string;
   width?: number;
   height?: number;
+  storageKey?: string;
+  storageUrl?: string;
 };
 
 export async function processRenderCard(job: Job<RenderCardJob>): Promise<{
@@ -58,13 +60,17 @@ export async function processRenderCard(job: Job<RenderCardJob>): Promise<{
       contentType: 'image/png',
     });
 
-    console.log(`📤 Card uploaded to S3: ${uploadResult.bucket}/${uploadResult.key}`);
+    const storageUrl = buildCardUrl(uploadResult.bucket, uploadResult.key);
+    console.log(`📤 Card uploaded to S3: ${storageUrl}`);
 
     await job.updateProgress(80);
 
-    // TODO [M1-T3]: Update job status in database with storage URL
-    // 1. Update batch record with rendered card URL
-    // 2. This enables frontend to show the rendered card
+    // Persist render output on the job so /render-status can surface the URL via returnvalue.
+    await job.updateData({
+      ...job.data,
+      storageKey,
+      storageUrl,
+    });
 
     await job.updateProgress(100);
 
@@ -72,7 +78,7 @@ export async function processRenderCard(job: Job<RenderCardJob>): Promise<{
       success: true,
       recordId,
       size: `${result.width}x${result.height}`,
-      storageUrl: `${uploadResult.bucket}/${uploadResult.key}`,
+      storageUrl,
     };
   } catch (error) {
     console.error(`❌ Render failed for ${recordId}:`, error instanceof Error ? error.message : error);

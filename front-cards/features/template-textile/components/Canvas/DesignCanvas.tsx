@@ -435,9 +435,11 @@ export function DesignCanvas() {
         const baseH = (target as fabric.Object).height ?? element.height;
         const effW = Math.round(Math.abs(Number(baseW) * scaleX));
         const effH = Math.round(Math.abs(Number(baseH) * scaleY));
+        const storeW = element.width ?? 0;
+        const storeH = element.height ?? 0;
         const rectGeomDrift =
           isRectLikeShape &&
-          (Math.abs(effW - element.width) > 0.5 || Math.abs(effH - element.height) > 0.5);
+          (Math.abs(effW - storeW) > 0.5 || Math.abs(effH - storeH) > 0.5);
         // QR is a fabric.Image: same Fabric 6 quirk — scale may already be ~1 when `object:modified` runs.
         const qrElForDrift = element.type === 'qr' ? (element as QRElement) : null;
         const qrStoreW = qrElForDrift ? qrElForDrift.width || qrElForDrift.size : 0;
@@ -891,24 +893,6 @@ export function DesignCanvas() {
                   });
                   fabricObj.setCoords();
                 }
-              }
-            } else if (element.type !== 'qr' && element.type !== 'image' && element.type !== 'text') {
-              // For non-shape, non-QR, non-image, non-text elements, use width/height.
-              // Text (IText / multi-color group) must not be forced to stored width/height — that
-              // desyncs layout vs font metrics on reopen when stale dimensions exist in JSON.
-              // QR elements are excluded because they manage their own scaling during regeneration
-              // Image elements are excluded because they maintain full resolution and use scale
-              const currentWidth = fabricObj.width * (fabricObj.scaleX || 1);
-              const currentHeight = fabricObj.height * (fabricObj.scaleY || 1);
-
-              if (Math.abs(currentWidth - element.width) > 0.5 || Math.abs(currentHeight - element.height) > 0.5) {
-                fabricObj.set({
-                  width: element.width,
-                  height: element.height,
-                  scaleX: 1,
-                  scaleY: 1
-                });
-                fabricObj.setCoords();
               }
             }
           }
@@ -1672,6 +1656,9 @@ export function DesignCanvas() {
       if (!canvas) return;
 
       const activeObject = canvas.getActiveObject();
+      if ((activeObject as { isEditing?: () => boolean } | undefined)?.isEditing?.()) {
+        return;
+      }
 
       // Delete/Backspace — use Fabric’s active objects (correct for multi-select; see isFabricActiveSelection)
       if (e.key === 'Delete' || e.key === 'Backspace') {

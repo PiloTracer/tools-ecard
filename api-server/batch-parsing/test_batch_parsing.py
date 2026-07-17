@@ -251,5 +251,28 @@ class MapRowPrefixIntegrationTests(unittest.TestCase):
         self.assertIsNone(mapped["work_phone_ext"])
 
 
+class GoldenFixtureParityTests(unittest.TestCase):
+    """Shared contract with front-cards demo parser (fixtures/golden_*.json)."""
+
+    def setUp(self):
+        self.parser = _make_batch_parser()
+        self.file_parser = FileParser()
+        self.fixtures_dir = os.path.join(os.path.dirname(__file__), "fixtures")
+        with open(os.path.join(self.fixtures_dir, "golden_expected.json"), encoding="utf-8") as f:
+            import json
+
+            self.expected = json.load(f)
+
+    def test_golden_csv_headers_and_mapped_rows(self):
+        csv_path = os.path.join(self.fixtures_dir, "golden_staff_table.csv")
+        df = self.file_parser.parse_file(csv_path)
+        self.assertEqual(list(df.columns), self.expected["headers"])
+
+        for i, row_spec in enumerate(self.expected["rows"]):
+            mapped = self.parser.map_row(df.iloc[i])
+            for field, value in row_spec.items():
+                self.assertEqual(mapped.get(field), value, msg=f"row {i} field {field}")
+
+
 if __name__ == "__main__":
     unittest.main()

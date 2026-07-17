@@ -155,7 +155,10 @@ export async function fetchBatchRecords(batchId: string): Promise<{ records: Bat
         throw new Error('Invalid API response format');
       }
 
-      allRecords.push(...data.data.records.map(contactToBatchRecord));
+      const pageRecords = isDemoMode()
+        ? data.data.records.map((r) => contactToBatchRecord(r as ContactRecord))
+        : (data.data.records as BatchRecord[]);
+      allRecords.push(...pageRecords);
       batchName = data.data.batchFileName;
 
       // Check if there are more pages

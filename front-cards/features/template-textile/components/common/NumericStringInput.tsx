@@ -135,16 +135,16 @@ export function NumericStringInput({
   }
 
   const btnClass =
-    'flex flex-1 min-h-0 items-center justify-center border-0 text-gray-600 transition-colors ' +
+    'flex flex-1 min-h-0 min-w-[1.75rem] items-center justify-center border-0 text-slate-700 transition-colors ' +
     'hover:bg-gray-100 active:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ' +
-    'text-[11px] font-semibold leading-none select-none';
+    'text-xs font-bold leading-none select-none';
 
   return (
     <div
       className={`${stepperShellClassName} ${disabled ? 'pointer-events-none opacity-60' : ''}`}
     >
       {inputEl}
-      <div className="flex w-6 shrink-0 flex-col border-l border-gray-200">
+      <div className="flex w-7 shrink-0 flex-col border-l border-gray-300 bg-slate-50">
         <button
           type="button"
           tabIndex={-1}
