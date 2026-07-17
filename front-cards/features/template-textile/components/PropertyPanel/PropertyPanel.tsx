@@ -10,10 +10,12 @@ import { ShapeProperties } from './ShapeProperties';
 import { isTextElement, isImageElement, isQRElement, isShapeElement } from '../../types';
 import { generateVCardFromElements } from '../../services/vcardGenerator';
 import { NumericStringInput } from '../common/NumericStringInput';
+import { fromPixels, toPixels, unitLabel } from '../../utils/lengthUnits';
+import type { LengthUnit } from '../../utils/lengthUnits';
 
 export function PropertyPanel() {
   const { selectedElementIds, fabricCanvas, setSelectedElements } = useCanvasStore();
-  const { elements, removeElements, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward, canvasWidth, canvasHeight } = useTemplateStore();
+  const { elements, removeElements, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward, canvasWidth, canvasHeight, canvasSizeUnit } = useTemplateStore();
   const selectedElementId = selectedElementIds[0] ?? null;
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
@@ -383,7 +385,7 @@ export function PropertyPanel() {
 
             {/* Position */}
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Position</h3>
+              <h3 className="mb-2 text-sm font-semibold text-gray-700">Position ({unitLabel(canvasSizeUnit)})</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-gray-600">X</label>
@@ -392,6 +394,8 @@ export function PropertyPanel() {
                     value={selectedElement.x}
                     roundDisplay
                     resetKey={selectedElementId}
+                    displayTransform={(px: number) => fromPixels(px, canvasSizeUnit)}
+                    commitTransform={(v: number) => toPixels(v, canvasSizeUnit)}
                     onCommit={(newX) => {
                       updateElement(selectedElementId!, { x: newX });
                       if (fabricCanvas) {
@@ -413,6 +417,8 @@ export function PropertyPanel() {
                     value={selectedElement.y}
                     roundDisplay
                     resetKey={selectedElementId}
+                    displayTransform={(px: number) => fromPixels(px, canvasSizeUnit)}
+                    commitTransform={(v: number) => toPixels(v, canvasSizeUnit)}
                     onCommit={(newY) => {
                       updateElement(selectedElementId!, { y: newY });
                       if (fabricCanvas) {
@@ -433,7 +439,7 @@ export function PropertyPanel() {
             {/* Size */}
             {(selectedElement.width !== undefined || selectedElement.height !== undefined) && (
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-gray-700">Size</h3>
+                <h3 className="mb-2 text-sm font-semibold text-gray-700">Size ({unitLabel(canvasSizeUnit)})</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {selectedElement.width !== undefined && (
                     <div>
@@ -444,6 +450,8 @@ export function PropertyPanel() {
                         roundDisplay
                         min={1}
                         resetKey={selectedElementId}
+                        displayTransform={(px: number) => fromPixels(px, canvasSizeUnit)}
+                        commitTransform={(v: number) => toPixels(v, canvasSizeUnit)}
                         onCommit={(newWidth) => {
                           if (fabricCanvas) {
                             const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);
@@ -497,6 +505,8 @@ export function PropertyPanel() {
                         roundDisplay
                         min={1}
                         resetKey={selectedElementId}
+                        displayTransform={(px: number) => fromPixels(px, canvasSizeUnit)}
+                        commitTransform={(v: number) => toPixels(v, canvasSizeUnit)}
                         onCommit={(newHeight) => {
                           if (fabricCanvas) {
                             const fabricObj = fabricCanvas.getObjects().find((obj: any) => obj.elementId === selectedElementId);

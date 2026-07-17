@@ -4,6 +4,7 @@
  */
 
 import JSZip from 'jszip';
+import { capitalizeName, DEMO_PERSON_NAME_KEYS } from './nameCapitalize';
 
 export type DemoParsedTable = {
   headers: string[];
@@ -753,6 +754,16 @@ export function mapRowToContactFields(
 
   reconcilePhoneAndExtension(fields);
   applyWorkPhonePrefix(fields, options.workPhonePrefix);
+
+  // Person-name title case at first ingest only (mirrors Normal DataNormalizer.format_field
+  // for name fields). Never re-applied on export/render or on later record edits.
+  // businessName is intentionally excluded — brand casing must be preserved.
+  for (const key of DEMO_PERSON_NAME_KEYS) {
+    const v = fields[key as keyof DemoContactFields];
+    if (typeof v === 'string' && v.trim()) {
+      (fields as Record<string, string | null | undefined>)[key] = capitalizeName(v);
+    }
+  }
 
   return fields;
 }

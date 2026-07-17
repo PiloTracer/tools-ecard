@@ -184,3 +184,5 @@ credentials/
 **/.ai.ui/
 
 .env.backup
+# Local agent/tool scratch (do not commit)
+.reasonix/

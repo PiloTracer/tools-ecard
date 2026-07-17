@@ -9,6 +9,7 @@ import * as fabric from 'fabric';
 import type { TemplateElement, TextElement, ImageElement, ShapeElement, QRElement } from '../types';
 import { createMultiColorText } from '../utils/multiColorText';
 import { applyPersistedTemplateGeometry } from '../utils/fabricTemplateGeometry';
+import { applyImageClipShape } from '../utils/imageClipShape';
 import QRCode from 'qrcode';
 
 export interface CanvasRendererOptions {
@@ -214,6 +215,10 @@ async function createImageElement(
 
     // Store original URL for high-res export
     (fabricImg as any)._originalImageUrl = element.imageUrl;
+    (fabricImg as any)._clipShape = element.clipShape || 'rectangle';
+
+    // Clip in object-local coords (unscaled image size) so it scales with the fabric object
+    applyImageClipShape(fabricImg, element.clipShape);
 
     loadingImages.delete(element.id);
     return fabricImg;

@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (post M5 commit + operator feedback fixes)
+**Updated:** 2026-07-16 (post feedback F4–F6/F9/F12 commit)
 
 ---
 
@@ -22,13 +22,14 @@
 | M5 x-director improvements | Playwright smoke + CI; render-worker PNG (text/shapes/images/QR); parser golden fixtures; ops runbook U6; TS gate; fake-indexeddb demo persistence test |
 | Operator feedback intake (2026-07-16) | `.work/feedback/README.md`, `20260717-system-observations.md` (12 items from ODT) |
 | Feedback fixes F1–F3, F7–F8, F10–F11 | Export height parity; render-retry API; RecordEditModal focus; 1076×380 defaults; home nav; steppers; multi-delete guard |
+| Feedback F4–F6/F9/F12 (2026-07-16) | Profile + subscription UI; ingest-only person-name capitalize; image clip shapes; canvas units; api-server jest runner |
 
 ---
 
 ### Intake queue
 
 - 2026-07-16 · cross-cutting · "Prepare prod deploy from tar.gz backups + Demo mode with browser-only persistence" → completed (M4)
-- 2026-07-16 · feedback · F4–F6, F9, F12 → deferred (profile, capitalization, image shapes, units — need SPEC or owner confirm)
+- 2026-07-16 · feedback · F4–F6, F9, F12 → **completed in code** (commit this session); browser smoke still owner/eng
 
 ---
 
@@ -38,7 +39,7 @@
 |---|------|-------|
 | 1 | DNS/TLS ownership for prod hostname | Procedure documented; host still operator-owned |
 | 2 | Clean public Demo deploy (both env flags) | Internet Demo cutover |
-| 3 | Manual browser click-through (Demo export + import-persistence) | jest covers IndexedDB; live PNG/font still eng/owner |
+| 3 | Manual browser click-through (Demo export + import-persistence + new F9/F12 UX) | Live PNG/font/clip/units still eng/owner |
 
 ---
 
@@ -46,18 +47,17 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font on PNG; import design, close tab, reopen |
+| **0** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font+clip on PNG; import design, close tab, reopen; profile; units |
 | **1** | Production deploy cutover | `./bin/start.sh prd up`; DNS/TLS; Demo flags on clean host |
-| **2** | Promote deferred feedback (F9, F12) or start M6 | Image clip shapes; template units — feature SPEC first |
-| **3** | Close residual M1/M2 gaps | Fabric parse TODO; batch-import placeholders |
-| **4** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
-| **5** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
+| **2** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
+| **3** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
+| **4** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
 
 ---
 
 ## Current iteration
 
-*(none active — M5 complete 2026-07-16. Start M6 or feature SPEC with `@code-implementation plan`)*
+*(none active — feedback UX slice complete 2026-07-16. Start M6 or residual M1/M2 with `@code-implementation plan`)*
 
 ### Completed — M5: x-director recommended improvements
 
@@ -83,10 +83,10 @@
 | ID | Description | Status |
 |----|-------------|--------|
 | M4-T1 | Ops: prd restore-from-backup runbook + env verify helper | done |
-| M4-T2 | Demo mode detection + provider + `/demo` + banner | done |
+| M4-T2 | Demo mode detection + provider + `/demo` route + banner | done |
 | M4-T3 | Browser store layer (localStorage + IndexedDB) | done |
 | M4-T4 | Demo adapters: projects + templates + resources | done |
 | M4-T5 | Demo adapters: fonts + batches/records (render mocked) | done |
 | M4-T6 | Auth bypass + api-server DEMO_MODE write guard | done |
-| M4-T7 | Tests + lint/tsc + MOD-06 + CHANGELOG | done |
+| M4-T7 | Tests + lint/tsc in compose + MOD-06 + CHANGELOG | done |
 | M4-verify | Public-Demo barriers (apiClient + Next BFF) | done |

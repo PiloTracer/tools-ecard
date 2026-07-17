@@ -265,6 +265,7 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
         });
 
         // Priority: record value > empty string (if no value, clear the field)
+        // Do NOT re-capitalize here — casing is fixed at ingest; user edits must be preserved.
         const newText = fieldValue || '';
 
         return {

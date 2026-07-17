@@ -6,9 +6,9 @@ type Props = Omit<
   InputHTMLAttributes<HTMLInputElement>,
   'value' | 'onChange' | 'type' | 'onInput'
 > & {
-  /** External canonical value (e.g. from the store) */
+  /** External canonical value (e.g. from the store) in the canonical unit (pixels). */
   value: number;
-  /** Called with a finite number when the user finishes editing (blur) or presses Enter */
+  /** Called with a finite number in the canonical unit when the user finishes editing (blur) or presses Enter */
   onCommit: (n: number) => void;
   /** When true, display and commit Math.round */
   roundDisplay?: boolean;
@@ -20,6 +20,10 @@ type Props = Omit<
   /** Show ± step buttons; uses `step` (default 1) without changing blur/enter commit behavior */
   withStepper?: boolean;
   step?: number;
+  /** Transform the canonical value for display (e.g. pixels → cm). Default: identity. */
+  displayTransform?: (canonical: number) => number;
+  /** Inverse transform on commit to convert display value back to canonical (e.g. cm → pixels). Default: identity. */
+  commitTransform?: (display: number) => number;
 };
 
 /**
@@ -48,9 +52,11 @@ export function NumericStringInput({
   onKeyDown: onKeyDownProp,
   withStepper = false,
   step: stepProp,
+  displayTransform,
+  commitTransform,
   ...rest
 }: Props) {
-  const [text, setText] = useState(() => formatValue(value, roundDisplay));
+  const [text, setText] = useState(() => formatValue(displayTransform ? displayTransform(value) : value, roundDisplay));
   const [focused, setFocused] = useState(false);
   const resetKeyRef = useRef(resetKey);
   const valueRef = useRef(value);
@@ -59,20 +65,23 @@ export function NumericStringInput({
   const commit = useCallback(() => {
     const raw = text.trim();
     if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
-      setText(formatValue(valueRef.current, roundDisplay));
+      const displayVal = displayTransform ? displayTransform(valueRef.current) : valueRef.current;
+      setText(formatValue(displayVal, roundDisplay));
       return;
     }
     let n = parseFloat(raw);
     if (Number.isNaN(n)) {
-      setText(formatValue(valueRef.current, roundDisplay));
+      const displayVal = displayTransform ? displayTransform(valueRef.current) : valueRef.current;
+      setText(formatValue(displayVal, roundDisplay));
       return;
     }
     if (roundDisplay) n = Math.round(n);
     if (min !== undefined) n = Math.max(min, n);
     if (max !== undefined) n = Math.min(max, n);
-    onCommit(n);
+    const canonical = commitTransform ? commitTransform(n) : n;
+    onCommit(canonical);
     setText(formatValue(n, roundDisplay));
-  }, [text, onCommit, roundDisplay, min, max]);
+  }, [text, onCommit, roundDisplay, min, max, commitTransform, displayTransform]);
 
   const step = stepProp !== undefined && stepProp > 0 ? stepProp : 1;
 
@@ -80,7 +89,7 @@ export function NumericStringInput({
     (dir: 1 | -1) => {
       if (disabled) return;
       const raw = text.trim();
-      let base = valueRef.current;
+      let base = displayTransform ? displayTransform(valueRef.current) : valueRef.current;
       if (raw !== '' && raw !== '-' && raw !== '.' && raw !== '-.') {
         const p = parseFloat(raw);
         if (!Number.isNaN(p)) base = p;
@@ -89,21 +98,24 @@ export function NumericStringInput({
       if (roundDisplay) n = Math.round(n);
       if (min !== undefined) n = Math.max(min, n);
       if (max !== undefined) n = Math.min(max, n);
-      onCommit(n);
+      const canonical = commitTransform ? commitTransform(n) : n;
+      onCommit(canonical);
       setText(formatValue(n, roundDisplay));
     },
-    [disabled, text, roundDisplay, min, max, onCommit, step]
+    [disabled, text, roundDisplay, min, max, onCommit, step, commitTransform, displayTransform]
   );
 
   useEffect(() => {
     if (resetKey !== undefined && resetKeyRef.current !== resetKey) {
       resetKeyRef.current = resetKey;
-      setText(formatValue(value, roundDisplay));
+      const displayVal = displayTransform ? displayTransform(value) : value;
+      setText(formatValue(displayVal, roundDisplay));
       return;
     }
     if (focused) return;
-    setText(formatValue(value, roundDisplay));
-  }, [value, focused, roundDisplay, resetKey]);
+    const displayVal = displayTransform ? displayTransform(value) : value;
+    setText(formatValue(displayVal, roundDisplay));
+  }, [value, focused, roundDisplay, resetKey, displayTransform]);
 
   const inputEl = (
     <input

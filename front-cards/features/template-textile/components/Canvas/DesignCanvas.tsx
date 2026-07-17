@@ -8,6 +8,7 @@ import { useTemplateStore } from '../../stores/templateStore';
 import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 import { createMultiColorText, updateMultiColorText, shouldUseMultiColor } from '../../utils/multiColorText';
 import { applyPersistedTemplateGeometry, readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
+import { applyImageClipShape } from '../../utils/imageClipShape';
 
 /**
  * Fabric 6: ActiveSelection extends Group — `type` is often `'group'`, not `'activeSelection'`.
@@ -909,6 +910,18 @@ export function DesignCanvas() {
           if (fabricObj.opacity !== element.opacity) fabricObj.set({ opacity: element.opacity || 1 });
           if (fabricObj.angle !== element.rotation) fabricObj.set({ angle: element.rotation || 0 });
 
+          // Image clip shape (circle/ellipse) — live preview when property panel changes
+          if (element.type === 'image') {
+            const imgEl = element as ImageElement;
+            const desired = imgEl.clipShape || 'rectangle';
+            const current = (fabricObj as any)._clipShape || 'rectangle';
+            if (desired !== current) {
+              applyImageClipShape(fabricObj, desired);
+              (fabricObj as any)._clipShape = desired;
+              fabricObj.setCoords();
+            }
+          }
+
           // IMAGE-SYNC PERMANENTLY REMOVED
           // This block was forcing image scale corrections on every store update,
           // preventing users from scaling images to any size they want.
@@ -1173,6 +1186,8 @@ export function DesignCanvas() {
 
             (fabricImg as any).elementId = imgEl.id;
             (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
+            (fabricImg as any)._clipShape = imgEl.clipShape || 'rectangle';
+            applyImageClipShape(fabricImg, imgEl.clipShape);
 
             console.log(`[REMOVE] Removing old image object ${imgEl.id} for recreation`);
             console.trace('[REMOVE] Stack trace for image recreation:'); // STACK TRACE
@@ -1956,6 +1971,8 @@ export function DesignCanvas() {
 
             (fabricImg as any).elementId = element.id;
             (fabricImg as any)._originalImageUrl = imgEl.imageUrl;
+            (fabricImg as any)._clipShape = imgEl.clipShape || 'rectangle';
+            applyImageClipShape(fabricImg, imgEl.clipShape);
 
             canvas.add(fabricImg);
             fabricObjectsMap.current.set(element.id, fabricImg);

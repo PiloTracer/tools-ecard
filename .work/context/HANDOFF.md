@@ -2,11 +2,11 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 — M5 gap closure + operator feedback (F1–F3, F7–F8, F10–F11) committed and pushed to `main`
+**Closed:** 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
 
 **Updated:** 2026-07-16
 
-**Repository state:** M5 engineering complete and committed. Playwright CI, render-worker PNG, parser golden fixtures, ops runbook, TS fixes, fake-indexeddb test, feedback intake (`.work/feedback/`), batch edit focus fix, export height parity, render-retry API + UI, 1076×380 default canvas, home nav, property steppers. **Verification:** front-cards jest **138/138** pass (container). api-server `tsc` OOM in default container (pre-existing). **Residual:** manual browser click-through (Demo export, import-persistence); owner DNS/TLS/Demo deploy; F4–F6, F9, F12 deferred; M1/M2 Fabric/batch-import placeholders.
+**Repository state:** Feedback UX slice landed on `main`. Profile page + dashboard link; image `clipShape` (designer + export + render-worker); canvas length units in PropertyPanel; person-name title case **at ingest only** (Demo `mapRowToContactFields`; Normal `DataNormalizer`); export/render do not rewrite casing; `business_name` exempt. api-server `test` uses `run-tests.cjs` (clears `DEBUG=*`). **Verification:** front-cards jest **147** pass; render-worker **13**; api-server **137**; touch-scope pass; blast-radius warn (scoped). **Residual:** manual browser click-through; owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -64,6 +64,30 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ---
 
+## Cross-framework action (@x-director)
+
+**Date:** 2026-07-16  
+**Request:** "Capitalization fixes can only be applied on data consumption… once inserted in the DB… stay like that… non-name texts should not be capitalized… maintain exception if found."  
+**Frameworks involved:** .ai  
+**Classified framework bucket(s):** engineering  
+**Routing confidence:** high  
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz yes | .ai.soc yes  
+**Executed:**
+1. Removed capitalize from `batchExportService.applyRecordData` and `fabricTemplateRenderer.resolveText` (export/render must not rewrite casing)
+2. Applied person-name title case at Demo ingest in `mapRowToContactFields` via `nameCapitalize` (moved under `features/demo/`)
+3. Confirmed Normal already title-cases at `DataNormalizer.format_field` during parse; `business_name` preserved; emails lowercased; record `updateRecord` paths do not re-format
+4. Tests: demo parser + nameCapitalize + golden parity + render-worker green  
+
+**User correction:** none  
+
+**Coordination notes:** Product rule — capitalize once at first load/paste/import into storage; never on card print paths; preserve post-edit casing.  
+
+**Blockers:** none  
+
+**Next recommended:** `@session-control close commit` when ready to persist dirty tree  
+
+---
+
 ## What this cycle produced (audit history - skim last session only)
 
 | Date | Session | Artifacts |
@@ -82,6 +106,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | x-director paste/import/font/naming session | KV+multi-section paste parsing + work-phone-prefix (Demo+Normal); font reopen fix (`fontService.preloadFontsForElements`, Regular/regular variant match); import name from filename with `(1)` dedup + Save modal; demo template upsert on re-save; jest 127 + python 22 green |
 | 2026-07-17 | x-director M5 gap closure | Playwright smoke + CI; render-worker PNG (text/shapes/images/QR); parser golden fixtures; ops runbook; TS fixes; fake-indexeddb persistence test; render-status storageUrl; verification green (jest 137, render-worker 13, python 23, tsc 0) |
 | 2026-07-16 | Operator feedback intake + x-director fixes | `.work/feedback/` from ODT; F8 focus fix; F1/F3 export+render-retry; F2/F7 nav+defaults; F10/F11 UI; jest 138 green; `close commit push` |
+| 2026-07-16 | Feedback F4–F6/F9/F12 + ingest-only capitalize | Profile page; clipShape live+export+worker; canvas units; capitalize at Demo ingest only; api `run-tests.cjs`; MOD-06; jest 147 |
 
 ---
 

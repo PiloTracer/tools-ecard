@@ -193,6 +193,20 @@ export function ImageProperties({ element }: ImagePropertiesProps) {
         </div>
       )}
 
+      {/* Clip Shape (circle/ellipse mask) */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Clip Shape</label>
+        <select
+          value={element.clipShape || 'rectangle'}
+          onChange={(e) => handleChange({ clipShape: e.target.value as ImageElement['clipShape'] })}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+        >
+          <option value="rectangle">Rectangle</option>
+          <option value="circle">Circle</option>
+          <option value="ellipse">Ellipse</option>
+        </select>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Width</label>

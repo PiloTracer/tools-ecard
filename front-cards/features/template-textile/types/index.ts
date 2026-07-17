@@ -53,6 +53,8 @@ export interface ImageElement extends BaseElement {
   scaleMode?: 'fill' | 'fit' | 'stretch';
   scaleX?: number; // Exact scale factor for X axis (preserves precision on save/load)
   scaleY?: number; // Exact scale factor for Y axis (preserves precision on save/load)
+  /** Clip/mask shape applied to the image: rectangle (default), circle, or ellipse. */
+  clipShape?: 'rectangle' | 'circle' | 'ellipse';
 }
 
 export interface QRElement extends BaseElement {

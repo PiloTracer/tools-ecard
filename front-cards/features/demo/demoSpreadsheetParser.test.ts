@@ -115,6 +115,23 @@ describe('demoSpreadsheetParser', () => {
   });
 
   describe('mapRowToContactFields', () => {
+    it('title-cases person names at ingest (lowercase source)', () => {
+      const fields = mapRowToContactFields(
+        ['Nombre', 'Email'],
+        ['sofía rodríguez oviedo', 'sofia@example.com']
+      );
+      expect(fields.fullName).toBe('Sofía Rodríguez Oviedo');
+      expect(fields.email).toBe('sofia@example.com');
+    });
+
+    it('does not title-case businessName (brand casing preserved)', () => {
+      const fields = mapRowToContactFields(
+        ['Empresa', 'Nombre'],
+        ['acme LLC', 'Ada Lovelace']
+      );
+      expect(fields.businessName).toBe('acme LLC');
+      expect(fields.fullName).toBe('Ada Lovelace');
+    });
     it('maps Spanish headers', () => {
       const fields = mapRowToContactFields(
         ['Nombre', 'Apellidos', 'Correo'],

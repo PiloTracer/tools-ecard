@@ -30,6 +30,7 @@ export interface TemplateElementJson {
   stroke?: string;
   strokeWidth?: number;
   imageUrl?: string;
+  clipShape?: string;
   size?: number;
   data?: string;
   colorDark?: string;
@@ -75,6 +76,7 @@ function resolveText(element: TemplateElementJson, record?: RecordFieldValues): 
     const key = FIELD_ID_TO_PROPERTY[element.fieldId] ?? (element.fieldId as keyof RecordFieldValues);
     const value = record[key];
     if (value != null && String(value).trim() !== '') {
+      // Use stored value as-is — casing is fixed at ingest; user edits must be preserved.
       return String(value);
     }
   }
@@ -169,7 +171,25 @@ async function drawImage(ctx: CanvasRenderingContext2D, element: TemplateElement
   const w = element.width ?? img.width;
   const h = element.height ?? img.height;
   applyRotation(ctx, element.x, element.y, w, h, element.rotation ?? 0, () => {
-    ctx.drawImage(img, element.x, element.y, w, h);
+    // Apply clip shape (circle/ellipse mask)
+    const clipShape = element.clipShape;
+    if (clipShape && clipShape !== 'rectangle') {
+      ctx.save();
+      ctx.beginPath();
+      const cx = element.x + w / 2;
+      const cy = element.y + h / 2;
+      if (clipShape === 'circle') {
+        const r = Math.min(w, h) / 2;
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      } else if (clipShape === 'ellipse') {
+        ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
+      }
+      ctx.clip();
+      ctx.drawImage(img, element.x, element.y, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, element.x, element.y, w, h);
+    }
   });
 }
 
