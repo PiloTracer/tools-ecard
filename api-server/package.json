@@ -1,6 +1,6 @@
 {
   "name": "@ecards/api-server",
-  "version": "1.0.0",
+  "version": "0.5.1",
   "description": "E-Cards internal API server",
   "main": "dist/server.js",
   "scripts": {

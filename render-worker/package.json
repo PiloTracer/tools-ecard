@@ -1,6 +1,6 @@
 {
   "name": "@ecards/render-worker",
-  "version": "1.0.0",
+  "version": "0.5.1",
   "description": "E-Cards background rendering worker",
   "main": "dist/worker.js",
   "scripts": {
