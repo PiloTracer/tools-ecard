@@ -967,10 +967,6 @@ export function CanvasControls() {
         markAsSaved();
         console.log('[Import] Template imported and saved successfully:', newTemplate.name);
         setShowSaveModal(true);
-        alert(
-          `Template "${newTemplate.name}" imported successfully! ` +
-            `You can change the name in the Save dialog or anytime via Save.`
-        );
       } catch (persistError) {
         console.error('[Import] Imported template could not be auto-saved:', persistError);
         alert(

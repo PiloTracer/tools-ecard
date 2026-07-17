@@ -2,7 +2,7 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 - paste parser flexibility (KV/multi-section/work-phone-prefix), font reload on template reopen, import naming from filename with dedup; verified jest 127 + python 22
+**Open:** 2026-07-16 - goal: not specified (pick up from NEXT.md — manual browser click-through or next owner priority)
 
 **Updated:** 2026-07-16
 

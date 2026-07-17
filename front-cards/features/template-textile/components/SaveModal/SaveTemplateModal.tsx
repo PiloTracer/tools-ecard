@@ -23,14 +23,13 @@ export function SaveTemplateModal({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Re-sync fields every time the modal opens so Save always shows the current name.
   useEffect(() => {
-    if (currentTemplateName) {
-      setTemplateName(currentTemplateName);
-    }
-    if (currentProjectName) {
-      setProjectName(currentProjectName);
-    }
-  }, [currentTemplateName, currentProjectName]);
+    if (!isOpen) return;
+    setTemplateName(currentTemplateName || '');
+    setProjectName(currentProjectName || 'default');
+    setError(null);
+  }, [isOpen, currentTemplateName, currentProjectName]);
 
   if (!isOpen) return null;
 

@@ -213,10 +213,13 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     };
   }),
 
-  setSaveMetadata: (projectName, templateName) => set({
+  setSaveMetadata: (projectName, templateName) => set((state) => ({
     currentProjectName: projectName,
     currentTemplateName: templateName,
-  }),
+    currentTemplate: state.currentTemplate
+      ? { ...state.currentTemplate, name: templateName }
+      : state.currentTemplate,
+  })),
 
   markAsSaved: () => set({
     lastSavedAt: new Date(),

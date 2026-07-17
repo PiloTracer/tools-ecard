@@ -8,14 +8,14 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { BatchStatusTracker } from './BatchStatusTracker';
+import { NameBatchModal } from './NameBatchModal';
 import { useProjects } from '@/features/simple-projects';
-import type {
-  BatchUploadResponse,
-  FileValidationError,
-  ALLOWED_FILE_EXTENSIONS,
-  MAX_FILE_SIZE_BYTES,
-  MAX_FILE_SIZE_MB
-} from '../types';
+import {
+  batchFileExtension,
+  fileWithDisplayName,
+  suggestBatchFileName,
+} from '../utils/batchNaming';
+import type { BatchUploadResponse, FileValidationError } from '../types';
 
 export interface UploadBatchComponentProps {
   className?: string;
@@ -24,24 +24,24 @@ export interface UploadBatchComponentProps {
 export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ className = '' }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<FileValidationError | null>(null);
   const [uploadedBatch, setUploadedBatch] = useState<BatchUploadResponse | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [suggestedBatchName, setSuggestedBatchName] = useState('');
+  const [showNameModal, setShowNameModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
-  const { selectedProjectId, selectedProject, projects, loading } = useProjects();
+  const { selectedProjectId, loading } = useProjects();
 
   const isDisabled = !selectedProjectId || loading;
 
-  // File type constants
   const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.vcf', '.xls', '.xlsx'];
   const MAX_SIZE_MB = 10;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
   const validateFile = useCallback(
     (file: File): FileValidationError | null => {
-      // Check file size
       if (file.size > MAX_SIZE_BYTES) {
         return {
           type: 'size',
@@ -49,7 +49,6 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         };
       }
 
-      // Check file type
       const fileExtension = file.name
         .toLowerCase()
         .substring(file.name.lastIndexOf('.'));
@@ -63,8 +62,32 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
       return null;
     },
-    []
+    [MAX_SIZE_BYTES]
   );
+
+  const finalizeBatchFileName = (userInput: string, sourceFile: File): string => {
+    const trimmed = userInput.trim().replace(/[<>:"/\\|?*]/g, '_');
+    if (!trimmed) {
+      throw new Error('Batch name is required');
+    }
+    if (/\.(csv|txt|vcf|xls|xlsx)$/i.test(trimmed)) {
+      return trimmed.slice(0, 120);
+    }
+    const ext = batchFileExtension(sourceFile.name);
+    return `${trimmed.slice(0, 100)}${ext}`;
+  };
+
+  const promptBatchName = useCallback(async (file: File) => {
+    const { batchService } = await import('../services/batchService');
+    const existing = await batchService.listBatches({ limit: 200 });
+    const suggested = suggestBatchFileName(
+      file,
+      existing.batches.map((b) => b.fileName)
+    );
+    setPendingFile(file);
+    setSuggestedBatchName(suggested);
+    setShowNameModal(true);
+  }, []);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -72,45 +95,35 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
       if (error) {
         setValidationError(error);
-        setSelectedFile(null);
         return;
       }
 
       setValidationError(null);
-      setSelectedFile(file);
-      // Auto-upload the file
-      uploadFile(file);
+      void promptBatchName(file);
     },
-    [validateFile]
+    [validateFile, promptBatchName]
   );
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = async (file: File, displayFileName: string) => {
     setIsUploading(true);
     setValidationError(null);
 
     try {
-      // Import the service dynamically to avoid circular dependencies
       const { batchService } = await import('../services/batchService');
       const { projectService } = await import('@/features/simple-projects');
 
-      // Get the current projects to ensure we have fresh data
       const projectsData = await projectService.getProjects();
-
-      // Use the selected project ID or fall back to the first project
       const projectId = selectedProjectId || projectsData.selectedProjectId || projectsData.projects[0]?.id;
-      const project = projectsData.projects.find(p => p.id === projectId);
+      const project = projectsData.projects.find((p) => p.id === projectId);
 
       if (!project) {
         throw new Error('No project available. Please create or select a project.');
       }
 
-      console.log('Uploading with project:', project.name, 'ID:', projectId);
-
-      // Use real API to upload to SeaweedFS
-      const response = await batchService.uploadBatch(file, projectId, project.name);
+      const namedFile = fileWithDisplayName(file, displayFileName);
+      const response = await batchService.uploadBatch(namedFile, projectId, project.name);
 
       setUploadedBatch(response);
-      setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -120,8 +133,29 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         type: 'other',
         message: errorMessage,
       });
+      throw error;
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleConfirmBatchName = async (batchFileName: string) => {
+    if (!pendingFile) {
+      throw new Error('No batch file selected');
+    }
+    const finalName = finalizeBatchFileName(batchFileName, pendingFile);
+    await uploadFile(pendingFile, finalName);
+    setPendingFile(null);
+    setSuggestedBatchName('');
+  };
+
+  const handleCloseNameModal = () => {
+    if (isUploading) return;
+    setShowNameModal(false);
+    setPendingFile(null);
+    setSuggestedBatchName('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -157,18 +191,17 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       e.preventDefault();
       e.stopPropagation();
 
-      // Reset the drag counter and state
       dragCounterRef.current = 0;
       setIsDragging(false);
 
-      if (isDisabled) return;
+      if (isDisabled || isUploading) return;
 
       const files = e.dataTransfer.files;
       if (files && files.length > 0) {
         handleFile(files[0]);
       }
     },
-    [handleFile, isDisabled]
+    [handleFile, isDisabled, isUploading]
   );
 
   const handleFileSelect = useCallback(
@@ -182,7 +215,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   );
 
   const handleClick = () => {
-    if (!isDisabled && !isUploading) {
+    if (!isDisabled && !isUploading && !showNameModal) {
       fileInputRef.current?.click();
     }
   };
@@ -191,33 +224,28 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     async (e: React.ClipboardEvent) => {
       e.preventDefault();
 
-      if (isDisabled || isUploading) return;
+      if (isDisabled || isUploading || showNameModal) return;
 
       const clipboardData = e.clipboardData;
-
-      // Check if there are files in the clipboard
       const files = clipboardData.files;
       if (files && files.length > 0) {
         handleFile(files[0]);
         return;
       }
 
-      // Check if there's text content
       const text = clipboardData.getData('text/plain');
       if (text && text.trim()) {
-        // Create a file from the pasted text
         const blob = new Blob([text], { type: 'text/plain' });
         const file = new File([blob], 'pasted-content.txt', { type: 'text/plain' });
         handleFile(file);
       }
     },
-    [handleFile, isDisabled, isUploading]
+    [handleFile, isDisabled, isUploading, showNameModal]
   );
 
-  // Set up paste event listener - works on hover
   React.useEffect(() => {
     const container = containerRef.current;
-    if (!container || isDisabled || isUploading) return;
+    if (!container || isDisabled || isUploading || showNameModal) return;
 
     let isHovering = false;
 
@@ -230,13 +258,11 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     };
 
     const handleDocumentPaste = (e: ClipboardEvent) => {
-      // Only handle paste if hovering over the container
       if (!isHovering) return;
 
       const clipboardData = e.clipboardData;
       if (!clipboardData) return;
 
-      // Check for files
       const files = clipboardData.files;
       if (files && files.length > 0) {
         e.preventDefault();
@@ -244,7 +270,6 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         return;
       }
 
-      // Check for text
       const text = clipboardData.getData('text/plain');
       if (text && text.trim()) {
         e.preventDefault();
@@ -263,11 +288,10 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       container.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('paste', handleDocumentPaste);
     };
-  }, [handleFile, isDisabled, isUploading]);
+  }, [handleFile, isDisabled, isUploading, showNameModal]);
 
-  // Button classes
   const getButtonClasses = () => {
-    const baseClasses = "flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200";
+    const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200';
 
     if (isDisabled) {
       return `${baseClasses} border-gray-200 bg-gray-50 cursor-not-allowed opacity-50`;
@@ -285,21 +309,15 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   };
 
   const getIconClasses = () => {
-    return isDisabled
-      ? "w-6 h-6 text-gray-300 mr-3"
-      : "w-6 h-6 text-gray-400 mr-3";
+    return isDisabled ? 'w-6 h-6 text-gray-300 mr-3' : 'w-6 h-6 text-gray-400 mr-3';
   };
 
   const getTitleClasses = () => {
-    return isDisabled
-      ? "font-medium text-gray-400"
-      : "font-medium text-gray-900";
+    return isDisabled ? 'font-medium text-gray-400' : 'font-medium text-gray-900';
   };
 
   const getDescriptionClasses = () => {
-    return isDisabled
-      ? "text-sm text-gray-300"
-      : "text-sm text-gray-500";
+    return isDisabled ? 'text-sm text-gray-300' : 'text-sm text-gray-500';
   };
 
   return (
@@ -310,10 +328,17 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         className="hidden"
         accept={ALLOWED_EXTENSIONS.join(',')}
         onChange={handleFileSelect}
-        disabled={isDisabled || isUploading}
+        disabled={isDisabled || isUploading || showNameModal}
       />
 
-      {/* Drag-and-Drop Area / Button */}
+      <NameBatchModal
+        isOpen={showNameModal}
+        suggestedName={suggestedBatchName}
+        sourceLabel={pendingFile?.name}
+        onClose={handleCloseNameModal}
+        onConfirm={handleConfirmBatchName}
+      />
+
       <div
         className={getButtonClasses()}
         onClick={handleClick}
@@ -326,7 +351,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         tabIndex={isDisabled ? -1 : 0}
         aria-label="Import Batch"
         aria-disabled={isDisabled}
-        title={isDisabled ? "Select a project to import batches" : "Click, drag and drop, or paste content"}
+        title={isDisabled ? 'Select a project to import batches' : 'Click, drag and drop, or paste content'}
       >
         <svg
           className={getIconClasses()}
@@ -357,18 +382,19 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
           )}
         </div>
         {isUploading && (
-          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent" style={{ pointerEvents: 'none' }}></div>
+          <div
+            className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"
+            style={{ pointerEvents: 'none' }}
+          />
         )}
       </div>
 
-      {/* Validation Error */}
       {validationError && (
         <div className="mt-2 p-3 bg-red-50 rounded-md border border-red-200">
           <p className="text-sm text-red-600">{validationError.message}</p>
         </div>
       )}
 
-      {/* Upload Status Tracker */}
       {uploadedBatch && (
         <div className="mt-4">
           <BatchStatusTracker batchId={uploadedBatch.id} />

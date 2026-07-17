@@ -5,6 +5,7 @@ export { FileUploadComponent } from './components/FileUploadComponent';
 export { BatchStatusTracker } from './components/BatchStatusTracker';
 export { UploadBatchComponent } from './components/UploadBatchComponent';
 export type { UploadBatchComponentProps } from './components/UploadBatchComponent';
+export { NameBatchModal } from './components/NameBatchModal';
 
 // Hooks
 export { useBatchUpload } from './hooks/useBatchUpload';
