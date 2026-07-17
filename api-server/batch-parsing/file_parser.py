@@ -8,15 +8,19 @@ import csv
 import os
 import json
 import logging
+import re
 import unicodedata
 from typing import List
 
 import pandas as pd
 import chardet
 
-from data_normalizer import FIELD_MAPPING
+from data_normalizer import FIELD_MAPPING, _normalize_header_token
 
 logger = logging.getLogger(__name__)
+
+KEY_VALUE_LINE_RE = re.compile(r'^\s*(?P<key>[^:]+?)\s*:\s*(?P<value>.+?)\s*$')
+
 
 class FileParser:
     """
@@ -114,6 +118,111 @@ class FileParser:
         except OSError:
             return pd.DataFrame()
         return pd.DataFrame(rows)
+
+    def _split_text_sections(self, text: str) -> List[str]:
+        cleaned = text.replace('\ufeff', '').strip()
+        if not cleaned:
+            return []
+        sections = [s.strip() for s in re.split(r'\n\s*\n+', cleaned) if s.strip()]
+        return sections if sections else [cleaned]
+
+    def _is_key_value_section(self, lines: List[str]) -> bool:
+        non_empty = [ln for ln in lines if ln.strip()]
+        if not non_empty:
+            return False
+        kv_count = sum(1 for ln in non_empty if KEY_VALUE_LINE_RE.match(ln.strip()))
+        return kv_count >= 2 and kv_count / len(non_empty) >= 0.6
+
+    def _parse_key_value_section(self, lines: List[str]) -> pd.DataFrame:
+        headers: List[str] = []
+        values: List[str] = []
+        for line in lines:
+            match = KEY_VALUE_LINE_RE.match(line.strip())
+            if not match:
+                continue
+            headers.append(match.group('key').strip())
+            values.append(match.group('value').strip())
+        if not headers:
+            return pd.DataFrame()
+        return pd.DataFrame([values], columns=headers)
+
+    def _looks_like_tabular_text(self, lines: List[str]) -> bool:
+        """True when pasted content is row/column tabular (TSV/CSV), not vertical stacks."""
+        non_empty = [ln for ln in lines if ln.strip()]
+        if len(non_empty) < 2:
+            return False
+        delimiter = self._detect_delimiter_from_lines(non_empty[:5])
+        matrix_rows: List[List[str]] = []
+        for ln in non_empty[:20]:
+            matrix_rows.append([c.strip() for c in ln.split(delimiter)])
+        if not matrix_rows or len(matrix_rows[0]) < 2:
+            return False
+        df_temp = pd.DataFrame(matrix_rows)
+        header_idx = self.find_header_row(df_temp)
+        header_score_row = df_temp.iloc[header_idx].tolist()
+        all_keywords = [kw.lower() for sublist in FIELD_MAPPING.values() for kw in sublist]
+        matches = 0
+        for val in header_score_row:
+            if pd.isna(val):
+                continue
+            val_norm = _normalize_header_token(str(val))
+            if any(kw in val_norm or val_norm in kw for kw in all_keywords):
+                matches += 1
+        return matches >= 2
+
+    def _detect_delimiter_from_lines(self, lines: List[str]) -> str:
+        sample = ''.join(lines)
+        counts = {'\t': sample.count('\t'), ',': sample.count(','), ';': sample.count(';')}
+        best = max(counts, key=lambda d: counts[d])
+        return best if counts[best] > 0 else '\t'
+
+    def _row_echoes_header(self, headers: List[str], row: List[str]) -> bool:
+        if not headers or not row:
+            return False
+        width = max(len(headers), len(row))
+        matches = 0
+        for i in range(width):
+            h = _normalize_header_token(str(headers[i] if i < len(headers) else ''))
+            c = _normalize_header_token(str(row[i] if i < len(row) else ''))
+            if h and c and h == c:
+                matches += 1
+        return matches >= 2
+
+    def _parse_delimited_section(self, lines: List[str], encoding: str) -> pd.DataFrame:
+        if not lines:
+            return pd.DataFrame()
+        delimiter = self._detect_delimiter_from_lines(lines[:5])
+        matrix_rows = [[c.strip() for c in ln.split(delimiter)] for ln in lines]
+        df_temp = pd.DataFrame(matrix_rows)
+        header_idx = self.find_header_row(df_temp)
+        headers = [str(h).strip() for h in df_temp.iloc[header_idx].tolist()]
+        data_rows = matrix_rows[header_idx + 1:]
+        rows = []
+        for row in data_rows:
+            if self._row_echoes_header(headers, row):
+                continue
+            padded = row + [''] * max(0, len(headers) - len(row))
+            rows.append(padded[: len(headers)])
+        if not rows:
+            return pd.DataFrame(columns=headers)
+        return pd.DataFrame(rows, columns=headers)
+
+    def _parse_plain_text_sections(self, text: str, encoding: str) -> pd.DataFrame:
+        sections = self._split_text_sections(text)
+        frames: List[pd.DataFrame] = []
+        for section in sections:
+            lines = [ln for ln in section.splitlines() if ln.strip()]
+            if not lines:
+                continue
+            if self._is_key_value_section(lines):
+                df = self._parse_key_value_section(lines)
+            else:
+                df = self._parse_delimited_section(lines, encoding)
+            if not df.empty:
+                frames.append(df)
+        if not frames:
+            return pd.DataFrame()
+        return pd.concat(frames, ignore_index=True, sort=False)
 
     def _parse_vertical_txt(self, file_path: str, encoding: str) -> pd.DataFrame:
         """
@@ -244,21 +353,24 @@ class FileParser:
                     df = pd.read_excel(file_path, engine='xlrd', header=header_idx)
 
             elif ext == '.txt':
-                # Try vertical format first (e.g. Name/Title/Email/Phone stacked per contact)
-                df = self._parse_vertical_txt(file_path, encoding)
-                if df.empty:
-                    # Fallback to delimited parsing. Pasted tabular text (copy-paste from
-                    # Excel/Sheets) can be tab-, comma-, or semicolon-delimited — detect
-                    # it instead of assuming tab — and apply the same header-row
-                    # detection used for CSV/Excel so preamble/title rows aren't
-                    # mistaken for column headers.
-                    delimiter = self._detect_delimiter(file_path, encoding)
-                    df_temp = self._read_raw_matrix(file_path, encoding, delimiter=delimiter)
-                    header_idx = self.find_header_row(df_temp)
-                    logger.debug(f"Reading TXT with delimiter {delimiter!r}, header at row {header_idx}")
-                    df = pd.read_csv(
-                        file_path, encoding=encoding, sep=delimiter, header=header_idx, engine='python'
-                    )
+                with open(file_path, 'r', encoding=encoding, errors='replace') as f:
+                    raw_text = f.read()
+                lines = [ln for ln in raw_text.splitlines() if ln.strip()]
+
+                # Pasted tabular text (TSV/CSV) must not go through the vertical
+                # email-anchor parser — it mis-identifies the header row as a name.
+                if self._looks_like_tabular_text(lines) or self._is_key_value_section(lines):
+                    df = self._parse_plain_text_sections(raw_text, encoding)
+                else:
+                    df = self._parse_vertical_txt(file_path, encoding)
+                    if df.empty:
+                        delimiter = self._detect_delimiter(file_path, encoding)
+                        df_temp = self._read_raw_matrix(file_path, encoding, delimiter=delimiter)
+                        header_idx = self.find_header_row(df_temp)
+                        logger.debug(f"Reading TXT with delimiter {delimiter!r}, header at row {header_idx}")
+                        df = pd.read_csv(
+                            file_path, encoding=encoding, sep=delimiter, header=header_idx, engine='python'
+                        )
 
             elif ext == '.json':
                 with open(file_path, 'r', encoding=encoding) as f:

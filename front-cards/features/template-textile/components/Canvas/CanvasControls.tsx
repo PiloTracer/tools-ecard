@@ -10,6 +10,10 @@ import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
 import { OffscreenExportButton } from '../OffscreenExport/OffscreenExportButton';
 import { ElementsLayerManagerModal } from './ElementsLayerManagerModal';
+import {
+  resolveUniqueTemplateName,
+  stemFromImportFileName,
+} from '../../utils/importTemplateNaming';
 import { templateService } from '../../services/templateService';
 import { templatePackageService } from '../../services/templatePackageService';
 import type { Template, ImageElement } from '../../types';
@@ -877,9 +881,9 @@ export function CanvasControls() {
 
         console.log('[Import] Parsed JSON data:', importedData);
 
-        // Validate required fields
-        if (!importedData.name || !importedData.width || !importedData.height || !Array.isArray(importedData.elements)) {
-          throw new Error('Invalid template file: missing required fields (name, width, height, or elements)');
+        // Validate required fields (name comes from the import file name)
+        if (!importedData.width || !importedData.height || !Array.isArray(importedData.elements)) {
+          throw new Error('Invalid template file: missing required fields (width, height, or elements)');
         }
 
         // Convert date strings back to Date objects if they exist
@@ -894,6 +898,13 @@ export function CanvasControls() {
           updatedAt,
         };
       }
+
+      const existingNames = (await templateService.listTemplates()).map((t) => t.name);
+      const importName = resolveUniqueTemplateName(
+        stemFromImportFileName(file.name),
+        existingNames
+      );
+      newTemplate = { ...newTemplate, name: importName };
 
       console.log('[Import] Created new template with ID:', newTemplate.id);
 
@@ -955,7 +966,11 @@ export function CanvasControls() {
         useTemplateStore.getState().updateTemplateId(metadata.id);
         markAsSaved();
         console.log('[Import] Template imported and saved successfully:', newTemplate.name);
-        alert(`Template "${newTemplate.name}" imported successfully!`);
+        setShowSaveModal(true);
+        alert(
+          `Template "${newTemplate.name}" imported successfully! ` +
+            `You can change the name in the Save dialog or anytime via Save.`
+        );
       } catch (persistError) {
         console.error('[Import] Imported template could not be auto-saved:', persistError);
         alert(

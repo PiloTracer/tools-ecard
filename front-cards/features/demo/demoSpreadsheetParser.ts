@@ -73,6 +73,9 @@ const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
   cellular: 'mobilePhone',
   celular: 'mobilePhone',
   movil: 'mobilePhone',
+  whatsapp: 'mobilePhone',
+  whats_app: 'mobilePhone',
+  cel_whatsapp: 'mobilePhone',
   address_street: 'addressStreet',
   address: 'addressStreet',
   street: 'addressStreet',
@@ -314,13 +317,74 @@ function looksLikeSectionOrTitle(value: string): boolean {
   );
 }
 
-/** Minimal CSV split: supports quoted fields and comma/semicolon delimiters. */
-export function parseCsvText(text: string): DemoParsedTable {
-  const cleaned = text.replace(/^\uFEFF/, '');
-  const lines = cleaned.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length === 0) {
-    return { headers: [], rows: [] };
+const KEY_VALUE_LINE_RE = /^\s*([^:\n]+?)\s*:\s*(.+?)\s*$/;
+
+function splitTextSections(text: string): string[] {
+  const cleaned = text.replace(/^\uFEFF/, '').trim();
+  if (!cleaned) return [];
+  const sections = cleaned.split(/\n\s*\n+/).map((s) => s.trim()).filter(Boolean);
+  return sections.length > 0 ? sections : [cleaned];
+}
+
+function isKeyValueSection(lines: string[]): boolean {
+  const nonEmpty = lines.filter((l) => l.trim());
+  if (nonEmpty.length === 0) return false;
+  const kvCount = nonEmpty.filter((l) => KEY_VALUE_LINE_RE.test(l.trim())).length;
+  return kvCount >= 2 && kvCount / nonEmpty.length >= 0.6;
+}
+
+function parseKeyValueSection(lines: string[]): DemoParsedTable {
+  const headers: string[] = [];
+  const values: string[] = [];
+  for (const line of lines) {
+    const m = line.trim().match(KEY_VALUE_LINE_RE);
+    if (!m) continue;
+    headers.push(m[1].trim());
+    values.push(m[2].trim());
   }
+  return { headers, rows: values.length ? [values] : [] };
+}
+
+function rowEchoesHeader(headers: string[], cols: string[]): boolean {
+  if (headers.length === 0 || cols.length === 0) return false;
+  const width = Math.max(headers.length, cols.length);
+  let matches = 0;
+  for (let i = 0; i < width; i++) {
+    const h = normalizeHeaderKey(headers[i] || '');
+    const c = normalizeHeaderKey(cols[i] || '');
+    if (h && c && h === c) matches += 1;
+  }
+  return matches >= 2;
+}
+
+function padRow(row: string[], width: number): string[] {
+  const padded = [...row.map((c) => String(c ?? '').trim())];
+  while (padded.length < width) padded.push('');
+  return padded.slice(0, width);
+}
+
+function mergeParsedTables(tables: DemoParsedTable[]): DemoParsedTable {
+  const useful = tables.filter((t) => t.rows.length > 0);
+  if (useful.length === 0) return { headers: [], rows: [] };
+  if (useful.length === 1) return useful[0];
+
+  const headers = useful[0].headers;
+  const width = Math.max(headers.length, ...useful.map((t) => t.headers.length));
+  const normalizedHeaders =
+    headers.length < width ? [...headers, ...Array(width - headers.length).fill('')] : headers;
+
+  const rows: string[][] = [];
+  for (const table of useful) {
+    for (const row of table.rows) {
+      if (rowEchoesHeader(table.headers, row)) continue;
+      rows.push(padRow(row, width));
+    }
+  }
+  return { headers: normalizedHeaders, rows };
+}
+
+function parseDelimitedSection(lines: string[]): DemoParsedTable {
+  if (lines.length === 0) return { headers: [], rows: [] };
 
   let bestDelim: ',' | ';' | '\t' = detectDelimiter(lines[0]);
   let bestScore = -1;
@@ -336,6 +400,116 @@ export function parseCsvText(text: string): DemoParsedTable {
 
   const matrix = lines.map((line) => splitDelimitedLine(line, bestDelim));
   return matrixToTable(matrix);
+}
+
+function parseSingleTextSection(text: string): DemoParsedTable {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return { headers: [], rows: [] };
+  if (isKeyValueSection(lines)) return parseKeyValueSection(lines);
+  return parseDelimitedSection(lines);
+}
+
+/** Parse pasted/plain text: key-value blocks, tabular CSV/TSV, or multiple sections. */
+export function parseCsvText(text: string): DemoParsedTable {
+  const sections = splitTextSections(text);
+  if (sections.length <= 1) {
+    return parseSingleTextSection(text.replace(/^\uFEFF/, '').trim());
+  }
+  return mergeParsedTables(sections.map(parseSingleTextSection));
+}
+
+function looksLikeEmail(value: string): boolean {
+  const v = value.trim();
+  return v.includes('@') && !/\s/.test(v);
+}
+
+function looksLikeWebsite(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (!v || v.includes('@')) return false;
+  return /^(https?:\/\/|www\.)/i.test(v) || /^[a-z0-9-]+(\.[a-z0-9-]+)+\/?$/i.test(v);
+}
+
+function looksLikePersonName(value: string): boolean {
+  const v = value.trim();
+  if (!v || v.length < 2 || v.length > 80) return false;
+  if (looksLikeEmail(v) || looksLikeWebsite(v)) return false;
+  if (digitsOnly(v).length >= 4) return false;
+  return /^[\p{L}\p{M}'.\- ]+$/u.test(v) && v.includes(' ');
+}
+
+/** Infer field type from cell value when headers are missing or unrecognized. */
+function inferFieldFromValue(value: string): keyof DemoContactFields | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (looksLikeEmail(v)) return 'email';
+  if (looksLikeWebsite(v)) return 'businessUrl';
+  if (looksLikePhoneNumber(v)) return 'workPhone';
+  if (looksLikeExtension(v)) return 'workPhoneExt';
+  if (looksLikePersonName(v)) return 'fullName';
+  return null;
+}
+
+/**
+ * When headers did not map a column, infer from value shape and fill gaps in a
+ * conservative order (name → title → email → phone → mobile → ext → website).
+ */
+function inferUnmappedColumns(
+  fields: DemoContactFields,
+  cols: string[],
+  unmatchedIndices: number[]
+): void {
+  const indices =
+    unmatchedIndices.length > 0 ? unmatchedIndices : cols.map((_, i) => i);
+  const inferred: Partial<Record<keyof DemoContactFields, string>> = {};
+  for (const i of indices) {
+    const value = cols[i]?.trim();
+    if (!value) continue;
+    const field = inferFieldFromValue(value);
+    if (!field || fields[field] || inferred[field]) continue;
+    inferred[field] = value;
+  }
+
+  const order: (keyof DemoContactFields)[] = [
+    'fullName',
+    'businessTitle',
+    'email',
+    'workPhone',
+    'mobilePhone',
+    'workPhoneExt',
+    'businessUrl',
+  ];
+  for (const key of order) {
+    if (!fields[key] && inferred[key]) {
+      fields[key] = inferred[key]!;
+    }
+  }
+}
+
+/**
+ * Apply project Work Phone Prefix: 4-digit values in phone/ext columns that are
+ * really local numbers (not short extensions) get the prefix prepended.
+ */
+export function applyWorkPhonePrefix(
+  fields: DemoContactFields,
+  workPhonePrefix?: string | null
+): void {
+  if (!workPhonePrefix?.trim()) return;
+  const prefix = workPhonePrefix.trim();
+
+  if (fields.workPhoneExt && !fields.workPhone) {
+    const extDigits = digitsOnly(fields.workPhoneExt);
+    if (extDigits.length === 4) {
+      fields.workPhone = prefix + extDigits;
+      delete fields.workPhoneExt;
+    }
+  }
+
+  if (fields.workPhone) {
+    const digits = digitsOnly(fields.workPhone);
+    if (digits.length === 4) {
+      fields.workPhone = prefix + digits;
+    }
+  }
 }
 
 function detectDelimiter(sample: string): ',' | ';' | '\t' {
@@ -495,7 +669,7 @@ async function parseXlsxBuffer(buffer: ArrayBuffer): Promise<DemoParsedTable> {
 export function mapRowToContactFields(
   headers: string[],
   cols: string[],
-  options: { allowPositionalFallback?: boolean } = {}
+  options: { allowPositionalFallback?: boolean; workPhonePrefix?: string | null } = {}
 ): DemoContactFields {
   const allowPositionalFallback = options.allowPositionalFallback !== false;
   const fields: DemoContactFields = {};
@@ -559,12 +733,26 @@ export function mapRowToContactFields(
     fields.fullName = [fields.firstName, fields.lastName].filter(Boolean).join(' ');
   }
 
+  // Multi-word "nombre" values are full names, not a lone given name.
+  if (fields.firstName && !fields.lastName && fields.firstName.includes(' ')) {
+    fields.fullName = fields.firstName;
+  }
+
   // Never treat a bare column-label echo as an email
   if (fields.email && !fields.email.includes('@')) {
     delete fields.email;
   }
 
+  // Value-based inference only for blank/unknown headers — never overwrite mapped fields.
+  const inferIndices = unmatchedHeaderIdx.filter((i) => !headers[i]?.trim());
+  if (mappedFromHeaders === 0 && headerRowMatchScore(headers) === 0) {
+    inferUnmappedColumns(fields, cols, cols.map((_, i) => i));
+  } else if (inferIndices.length > 0) {
+    inferUnmappedColumns(fields, cols, inferIndices);
+  }
+
   reconcilePhoneAndExtension(fields);
+  applyWorkPhonePrefix(fields, options.workPhonePrefix);
 
   return fields;
 }

@@ -179,7 +179,76 @@ class FileParserFlexibilityTests(unittest.TestCase):
         path = self._write_tmp(content, ".txt")
         df = self.parser.parse_file(path)
         self.assertIn("Nombre", df.columns)
-        self.assertEqual(df.iloc[0]["Telefono"], 22221111)
+        self.assertEqual(str(df.iloc[0]["Telefono"]), "22221111")
+
+    def test_key_value_paste_is_parsed(self):
+        content = (
+            "nombre: Pilo Montaneno Pulmoclas\n"
+            "puesto: Manager\n"
+            "telefono: 12341234\n"
+            "whatsapp: 12341234\n"
+            "website: www.logicbison.com\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["nombre"], "Pilo Montaneno Pulmoclas")
+        self.assertEqual(df.iloc[0]["website"], "www.logicbison.com")
+
+    def test_tabular_paste_does_not_use_vertical_parser(self):
+        content = (
+            "Nombre\tPuesto\tCorreo\tExt\n"
+            "Camila Castro Cordero\tAsistente de Ingeniería\tccastro@code-cr.com\t2459-7578\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertIn("Nombre", df.columns)
+        self.assertEqual(df.iloc[0]["Correo"], "ccastro@code-cr.com")
+        self.assertNotEqual(str(df.iloc[0]["Nombre"]).strip(), "Nombre")
+
+    def test_multi_section_paste_merges_rows(self):
+        content = (
+            "Nombre\tPuesto\tCorreo\tNumero de teléfono\n"
+            "Jimena Rojas Arias\tAuxiliar de compras\tjrojas@code-cr.com\t2459-6068\n"
+            "\n"
+            "Nombre\tPuesto\tCorreo\tExt\n"
+            "Brandon Alvarez Quiros\tAuxiliar de Logistica y Compras\tbalavez@code-cr.com\t6088\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 2)
+        self.assertEqual(df.iloc[1]["Correo"], "balavez@code-cr.com")
+
+
+class WorkPhonePrefixPolicyTests(unittest.TestCase):
+    def setUp(self):
+        self.normalizer = DataNormalizer()
+
+    def test_four_digit_ext_becomes_prefixed_work_phone(self):
+        mapped = {"work_phone": None, "work_phone_ext": "6088"}
+        self.normalizer.apply_work_phone_prefix_policy(mapped, "2459")
+        self.assertEqual(mapped["work_phone"], "24596088")
+        self.assertIsNone(mapped["work_phone_ext"])
+
+
+class MapRowPrefixIntegrationTests(unittest.TestCase):
+    def test_ext_short_number_gets_work_phone_prefix_on_map(self):
+        parser = BatchParser(
+            batch_id="00000000-0000-0000-0000-000000000000",
+            file_path="unused",
+            postgres_url="postgresql://unused",
+            cassandra_hosts=["unused"],
+            storage_mode="local",
+            work_phone_prefix="2459",
+        )
+        row = pd.Series({
+            "Nombre": "Brandon Alvarez",
+            "Correo": "b@example.com",
+            "Ext": "6088",
+        })
+        mapped = parser.map_row(row)
+        self.assertEqual(mapped["work_phone"], "2459-6088")
+        self.assertIsNone(mapped["work_phone_ext"])
 
 
 if __name__ == "__main__":

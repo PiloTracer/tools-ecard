@@ -64,12 +64,32 @@ export const demoTemplateRepository = {
 
   async saveTemplate(request: DemoSaveTemplateRequest): Promise<DemoTemplateMetadata> {
     const templates = demoStore.getTemplates<DemoTemplateRecord>();
-    const id = newDemoId('tpl');
+    const templateId = request.templateData.id;
+    const existingIdx = templates.findIndex((t) => t.id === templateId);
     const now = new Date().toISOString();
+
+    if (existingIdx >= 0) {
+      const updated: DemoTemplateRecord = {
+        ...templates[existingIdx],
+        name: request.name,
+        data: { ...request.templateData, name: request.name },
+        updatedAt: now,
+      };
+      templates[existingIdx] = updated;
+      demoStore.setTemplates(templates);
+      await demoStore.putBlob(
+        `template:${templateId}`,
+        JSON.stringify(updated.data),
+        'application/json'
+      );
+      return toMeta(updated);
+    }
+
+    const id = newDemoId('tpl');
     const record: DemoTemplateRecord = {
       id,
       name: request.name,
-      data: request.templateData,
+      data: { ...request.templateData, id, name: request.name },
       resources: [],
       createdAt: now,
       updatedAt: now,

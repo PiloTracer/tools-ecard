@@ -11,6 +11,7 @@ import {
   type ListBatchesResponse,
 } from '@/features/batch-upload/types';
 import { demoStore, newDemoId } from './demoStore';
+import type { Project } from '@/features/simple-projects/types';
 import {
   isUsefulDemoContactRow,
   mapRowToContactFields,
@@ -46,6 +47,9 @@ export const demoBatchRepository = {
   async uploadBatch(file: File, projectId: string, projectName: string): Promise<BatchUploadResponse> {
     const id = newDemoId('batch');
     const now = new Date().toISOString();
+    const projects = demoStore.getProjects<Project>();
+    const project = projects.find((p) => p.id === projectId);
+    const workPhonePrefix = project?.workPhonePrefix ?? null;
     const table = await parseDemoSpreadsheetFile(file);
     const dataRows = table.rows.filter((cols) =>
       isUsefulDemoContactRow(table.headers, cols)
@@ -53,7 +57,7 @@ export const demoBatchRepository = {
     const totalRecords = dataRows.length;
 
     const records = dataRows.map((cols, i) => {
-      const fields = mapRowToContactFields(table.headers, cols);
+      const fields = mapRowToContactFields(table.headers, cols, { workPhonePrefix });
       return {
         id: newDemoId('rec'),
         batchId: id,

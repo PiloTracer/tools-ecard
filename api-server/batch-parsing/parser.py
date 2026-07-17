@@ -304,6 +304,8 @@ class BatchParser:
         # "Teléfono") — reclassify by value shape before normalizing/formatting phones.
         self.normalizer.reconcile_phone_and_extension(mapped)
 
+        self.normalizer.apply_work_phone_prefix_policy(mapped, self.work_phone_prefix)
+
         # Normalize phones with project-specific configuration
         if mapped.get("mobile_phone"):
             mapped["mobile_phone"] = self.normalizer.normalize_phone(

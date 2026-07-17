@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import {
+  applyWorkPhonePrefix,
   findHeaderRowIndex,
   isUsefulDemoContactRow,
   mapRowToContactFields,
@@ -48,6 +49,55 @@ describe('demoSpreadsheetParser', () => {
       );
       expect(useful).toHaveLength(2);
       expect(useful[0][0]).toBe('Sofia Rodriguez Oviedo');
+    });
+
+    it('parses key-value paste (label: value lines)', () => {
+      const table = parseCsvText(
+        [
+          'nombre: Pilo Montaneno Pulmoclas',
+          'puesto: Manager',
+          'telefono: 12341234',
+          'whatsapp: 12341234',
+          'website: www.logicbison.com',
+        ].join('\n')
+      );
+      expect(table.rows).toHaveLength(1);
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('Pilo Montaneno Pulmoclas');
+      expect(fields.businessTitle).toBe('Manager');
+      expect(fields.workPhone).toBe('12341234');
+      expect(fields.mobilePhone).toBe('12341234');
+      expect(fields.businessUrl).toBe('www.logicbison.com');
+      expect(isUsefulDemoContactRow(table.headers, table.rows[0])).toBe(true);
+    });
+
+    it('parses tab-separated paste with Ext column holding full phone numbers', () => {
+      const table = parseCsvText(
+        'Nombre\tPuesto\tCorreo\tExt\nCamila Castro Cordero\tAsistente de Ingeniería\tccastro@code-cr.com\t2459-7578\n'
+      );
+      expect(table.rows).toHaveLength(1);
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('Camila Castro Cordero');
+      expect(fields.email).toBe('ccastro@code-cr.com');
+      expect(fields.workPhone).toBe('2459-7578');
+    });
+
+    it('merges multiple pasted table sections and skips repeated header rows', () => {
+      const table = parseCsvText(
+        [
+          'Nombre\tPuesto\tCorreo\tNumero de teléfono',
+          'Jimena Rojas Arias\tAuxiliar de compras\tjrojas@code-cr.com\t2459-6068',
+          'Veronica Mora  Herrera\tAsistente de Contabilidad\tvmora@code-cr.com\t2459-6073',
+          '',
+          'Nombre\tPuesto\tCorreo\tExt',
+          'Brandon Alvarez Quiros\tAuxiliar de Logistica y Compras\tbalavez@code-cr.com\t6088',
+          'Luis Angel Arispe Córdoba\tSupervisor de Contabilidad\tlarispe@code-cr.com\t7582',
+        ].join('\n')
+      );
+      expect(table.rows).toHaveLength(4);
+      const brandon = mapRowToContactFields(table.headers, table.rows[2]);
+      expect(brandon.fullName).toBe('Brandon Alvarez Quiros');
+      expect(brandon.email).toBe('balavez@code-cr.com');
     });
   });
 
@@ -174,6 +224,23 @@ describe('demoSpreadsheetParser', () => {
         const fields = mapRowToContactFields(headers, ['Ada Lovelace', '+50622334455', '105']);
         expect(fields.workPhone).toBe('+50622334455');
         expect(fields.workPhoneExt).toBe('105');
+      });
+
+      it('applies Work Phone Prefix to 4-digit Ext values that are local numbers', () => {
+        const headers = ['Nombre', 'Correo', 'Ext'];
+        const fields = mapRowToContactFields(headers, ['Brandon Alvarez', 'b@example.com', '6088'], {
+          workPhonePrefix: '2459',
+        });
+        expect(fields.workPhone).toBe('24596088');
+        expect(fields.workPhoneExt).toBeUndefined();
+      });
+    });
+
+    describe('applyWorkPhonePrefix', () => {
+      it('prefixes a bare 4-digit work phone', () => {
+        const fields = { workPhone: '6088' };
+        applyWorkPhonePrefix(fields, '2459');
+        expect(fields.workPhone).toBe('24596088');
       });
     });
   });

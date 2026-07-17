@@ -8,6 +8,7 @@ import { apiClient } from '@/shared/lib/api-client';
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 import { isDemoMode } from '@/features/demo/isDemoMode';
 import { demoFontRepository } from '@/features/demo/demoFontRepository';
+import type { TemplateElement, TextElement } from '../types';
 
 export interface Font {
   fontId: string;
@@ -25,6 +26,23 @@ export interface FontFamily {
   family: string;
   category: string;
   variants: Font[];
+}
+
+/** Normalize variant labels so `Regular`, `regular`, and `REGULAR` all match. */
+export function normalizeFontVariant(variant: string): string {
+  return variant.toLowerCase().replace(/\s+/g, '-');
+}
+
+export function variantFromTextStyle(
+  fontWeight?: string | number,
+  fontStyle?: string
+): string {
+  const weight = fontWeight === 'bold' || fontWeight === 700 || fontWeight === '700';
+  const italic = fontStyle === 'italic';
+  if (weight && italic) return 'bold-italic';
+  if (weight) return 'bold';
+  if (italic) return 'italic';
+  return 'regular';
 }
 
 /**
@@ -191,6 +209,98 @@ class FontService {
    */
   getCachedFonts(): Font[] {
     return this.cachedFonts;
+  }
+
+  /**
+   * Find a catalog entry for a text element's requested family + variant.
+   * Falls back to any variant of the same family (ZIP imports may register
+   * `Regular` while elements request `regular`).
+   */
+  resolveFont(
+    fontFamily: string,
+    variant: string,
+    fonts: Font[] = this.cachedFonts
+  ): Font | undefined {
+    const norm = normalizeFontVariant(variant);
+    return (
+      fonts.find(
+        (f) =>
+          f.fontFamily === fontFamily &&
+          normalizeFontVariant(f.fontVariant) === norm
+      ) || fonts.find((f) => f.fontFamily === fontFamily)
+    );
+  }
+
+  /**
+   * Preload every font referenced by template text elements and wait for the
+   * browser Font Loading API so Fabric never renders with a fallback face.
+   */
+  async preloadFontsForElements(elements: TemplateElement[]): Promise<void> {
+    const fontKeys = new Set<string>();
+    elements.forEach((element) => {
+      if (element.type !== 'text') return;
+      const textElement = element as TextElement;
+      const variant = variantFromTextStyle(
+        textElement.fontWeight,
+        textElement.fontStyle
+      );
+      fontKeys.add(`${textElement.fontFamily || 'Arial'}:${variant}`);
+    });
+
+    if (fontKeys.size === 0) return;
+
+    let cachedFonts = this.getCachedFonts();
+    if (cachedFonts.length === 0) {
+      await this.listFonts('all');
+      cachedFonts = this.getCachedFonts();
+    }
+
+    const families = new Set<string>();
+    const loadOne = async (fontFamily: string, variant: string) => {
+      families.add(fontFamily);
+      let font = this.resolveFont(fontFamily, variant, cachedFonts);
+      if (!font) {
+        await this.listFonts('all');
+        cachedFonts = this.getCachedFonts();
+        font = this.resolveFont(fontFamily, variant, cachedFonts);
+      }
+      if (!font) {
+        console.warn(
+          `[FontService] Font not found in catalog, will render with fallback: ${fontFamily} (${variant})`
+        );
+        return;
+      }
+      try {
+        await this.loadFont(font);
+      } catch (error) {
+        console.error(
+          `[FontService] Failed to preload font ${fontFamily} (${variant}):`,
+          error
+        );
+      }
+    };
+
+    await Promise.all(
+      Array.from(fontKeys).map(async (fontKey) => {
+        const [fontFamily, variant] = fontKey.split(':');
+        await loadOne(fontFamily, variant);
+      })
+    );
+
+    const fontsApi: FontFaceSet | undefined =
+      typeof document !== 'undefined' ? document.fonts : undefined;
+    if (fontsApi?.load) {
+      try {
+        await Promise.all(
+          Array.from(families).map((family) =>
+            fontsApi.load(`16px "${family}"`).catch(() => {})
+          )
+        );
+        await fontsApi.ready;
+      } catch {
+        /* Font Loading API unavailable — best effort */
+      }
+    }
   }
 
   /**

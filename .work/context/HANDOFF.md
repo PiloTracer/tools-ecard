@@ -2,7 +2,7 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 - flexible field-mapping (fuzzy headers + phone/ext value reconciliation, Excel/CSV/paste, Demo + Normal) and import-persistence fix (imports now auto-save) landed and verified (jest/eslint/tsc diffed against baseline, zero regressions); no live-browser click-through performed (see Open owner actions).
+**Closed:** 2026-07-16 - paste parser flexibility (KV/multi-section/work-phone-prefix), font reload on template reopen, import naming from filename with dedup; verified jest 127 + python 22
 
 **Updated:** 2026-07-16
 
@@ -81,6 +81,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | session-control start → clone diagnosis → close | Confirmed `node_modules` / `.opencode` not in git; GitHub ~3MB; local tree ~11GB ignored deps; no code changes |
 | 2026-07-16 | x-director Demo card-generation reliability fix | `exportService.ts` font preload (`preloadTemplateFonts`, both modes); `demoSpreadsheetParser.ts` XLSX self-closing-cell regex fix + per-field name fallback; `batchRecordService.ts` legacy-cols/updateRecord fixes; 3 new/updated test files (10 new tests); verified against user's real `.xlsx` file inside the running container |
 | 2026-07-16 | x-director flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext value reconciliation (`demoSpreadsheetParser.ts`, `data_normalizer.py`/`parser.py`); CSV/paste header-row + delimiter detection (`file_parser.py`); `CanvasControls.tsx` import now auto-persists (`templateService.saveTemplate`); new `test_batch_parsing.py` (17 tests); 16 new demo-parser tests; verified via container jest/python unittest + `git stash`-diffed eslint/tsc (zero new issues) |
+| 2026-07-16 | x-director paste/import/font/naming session | KV+multi-section paste parsing + work-phone-prefix (Demo+Normal); font reopen fix (`fontService.preloadFontsForElements`, Regular/regular variant match); import name from filename with `(1)` dedup + Save modal; demo template upsert on re-save; jest 127 + python 22 green |
 
 ---
 

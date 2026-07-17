@@ -60,62 +60,8 @@ export async function exportTemplateById(
  * mode where the font catalog is local-only and no other flow warms it).
  */
 export async function preloadTemplateFonts(elements: TemplateElement[]): Promise<void> {
-  const fontKeys = new Set<string>();
-  elements.forEach((element) => {
-    if (element.type !== 'text') return;
-    const textElement = element as TextElement;
-    const variant =
-      textElement.fontWeight === 'bold' && textElement.fontStyle === 'italic' ? 'bold-italic' :
-      textElement.fontWeight === 'bold' ? 'bold' :
-      textElement.fontStyle === 'italic' ? 'italic' :
-      'regular';
-    fontKeys.add(`${textElement.fontFamily || 'Arial'}:${variant}`);
-  });
-
-  if (fontKeys.size === 0) return;
-
   const { fontService } = await import('./fontService');
-  let cachedFonts = fontService.getCachedFonts();
-  if (cachedFonts.length === 0) {
-    await fontService.listFonts('all');
-    cachedFonts = fontService.getCachedFonts();
-  }
-
-  const families = new Set<string>();
-  await Promise.all(
-    Array.from(fontKeys).map(async (fontKey) => {
-      const [fontFamily, variant] = fontKey.split(':');
-      families.add(fontFamily);
-      const font =
-        cachedFonts.find((f) => f.fontFamily === fontFamily && f.fontVariant === variant) ||
-        cachedFonts.find((f) => f.fontFamily === fontFamily);
-      if (!font) {
-        console.warn(`[Export] Font not found in catalog, will render with fallback: ${fontFamily} (${variant})`);
-        return;
-      }
-      try {
-        await fontService.loadFont(font);
-      } catch (error) {
-        console.error(`[Export] Failed to preload font ${fontFamily} (${variant}):`, error);
-      }
-    })
-  );
-
-  // Injecting @font-face is not enough: the browser may not have actually
-  // fetched/parsed the font file yet, and canvas text does not repaint when
-  // a lazily-loaded font finishes after the initial synchronous render.
-  const fontsApi: FontFaceSet | undefined =
-    typeof document !== 'undefined' ? document.fonts : undefined;
-  if (fontsApi?.load) {
-    try {
-      await Promise.all(
-        Array.from(families).map((family) => fontsApi.load(`16px "${family}"`).catch(() => {}))
-      );
-      await fontsApi.ready;
-    } catch {
-      // Font Loading API unsupported/unavailable — best effort only
-    }
-  }
+  await fontService.preloadFontsForElements(elements);
 }
 
 /**

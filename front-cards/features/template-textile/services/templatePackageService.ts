@@ -175,7 +175,7 @@ export class TemplatePackageService {
             fontName: fontMeta.fontFamily,
             fontFamily: fontMeta.fontFamily,
             fontCategory: 'sans-serif', // Default, could be stored in metadata
-            fontVariant: 'Regular',
+            fontVariant: 'regular',
             fontWeight: 400,
             fontStyle: 'normal'
           });

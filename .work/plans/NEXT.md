@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (post flexible field-mapping + import-persistence fix)
+**Updated:** 2026-07-16 (post paste-parser + font-reopen + import-naming fixes)
 
 ---
 
@@ -17,7 +17,8 @@
 | M4 post-verify fixes | Demo batch export + package export paths; BFF proxy test; jest `maxWorkers:1` |
 | Clone-size diagnosis (2026-07-16) | Confirmed ignored local `node_modules` (~9GB+) and absent `.opencode` are not in git; GitHub ~3MB |
 | Demo card-generation reliability fix | Font preload (`exportService.ts`, both modes); XLSX self-closing-cell regex bug + per-field name fallback (`demoSpreadsheetParser.ts`); legacy-cols/updateRecord field-loss fixes (`batchRecordService.ts`); verified against user's real `.xlsx` |
-| Flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext value reconciliation in both `demoSpreadsheetParser.ts` and `api-server/batch-parsing` (`data_normalizer.py`/`parser.py`); CSV/paste header-row detection + delimiter auto-detect (`file_parser.py`); `CanvasControls.tsx` import now auto-persists via `templateService.saveTemplate` instead of only updating in-memory state; new `test_batch_parsing.py` (17 tests, no prior Python test infra existed) |
+| Flexible field-mapping + import persistence | Fuzzy header fallback + phone/ext reconciliation (Demo + Normal); CSV/paste delimiter/header detection; import auto-persist via `templateService.saveTemplate`; `test_batch_parsing.py` |
+| Paste parser + font reopen + import naming | KV/multi-section paste; work-phone-prefix; `fontService.preloadFontsForElements`; filename-based import names with `(n)` dedup; demo template upsert; jest 127 + python 22 |
 
 ---
 

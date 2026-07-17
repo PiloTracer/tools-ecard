@@ -22,7 +22,7 @@ FIELD_MAPPING = {
     "email": ["email", "e-mail", "mail", "email address", "correo", "correo electrónico", "correo electronico"],
     "work_phone": ["work_phone", "workPhone", "work phone", "office phone", "business phone", "tel", "phone", "telefono", "teléfono", "telefono ofi", "teléfono ofi"],
     "work_phone_ext": ["work_phone_ext", "ext", "extension", "extensión"],
-    "mobile_phone": ["mobile_phone", "mobilePhone", "mobile", "cell", "cellular", "mobile phone", "cell phone", "celular", "móvil"],
+    "mobile_phone": ["mobile_phone", "mobilePhone", "mobile", "cell", "cellular", "mobile phone", "cell phone", "celular", "móvil", "whatsapp", "whats app"],
 
     # Address (Core)
     "address_street": ["address_street", "address", "street", "street address", "dirección", "direccion", "calle"],
@@ -379,6 +379,31 @@ class DataNormalizer:
         elif ext_is_phone_shaped and not phone:
             mapped["work_phone"] = ext
             mapped["work_phone_ext"] = None
+
+    def apply_work_phone_prefix_policy(self, mapped: Dict[str, Any], work_phone_prefix: str = None) -> None:
+        """
+        When a project Work Phone Prefix is configured, 4-digit values sitting in the
+        extension column (or work_phone) are local numbers needing the prefix — not
+        short dial extensions. Must run after reconcile_phone_and_extension and before
+        normalize_phone.
+        """
+        if not work_phone_prefix or not str(work_phone_prefix).strip():
+            return
+        prefix = str(work_phone_prefix).strip()
+
+        ext = mapped.get("work_phone_ext")
+        phone = mapped.get("work_phone")
+        if ext and not phone:
+            ext_digits = self._digits_only(ext)
+            if len(ext_digits) == 4:
+                mapped["work_phone"] = prefix + ext_digits
+                mapped["work_phone_ext"] = None
+                return
+
+        if phone:
+            digits = self._digits_only(phone)
+            if len(digits) == 4:
+                mapped["work_phone"] = prefix + digits
 
     def parse_name(self, full_name: str) -> Dict[str, str]:
         """
