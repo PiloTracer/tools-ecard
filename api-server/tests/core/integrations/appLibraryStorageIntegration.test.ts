@@ -67,6 +67,16 @@ describe('App library storage integration startup policy', () => {
     expect(loadPolicy()()).toBe(false);
   });
 
+  it('does not require integration when NEXT_PUBLIC_DEMO_MODE is on', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.DEMO_MODE = 'false';
+    process.env.NEXT_PUBLIC_DEMO_MODE = 'true';
+    process.env.APP_LIBRARY_STORAGE_INTEGRATION_OPTIONAL = 'false';
+    process.env.TOOLS_DASHBOARD_ORIGIN = 'https://tools.example.com';
+    process.env.APP_LIBRARY_STORAGE_INTEGRATION_KEY = 'secret';
+    expect(loadPolicy()()).toBe(false);
+  });
+
   it('requires integration in strict production', () => {
     process.env.NODE_ENV = 'production';
     process.env.DEMO_MODE = 'false';

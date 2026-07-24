@@ -65,6 +65,9 @@ export function isAppLibraryStorageIntegrationRequiredAtStartup(): boolean {
   if (isDemoModeEnabled()) {
     return false;
   }
+  if (['1', 'true', 'yes', 'on'].includes((process.env.NEXT_PUBLIC_DEMO_MODE || '').trim().toLowerCase())) {
+    return false;
+  }
   const optional = (process.env.APP_LIBRARY_STORAGE_INTEGRATION_OPTIONAL || '').trim().toLowerCase();
   return !(optional === '1' || optional === 'true' || optional === 'yes' || optional === 'on');
 }

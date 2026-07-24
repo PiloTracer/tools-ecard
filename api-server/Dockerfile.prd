@@ -2,6 +2,8 @@
 # Alpine GCC 15 currently breaks node-canvas native compile.
 FROM node:20-bookworm-slim AS builder
 
+ARG ECARDS_API_BUILD_ID=unknown
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -30,9 +32,12 @@ RUN npm prune --omit=dev
 
 FROM node:20-bookworm-slim AS runner
 
+ARG ECARDS_API_BUILD_ID=unknown
+
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV ECARDS_API_BUILD_ID=${ECARDS_API_BUILD_ID}
 
 COPY package.json ./
 COPY batch-parsing/requirements.txt ./batch-parsing/
@@ -66,6 +71,7 @@ COPY --from=builder /app/batch-parsing ./batch-parsing
 
 RUN groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs apiserver \
+    && echo "${ECARDS_API_BUILD_ID}" > /app/BUILD_ID \
     && chown -R apiserver:nodejs /app
 
 USER apiserver

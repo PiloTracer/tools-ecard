@@ -7,6 +7,10 @@
 
 set -e
 
+if [ -f /app/BUILD_ID ]; then
+  echo "ecards-api image build: $(cat /app/BUILD_ID)"
+fi
+
 PRISMA="npx prisma"
 MIGRATE_LOG="/tmp/prisma-migrate-deploy.log"
 

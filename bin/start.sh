@@ -338,9 +338,15 @@ report_build_log_tail() {
   fi
 }
 
+export_ecards_build_id() {
+  ECARDS_API_BUILD_ID="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  export ECARDS_API_BUILD_ID
+}
+
 # docker compose build … — tee to BUILD_LOG; on failure print tail (image build errors).
 run_compose_build_logged() {
-  echo "docker compose build — output to terminal and: $BUILD_LOG" >&2
+  export_ecards_build_id
+  echo "docker compose build (ECARDS_API_BUILD_ID=${ECARDS_API_BUILD_ID}) — output to terminal and: $BUILD_LOG" >&2
   if ! run_compose build "$@" 2>&1 | tee "$BUILD_LOG"; then
     echo "docker compose build failed." >&2
     report_build_log_tail 220
@@ -353,10 +359,11 @@ run_compose_build_logged() {
 # docker compose up -d --build — tee full output to BUILD_LOG; on failure tail + compose diagnostics.
 run_compose_up_build_logged() {
   local wait_flags=()
+  export_ecards_build_id
   # shellcheck disable=SC2207
   wait_flags=($(compose_up_wait_flags))
-  echo "docker compose up -d --build ${wait_flags[*]:-}— output to terminal and: $BUILD_LOG" >&2
-  if ! run_compose up -d --build "${wait_flags[@]}" 2>&1 | tee "$BUILD_LOG"; then
+  echo "docker compose up -d --build --force-recreate ${wait_flags[*]:-}— ECARDS_API_BUILD_ID=${ECARDS_API_BUILD_ID} — output to terminal and: $BUILD_LOG" >&2
+  if ! run_compose up -d --build --force-recreate "${wait_flags[@]}" 2>&1 | tee "$BUILD_LOG"; then
     echo "docker compose up -d --build failed (includes image build output)." >&2
     report_build_log_tail 220
     compose_failure_context
