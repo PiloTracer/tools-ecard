@@ -61,8 +61,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Python setuptools / venv artifacts (repo root only — do not use bare lib/; it ignores front-cards/shared/lib/)
+/lib/
+/lib64/
 parts/
 sdist/
 var/
