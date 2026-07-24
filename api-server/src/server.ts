@@ -26,6 +26,15 @@ const log = createLogger('Server');
 async function start() {
   try {
     logDemoModeStartupOnce();
+    log.info(
+      {
+        demoMode: isDemoModeEnabled(),
+        appLibraryIntegrationEnabled: isAppLibraryStorageIntegrationEnabled(),
+        appLibraryRequiredAtStartup: isAppLibraryStorageIntegrationRequiredAtStartup(),
+        redisAuthConfigured: Boolean((process.env.REDIS_PASSWORD || '').trim()),
+      },
+      'API startup configuration',
+    );
 
     // Load Tools Dashboard storage metadata before routes/plugins run (public URL resolution uses cache).
     if (isAppLibraryStorageIntegrationEnabled()) {

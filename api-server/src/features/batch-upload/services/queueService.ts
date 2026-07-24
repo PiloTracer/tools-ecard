@@ -1,20 +1,13 @@
 import Bull from 'bull';
+import { getBullRedisOptions } from '../../../core/database/redisConnection';
 import { BatchProcessingJob, BATCH_PARSE_QUEUE } from '../types';
 
 export class QueueService {
   private parseQueue: Bull.Queue<BatchProcessingJob>;
 
   constructor() {
-    const redisHost = process.env.REDIS_HOST || 'redis';
-    const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-    const redisPassword = process.env.REDIS_PASSWORD;
-
     const redisConfig: Bull.QueueOptions = {
-      redis: {
-        host: redisHost,
-        port: redisPort,
-        ...(redisPassword && { password: redisPassword }),
-      },
+      ...getBullRedisOptions(),
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: false,

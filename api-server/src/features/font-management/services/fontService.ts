@@ -34,8 +34,8 @@ export class FontService {
 
   constructor() {
     this.s3Service = new S3Service();
-    this.ensureBucketExists().catch(err => {
-      log.error({ err: serializeError(err) }, 'Failed to create fonts bucket');
+    this.ensureBucketExists().catch((err) => {
+      log.warn({ err: serializeError(err), bucket: FONTS_BUCKET }, 'Fonts bucket unavailable at startup — SeaweedFS may be unreachable');
     });
   }
 

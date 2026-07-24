@@ -5,6 +5,7 @@
  */
 
 import Bull from 'bull';
+import { getBullRedisOptions } from '../../../core/database/redisConnection';
 import { createLogger } from '../../../core/utils/logger';
 import { BatchProcessingJob, BATCH_PARSE_QUEUE } from '../../batch-upload/types';
 import { batchParsingService } from './batchParsingService';
@@ -24,16 +25,8 @@ export class BatchParsingWorkerService {
       return this.parseQueue;
     }
 
-    const redisHost = process.env.REDIS_HOST || 'redis';
-    const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-    const redisPassword = process.env.REDIS_PASSWORD;
-
     const redisConfig: Bull.QueueOptions = {
-      redis: {
-        host: redisHost,
-        port: redisPort,
-        ...(redisPassword && { password: redisPassword }),
-      },
+      ...getBullRedisOptions(),
     };
 
     this.parseQueue = new Bull(BATCH_PARSE_QUEUE, redisConfig);

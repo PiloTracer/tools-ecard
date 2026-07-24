@@ -35,6 +35,15 @@ describe('Redis connection options', () => {
     });
   });
 
+  it('prefers runtime REDIS_PASSWORD over appConfig', () => {
+    process.env.REDIS_HOST = 'redis';
+    process.env.REDIS_PORT = '6379';
+    process.env.REDIS_PASSWORD = 'runtime-secret';
+
+    const { getRedisConnectionOptions } = require('../../../src/core/database/redisConnection');
+    expect(getRedisConnectionOptions().password).toBe('runtime-secret');
+  });
+
   it('omits password when REDIS_PASSWORD is empty', () => {
     process.env.REDIS_HOST = 'redis';
     process.env.REDIS_PORT = '6379';
