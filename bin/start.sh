@@ -20,7 +20,9 @@
 # (requires docker-compose.prd.yml — shipped in this repository.)
 #
 # Env file policy (tools-ecards): canonical key lists are repo root .env.dev.example and .env.prd.example
-# only. Dev uses .env (or optional .env.dev with the same keys). Prd uses .env.prd. No per-package .env files.
+# only. Dev uses .env (or optional .env.dev with the same keys). Prd uses .env.prd only. No per-package .env files.
+# start.sh exports ECARDS_ENV_FILE and always passes docker compose --env-file "$ENV_FILE" so interpolation
+# and container env_file paths stay aligned. Do not run prd compose without --env-file .env.prd.
 
 set -euo pipefail
 
@@ -167,9 +169,44 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "Create it from the example: cp \"$PROJECT_ROOT/.env.prd.example\" \"$ENV_FILE\" then fill secrets."
   elif [ "$TARGET_ENV" = "stg" ]; then
     echo "Create \"$ENV_FILE\" (staging compose is optional in this repo)."
+  elif [ "$TARGET_ENV" = "dev" ]; then
+    echo "Create it from the example: cp \"$PROJECT_ROOT/.env.dev.example\" \"$PROJECT_ROOT/.env\" (or .env.dev) then fill values."
   fi
   exit 1
 fi
+
+# Basename for docker-compose env_file: (${ECARDS_ENV_FILE}) — must match --env-file target.
+ECARDS_ENV_FILE="$(basename "$ENV_FILE")"
+export ECARDS_ENV_FILE
+case "$TARGET_ENV" in
+  prd)
+    if [ "$ECARDS_ENV_FILE" != ".env.prd" ]; then
+      echo "ERROR: prd must use $PROJECT_ROOT/.env.prd (got: $ENV_FILE)" >&2
+      exit 1
+    fi
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+      echo "WARN: $PROJECT_ROOT/.env exists; prd uses only $ENV_FILE via --env-file (not .env)." >&2
+    fi
+    ;;
+  dev)
+    case "$ECARDS_ENV_FILE" in
+      .env | .env.dev) ;;
+      *)
+        echo "ERROR: dev must use $PROJECT_ROOT/.env or .env.dev (got: $ENV_FILE)" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  stg)
+    case "$ECARDS_ENV_FILE" in
+      .env.stg) ;;
+      *)
+        echo "ERROR: stg must use $PROJECT_ROOT/.env.stg (got: $ENV_FILE)" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+esac
 
 # --- Compose project name, stack suffix (host-safe isolation) & published ports
 PROJ_NAME=""
@@ -281,6 +318,8 @@ fi
 
 run_compose() {
   # -p: always use validated PROJ_NAME (tools_dashboard + TD_STACK_SUFFIX) so this script and compose stay aligned.
+  # --env-file: sole source for compose ${VAR} interpolation (prd → .env.prd; dev → .env or .env.dev).
+  # ECARDS_ENV_FILE: same basename for service env_file: in docker-compose.*.yml.
   "${DOCKER_COMPOSE[@]}" -p "$PROJ_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 

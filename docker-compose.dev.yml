@@ -96,9 +96,9 @@ services:
       # dev.aiepic.app to 127.0.0.1 *inside the container* (nothing on :443) → fetch ECONNREFUSED / OAuth fails.
       - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
-    # Single source of truth: monorepo root `.env` (same as api-server). No front-cards/.env.local.
+    # Single source of truth: monorepo root env (bin/start.sh sets ECARDS_ENV_FILE to .env or .env.dev).
     env_file:
-      - .env
+      - ${ECARDS_ENV_FILE:-.env}
     environment:
       # Next reads `PORT`; root `.env` also sets `PORT` for api-server — force the in-container listen to match the published port mapping.
       PORT: ${FRONTEND_PORT:-3000}
@@ -129,7 +129,7 @@ services:
 
   # API Server - Internal backend service (NOT the external auth API)
   # This is the E-Cards application's own API server for internal operations
-  # All runtime configuration comes from the monorepo root .env (same as bin/start.sh --env-file);
+  # All runtime configuration comes from the monorepo root env file (bin/start.sh --env-file .env or .env.dev);
   # copy .env.dev.example → .env and align hostnames for Compose (e.g. postgres, cassandra, redis).
   # SeaweedFS is not in this compose: SEAWEEDFS_ENDPOINT targets the host (e.g. host.docker.internal:18333 when
   # the other stack maps host 18333 → container 8333). extra_hosts makes host.docker.internal resolve on Linux.
@@ -157,7 +157,7 @@ services:
       # Same as front-cards: api-server rewrites s3:// image URLs to this base for the resource proxy.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:7400}
     env_file:
-      - .env
+      - ${ECARDS_ENV_FILE:-.env}
     networks:
       - ecards-network
     depends_on:
@@ -191,6 +191,8 @@ services:
     extra_hosts:
       - "dev.aiepic.app:host-gateway"
       - "host.docker.internal:host-gateway"
+    env_file:
+      - ${ECARDS_ENV_FILE:-.env}
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       # PostgreSQL

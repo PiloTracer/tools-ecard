@@ -5,7 +5,7 @@
 
 ## Summary
 
-Production-ready credentials and configuration applied to both dev and production environments for the E-Cards application. The companion Tools Dashboard (OAuth/identity) was already configured for production at `tools.aiepic.app`.
+Production-ready credentials and configuration applied to both dev and production environments for the E-Cards application. The companion Tools Dashboard (OAuth/identity) was already configured for production at `tools.datawork.top`.
 
 ## Changes Applied
 
@@ -24,7 +24,7 @@ Production-ready credentials and configuration applied to both dev and productio
 | File | Changes |
 |---|---|
 | `.env` | Replaced 5 placeholder credentials with generated values. Kept all dev URLs (`localhost`, `dev.aiepic.app`), existing OAuth/application IDs |
-| `.env.prd` | Replaced 8 placeholder values (same as dev + Redis password + DeepSeek API key + app-library key). Production URLs remain (`ecards.aiepic.app`, `tools.aiepic.app`) |
+| `.env.prd` | Replaced 8 placeholder values (same as dev + Redis password + DeepSeek API key + app-library key). Production URLs remain (`ecards.aiepic.app`, `tools.datawork.top`) |
 | `.env.prd.example` | Updated `REDIS_PASSWORD` placeholder from empty to `CHANGE_ME_REDIS_PASSWORD`, `SEAWEEDFS_BUCKET` to `CHANGE_ME_S3_BUCKET` |
 | `docker-compose.dev.yml` | Redis service now supports `REDIS_PASSWORD` env var with conditional `--requirepass` (matching prd pattern) |
 

@@ -5,9 +5,9 @@
 #   2. Register OAuth redirect URI with your IdP, e.g. https://ecards.aiepic.app/oauth/complete
 #   3. Point DNS ecards.aiepic.app to this host; terminate TLS at LB or extend nginx with certs.
 #
-# Usage:
-#   docker compose --env-file .env.prd -f docker-compose.prd.yml up -d
-#   ./bin/start.sh prd up   # if .env.prd exists and start.sh is configured
+# Usage (always use .env.prd as the env source):
+#   ./bin/start.sh prd up
+#   ECARDS_ENV_FILE=.env.prd docker compose --env-file .env.prd -f docker-compose.prd.yml up -d
 #
 # Public entry: nginx on ports NGINX_HTTP_PORT / NGINX_HTTPS_PORT (default 80/443).
 
@@ -107,6 +107,8 @@ services:
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-api
     restart: unless-stopped
     command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/server.js"]
+    env_file:
+      - ${ECARDS_ENV_FILE:-.env.prd}
     environment:
       NODE_ENV: production
       PORT: ${API_INTERNAL_PORT:-4000}
@@ -173,6 +175,7 @@ services:
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DEBUG: ${DEBUG:-}
+      DEMO_MODE: ${DEMO_MODE:-false}
     networks:
       - ecards-prd
     depends_on:
@@ -196,6 +199,8 @@ services:
     image: ${ECARDS_WORKER_IMAGE:-ecards-render-worker:prd}
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-render-worker
     restart: unless-stopped
+    env_file:
+      - ${ECARDS_ENV_FILE:-.env.prd}
     environment:
       NODE_ENV: production
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -241,7 +246,7 @@ services:
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-frontend
     restart: unless-stopped
     env_file:
-      - .env.prd
+      - ${ECARDS_ENV_FILE:-.env.prd}
     environment:
       # Next reads `PORT`; root env may set `PORT` for the API — keep the app on the internal FRONTEND_PORT.
       PORT: ${FRONTEND_PORT:-3000}
@@ -266,6 +271,8 @@ services:
       NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}
       POST_LOGIN_REDIRECT_URL: ${POST_LOGIN_REDIRECT_URL:-/dashboard}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-false}
     networks:
       - ecards-prd
     depends_on:

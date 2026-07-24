@@ -5,7 +5,7 @@
 # Stops only the Postgres container briefly for a filesystem-consistent tarball.
 #
 # Usage: ./bin/start_cron.sh [dev]
-# Requires: .env or .env.dev (same as bin/start.sh)
+# Requires: .env or .env.dev (same resolution as bin/start.sh dev)
 
 set -euo pipefail
 
@@ -41,6 +41,8 @@ else
   echo "❌ No .env or .env.dev at $PROJECT_ROOT"
   exit 1
 fi
+
+export ECARDS_ENV_FILE="$(basename "$ENV_FILE")"
 
 if [ -d "/mnt/data" ]; then BACKUP_BASE="/mnt/data"; else BACKUP_BASE="/data"; fi
 
