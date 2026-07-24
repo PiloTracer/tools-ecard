@@ -60,6 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts/prisma-start-prd.sh ./scripts/prisma-start-prd.sh
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/batch-parsing ./batch-parsing
 
@@ -74,4 +75,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget -qO- http://127.0.0.1:4000/health > /dev/null || exit 1
 
-CMD ["npm", "start"]
+CMD ["sh", "/app/scripts/prisma-start-prd.sh"]

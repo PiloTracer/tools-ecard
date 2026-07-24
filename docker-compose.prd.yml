@@ -106,7 +106,7 @@ services:
     image: ${ECARDS_API_IMAGE:-ecards-api:prd}
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-api
     restart: unless-stopped
-    command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/server.js"]
+    command: ["sh", "/app/scripts/prisma-start-prd.sh"]
     env_file:
       - ${ECARDS_ENV_FILE:-.env.prd}
     environment:
