@@ -19,6 +19,7 @@ export {
   ensureAppLibraryStorageIntegrationReady,
   getAppLibraryStorageIntegrationStatus,
   isAppLibraryStorageIntegrationEnabled,
+  isAppLibraryStorageIntegrationRequiredAtStartup,
   isAppLibraryStoragePublicBaseReady,
   resolvePublicObjectUrl,
   shouldUseDashboardPublicUrlForBucket,

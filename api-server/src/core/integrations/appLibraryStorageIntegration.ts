@@ -19,6 +19,7 @@
  */
 
 import { z } from 'zod';
+import { isDemoModeEnabled } from '../middleware/demoModeGuard';
 import { oauthServerFetch } from '../oauthFetch';
 import { createLogger, serializeError } from '../utils/logger';
 
@@ -48,6 +49,24 @@ export function isAppLibraryStorageIntegrationEnabled(): boolean {
   const origin = (process.env.TOOLS_DASHBOARD_ORIGIN || '').trim();
   const key = (process.env.APP_LIBRARY_STORAGE_INTEGRATION_KEY || '').trim();
   return Boolean(origin && key);
+}
+
+/**
+ * When false, a failed app-library GET at startup is logged and the API continues
+ * (demo deployments, optional integration, or non-production).
+ */
+export function isAppLibraryStorageIntegrationRequiredAtStartup(): boolean {
+  if (!isAppLibraryStorageIntegrationEnabled()) {
+    return false;
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    return false;
+  }
+  if (isDemoModeEnabled()) {
+    return false;
+  }
+  const optional = (process.env.APP_LIBRARY_STORAGE_INTEGRATION_OPTIONAL || '').trim().toLowerCase();
+  return !(optional === '1' || optional === 'true' || optional === 'yes' || optional === 'on');
 }
 
 function normalizeOrigin(origin: string): string {

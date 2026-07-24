@@ -17,24 +17,30 @@ import { createLogger, serializeError } from './core/utils/logger';
 import {
   ensureAppLibraryStorageIntegrationReady,
   isAppLibraryStorageIntegrationEnabled,
+  isAppLibraryStorageIntegrationRequiredAtStartup,
 } from './core/storage';
+import { isDemoModeEnabled, logDemoModeStartupOnce } from './core/middleware/demoModeGuard';
 
 const log = createLogger('Server');
 
 async function start() {
   try {
+    logDemoModeStartupOnce();
+
     // Load Tools Dashboard storage metadata before routes/plugins run (public URL resolution uses cache).
     if (isAppLibraryStorageIntegrationEnabled()) {
       log.info('Loading Tools Dashboard app-library storage integration');
       try {
         await ensureAppLibraryStorageIntegrationReady();
       } catch (error) {
-        if (appConfig.env === 'production') {
+        if (isAppLibraryStorageIntegrationRequiredAtStartup()) {
           throw error;
         }
         log.warn(
           { err: serializeError(error) },
-          'App library storage integration unavailable at startup; continuing without dashboard public URLs (development only). Fix TOOLS_DASHBOARD_ORIGIN / key or clear APP_LIBRARY_STORAGE_INTEGRATION_KEY, then restart api-server.',
+          isDemoModeEnabled()
+            ? 'App library storage integration unavailable at startup; continuing (DEMO_MODE). Dashboard public URLs disabled until integration succeeds.'
+            : 'App library storage integration unavailable at startup; continuing without dashboard public URLs. Set APP_LIBRARY_STORAGE_INTEGRATION_OPTIONAL=false and fix TOOLS_DASHBOARD_ORIGIN / key for strict production startup.',
         );
       }
     }

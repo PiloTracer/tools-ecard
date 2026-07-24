@@ -4,11 +4,10 @@
  */
 
 import Redis from 'ioredis';
-import { appConfig } from '../config';
+import { getRedisConnectionOptions } from './redisConnection';
 
 export const redisClient = new Redis({
-  host: appConfig.redis.host,
-  port: appConfig.redis.port,
+  ...getRedisConnectionOptions(),
   maxRetriesPerRequest: null, // Required for BullMQ
 });
 

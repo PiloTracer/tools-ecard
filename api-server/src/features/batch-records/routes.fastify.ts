@@ -5,6 +5,7 @@
 
 import { FastifyPluginAsync } from 'fastify';
 import { Queue } from 'bullmq';
+import { getRedisConnectionOptions } from '../../../core/database/redisConnection';
 import { batchRecordController } from './controllers/batchRecordController';
 
 const RENDER_QUEUE_NAME = 'card-rendering';
@@ -14,10 +15,7 @@ let renderQueue: Queue | null = null;
 function getRenderQueue(): Queue {
   if (!renderQueue) {
     renderQueue = new Queue(RENDER_QUEUE_NAME, {
-      connection: {
-        host: process.env.REDIS_HOST || 'redis',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      },
+      connection: getRedisConnectionOptions(),
     });
   }
   return renderQueue;

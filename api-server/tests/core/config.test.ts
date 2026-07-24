@@ -6,7 +6,7 @@ describe('Core Config', () => {
   const envVars = [
     'NODE_ENV', 'PORT', 'POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB',
     'POSTGRES_USER', 'POSTGRES_PASSWORD', 'CASSANDRA_HOSTS', 'CASSANDRA_DC',
-    'CASSANDRA_KEYSPACE', 'REDIS_HOST', 'REDIS_PORT', 'SEAWEEDFS_ENDPOINT',
+    'CASSANDRA_KEYSPACE', 'REDIS_HOST', 'REDIS_PORT', 'REDIS_PASSWORD', 'SEAWEEDFS_ENDPOINT',
     'SEAWEEDFS_ACCESS_KEY', 'SEAWEEDFS_SECRET_KEY', 'SEAWEEDFS_BUCKET',
     'LLM_ENABLED', 'LLM_PRIMARY_PROVIDER', 'LLM_FALLBACK_PROVIDER',
     'LLM_CREDIT_COST', 'LLM_RETRY_ATTEMPTS', 'LLM_TIMEOUT_MS',
@@ -76,6 +76,7 @@ describe('Core Config', () => {
     process.env.CASSANDRA_KEYSPACE = 'my_keyspace';
     process.env.REDIS_HOST = 'redis.example.com';
     process.env.REDIS_PORT = '6380';
+    process.env.REDIS_PASSWORD = 'redis-secret';
     process.env.SEAWEEDFS_ENDPOINT = 'https://storage.example.com';
     process.env.SEAWEEDFS_ACCESS_KEY = 'access_key';
     process.env.SEAWEEDFS_SECRET_KEY = 'secret_key';
@@ -120,6 +121,7 @@ describe('Core Config', () => {
     expect(appConfig.cassandra.keyspace).toBe('my_keyspace');
     expect(appConfig.redis.host).toBe('redis.example.com');
     expect(appConfig.redis.port).toBe(6380);
+    expect(appConfig.redis.password).toBe('redis-secret');
     expect(appConfig.seaweedfs.endpoint).toBe('https://storage.example.com');
     expect(appConfig.seaweedfs.accessKey).toBe('access_key');
     expect(appConfig.seaweedfs.secretKey).toBe('secret_key');

@@ -52,8 +52,7 @@ export class FontService {
         await this.s3Service.createBucket(FONTS_BUCKET);
       }
     } catch (error) {
-      log.error({ err: serializeError(error) }, 'Error ensuring bucket exists');
-      throw error;
+      log.warn({ err: serializeError(error), bucket: FONTS_BUCKET }, 'Fonts bucket unavailable — SeaweedFS may be unreachable; font uploads disabled until storage is configured');
     }
   }
 
