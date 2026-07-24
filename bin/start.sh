@@ -352,8 +352,11 @@ run_compose_build_logged() {
 
 # docker compose up -d --build — tee full output to BUILD_LOG; on failure tail + compose diagnostics.
 run_compose_up_build_logged() {
-  echo "docker compose up -d --build — output to terminal and: $BUILD_LOG" >&2
-  if ! run_compose up -d --build 2>&1 | tee "$BUILD_LOG"; then
+  local wait_flags=()
+  # shellcheck disable=SC2207
+  wait_flags=($(compose_up_wait_flags))
+  echo "docker compose up -d --build ${wait_flags[*]:-}— output to terminal and: $BUILD_LOG" >&2
+  if ! run_compose up -d --build "${wait_flags[@]}" 2>&1 | tee "$BUILD_LOG"; then
     echo "docker compose up -d --build failed (includes image build output)." >&2
     report_build_log_tail 220
     compose_failure_context
@@ -376,7 +379,7 @@ compose_failure_context() {
     echo >&2 "--- logs --tail=120 (all services) ---"
     run_compose logs --tail=120 2>&1 | sed 's/^/  /' >&2 || true
   else
-    for svc in api-server postgres cassandra redis; do
+    for svc in api-server front-cards nginx postgres cassandra redis; do
       echo >&2 "--- logs --tail=60 ${svc} ---"
       run_compose logs --tail=60 "$svc" 2>&1 | sed 's/^/  /' >&2 || true
     done
@@ -414,17 +417,149 @@ ensure_volumes_info() {
   done
 }
 
+# Cassandra + db-init + images — prd needs a longer first-boot window than dev.
+compose_api_wait_secs() {
+  if [ "$TARGET_ENV" = "prd" ]; then
+    echo "${1:-300}"
+  else
+    echo "$1"
+  fi
+}
+
+# Services to poll in startup order (db-init handled separately).
+stack_services_in_order() {
+  case "$TARGET_ENV" in
+    prd) echo "postgres cassandra redis api-server front-cards nginx render-worker" ;;
+    dev) echo "postgres cassandra redis api-server front-cards render-worker" ;;
+    *) echo "postgres cassandra redis api-server" ;;
+  esac
+}
+
+service_container_id() {
+  local svc="$1"
+  run_compose ps -q "$svc" 2>/dev/null | head -1
+}
+
+# Parse NGINX_HTTP_PORT: "8084" or "127.0.0.1:8084" → host + port for curl.
+read_nginx_bind() {
+  local bind def_host def_port
+  bind="$(read_env_value NGINX_HTTP_PORT "")"
+  if [ -z "$bind" ]; then
+    bind="$(read_env_port NGINX_HTTP_PORT 80)"
+  fi
+  def_host="127.0.0.1"
+  def_port="80"
+  if [[ "$bind" == *:* ]]; then
+    echo "${bind%%:*} ${bind##*:}"
+  else
+    echo "$def_host $bind"
+  fi
+}
+
+wait_for_db_init_complete() {
+  local max="${1:-300}" n=0 cid exit_code running
+
+  echo "Waiting for db-init (Cassandra schema, up to ${max}s)..."
+  while [ "$n" -lt "$max" ]; do
+    cid="$(service_container_id db-init)"
+    if [ -z "$cid" ]; then
+      sleep 1
+      n=$((n + 1))
+      continue
+    fi
+    running="$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null || echo false)"
+    if [ "$running" = "false" ]; then
+      exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$cid" 2>/dev/null || echo 1)"
+      if [ "$exit_code" = "0" ]; then
+        echo "  ✓ db-init completed"
+        return 0
+      fi
+      echo "db-init failed (exit ${exit_code}). See: $0 $TARGET_ENV logs db-init" >&2
+      return 1
+    fi
+    sleep 2
+    n=$((n + 2))
+    if [ $((n % 20)) -eq 0 ]; then echo "  ... db-init ${n}s"; fi
+  done
+  echo "Timeout waiting for db-init." >&2
+  return 1
+}
+
+wait_for_service_ready() {
+  local svc="$1" max="$2"
+  local n=0 cid status running restarting
+
+  while [ "$n" -lt "$max" ]; do
+    cid="$(service_container_id "$svc")"
+    if [ -z "$cid" ]; then
+      sleep 1
+      n=$((n + 1))
+      if [ $((n % 15)) -eq 0 ]; then echo "  ... $svc not created yet (${n}s)"; fi
+      continue
+    fi
+    restarting="$(docker inspect -f '{{.State.Restarting}}' "$cid" 2>/dev/null || echo false)"
+    if [ "$restarting" = "true" ]; then
+      if [ $((n % 10)) -eq 0 ]; then
+        echo "  ... $svc restarting (crash loop — check: $0 $TARGET_ENV logs $svc)" >&2
+      fi
+      sleep 2
+      n=$((n + 2))
+      continue
+    fi
+    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$cid" 2>/dev/null || echo missing)"
+    case "$status" in
+      healthy)
+        echo "  ✓ $svc healthy"
+        return 0
+        ;;
+      no-healthcheck)
+        running="$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null || echo false)"
+        if [ "$running" = "true" ]; then
+          echo "  ✓ $svc running"
+          return 0
+        fi
+        ;;
+      unhealthy)
+        if [ $((n % 10)) -eq 0 ]; then echo "  ... $svc unhealthy" >&2; fi
+        ;;
+      starting|missing)
+        ;;
+    esac
+    sleep 2
+    n=$((n + 2))
+    if [ $((n % 20)) -eq 0 ]; then echo "  ... $svc ${n}s (${status})"; fi
+  done
+  echo "Timeout waiting for $svc (last status: ${status:-unknown})." >&2
+  return 1
+}
+
+wait_for_stack_services() {
+  local max="${1:-120}" svc
+
+  if ! wait_for_db_init_complete "$max"; then
+    return 1
+  fi
+
+  echo "Waiting for containers to be healthy (up to ${max}s)..."
+  for svc in $(stack_services_in_order); do
+    if ! wait_for_service_ready "$svc" "$max"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
 wait_for_api_ready() {
   local max="${1:-120}"
   local n=0
   local H="127.0.0.1"
-  local nginx_p
+  local nginx_host nginx_port
 
   if [ "$TARGET_ENV" = "prd" ]; then
-    nginx_p="$(read_env_port NGINX_HTTP_PORT 80)"
-    echo "Waiting for production readiness (nginx http://${H}:${nginx_p}/health — up to ${max}s)..."
+    read -r nginx_host nginx_port < <(read_nginx_bind)
+    echo "Waiting for HTTP /health at http://${nginx_host}:${nginx_port}/health (up to ${max}s)..."
     while [ "$n" -lt "$max" ]; do
-      if curl -sf "http://${H}:${nginx_p}/health" >/dev/null 2>&1; then
+      if curl -sf "http://${nginx_host}:${nginx_port}/health" >/dev/null 2>&1; then
         echo "Nginx /health passed (API + frontend chain is up)."
         return 0
       fi
@@ -452,13 +587,29 @@ wait_for_api_ready() {
   return 1
 }
 
-# Cassandra + db-init + images — prd needs a longer first-boot window than dev.
-compose_api_wait_secs() {
-  if [ "$TARGET_ENV" = "prd" ]; then
-    echo "${1:-300}"
-  else
-    echo "$1"
+wait_for_stack_ready() {
+  local max="${1:-120}"
+  if ! wait_for_stack_services "$max"; then
+    compose_failure_context
+    return 1
   fi
+  wait_for_api_ready "$max"
+}
+
+# Optional: docker compose up --wait (Compose v2.1+). Falls back to wait_for_stack_ready after up.
+compose_up_wait_flags() {
+  local timeout
+  timeout="$(compose_api_wait_secs 120)"
+  if run_compose up --help 2>&1 | grep -q -- '--wait'; then
+    echo "--wait --wait-timeout ${timeout}"
+  fi
+}
+
+run_compose_up_detached() {
+  local wait_flags=()
+  # shellcheck disable=SC2207
+  wait_flags=($(compose_up_wait_flags))
+  run_compose up -d "${wait_flags[@]}"
 }
 
 print_stack_urls() {
@@ -486,10 +637,10 @@ print_stack_urls() {
   echo "Stack is up (env=$TARGET_ENV, project=$PROJ_NAME) — open in your browser (replace ${H} with your host if remote)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   if [ "$TARGET_ENV" = "prd" ]; then
-    local nginx_port
-    nginx_port="$(read_env_port NGINX_HTTP_PORT 80)"
+    local nginx_host nginx_port
+    read -r nginx_host nginx_port < <(read_nginx_bind)
     echo "  Production entry (nginx → Next + API)"
-    echo "  Public URL:          http://${H}:${nginx_port}/  (TLS at load balancer or extend deploy/nginx)"
+    echo "  Public URL:          http://${nginx_host}:${nginx_port}/  (TLS at load balancer or extend deploy/nginx)"
     echo "  API (browser env):   ${api_pub}"
     echo "  WebSocket (env):     ${ws_pub}"
     echo "  OAuth callback:      ${oauth_redirect}"
@@ -533,14 +684,17 @@ print_stack_urls() {
 }
 
 cmd_up_quick() {
+  local wait_flags=()
+  # shellcheck disable=SC2207
+  wait_flags=($(compose_up_wait_flags))
   echo "Starting stack (no image rebuild)..."
-  if ! run_compose up -d; then
+  if ! run_compose up -d "${wait_flags[@]}"; then
     echo "docker compose up -d failed." >&2
     compose_failure_context
     return 1
   fi
-  if ! wait_for_api_ready "$(compose_api_wait_secs 120)"; then
-    echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
+  if ! wait_for_stack_ready "$(compose_api_wait_secs 120)"; then
+    echo "Stack did not become healthy — check: $0 $TARGET_ENV logs" >&2
     return 1
   fi
   print_stack_urls
@@ -551,8 +705,8 @@ cmd_up_build() {
   if ! run_compose_up_build_logged; then
     return 1
   fi
-  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
-    echo "Stack may still be starting — check: $0 $TARGET_ENV logs" >&2
+  if ! wait_for_stack_ready "$(compose_api_wait_secs 180)"; then
+    echo "Stack did not become healthy — check: $0 $TARGET_ENV logs" >&2
     return 1
   fi
   print_stack_urls
@@ -584,11 +738,11 @@ cmd_status() {
 cmd_restart() {
   echo "Restarting all services..."
   run_compose restart
-  if wait_for_api_ready "$(compose_api_wait_secs 120)"; then
+  if wait_for_stack_ready "$(compose_api_wait_secs 120)"; then
     print_stack_urls
     return 0
   fi
-  echo "Warning: API /health not ready after restart — inspect logs." >&2
+  echo "Warning: stack not healthy after restart — inspect logs." >&2
   compose_failure_context
   return 1
 }
@@ -604,13 +758,13 @@ cmd_rebuild_stack() {
   if ! run_compose_build_logged; then
     return 1
   fi
-  if ! run_compose up -d; then
+  if ! run_compose_up_detached; then
     echo "docker compose up -d failed after rebuild." >&2
     report_build_log_tail 80
     compose_failure_context
     return 1
   fi
-  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
+  if ! wait_for_stack_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
   print_stack_urls
@@ -627,13 +781,13 @@ cmd_reset_stack() {
   if ! run_compose_build_logged; then
     return 1
   fi
-  if ! run_compose up -d; then
+  if ! run_compose_up_detached; then
     echo "docker compose up -d failed after reset build." >&2
     report_build_log_tail 80
     compose_failure_context
     return 1
   fi
-  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
+  if ! wait_for_stack_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
   print_stack_urls
@@ -645,13 +799,13 @@ cmd_force_rebuild() {
   if ! run_compose_build_logged --no-cache; then
     return 1
   fi
-  if ! run_compose up -d; then
+  if ! run_compose_up_detached; then
     echo "docker compose up -d failed after force build." >&2
     report_build_log_tail 80
     compose_failure_context
     return 1
   fi
-  if ! wait_for_api_ready "$(compose_api_wait_secs 180)"; then
+  if ! wait_for_stack_ready "$(compose_api_wait_secs 180)"; then
     return 1
   fi
   print_stack_urls
@@ -754,6 +908,10 @@ mount_and_start() {
     pause_after_error
     return 1
   fi
+  if ! wait_for_stack_ready "$(compose_api_wait_secs 180)"; then
+    pause_after_error
+    return 1
+  fi
   echo "Restore complete."
   if [ -z "${ECARDS_CLI_CMD:-}" ]; then pause; fi
 }
@@ -782,12 +940,12 @@ backup() {
   find "$BACKUP_DIR" -maxdepth 1 -name "cassandra_*.tar.gz" -mtime +"$RETENTION_DAYS" -delete 2>/dev/null || true
 
   echo "Restarting stack after backup..."
-  if ! run_compose up -d; then
+  if ! run_compose_up_detached; then
     echo "Warning: failed to restart stack after backup." >&2
     compose_failure_context
   fi
-  echo "Waiting for API health after restart..."
-  wait_for_api_ready "$(compose_api_wait_secs 120)" || true
+  echo "Waiting for stack health after restart..."
+  wait_for_stack_ready "$(compose_api_wait_secs 120)" || true
 
   echo ""
   echo "Backup complete."
