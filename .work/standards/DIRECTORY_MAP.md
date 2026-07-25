@@ -61,7 +61,8 @@ tools-ecards/
 | `api-server` | Fastify + Prisma API |
 | `render-worker` | Background job processor |
 | `db-init` | DB initialization |
-| `nginx` | TLS front (production compose) |
+
+Production has no in-stack reverse proxy: the host's nginx terminates TLS and proxies to the loopback ports published by `front-cards` and `api-server` (`deploy/nginx/ecards-host.conf`).
 
 Stack identity: `TD_STACK_SUFFIX` env var (default `_dev_tcrd`).
 

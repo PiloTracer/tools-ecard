@@ -2,9 +2,13 @@
 
 ## Session status
 
-**Closed:** 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
+**Open:** 2026-07-24 — goal: production cutover — drop in-stack nginx in favour of the host nginx, set up TLS behind Cloudflare (proxied) for target host 217.216.65.112, fix render-worker unhealthy, and make `bin/start.sh` correct for both dev and prd
 
-**Updated:** 2026-07-16
+**Prior:** Closed 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
+
+**Updated:** 2026-07-24
+
+**Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
 **Repository state:** Feedback UX slice landed on `main`. Profile page + dashboard link; image `clipShape` (designer + export + render-worker); canvas length units in PropertyPanel; person-name title case **at ingest only** (Demo `mapRowToContactFields`; Normal `DataNormalizer`); export/render do not rewrite casing; `business_name` exempt. api-server `test` uses `run-tests.cjs` (clears `DEBUG=*`). **Verification:** front-cards jest **147** pass; render-worker **13**; api-server **137**; touch-scope pass; blast-radius warn (scoped). **Residual:** manual browser click-through; owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
 

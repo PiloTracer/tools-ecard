@@ -20,8 +20,9 @@ docker-compose -f docker-compose.dev.yml up
 
 - Copy **`.env.prd.example`** to **`.env.prd`** and set secrets (file is gitignored).
 - Build and run: **`docker compose --env-file .env.prd -f docker-compose.prd.yml up -d --build`**
-- **Nginx** fronts **Next.js** and **Fastify** on one hostname; see **`deploy/nginx/ecards.prd.conf`**.
-- TLS: terminate HTTPS at your load balancer, or extend nginx with certificates.
+- The stack publishes **loopback only** — Next.js on `127.0.0.1:${FRONTEND_HOST_PORT}`, Fastify on `127.0.0.1:${API_HOST_PORT}`.
+- The **server's own nginx** fronts both on one hostname; install **`deploy/nginx/ecards-host.conf`** as a site.
+- TLS is issued and renewed on the host with certbot; see the ops runbook § Production cutover (host nginx + TLS).
 
 ### Production readiness checklist
 
@@ -36,12 +37,12 @@ Before a production deploy, confirm:
   - Optional LLM keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`
 - **OAuth redirect URI registered** with your IdP: `https://ecards.aiepic.app/oauth/complete`.
 - **DNS** `ecards.aiepic.app` points to the production host.
-- **TLS terminated** (load balancer or nginx certs); `SESSION_COOKIE_SECURE=true`.
+- **TLS terminated by the host nginx** (certbot certificate installed and renewing); `SESSION_COOKIE_SECURE=true`.
 - **Database migrations** applied — `api-server` runs `prisma migrate deploy` on start; verify the `prisma/migrations/` directory is committed and built into the image.
 - **Image build** succeeded locally or in CI (see `.github/workflows/ci.yml`).
 - **Backups** scheduled for `postgres_prd_data` and `cassandra_prd_data` volumes.
 - **Logs** retained and rotated (`json-file` driver with 20MB x 5 files is configured per service).
-- **Healthchecks** green (`nginx`, `postgres`, `cassandra`, `redis`, `api-server`, `front-cards`).
+- **Healthchecks** green (`postgres`, `cassandra`, `redis`, `api-server`, `front-cards`, `render-worker`).
 
 ### Secret hygiene
 
@@ -78,10 +79,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR:
 ├── render-worker/           # Background job processor
 ├── db/                      # Database initialization scripts
 ├── docker-compose.dev.yml   # Local development environment
-├── docker-compose.prd.yml   # Production stack (nginx + images)
+├── docker-compose.prd.yml   # Production stack (loopback-published; host nginx fronts it)
 ├── .env.dev.example         # Dev env template (copy → repo root `.env`)
 ├── .env.prd.example         # Production env template (copy → `.env.prd`)
-├── deploy/nginx/            # Production reverse proxy configs
+├── deploy/nginx/            # Site config for the host's nginx (not a container)
 ├── CONTEXT.md               # Fast pointer table (start here for agents)
 ├── DOCS_CONTEXT.md         # Full project documentation
 ├── DOCS_TECH_STACK.md     # Services, ports, commands

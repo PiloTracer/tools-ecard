@@ -55,7 +55,7 @@ RUN groupadd --system --gid 1001 nodejs \
 
 USER worker
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "const fs=require('fs');try{const c=fs.readFileSync('/proc/1/cmdline');process.exit(c.includes('node')?0:1)}catch{process.exit(1)}"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "const fs=require('fs');const f=process.env.WORKER_HEARTBEAT_FILE||'/tmp/render-worker-heartbeat';try{const age=Date.now()-fs.statSync(f).mtimeMs;process.exit(age<60000?0:1)}catch{process.exit(1)}"
 
 CMD ["npm", "start"]

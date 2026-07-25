@@ -2,6 +2,7 @@
  * Render worker entry point
  */
 
+import { writeFile } from 'node:fs/promises';
 import { Worker } from 'bullmq';
 import { workerConfig } from './core/config';
 import { processRenderCard } from './jobs/render-card';
@@ -12,6 +13,11 @@ const connection = {
   port: workerConfig.redis.port,
   ...(workerConfig.redis.password && { password: workerConfig.redis.password }),
 };
+
+// Touched only while the queue connection answers PING, so the container healthcheck
+// fails on a wedged Redis link instead of just "the node process still exists".
+const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE || '/tmp/render-worker-heartbeat';
+const HEARTBEAT_INTERVAL_MS = Number(process.env.WORKER_HEARTBEAT_INTERVAL_MS || 15000);
 
 async function start() {
   // Connect to database
@@ -51,9 +57,27 @@ async function start() {
     console.error('Render worker error:', error);
   });
 
+  // BullMQ types its shared connection as IRedisClient, which omits the ioredis
+  // command surface; PING is the cheapest way to prove the link is still alive.
+  type PingableClient = { ping: () => Promise<unknown> };
+
+  const writeHeartbeat = async () => {
+    try {
+      const client = (await worker.client) as unknown as PingableClient;
+      await client.ping();
+      await writeFile(HEARTBEAT_FILE, `${Date.now()}\n`);
+    } catch (error) {
+      console.error('Render worker heartbeat failed:', error);
+    }
+  };
+
+  await writeHeartbeat();
+  const heartbeat = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     console.log(`${signal} received, shutting down render worker...`);
+    clearInterval(heartbeat);
     await worker.close();
     await disconnectDatabase();
     process.exit(0);

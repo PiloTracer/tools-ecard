@@ -363,7 +363,7 @@ run_compose_up_build_logged() {
   # shellcheck disable=SC2207
   wait_flags=($(compose_up_wait_flags))
   echo "docker compose up -d --build --force-recreate ${wait_flags[*]:-}— ECARDS_API_BUILD_ID=${ECARDS_API_BUILD_ID} — output to terminal and: $BUILD_LOG" >&2
-  if ! run_compose up -d --build --force-recreate "${wait_flags[@]}" 2>&1 | tee "$BUILD_LOG"; then
+  if ! run_compose up -d --build --force-recreate --remove-orphans "${wait_flags[@]}" 2>&1 | tee "$BUILD_LOG"; then
     echo "docker compose up -d --build failed (includes image build output)." >&2
     report_build_log_tail 220
     compose_failure_context
@@ -386,7 +386,7 @@ compose_failure_context() {
     echo >&2 "--- logs --tail=120 (all services) ---"
     run_compose logs --tail=120 2>&1 | sed 's/^/  /' >&2 || true
   else
-    for svc in api-server front-cards nginx postgres cassandra redis; do
+    for svc in api-server front-cards render-worker postgres cassandra redis; do
       echo >&2 "--- logs --tail=60 ${svc} ---"
       run_compose logs --tail=60 "$svc" 2>&1 | sed 's/^/  /' >&2 || true
     done
@@ -436,7 +436,7 @@ compose_api_wait_secs() {
 # Services to poll in startup order (db-init handled separately).
 stack_services_in_order() {
   case "$TARGET_ENV" in
-    prd) echo "postgres cassandra redis api-server front-cards nginx render-worker" ;;
+    prd) echo "postgres cassandra redis api-server front-cards render-worker" ;;
     dev) echo "postgres cassandra redis api-server front-cards render-worker" ;;
     *) echo "postgres cassandra redis api-server" ;;
   esac
@@ -447,20 +447,13 @@ service_container_id() {
   run_compose ps -q "$svc" 2>/dev/null | head -1
 }
 
-# Parse NGINX_HTTP_PORT: "8084" or "127.0.0.1:8084" → host + port for curl.
-read_nginx_bind() {
-  local bind def_host def_port
-  bind="$(read_env_value NGINX_HTTP_PORT "")"
-  if [ -z "$bind" ]; then
-    bind="$(read_env_port NGINX_HTTP_PORT 80)"
-  fi
-  def_host="127.0.0.1"
-  def_port="80"
-  if [[ "$bind" == *:* ]]; then
-    echo "${bind%%:*} ${bind##*:}"
-  else
-    echo "$def_host $bind"
-  fi
+# Public origin served by the SERVER's nginx (prd). Falls back to the loopback frontend port.
+read_public_base_url() {
+  local url
+  url="$(read_env_value PUBLIC_BASE_URL "")"
+  [ -z "$url" ] && url="$(read_env_value NEXT_PUBLIC_API_URL "")"
+  [ -z "$url" ] && url="http://127.0.0.1:${ECARDS_FRONT_PORT}"
+  echo "${url%/}"
 }
 
 wait_for_db_init_complete() {
@@ -560,21 +553,22 @@ wait_for_api_ready() {
   local max="${1:-120}"
   local n=0
   local H="127.0.0.1"
-  local nginx_host nginx_port
 
   if [ "$TARGET_ENV" = "prd" ]; then
-    read -r nginx_host nginx_port < <(read_nginx_bind)
-    echo "Waiting for HTTP /health at http://${nginx_host}:${nginx_port}/health (up to ${max}s)..."
+    # prd publishes on loopback only; the host's own nginx is the public entry and is not
+    # part of this stack, so probe the two upstreams it proxies to.
+    echo "Waiting for API /health at http://${H}:${ECARDS_API_PUBLISHED_PORT}/health and frontend at http://${H}:${ECARDS_FRONT_PORT}/ (up to ${max}s)..."
     while [ "$n" -lt "$max" ]; do
-      if curl -sf "http://${nginx_host}:${nginx_port}/health" >/dev/null 2>&1; then
-        echo "Nginx /health passed (API + frontend chain is up)."
+      if curl -sf "http://${H}:${ECARDS_API_PUBLISHED_PORT}/health" >/dev/null 2>&1 &&
+        curl -sf -o /dev/null "http://${H}:${ECARDS_FRONT_PORT}/" 2>/dev/null; then
+        echo "API /health and frontend both responding on loopback."
         return 0
       fi
       sleep 1
       n=$((n + 1))
       if [ $((n % 20)) -eq 0 ]; then echo "  ... ${n}s"; fi
     done
-    echo "Timeout waiting for nginx /health (check api-server and front-cards logs)." >&2
+    echo "Timeout waiting for loopback API /health + frontend (check api-server and front-cards logs)." >&2
     compose_failure_context
     return 1
   fi
@@ -616,7 +610,9 @@ run_compose_up_detached() {
   local wait_flags=()
   # shellcheck disable=SC2207
   wait_flags=($(compose_up_wait_flags))
-  run_compose up -d "${wait_flags[@]}"
+  # --remove-orphans: drops containers this project owns that the compose file no longer
+  # defines (e.g. the retired prd nginx), which would otherwise keep holding its host port.
+  run_compose up -d --remove-orphans "${wait_flags[@]}"
 }
 
 print_stack_urls() {
@@ -644,14 +640,16 @@ print_stack_urls() {
   echo "Stack is up (env=$TARGET_ENV, project=$PROJ_NAME) — open in your browser (replace ${H} with your host if remote)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   if [ "$TARGET_ENV" = "prd" ]; then
-    local nginx_host nginx_port
-    read -r nginx_host nginx_port < <(read_nginx_bind)
-    echo "  Production entry (nginx → Next + API)"
-    echo "  Public URL:          http://${nginx_host}:${nginx_port}/  (TLS at load balancer or extend deploy/nginx)"
+    local public_base
+    public_base="$(read_public_base_url)"
+    echo "  Production entry — the SERVER's nginx terminates TLS (not part of this stack)"
+    echo "  Public URL:          ${public_base}/"
+    echo "  Host nginx site:     deploy/nginx/ecards-host.conf → /etc/nginx/sites-available/"
+    echo "  nginx upstreams:     127.0.0.1:${ECARDS_FRONT_PORT} (Next)  ·  127.0.0.1:${ECARDS_API_PUBLISHED_PORT} (API)"
     echo "  API (browser env):   ${api_pub}"
     echo "  WebSocket (env):     ${ws_pub}"
     echo "  OAuth callback:      ${oauth_redirect}"
-    echo "  API direct (ops):  http://${H}:${ECARDS_API_PUBLISHED_PORT}/health  (bound to loopback in compose prd)"
+    echo "  Health (ops):        curl -sf http://127.0.0.1:${ECARDS_API_PUBLISHED_PORT}/health"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   fi
   echo "  E-Cards in this compose (direct host ports — not TD nginx)"
@@ -695,7 +693,7 @@ cmd_up_quick() {
   # shellcheck disable=SC2207
   wait_flags=($(compose_up_wait_flags))
   echo "Starting stack (no image rebuild)..."
-  if ! run_compose up -d "${wait_flags[@]}"; then
+  if ! run_compose up -d --remove-orphans "${wait_flags[@]}"; then
     echo "docker compose up -d failed." >&2
     compose_failure_context
     return 1

@@ -142,7 +142,9 @@ docker compose exec api bash -c "cd /app && npm run db:migrate"
 
 ### Production overview
 
-Production uses [`docker-compose.prd.yml`](../../../docker-compose.prd.yml) + root [`.env.prd`](../../../.env.prd) (from [`.env.prd.example`](../../../.env.prd.example)) and [`bin/start.sh`](../../../bin/start.sh) with target `prd`. Nginx terminates HTTP on the host (`NGINX_HTTP_PORT`, default 80).
+Production uses [`docker-compose.prd.yml`](../../../docker-compose.prd.yml) + root [`.env.prd`](../../../.env.prd) (from [`.env.prd.example`](../../../.env.prd.example)) and [`bin/start.sh`](../../../bin/start.sh) with target `prd`.
+
+The stack **does not ship a reverse proxy**. It publishes two loopback ports only — `front-cards` on `127.0.0.1:${FRONTEND_HOST_PORT}` (7300) and `api-server` on `127.0.0.1:${API_HOST_PORT}` (7400) — and the **server's own nginx** terminates TLS and proxies to both. See § Production cutover (host nginx + TLS).
 
 Compose project / volume names come from `.env.prd` (`COMPOSE_PROJECT_NAME`, typically `tools_dashboard_prd_tcrd`). Volume backups live under:
 
@@ -177,7 +179,8 @@ sudo swapoff -a
 4. Verify env: `bash bin/verify-prd-env.sh .env.prd` (must exit 0).
 5. Apply host tuning above.
 6. Start: `./bin/start.sh prd up` (builds and waits for API health).
-7. Confirm: `curl -sS http://127.0.0.1:<API_HOST_PORT>/health` (API is loopback-bound in prd) and hit the public nginx URL.
+7. Confirm both loopback upstreams: `curl -sS http://127.0.0.1:<API_HOST_PORT>/health` and `curl -sSI http://127.0.0.1:<FRONTEND_HOST_PORT>/`.
+8. Install the host nginx site and certificates — see § Production cutover (host nginx + TLS) — then hit the public HTTPS URL.
 
 Optional **Demo deploy** (no durable user data on server): set **`DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true`** in `.env.prd`, then up. **Both flags are mandatory** for a public internet Demo. `/demo` alone is not enough for legal/security guarantees.
 
@@ -212,7 +215,53 @@ Use when migrating hosts or recovering Postgres/Redis/Cassandra volumes.
 
    This stops the stack, recreates `postgres_prd_data` / `redis_prd_data` / `cassandra_prd_data`, extracts the matching tar.gz files, then `up --build`. Confirm the SeaweedFS warning in the script output — restore object storage out of band if needed.
 
-5. Health-check API and nginx as in Path A.
+5. Health-check the loopback upstreams and the public URL as in Path A.
+
+### Production cutover (host nginx + TLS)
+
+The public entry point is the server's nginx, installed and renewed on the host. Certificates are issued by certbot (Let's Encrypt) directly on the server — no Cloudflare-issued origin certificate is involved.
+
+1. Install the site and reload nginx:
+
+   ```bash
+   sudo cp deploy/nginx/ecards-host.conf /etc/nginx/sites-available/ecards-demo.aiepic.app.conf
+   sudo ln -s /etc/nginx/sites-available/ecards-demo.aiepic.app.conf /etc/nginx/sites-enabled/
+   sudo mkdir -p /var/www/certbot
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+   `nginx -t` fails until the certificate files exist. Either run step 2 first with the 443 block commented out, or use `certbot --nginx`, which writes a temporary config for you.
+
+2. Issue the certificate. **The hostname is proxied through Cloudflare (orange cloud), which breaks the HTTP-01 challenge unless port 80 reaches this host.** Two working options:
+
+   - **DNS-01 (works with the proxy on):** create a Cloudflare API token scoped to `Zone:DNS:Edit` for the zone, store it at `/root/.secrets/cloudflare.ini` (`chmod 600`), then:
+
+     ```bash
+     sudo certbot certonly --dns-cloudflare \
+       --dns-cloudflare-credentials /root/.secrets/cloudflare.ini \
+       -d ecards-demo.aiepic.app
+     ```
+
+   - **HTTP-01 (grey-cloud during issuance):** set the DNS record to "DNS only" in Cloudflare, wait for propagation, then:
+
+     ```bash
+     sudo certbot certonly --webroot -w /var/www/certbot -d ecards-demo.aiepic.app
+     ```
+
+     Re-enable the proxy afterwards. Renewals will fail while proxied, so prefer DNS-01 for an unattended host.
+
+3. With the proxy on, set the Cloudflare SSL/TLS mode to **Full (strict)**. "Flexible" would make Cloudflare talk plain HTTP to port 80, which this config answers with a 301 redirect — that produces a redirect loop.
+
+4. Verify renewal is unattended: `sudo certbot renew --dry-run` and `systemctl list-timers | grep certbot`.
+
+5. Verify end to end:
+
+   ```bash
+   curl -sSI https://ecards-demo.aiepic.app/            # 200 from Next.js
+   curl -sS  https://ecards-demo.aiepic.app/health      # API health JSON
+   ```
+
+6. If the hostname stays proxied, install `deploy/nginx/ecards-cloudflare-realip.conf` into `/etc/nginx/snippets/` and uncomment the matching `include` — otherwise every access-log line records a Cloudflare edge IP.
 
 ### Path C — Backup only (no restore)
 
