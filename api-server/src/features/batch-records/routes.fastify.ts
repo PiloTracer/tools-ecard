@@ -5,7 +5,7 @@
 
 import { FastifyPluginAsync } from 'fastify';
 import { Queue } from 'bullmq';
-import { getRedisConnectionOptions } from '../../../core/database/redisConnection';
+import { getRedisConnectionOptions } from '../../core/database/redisConnection';
 import { batchRecordController } from './controllers/batchRecordController';
 
 const RENDER_QUEUE_NAME = 'card-rendering';
