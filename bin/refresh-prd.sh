@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/refresh-prd.sh — targeted production refresh (minimal blast radius)
+# bin/refresh-prd.sh — targeted production/demo refresh (minimal blast radius)
 #
 # Rebuilds and recreates only the compose services you name. Data stores
 # (postgres, cassandra, redis) are never touched. Use this after UI/i18n or
@@ -7,17 +7,20 @@
 #
 # Typical usage on the production host (from repo root):
 #   git pull --ff-only
-#   ./bin/refresh-prd.sh              # UI only (front-cards) — landing + i18n
-#   ./bin/refresh-prd.sh --pull       # pull then refresh UI
-#   ./bin/refresh-prd.sh api          # api-server only
-#   ./bin/refresh-prd.sh ui api       # front + API
-#   ./bin/refresh-prd.sh --app        # api-server + front-cards + render-worker
+#   ./bin/refresh-prd.sh              # prd: UI only (front-cards) — landing + i18n
+#   ./bin/refresh-prd.sh --pull       # pull then refresh prd UI
+#   ./bin/refresh-prd.sh api          # prd api-server only
+#   ./bin/refresh-prd.sh ui api       # prd front + API
+#   ./bin/refresh-prd.sh --app        # prd api-server + front-cards + render-worker
 #   ./bin/refresh-prd.sh --all        # same as --app (alias)
+#   ./bin/refresh-prd.sh demo         # same, but for the demo stack (.env.demo)
+#   ./bin/refresh-prd.sh demo ui      # demo UI only
+#   ./bin/refresh-demo.sh             # shorthand for `refresh-prd.sh demo`
 #
 # Requirements:
-#   - .env.prd filled (see .env.prd.example)
+#   - .env.prd filled (see .env.prd.example); demo mode needs .env.demo
 #   - Docker + compose v2
-#   - Stack already provisioned once via `./bin/start.sh prd up` or `up-build`
+#   - Stack already provisioned once via `./bin/start.sh prd|demo up` or `up-build`
 #
 # Logs: build transcript appended view at repo-root build.log (same as start.sh)
 
@@ -25,9 +28,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_FILE="$PROJECT_ROOT/docker-compose.prd.yml"
-ENV_FILE="$PROJECT_ROOT/.env.prd"
 BUILD_LOG="$PROJECT_ROOT/build.log"
+
+# Optional leading mode: prd (default) | demo — selects compose file + env file.
+MODE="prd"
+if [[ "${1:-}" == "prd" || "${1:-}" == "demo" ]]; then
+  MODE="$1"
+  shift
+fi
+COMPOSE_FILE="$PROJECT_ROOT/docker-compose.${MODE}.yml"
+ENV_FILE="$PROJECT_ROOT/.env.${MODE}"
 
 DO_PULL=0
 DO_VERIFY=1
@@ -36,8 +46,12 @@ PRESET=""
 SERVICES=()
 
 usage() {
-  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
+
+Modes (optional first argument):
+  prd           production stack (docker-compose.prd.yml + .env.prd) — default
+  demo          public demo stack (docker-compose.demo.yml + .env.demo)
 
 Options:
   --pull        git pull --ff-only before building
@@ -119,11 +133,11 @@ done
 SERVICES=("${deduped[@]}")
 
 [[ -f "$COMPOSE_FILE" ]] || die "Missing $COMPOSE_FILE"
-[[ -f "$ENV_FILE" ]] || die "Missing $ENV_FILE — cp .env.prd.example .env.prd and fill secrets"
+[[ -f "$ENV_FILE" ]] || die "Missing $ENV_FILE — seed from .env.prd.example and fill secrets (see start.sh ${MODE} hints)"
 
 if [[ "$DO_VERIFY" -eq 1 ]]; then
-  log "Verifying production env..."
-  bash "$SCRIPT_DIR/verify-prd-env.sh" "$ENV_FILE"
+  log "Verifying ${MODE} env..."
+  bash "$SCRIPT_DIR/verify-prd-env.sh" "$ENV_FILE" "$MODE"
 fi
 
 if docker compose version &>/dev/null; then
@@ -136,11 +150,11 @@ fi
 
 PROJ_NAME="$(read_env_key COMPOSE_PROJECT_NAME)"
 if [[ -z "$PROJ_NAME" ]]; then
-  suffix="$(read_env_key TD_STACK_SUFFIX _prd_tcrd)"
+  suffix="$(read_env_key TD_STACK_SUFFIX "_${MODE}_tcrd")"
   PROJ_NAME="tools_dashboard${suffix}"
 fi
 
-export ECARDS_ENV_FILE=".env.prd"
+export ECARDS_ENV_FILE=".env.${MODE}"
 export ECARDS_API_BUILD_ID="$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 run_compose() {
@@ -223,7 +237,7 @@ if [[ "$DO_PULL" -eq 1 ]]; then
 fi
 
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-log "Production refresh"
+log "Stack refresh (mode: ${MODE})"
 log "  Project:   $PROJ_NAME"
 log "  Env file:  $ENV_FILE"
 log "  Services:  ${SERVICES[*]}"

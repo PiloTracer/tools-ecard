@@ -46,7 +46,7 @@ Before a production deploy, confirm:
 
 ### Secret hygiene
 
-- `.env` and `.env.prd` are **gitignored**. Only `*.example` files are tracked.
+- `.env`, `.env.prd` and `.env.demo` are **gitignored**. Only `*.example` files are tracked.
 - **Rotate** any secret that has ever been committed, pasted into a chat, or shared outside the secret manager.
 - Never reuse dev values (`dev_jwt_secret_change_in_production`, all-zero `TOKEN_ENCRYPTION_KEY`) in production.
 - If you must pre-provision `.env.prd` on hosts, deliver it via your secret manager (SSM, Vault, 1Password CLI) with `chmod 600` and root ownership; do not `scp` in cleartext.
@@ -79,7 +79,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR:
 ├── render-worker/           # Background job processor
 ├── db/                      # Database initialization scripts
 ├── docker-compose.dev.yml   # Local development environment
-├── docker-compose.prd.yml   # Production stack (loopback-published; host nginx fronts it)
+├── docker-compose.prd.yml   # Production stack (loopback-published 7500/7600; host nginx fronts it)
+├── docker-compose.demo.yml  # Public demo stack (loopback-published 7300/7400; coexists with prd)
 ├── .env.dev.example         # Dev env template (copy → repo root `.env`)
 ├── .env.prd.example         # Production env template (copy → `.env.prd`)
 ├── deploy/nginx/            # Site config for the host's nginx (not a container)

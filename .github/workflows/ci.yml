@@ -23,6 +23,10 @@ jobs:
         run: |
           cp .env.prd.example .env.prd
           docker compose -f docker-compose.prd.yml --env-file .env.prd config >/dev/null
+      - name: Validate demo compose (with .env.prd.example keys)
+        run: |
+          cp .env.prd.example .env.demo
+          docker compose -f docker-compose.demo.yml --env-file .env.demo config >/dev/null
 
   api-server:
     name: api-server (build + test)

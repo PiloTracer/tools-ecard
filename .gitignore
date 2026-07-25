@@ -102,6 +102,7 @@ VolumeIcon.icns
 # Environment variables
 .env
 .env.prd
+.env.demo
 .env.stg
 .env.local
 .env.development.local

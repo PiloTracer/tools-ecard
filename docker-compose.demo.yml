@@ -1,17 +1,18 @@
-# E-Cards — production stack
+# E-Cards — public DEMO stack (DEMO_MODE=true; api-server rejects mutating writes)
 #
-# Shares the host with the public demo stack (docker-compose.demo.yml, .env.demo).
-# Isolation: TD_STACK_SUFFIX=_prd_tcrd (containers/project), network ecards-prd,
-# volumes *_prd_data, loopback ports front 7500 / api 7600 (demo keeps 7300/7400).
+# Runs side-by-side with the real production stack (docker-compose.prd.yml) on the
+# same host. Isolation comes from .env.demo: TD_STACK_SUFFIX=_demo_tcrd gives distinct
+# container names, compose project, networks (ecards-demo) and volumes (*_demo_data).
+# The demo keeps the original loopback ports (front 7300 / api 7400); prd uses 7500/7600.
 #
 # Prerequisites:
-#   1. Copy .env.prd.example to .env.prd and fill secrets (never commit .env.prd).
+#   1. Create .env.demo (seed from .env.prd.example; DEMO_MODE=true, _demo_tcrd suffix).
 #   2. Register OAuth redirect URI with your IdP, e.g. https://ecards-demo.aiepic.app/oauth/complete
 #   3. Point DNS at this host and install the host nginx site: deploy/nginx/ecards-host.conf
 #
-# Usage (always use .env.prd as the env source):
-#   ./bin/start.sh prd up
-#   ECARDS_ENV_FILE=.env.prd docker compose --env-file .env.prd -f docker-compose.prd.yml up -d
+# Usage (always use .env.demo as the env source):
+#   ./bin/start.sh demo up
+#   ECARDS_ENV_FILE=.env.demo docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
 #
 # Public entry: the SERVER's nginx (not part of this stack). This stack publishes only on
 # loopback — front-cards on 127.0.0.1:${FRONTEND_HOST_PORT} and api-server on
@@ -27,10 +28,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ecards_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
-      - postgres_prd_data:/var/lib/postgresql/data
+      - postgres_demo_data:/var/lib/postgresql/data
       - ./db/init-postgres:/docker-entrypoint-initdb.d:ro
     networks:
-      - ecards-prd
+      - ecards-demo
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecards_user} -d ${POSTGRES_DB:-ecards_db}"]
       interval: 10s
@@ -56,10 +57,10 @@ services:
       MAX_HEAP_SIZE: ${CASSANDRA_MAX_HEAP_SIZE:-2G}
       JVM_OPTS: ${CASSANDRA_JVM_OPTS:--XX:MaxDirectMemorySize=1G}
     volumes:
-      - cassandra_prd_data:/var/lib/cassandra
+      - cassandra_demo_data:/var/lib/cassandra
       - ./db/init-cassandra:/docker-entrypoint-initdb.d:ro
     networks:
-      - ecards-prd
+      - ecards-demo
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
       interval: 10s
@@ -79,9 +80,9 @@ services:
     command: >
       sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"; else exec redis-server --appendonly yes; fi'
     volumes:
-      - redis_prd_data:/data
+      - redis_demo_data:/data
     networks:
-      - ecards-prd
+      - ecards-demo
     healthcheck:
       test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG; else redis-cli ping | grep -q PONG; fi"]
       interval: 10s
@@ -94,7 +95,7 @@ services:
     image: cassandra:5.0
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-db-init
     networks:
-      - ecards-prd
+      - ecards-demo
     depends_on:
       cassandra:
         condition: service_healthy
@@ -116,7 +117,7 @@ services:
     restart: unless-stopped
     command: ["sh", "/app/scripts/prisma-start-prd.sh"]
     env_file:
-      - ${ECARDS_ENV_FILE:-.env.prd}
+      - ${ECARDS_ENV_FILE:-.env.demo}
     environment:
       NODE_ENV: production
       PORT: ${API_INTERNAL_PORT:-4000}
@@ -186,7 +187,7 @@ services:
       DEBUG: ${DEBUG:-}
       DEMO_MODE: ${DEMO_MODE:-false}
     networks:
-      - ecards-prd
+      - ecards-demo
     depends_on:
       postgres:
         condition: service_healthy
@@ -215,7 +216,7 @@ services:
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-render-worker
     restart: unless-stopped
     env_file:
-      - ${ECARDS_ENV_FILE:-.env.prd}
+      - ${ECARDS_ENV_FILE:-.env.demo}
     environment:
       NODE_ENV: production
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -240,7 +241,7 @@ services:
       WORKER_TIMEOUT: ${WORKER_TIMEOUT:-60000}
       RENDER_ENGINE: ${RENDER_ENGINE:-canvas}
     networks:
-      - ecards-prd
+      - ecards-demo
     depends_on:
       postgres:
         condition: service_healthy
@@ -273,7 +274,7 @@ services:
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-frontend
     restart: unless-stopped
     env_file:
-      - ${ECARDS_ENV_FILE:-.env.prd}
+      - ${ECARDS_ENV_FILE:-.env.demo}
     environment:
       # Next reads `PORT`; root env may set `PORT` for the API — keep the app on the internal FRONTEND_PORT.
       PORT: ${FRONTEND_PORT:-3000}
@@ -301,7 +302,7 @@ services:
       DEMO_MODE: ${DEMO_MODE:-false}
       NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-false}
     networks:
-      - ecards-prd
+      - ecards-demo
     depends_on:
       api-server:
         condition: service_healthy
@@ -317,10 +318,10 @@ services:
     logging: *default-logging
 
 networks:
-  ecards-prd:
+  ecards-demo:
     driver: bridge
 
 volumes:
-  postgres_prd_data:
-  cassandra_prd_data:
-  redis_prd_data:
+  postgres_demo_data:
+  cassandra_demo_data:
+  redis_demo_data:

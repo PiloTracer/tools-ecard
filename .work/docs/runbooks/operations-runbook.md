@@ -142,9 +142,38 @@ docker compose exec api bash -c "cd /app && npm run db:migrate"
 
 ### Production overview
 
-Production uses [`docker-compose.prd.yml`](../../../docker-compose.prd.yml) + root [`.env.prd`](../../../.env.prd) (from [`.env.prd.example`](../../../.env.prd.example)) and [`bin/start.sh`](../../../bin/start.sh) with target `prd`.
+Production uses [`docker-compose.prd.yml`](../../../docker-compose.prd.yml) + root [`.env.prd`](../../../.env.prd) (from [`.env.prd.example`](../../../.env.prd.example)) and [`bin/start.sh`](../../../bin/start.sh) with target `prd`. The public **demo** is a separate co-located stack: [`docker-compose.demo.yml`](../../../docker-compose.demo.yml) + root `.env.demo`, driven with target `demo` — see § Dual-stack on one host below.
 
-The stack **does not ship a reverse proxy**. It publishes two loopback ports only — `front-cards` on `127.0.0.1:${FRONTEND_HOST_PORT}` (7300) and `api-server` on `127.0.0.1:${API_HOST_PORT}` (7400) — and the **server's own nginx** terminates TLS and proxies to both. See § Production cutover (host nginx + TLS).
+The stack **does not ship a reverse proxy**. It publishes two loopback ports only — `front-cards` on `127.0.0.1:${FRONTEND_HOST_PORT}` and `api-server` on `127.0.0.1:${API_HOST_PORT}` (prd: **7500/7600**; demo: **7300/7400**) — and the **server's own nginx** terminates TLS and proxies to both. See § Production cutover (host nginx + TLS).
+
+### Dual-stack on one host (prd + demo)
+
+Both stacks run side-by-side on the same host. Isolation is entirely name/port-based — nothing is shared:
+
+| Concern | prd (real production) | demo (public demo) |
+|---------|----------------------|--------------------|
+| Compose file / env | `docker-compose.prd.yml` / `.env.prd` | `docker-compose.demo.yml` / `.env.demo` |
+| `TD_STACK_SUFFIX` | `_prd_tcrd` | `_demo_tcrd` |
+| Compose project | `tools_dashboard_prd_tcrd` | `tools_dashboard_demo_tcrd` |
+| Containers | `tools_dashboard_prd_tcrd-*` | `tools_dashboard_demo_tcrd-*` |
+| Network | `…_ecards-prd` | `…_ecards-demo` |
+| Volumes | `*_prd_data` | `*_demo_data` |
+| Loopback ports (front/api) | `7500` / `7600` | `7300` / `7400` |
+| Public site | `ecards.aiepic.app` (`deploy/nginx/ecards-prd-host.conf`) | `ecards-demo.aiepic.app` (`deploy/nginx/ecards-host.conf`) |
+| `DEMO_MODE` | `false` (enforced by verify) | `true` (enforced by verify) |
+
+Operations:
+
+```bash
+./bin/start.sh prd up          # production stack
+./bin/start.sh demo up         # demo stack (same commands: up/up-build/down/logs/status/…)
+bash bin/verify-prd-env.sh .env.prd prd     # must exit 0; fails if DEMO_MODE=true
+bash bin/verify-prd-env.sh .env.demo demo   # must exit 0; fails if DEMO_MODE=false
+./bin/refresh-prd.sh           # targeted prd refresh (default: front-cards only)
+./bin/refresh-demo.sh          # same, for the demo stack (= refresh-prd.sh demo)
+```
+
+**Migration note (one-time, when the demo used to run as the `_prd_tcrd` project):** the old demo's volumes are named `tools_dashboard_prd_tcrd_*_prd_data`. If production must start clean, remove them before the first `prd up` (`docker volume rm tools_dashboard_prd_tcrd_postgres_prd_data tools_dashboard_prd_tcrd_redis_prd_data tools_dashboard_prd_tcrd_cassandra_prd_data`); if the old demo data should be kept, clone it into the demo names first, e.g. `docker run --rm -v tools_dashboard_prd_tcrd_postgres_prd_data:/from -v tools_dashboard_demo_tcrd_postgres_demo_data:/to busybox sh -c 'cp -a /from/. /to/'` (repeat for redis/cassandra), then remove the old volumes.
 
 Compose project / volume names come from `.env.prd` (`COMPOSE_PROJECT_NAME`, typically `tools_dashboard_prd_tcrd`). Volume backups live under:
 
@@ -182,7 +211,7 @@ sudo swapoff -a
 7. Confirm both loopback upstreams: `curl -sS http://127.0.0.1:<API_HOST_PORT>/health` and `curl -sSI http://127.0.0.1:<FRONTEND_HOST_PORT>/`.
 8. Install the host nginx site and certificates — see § Production cutover (host nginx + TLS) — then hit the public HTTPS URL.
 
-Optional **Demo deploy** (no durable user data on server): set **`DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true`** in `.env.prd`, then up. **Both flags are mandatory** for a public internet Demo. `/demo` alone is not enough for legal/security guarantees.
+Optional **Demo deploy** (no durable user data on server): use the dedicated demo stack (`./bin/start.sh demo up`) described in § Dual-stack on one host — it carries `DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true` in `.env.demo`. **Both flags are mandatory** for a public internet Demo. `/demo` alone is not enough for legal/security guarantees.
 
 ### Path B — Restore production from `start.sh` tar.gz backups
 
@@ -220,6 +249,8 @@ Use when migrating hosts or recovering Postgres/Redis/Cassandra volumes.
 ### Production cutover (host nginx + TLS)
 
 The public entry point is the server's nginx, installed and renewed on the host. Certificates are issued by certbot (Let's Encrypt) directly on the server — no Cloudflare-issued origin certificate is involved.
+
+This section uses the demo site as the example. For the **production** site, repeat the same steps with `deploy/nginx/ecards-prd-host.conf` (installed as `ecards.aiepic.app.conf`) and `-d ecards.aiepic.app` — the two sites coexist (distinct upstream/map names, distinct ports 7500/7600). The prd stack must be running first (`./bin/start.sh prd up`), and `https://ecards.aiepic.app/oauth/complete` must be registered with the IdP.
 
 1. Install the site and reload nginx:
 
@@ -330,10 +361,10 @@ curl -b cookies.txt http://localhost:7400/api/batches/BATCH_ID/records/RECORD_ID
 
 ## Production cutover checklist
 
-1. Copy `.env.prd.example` → `.env.prd`; run `bin/verify-prd-env.sh` (must pass).
+1. Copy `.env.prd.example` → `.env.prd`; run `bin/verify-prd-env.sh .env.prd prd` (must pass).
 2. Confirm DNS A/AAAA records point to the host running nginx.
 3. TLS certificates installed (Let's Encrypt or operator-provided).
-4. For **Demo** internet cutover: set `DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true`; start with empty volumes.
+4. For the **Demo** internet site: use the dedicated demo stack — `.env.demo` with `DEMO_MODE=true` / `NEXT_PUBLIC_DEMO_MODE=true`, `./bin/start.sh demo up` (see § Dual-stack on one host).
 5. `./bin/start.sh prd up` — wait for postgres/redis/cassandra healthy.
 6. Smoke test: `curl https://<host>/health`, login, upload batch, export one card.
 7. Enable volume backups: `bin/start_cron.sh` (dev) or operator cron for prd volume tars under `/data/backups_<COMPOSE_PROJECT_NAME>/`.

@@ -15,14 +15,17 @@
 #   ./bin/start.sh dev status
 #   ./bin/start.sh dev help
 #
-# Environments: dev | stg | prd  (aliases: development, staging, prod|production)
+# Environments: dev | stg | prd | demo  (aliases: development, staging, prod|production)
 # Production: copy .env.prd.example → .env.prd, then: ./bin/start.sh prd up
-# (requires docker-compose.prd.yml — shipped in this repository.)
+# Demo (public, DEMO_MODE=true): uses .env.demo + docker-compose.demo.yml: ./bin/start.sh demo up
+# prd and demo coexist on the same host (distinct suffix, project, network, volumes, ports).
+# (requires docker-compose.prd.yml / docker-compose.demo.yml — shipped in this repository.)
 #
 # Env file policy (tools-ecards): canonical key lists are repo root .env.dev.example and .env.prd.example
-# only. Dev uses .env (or optional .env.dev with the same keys). Prd uses .env.prd only. No per-package .env files.
+# only. Dev uses .env (or optional .env.dev with the same keys). Prd uses .env.prd only;
+# demo uses .env.demo only (same keys as prd). No per-package .env files.
 # start.sh exports ECARDS_ENV_FILE and always passes docker compose --env-file "$ENV_FILE" so interpolation
-# and container env_file paths stay aligned. Do not run prd compose without --env-file .env.prd.
+# and container env_file paths stay aligned. Do not run prd/demo compose without its --env-file.
 
 set -euo pipefail
 
@@ -34,7 +37,7 @@ usage() {
 tools-ecards — Docker Compose helper
 
 Usage:
-  ./bin/start.sh [dev|stg|prd]           Interactive menu
+  ./bin/start.sh [dev|stg|prd|demo]      Interactive menu
   ./bin/start.sh [env] <command>       Run one command and exit
 
 Commands:
@@ -59,7 +62,7 @@ Environment:
 
 Stack identity (in the env file; Tools Dashboard naming; keeps this stack separate on a shared host):
   TD_APP_CODE               e.g. tcrd
-  TD_STACK_SUFFIX             e.g. _dev_tcrd or _prd_tcrd (use _prd_tcrd for production)
+  TD_STACK_SUFFIX             e.g. _dev_tcrd, _prd_tcrd or _demo_tcrd (use _prd_tcrd for production)
   COMPOSE_PROJECT_NAME      Must equal tools_dashboard + TD_STACK_SUFFIX, e.g. tools_dashboard_dev_tcrd. start.sh passes -p.
 
 Build output:
@@ -74,6 +77,7 @@ normalize_env() {
     dev | development) echo dev ;;
     stg | staging) echo stg ;;
     prd | prod | production) echo prd ;;
+    demo) echo demo ;;
     *) echo "" ;;
   esac
 }
@@ -155,11 +159,19 @@ case "$TARGET_ENV" in
     REDIS_VOLUME_NAME="redis_prd_data"
     CASSANDRA_VOLUME_NAME="cassandra_prd_data"
     ;;
+  demo)
+    COMPOSE_FILE="$PROJECT_ROOT/docker-compose.demo.yml"
+    ENV_FILE="$PROJECT_ROOT/.env.demo"
+    BACKUP_BASE="/data"
+    PG_VOLUME_NAME="postgres_demo_data"
+    REDIS_VOLUME_NAME="redis_demo_data"
+    CASSANDRA_VOLUME_NAME="cassandra_demo_data"
+    ;;
 esac
 
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "Compose file not found: $COMPOSE_FILE"
-  echo "This repository ships docker-compose.dev.yml (dev) and docker-compose.prd.yml (prd)."
+  echo "This repository ships docker-compose.dev.yml (dev), docker-compose.prd.yml (prd) and docker-compose.demo.yml (demo)."
   exit 1
 fi
 
@@ -167,6 +179,8 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "Env file not found: $ENV_FILE"
   if [ "$TARGET_ENV" = "prd" ]; then
     echo "Create it from the example: cp \"$PROJECT_ROOT/.env.prd.example\" \"$ENV_FILE\" then fill secrets."
+  elif [ "$TARGET_ENV" = "demo" ]; then
+    echo "Create it from the example: cp \"$PROJECT_ROOT/.env.prd.example\" \"$ENV_FILE\", set TD_STACK_SUFFIX=_demo_tcrd / COMPOSE_PROJECT_NAME=tools_dashboard_demo_tcrd / DEMO_MODE=true, then fill secrets."
   elif [ "$TARGET_ENV" = "stg" ]; then
     echo "Create \"$ENV_FILE\" (staging compose is optional in this repo)."
   elif [ "$TARGET_ENV" = "dev" ]; then
@@ -186,6 +200,12 @@ case "$TARGET_ENV" in
     fi
     if [ -f "$PROJECT_ROOT/.env" ]; then
       echo "WARN: $PROJECT_ROOT/.env exists; prd uses only $ENV_FILE via --env-file (not .env)." >&2
+    fi
+    ;;
+  demo)
+    if [ "$ECARDS_ENV_FILE" != ".env.demo" ]; then
+      echo "ERROR: demo must use $PROJECT_ROOT/.env.demo (got: $ENV_FILE)" >&2
+      exit 1
     fi
     ;;
   dev)
@@ -227,6 +247,7 @@ if [ -z "$TD_STACK_SUFFIX_VAL" ]; then
   case "$TARGET_ENV" in
     dev) TD_STACK_SUFFIX_VAL="_dev_tcrd" ;;
     prd) TD_STACK_SUFFIX_VAL="_prd_tcrd" ;;
+    demo) TD_STACK_SUFFIX_VAL="_demo_tcrd" ;;
     stg) TD_STACK_SUFFIX_VAL="_stg_tcrd" ;;
     *) TD_STACK_SUFFIX_VAL="_dev_tcrd" ;;
   esac
@@ -242,6 +263,12 @@ case "$TARGET_ENV" in
   prd)
     if ! echo "$TD_STACK_SUFFIX_VAL" | grep -qE '^_prd_'; then
       echo "ERROR: prd stack expects TD_STACK_SUFFIX like _prd_tcrd (got: ${TD_STACK_SUFFIX_VAL})" >&2
+      exit 1
+    fi
+    ;;
+  demo)
+    if ! echo "$TD_STACK_SUFFIX_VAL" | grep -qE '^_demo_'; then
+      echo "ERROR: demo stack expects TD_STACK_SUFFIX like _demo_tcrd (got: ${TD_STACK_SUFFIX_VAL})" >&2
       exit 1
     fi
     ;;
@@ -424,9 +451,9 @@ ensure_volumes_info() {
   done
 }
 
-# Cassandra + db-init + images — prd needs a longer first-boot window than dev.
+# Cassandra + db-init + images — prd/demo need a longer first-boot window than dev.
 compose_api_wait_secs() {
-  if [ "$TARGET_ENV" = "prd" ]; then
+  if [ "$TARGET_ENV" = "prd" ] || [ "$TARGET_ENV" = "demo" ]; then
     echo "${1:-300}"
   else
     echo "$1"
@@ -436,7 +463,7 @@ compose_api_wait_secs() {
 # Services to poll in startup order (db-init handled separately).
 stack_services_in_order() {
   case "$TARGET_ENV" in
-    prd) echo "postgres cassandra redis api-server front-cards render-worker" ;;
+    prd | demo) echo "postgres cassandra redis api-server front-cards render-worker" ;;
     dev) echo "postgres cassandra redis api-server front-cards render-worker" ;;
     *) echo "postgres cassandra redis api-server" ;;
   esac
@@ -554,8 +581,8 @@ wait_for_api_ready() {
   local n=0
   local H="127.0.0.1"
 
-  if [ "$TARGET_ENV" = "prd" ]; then
-    # prd publishes on loopback only; the host's own nginx is the public entry and is not
+  if [ "$TARGET_ENV" = "prd" ] || [ "$TARGET_ENV" = "demo" ]; then
+    # prd/demo publish on loopback only; the host's own nginx is the public entry and is not
     # part of this stack, so probe the two upstreams it proxies to.
     echo "Waiting for API /health at http://${H}:${ECARDS_API_PUBLISHED_PORT}/health and frontend at http://${H}:${ECARDS_FRONT_PORT}/ (up to ${max}s)..."
     while [ "$n" -lt "$max" ]; do
@@ -639,12 +666,19 @@ print_stack_urls() {
   echo ""
   echo "Stack is up (env=$TARGET_ENV, project=$PROJ_NAME) — open in your browser (replace ${H} with your host if remote)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  if [ "$TARGET_ENV" = "prd" ]; then
-    local public_base
+  if [ "$TARGET_ENV" = "prd" ] || [ "$TARGET_ENV" = "demo" ]; then
+    local public_base host_conf env_label
     public_base="$(read_public_base_url)"
-    echo "  Production entry — the SERVER's nginx terminates TLS (not part of this stack)"
+    if [ "$TARGET_ENV" = "prd" ]; then
+      host_conf="deploy/nginx/ecards-prd-host.conf"
+      env_label="Production"
+    else
+      host_conf="deploy/nginx/ecards-host.conf"
+      env_label="Demo (DEMO_MODE=true)"
+    fi
+    echo "  ${env_label} entry — the SERVER's nginx terminates TLS (not part of this stack)"
     echo "  Public URL:          ${public_base}/"
-    echo "  Host nginx site:     deploy/nginx/ecards-host.conf → /etc/nginx/sites-available/"
+    echo "  Host nginx site:     ${host_conf} → /etc/nginx/sites-available/"
     echo "  nginx upstreams:     127.0.0.1:${ECARDS_FRONT_PORT} (Next)  ·  127.0.0.1:${ECARDS_API_PUBLISHED_PORT} (API)"
     echo "  API (browser env):   ${api_pub}"
     echo "  WebSocket (env):     ${ws_pub}"
