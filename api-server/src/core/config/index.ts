@@ -69,7 +69,7 @@ export const appConfig = {
 
     // Anthropic Configuration
     anthropic: {
-      apiKey: process.env.ANTHROPIC_API_KEY_CUSTOM || '',
+      apiKey: process.env.ANTHROPIC_API_KEY || '',
       model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
       maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '500', 10),
       temperature: parseFloat(process.env.ANTHROPIC_TEMPERATURE || '0.3'),
