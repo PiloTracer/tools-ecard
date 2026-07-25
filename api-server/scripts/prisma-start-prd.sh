@@ -28,7 +28,10 @@ recover_schema() {
     $PRISMA migrate resolve --rolled-back "$migration_name" 2>/dev/null || true
   done
 
-  if ! $PRISMA db push --skip-generate; then
+  # --accept-data-loss: this path only runs when migrate deploy failed (fresh/greenfield
+  # or broken-state databases). On fresh DBs the warnings (e.g. adding a unique constraint)
+  # are no-ops; without the flag db push refuses to proceed and the API crash-loops.
+  if ! $PRISMA db push --skip-generate --accept-data-loss; then
     echo "Prisma db push failed during schema recovery." >&2
     return 1
   fi

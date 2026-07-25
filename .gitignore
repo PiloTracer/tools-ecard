@@ -188,3 +188,4 @@ credentials/
 .env.backup
 # Local agent/tool scratch (do not commit)
 .reasonix/
+.env.demo
