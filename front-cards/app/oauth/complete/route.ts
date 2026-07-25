@@ -108,6 +108,18 @@ const COOKIE_CONFIG = {
   },
 };
 
+/**
+ * Redirect back to /login after a failed callback, dropping the one-shot PKCE cookies.
+ * Keeping them would let a stale state collide with every retry until its 10 minute TTL
+ * expires — including app-library launches, whose state can never match a local cookie.
+ */
+function failureRedirect(url: string): NextResponse {
+  const response = NextResponse.redirect(url);
+  response.cookies.delete(COOKIE_CONFIG.state.name);
+  response.cookies.delete(COOKIE_CONFIG.codeVerifier.name);
+  return response;
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('=== Server-Side OAuth Callback Started ===');
@@ -130,7 +142,7 @@ export async function GET(request: NextRequest) {
     // Check for OAuth errors
     if (error) {
       console.error('OAuth error received:', error, errorDescription);
-      return NextResponse.redirect(
+      return failureRedirect(
         `${getBaseUrl()}/login?error=${error}&description=${encodeURIComponent(errorDescription || '')}`
       );
     }
@@ -138,13 +150,13 @@ export async function GET(request: NextRequest) {
     // Validate authorization code
     if (!code) {
       console.error('No authorization code received');
-      return NextResponse.redirect(`${getBaseUrl()}/login?error=no_code`);
+      return failureRedirect(`${getBaseUrl()}/login?error=no_code`);
     }
 
     // Validate client secret is configured
     if (!OAUTH_CONFIG.clientSecret) {
       console.error('OAUTH_CLIENT_SECRET is not configured in environment');
-      return NextResponse.redirect(`${getBaseUrl()}/login?error=server_misconfigured`);
+      return failureRedirect(`${getBaseUrl()}/login?error=server_misconfigured`);
     }
 
     const storedState = request.cookies.get(COOKIE_CONFIG.state.name)?.value;
@@ -152,7 +164,7 @@ export async function GET(request: NextRequest) {
 
     // Both must match for the PKCE flow; otherwise we would trade the code without code_verifier and the IdP would reject.
     if (storedState && receivedState && storedState !== receivedState) {
-      return NextResponse.redirect(
+      return failureRedirect(
         `${getBaseUrl()}/login?error=state_mismatch&description=${encodeURIComponent(
           'The OAuth state did not match. Start a new sign-in (do not open the return URL in another browser or a preview tool).',
         )}`,
@@ -177,7 +189,7 @@ export async function GET(request: NextRequest) {
 
       if (!storedCodeVerifier) {
         console.error('No code verifier found in cookies for manual login');
-        return NextResponse.redirect(`${getBaseUrl()}/login?error=missing_code_verifier`);
+        return failureRedirect(`${getBaseUrl()}/login?error=missing_code_verifier`);
       }
 
       codeVerifier = storedCodeVerifier;
@@ -229,7 +241,7 @@ export async function GET(request: NextRequest) {
         (errorData.error === 'invalid_grant' || /code|expired|invalid/i.test(serverDesc))
           ? ' This often happens if PKCE is required (you used "Sign in") but cookies were not sent on the redirect back, or the authorization code was already used—open the app at the same host you started from, allow cookies, click Sign in once, and do not refresh the return URL.'
           : '';
-      return NextResponse.redirect(
+      return failureRedirect(
         `${getBaseUrl()}/login?error=token_exchange_failed&description=${encodeURIComponent(serverDesc + hint)}`
       );
     }
@@ -249,7 +261,7 @@ export async function GET(request: NextRequest) {
 
     if (!userResponse.ok) {
       console.error('Failed to fetch user info:', userResponse.status);
-      return NextResponse.redirect(`${getBaseUrl()}/login?error=user_info_failed`);
+      return failureRedirect(`${getBaseUrl()}/login?error=user_info_failed`);
     }
 
     const user: User = await userResponse.json();
@@ -310,7 +322,7 @@ export async function GET(request: NextRequest) {
     console.error('=== OAuth Callback Error ===');
     console.error('Error:', err);
     console.error('Stack trace:', err instanceof Error ? err.stack : 'N/A');
-    return NextResponse.redirect(
+    return failureRedirect(
       `${getBaseUrl()}/login?error=server_error&description=${encodeURIComponent(err instanceof Error ? err.message : 'Unknown error')}`
     );
   }
