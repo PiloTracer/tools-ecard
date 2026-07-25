@@ -88,10 +88,16 @@ async function start() {
       healthCheck: `http://localhost:${appConfig.port}/health`
     }, 'API Server started');
 
-    // Load Google Fonts in background (don't block startup)
-    loadGoogleFonts().catch(err => {
-      log.error({ error: err }, 'Failed to load Google Fonts');
-    });
+    // Load Google Fonts in background (don't block startup).
+    // Skipped in DEMO_MODE: demo keeps all data browser-side, so seeding fonts
+    // into S3/Cassandra is both pointless and contrary to "no server persistence".
+    if (isDemoModeEnabled()) {
+      log.info('DEMO_MODE enabled — skipping Google Fonts server-side seeding');
+    } else {
+      loadGoogleFonts().catch(err => {
+        log.error({ error: err }, 'Failed to load Google Fonts');
+      });
+    }
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
