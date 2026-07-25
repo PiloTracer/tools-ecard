@@ -12,6 +12,7 @@
 import React from 'react';
 import { useProjects } from '@/features/simple-projects';
 import { UploadBatchComponent } from '@/features/batch-upload';
+import { useTranslation } from '@/features/i18n';
 import type { QuickActionsProps } from '../index';
 
 export function QuickActions({
@@ -19,7 +20,7 @@ export function QuickActions({
   onViewBatches,
   className = ''
 }: QuickActionsProps) {
-  // Get selected project from simple-projects feature
+  const { t } = useTranslation();
   const { selectedProjectId, loading } = useProjects();
 
   // Buttons are disabled when no project is selected or still loading
@@ -71,10 +72,10 @@ export function QuickActions({
   return (
     <div className={`bg-white rounded-lg shadow-md p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{t('quickActions.title')}</h2>
         {isDisabled && !loading && (
           <span className="text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded">
-            Select a project to enable actions
+            {t('quickActions.selectProject')}
           </span>
         )}
       </div>
@@ -85,8 +86,8 @@ export function QuickActions({
           className={getButtonClasses()}
           onClick={handleCreateTemplate}
           disabled={isDisabled}
-          aria-label="Template Designer"
-          title={isDisabled ? "Select a project to create templates" : "Create a new card template"}
+          aria-label={t('quickActions.templateDesigner')}
+          title={isDisabled ? t('quickActions.selectProjectTitle') : t('quickActions.templateDesignerTitle')}
         >
           <svg
             className={getIconClasses()}
@@ -103,8 +104,8 @@ export function QuickActions({
             />
           </svg>
           <div className="text-left">
-            <p className={getTitleClasses()}>Template Designer</p>
-            <p className={getDescriptionClasses()}>Design a new card template</p>
+            <p className={getTitleClasses()}>{t('quickActions.templateDesigner')}</p>
+            <p className={getDescriptionClasses()}>{t('quickActions.templateDesignerDesc')}</p>
           </div>
         </button>
 
@@ -116,8 +117,8 @@ export function QuickActions({
           className={getButtonClasses()}
           onClick={handleViewBatches}
           disabled={isDisabled}
-          aria-label="View Batches"
-          title={isDisabled ? "Select a project to view batches" : "Manage generated cards"}
+          aria-label={t('quickActions.viewBatches')}
+          title={isDisabled ? t('quickActions.selectProjectViewTitle') : t('quickActions.viewBatchesTitle')}
         >
           <svg
             className={getIconClasses()}
@@ -134,8 +135,8 @@ export function QuickActions({
             />
           </svg>
           <div className="text-left">
-            <p className={getTitleClasses()}>View Batches</p>
-            <p className={getDescriptionClasses()}>Manage generated cards</p>
+            <p className={getTitleClasses()}>{t('quickActions.viewBatches')}</p>
+            <p className={getDescriptionClasses()}>{t('quickActions.viewBatchesDesc')}</p>
           </div>
         </button>
       </div>
@@ -148,7 +149,7 @@ export function QuickActions({
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span className="text-sm">Loading projects...</span>
+            <span className="text-sm">{t('quickActions.loadingProjects')}</span>
           </div>
         </div>
       )}

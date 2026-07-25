@@ -8,6 +8,7 @@ import React, { createContext, useCallback, useContext, useMemo, useState, start
 import { canExitDemoMode, enterDemoMode, exitDemoMode, isDemoMode, isEnvDemoMode } from './isDemoMode';
 import { demoStore } from './demoStore';
 import { demoProjectRepository } from './demoProjectRepository';
+import { useTranslation } from '@/features/i18n';
 
 type DemoContextValue = {
   demo: boolean;
@@ -73,6 +74,7 @@ function DemoBanner({
   onClear: () => Promise<void>;
   onExit: () => void;
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   return (
     <div
@@ -93,10 +95,7 @@ function DemoBanner({
         borderBottom: '2px solid #c45c26',
       }}
     >
-      <span>
-        <strong>Demo</strong> — data stays in this browser (localStorage / IndexedDB). Nothing is saved on
-        the server.
-      </span>
+      <span>{t('demo.banner')}</span>
       <span style={{ display: 'flex', gap: '0.5rem' }}>
         <button
           type="button"
@@ -118,7 +117,7 @@ function DemoBanner({
             cursor: 'pointer',
           }}
         >
-          Clear Demo Data
+          {t('demo.clearData')}
         </button>
         {canExit ? (
           <button
@@ -133,7 +132,7 @@ function DemoBanner({
               cursor: 'pointer',
             }}
           >
-            Exit Demo
+            {t('demo.exitDemo')}
           </button>
         ) : null}
       </span>

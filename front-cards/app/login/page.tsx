@@ -1,24 +1,19 @@
 'use client';
 
-/**
- * Login Page
- *
- * Entry point for user authentication via Tools Dashboard OAuth
- */
-
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { generateAuthorizationUrl, getOAuthErrorMessage } from '@/shared/lib/oauth-utils';
 import { OAUTH_CONFIG, USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
+import { LanguageSwitcher, useTranslation } from '@/features/i18n';
 
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for error in URL params (redirected from callback with error)
     const errorParam = searchParams.get('error');
     const errorDetail =
       searchParams.get('error_description') || searchParams.get('description');
@@ -34,40 +29,17 @@ function LoginPageContent() {
       const base = getOAuthErrorMessage(errorParam);
       setError(detail ? `${base}\n${detail}` : base);
       if (process.env.NODE_ENV === 'development') {
-        // Avoid Next overlay treating this as an uncaught "Console Error" — auth failures are expected paths.
         console.info('[login] OAuth redirect params:', { error: errorParam, description: detail || undefined });
       }
     }
 
-    // Check if OAuth parameters are present (pre-initiated from Tools Dashboard)
-    // Note: Pre-initiated flows do NOT include PKCE parameters (code_challenge)
-    const hasOAuthParams = searchParams.has('client_id') &&
-                          searchParams.has('state') &&
-                          searchParams.has('response_type');
+    const hasOAuthParams =
+      searchParams.has('client_id') &&
+      searchParams.has('state') &&
+      searchParams.has('response_type');
 
     if (hasOAuthParams && !errorParam) {
-      console.log('OAuth parameters detected from Tools Dashboard - using provided parameters...');
-      console.log('Parameters:', {
-        client_id: searchParams.get('client_id'),
-        redirect_uri: searchParams.get('redirect_uri'),
-        state: searchParams.get('state'),
-        scope: searchParams.get('scope'),
-        response_type: searchParams.get('response_type'),
-      });
-
-      // Use the OAuth parameters that Tools Dashboard already sent
-      // Don't generate new ones - just redirect with the same parameters
       const authUrl = `${OAUTH_CONFIG.authorizationEndpoint}?${searchParams.toString()}`;
-
-      console.log('=== OAuth Redirect Debug ===');
-      console.log('Authorization endpoint:', OAUTH_CONFIG.authorizationEndpoint);
-      console.log('Search params string:', searchParams.toString());
-      console.log('Full authorization URL:', authUrl);
-      console.log('URL length:', authUrl.length);
-      console.log('Contains "oauth":', authUrl.includes('oauth'));
-      console.log('Contains "/oauth/authorize":', authUrl.includes('/oauth/authorize'));
-      console.log('===========================');
-
       setIsLoading(true);
       window.location.href = authUrl;
     }
@@ -78,9 +50,6 @@ function LoginPageContent() {
       setIsLoading(true);
       setError(null);
 
-      console.log('Initiating OAuth flow (server-side)...');
-
-      // Call server-side API to generate authorization URL and store PKCE in cookies
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -98,23 +67,24 @@ function LoginPageContent() {
         throw new Error(data.error || 'Failed to get authorization URL');
       }
 
-      console.log('Authorization URL received from server');
-      console.log('PKCE data stored in HTTP-only cookies');
-      console.log('Redirecting to OAuth authorization endpoint...');
-
-      // Redirect to Tools Dashboard for authentication
       window.location.href = data.authorizationUrl;
     } catch (err) {
       console.error('Error initiating login:', err);
-      setError(`Failed to initiate login: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(
+        t('login.loginFailed', {
+          message: err instanceof Error ? err.message : 'Unknown error',
+        })
+      );
       setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <div className="max-w-md w-full">
-        {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="inline-block p-3 bg-blue-600 rounded-lg mb-4">
             <svg
@@ -132,17 +102,13 @@ function LoginPageContent() {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">E-Cards Designer</h1>
-          <p className="text-gray-600">Create and manage personalized e-cards at scale</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('login.title')}</h1>
+          <p className="text-gray-600">{t('login.subtitle')}</p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white rounded-lg shadow-xl p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 text-center">
-            Sign in to get started
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 text-center">{t('login.signInTitle')}</h2>
 
-          {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-start">
@@ -162,7 +128,6 @@ function LoginPageContent() {
             </div>
           )}
 
-          {/* Login Button */}
           <button
             onClick={handleLogin}
             disabled={isLoading}
@@ -176,49 +141,24 @@ function LoginPageContent() {
                   fill="none"
                   viewBox="0 0 24 24"
                 >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path
                     className="opacity-75"
                     fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Redirecting to Tools Dashboard...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z"
-                    clipRule="evenodd"
                   />
                 </svg>
-                Login with Tools Dashboard
+                {t('common.redirectingToToolsDashboard')}
               </>
+            ) : (
+              t('login.loginButton')
             )}
           </button>
 
-          {/* Info Box */}
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-900">
-              <strong>First time here?</strong> You'll be redirected to the Tools Dashboard
-              to authenticate. If you don't have an account, you can sign up there.
-            </p>
+            <p className="text-sm text-blue-900">{t('login.firstTime')}</p>
           </div>
 
-          {/* Footer Links */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="text-center space-y-2">
               <a
@@ -227,25 +167,22 @@ function LoginPageContent() {
                 rel="noopener noreferrer"
                 className="block text-sm text-blue-600 hover:text-blue-700 hover:underline"
               >
-                Manage Subscription
+                {t('login.manageSubscription')}
               </a>
-              <p className="text-xs text-gray-500">
-                Secured by OAuth 2.0 with PKCE
-              </p>
+              <p className="text-xs text-gray-500">{t('login.securedBy')}</p>
             </div>
           </div>
         </div>
 
-        {/* Additional Info */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            By signing in, you agree to our{' '}
+            {t('login.termsPrefix')}{' '}
             <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline">
-              Terms of Service
+              {t('login.terms')}
             </a>{' '}
-            and{' '}
+            {t('login.and')}{' '}
             <a href="#" className="text-blue-600 hover:text-blue-700 hover:underline">
-              Privacy Policy
+              {t('login.privacy')}
             </a>
           </p>
         </div>

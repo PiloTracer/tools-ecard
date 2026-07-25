@@ -3,76 +3,35 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth';
-import { USER_SUBSCRIPTION_URL, OAUTH_CONFIG } from '@/shared/lib/oauth-config';
-import { generateAuthorizationUrl } from '@/shared/lib/oauth-utils';
+import { LandingPage } from '@/features/i18n/components/LandingPage';
+import { useTranslation } from '@/features/i18n';
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useTranslation();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    // Check if OAuth parameters are present in URL (sent from Tools Dashboard)
-    // Note: Pre-initiated flows do NOT include PKCE parameters
-    const hasOAuthParams = searchParams.has('client_id') &&
-                          searchParams.has('state') &&
-                          searchParams.has('response_type');
+    const hasOAuthParams =
+      searchParams.has('client_id') &&
+      searchParams.has('state') &&
+      searchParams.has('response_type');
 
     if (hasOAuthParams && !isAuthenticated && !isLoading) {
-      // Tools Dashboard has pre-initiated OAuth flow
-      // Auto-redirect to login/OAuth flow
-      console.log('OAuth parameters detected in URL - passing to login page...');
       setIsRedirecting(true);
-
-      // Extract the state parameter if provided by Tools Dashboard
-      const externalState = searchParams.get('state');
-      if (externalState) {
-        console.log('Using external state parameter:', externalState);
-      }
-
-      // Redirect to login page WITH the OAuth parameters
-      // This is crucial - login page needs these parameters to redirect to authorization endpoint
-      const loginUrl = `/login?${searchParams.toString()}`;
-      console.log('=== Landing Page Redirect Debug ===');
-      console.log('Original search params:', searchParams.toString());
-      console.log('Login URL:', loginUrl);
-      console.log('URL length:', loginUrl.length);
-      console.log('===================================');
-
-      router.push(loginUrl);
-      return;
-    }
-
-    if (!isLoading && isAuthenticated) {
-      // Redirect authenticated users to dashboard
-      router.push('/dashboard');
+      router.push(`/login?${searchParams.toString()}`);
     }
   }, [isAuthenticated, isLoading, searchParams, router]);
 
-  const handleLogin = async () => {
-    try {
-      setIsRedirecting(true);
-
-      // Generate OAuth authorization URL and redirect immediately
-      const authUrl = await generateAuthorizationUrl();
-      window.location.href = authUrl;
-    } catch (error) {
-      console.error('Error initiating OAuth:', error);
-      setIsRedirecting(false);
-      // Fallback to login page
-      router.push('/login');
-    }
-  };
-
-  // Show loading/redirecting state
   if (isLoading || isRedirecting) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-center">
-          <div className="inline-block p-4 bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 rounded-full shadow-2xl mb-4">
+          <div className="mb-4 inline-block rounded-full bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 p-4 shadow-2xl">
             <svg
-              className="animate-spin h-12 w-12 text-white"
+              className="h-12 w-12 animate-spin text-white"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -84,163 +43,30 @@ function HomeContent() {
                 r="10"
                 stroke="currentColor"
                 strokeWidth="4"
-              ></circle>
+              />
               <path
                 className="opacity-75"
                 fill="currentColor"
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
+              />
             </svg>
           </div>
-          <p className="text-gray-400 font-medium">
-            {isRedirecting ? 'Redirecting to Tools Dashboard...' : 'Loading...'}
+          <p className="font-medium text-gray-400">
+            {isRedirecting ? t('common.redirectingToToolsDashboard') : t('common.loading')}
           </p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="relative flex min-h-screen items-center justify-center bg-black overflow-hidden">
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-teal-900/20" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(120,119,198,0.3),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(34,211,238,0.2),transparent_50%)]" />
-
-      <main className="relative z-10 flex flex-col items-center justify-center px-6 py-32 text-center max-w-4xl mx-auto">
-        {/* Logo/Icon area with gradient */}
-        <div className="mb-8 relative">
-          <div className="absolute inset-0 blur-3xl bg-gradient-to-r from-purple-500 via-blue-500 to-teal-500 opacity-30 rounded-full" />
-          <div className="relative bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 p-6 rounded-2xl shadow-2xl">
-            <svg
-              className="w-16 h-16 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z M12 3v4"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* Main title with gradient */}
-        <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-blue-400 to-teal-400 bg-clip-text text-transparent leading-tight">
-          E-Card + QR-Code
-          <br />
-          Batch Generator
-        </h1>
-
-        {/* Description */}
-        <p className="text-xl md:text-2xl text-gray-300 mb-4 max-w-2xl leading-relaxed">
-          Transform your workflow with professional batch card generation
-        </p>
-        <p className="text-lg text-gray-400 mb-12 max-w-2xl">
-          Create stunning personalized cards with dynamic QR codes, customizable templates, and intelligent name parsing.
-          From design to deployment in minutes.
-        </p>
-
-        {/* Features grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 w-full max-w-3xl">
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all">
-            <div className="text-3xl mb-3">🎨</div>
-            <h3 className="text-white font-semibold mb-2">Template Designer</h3>
-            <p className="text-gray-400 text-sm">Visual editor with drag-and-drop elements</p>
-          </div>
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all">
-            <div className="text-3xl mb-3">📊</div>
-            <h3 className="text-white font-semibold mb-2">Batch Import</h3>
-            <p className="text-gray-400 text-sm">Excel & text parsing with AI assistance</p>
-          </div>
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all">
-            <div className="text-3xl mb-3">⚡</div>
-            <h3 className="text-white font-semibold mb-2">Fast Rendering</h3>
-            <p className="text-gray-400 text-sm">High-performance card generation engine</p>
-          </div>
-        </div>
-
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-          <button
-            onClick={handleLogin}
-            disabled={isRedirecting}
-            className="group relative flex-1 h-14 px-8 rounded-xl overflow-hidden transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-blue-600 to-teal-600" />
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-blue-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <span className="relative z-10 text-white font-semibold text-lg flex items-center justify-center">
-              {isRedirecting ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Redirecting...
-                </>
-              ) : (
-                'Login with Tools Dashboard'
-              )}
-            </span>
-          </button>
-
-          <a
-            href={USER_SUBSCRIPTION_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative flex-1 h-14 px-8 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm border-2 border-white/20 hover:border-white/40 transition-all hover:scale-105 flex items-center justify-center"
-          >
-            <span className="relative z-10 text-white font-semibold text-lg">Subscribe at Tools Dashboard</span>
-          </a>
-        </div>
-
-        {/* Footer tagline */}
-        <div className="mt-12 flex flex-col items-center gap-2">
-          <p className="text-gray-500 text-sm">
-            Powered by AI Epic Studio · Designed for scale and style
-          </p>
-          <p className="text-gray-600 text-xs">
-            © {new Date().getFullYear()}{" "}
-            <a
-              href="https://AIEpicStudio.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 transition-colors underline"
-            >
-              AIEpicStudio.com
-            </a>
-            {" "}· All rights reserved
-          </p>
-        </div>
-      </main>
-    </div>
-  );
+  return <LandingPage />;
 }
 
 export default function Home() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center bg-black">
           <p className="text-white">Loading…</p>
         </div>
       }

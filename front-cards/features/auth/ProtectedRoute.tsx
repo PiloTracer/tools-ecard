@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthContext';
 import { isDemoMode } from '@/features/demo/isDemoMode';
+import { useTranslation } from '@/features/i18n';
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -25,6 +26,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isDemoMode()) {
@@ -67,7 +69,7 @@ export function ProtectedRoute({
               ></path>
             </svg>
           </div>
-          <p className="text-gray-600 font-medium">Checking authentication...</p>
+          <p className="text-gray-600 font-medium">{t('common.checkingAuthentication')}</p>
         </div>
       </div>
     );

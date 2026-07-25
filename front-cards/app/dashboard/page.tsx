@@ -15,9 +15,11 @@ import Link from 'next/link';
 import { QuickActions } from '@/features/simple-quick-actions';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageHeaderActions, useTranslation } from '@/features/i18n';
 
 function DashboardInner() {
   const { user, logout } = useAuth();
+  const { t, locale } = useTranslation();
   const { ensureDefaultProject, selectedProjectId, loading: projectsLoading, error: projectsError } = useProjects();
   const router = useRouter();
   /** Prevents infinite loop: ensureDefault → loadProjects → loading false triggers this effect again. */
@@ -81,12 +83,13 @@ function DashboardInner() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">E-Cards Designer</h1>
-                <p className="text-sm text-gray-500">Welcome back, {user.username}</p>
+                <h1 className="text-xl font-bold text-gray-900">{t('dashboard.title')}</h1>
+                <p className="text-sm text-gray-500">{t('dashboard.welcomeBack', { username: user.username })}</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
+              <PageHeaderActions />
               <Link
                 href="/profile"
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -94,7 +97,7 @@ function DashboardInner() {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                Profile
+                {t('common.profile')}
               </Link>
               <button
                 onClick={logout}
@@ -113,7 +116,7 @@ function DashboardInner() {
                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                   />
                 </svg>
-                Logout
+                {t('common.logout')}
               </button>
             </div>
           </div>
@@ -124,22 +127,22 @@ function DashboardInner() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* User Info Card */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Account</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('dashboard.yourAccount')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-500">Email</p>
+              <p className="text-sm text-gray-500">{t('dashboard.email')}</p>
               <p className="font-medium text-gray-900">{user.email}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Username</p>
+              <p className="text-sm text-gray-500">{t('dashboard.username')}</p>
               <p className="font-medium text-gray-900">{user.username}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Display Name</p>
+              <p className="text-sm text-gray-500">{t('dashboard.displayName')}</p>
               <p className="font-medium text-gray-900">{user.display_name || user.username}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">User ID</p>
+              <p className="text-sm text-gray-500">{t('dashboard.userId')}</p>
               <p className="font-mono text-sm text-gray-600">{user.id}</p>
             </div>
           </div>
@@ -148,14 +151,14 @@ function DashboardInner() {
         {/* Subscription Info Card */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Subscription</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.subscription')}</h2>
             <a
               href={USER_SUBSCRIPTION_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
             >
-              Manage Subscription →
+              {t('dashboard.manageSubscription')}
             </a>
           </div>
 
@@ -164,7 +167,7 @@ function DashboardInner() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Tier */}
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Current Plan</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('dashboard.currentPlan')}</p>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 capitalize">
                     {user.subscription.tier}
                   </span>
@@ -172,7 +175,7 @@ function DashboardInner() {
 
                 {/* Status */}
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Status</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('dashboard.status')}</p>
                   <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${
                       user.subscription.status === 'active'
@@ -188,20 +191,19 @@ function DashboardInner() {
 
                 {/* Reset Date */}
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Billing Cycle Resets</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('dashboard.billingResets')}</p>
                   <p className="font-medium text-gray-900">
-                    {new Date(user.subscription.resetDate).toLocaleDateString()}
+                    {new Date(user.subscription.resetDate).toLocaleDateString(locale === 'es' ? 'es-MX' : 'en-US')}
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Usage & Limits</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">{t('dashboard.usageLimits')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Cards Usage */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">Cards Generated</span>
+                      <span className="text-sm text-gray-600">{t('dashboard.cardsGenerated')}</span>
                       <span className="text-sm font-medium text-gray-900">
                         {user.subscription.currentUsage} / {user.subscription.cardsPerMonth}
                       </span>
@@ -219,12 +221,11 @@ function DashboardInner() {
                     </div>
                   </div>
 
-                  {/* LLM Credits */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">LLM Credits</span>
+                      <span className="text-sm text-gray-600">{t('dashboard.llmCredits')}</span>
                       <span className="text-sm font-medium text-gray-900">
-                        {user.subscription.llmCredits} remaining
+                        {t('dashboard.llmCreditsRemaining', { count: user.subscription.llmCredits })}
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -256,19 +257,8 @@ function DashboardInner() {
                   />
                 </svg>
                 <div>
-                  <p className="font-medium text-yellow-900">Subscription data not available</p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Your subscription information could not be loaded. Please visit the{' '}
-                    <a
-                      href={USER_SUBSCRIPTION_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-yellow-800"
-                    >
-                      Tools Dashboard
-                    </a>{' '}
-                    to view your subscription details.
-                  </p>
+                  <p className="font-medium text-yellow-900">{t('dashboard.subscriptionUnavailable')}</p>
+                  <p className="text-sm text-yellow-700 mt-1">{t('dashboard.subscriptionUnavailableBody')}</p>
                 </div>
               </div>
             </div>
@@ -302,13 +292,8 @@ function DashboardInner() {
               />
             </svg>
             <div>
-              <p className="font-medium text-green-900">
-                ✨ Successfully authenticated with OAuth 2.0 + PKCE!
-              </p>
-              <p className="text-sm text-green-700 mt-1">
-                You're now logged in securely via the Tools Dashboard. Your session is
-                protected with httpOnly cookies and refresh tokens.
-              </p>
+              <p className="font-medium text-green-900">{t('dashboard.authSuccessTitle')}</p>
+              <p className="text-sm text-green-700 mt-1">{t('dashboard.authSuccessBody')}</p>
             </div>
           </div>
         </div>

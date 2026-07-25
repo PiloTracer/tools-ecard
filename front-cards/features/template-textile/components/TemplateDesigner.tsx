@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProjects } from '@/features/simple-projects';
+import { useTranslation } from '@/features/i18n';
 import { DesignCanvas } from './Canvas/DesignCanvas';
 import { CanvasControls } from './Canvas/CanvasControls';
 import { CanvasSettings } from './CanvasSettings';
@@ -17,6 +18,7 @@ import {
 
 export function TemplateDesigner() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { selectedProject } = useProjects();
   const { currentTemplate, createTemplate, hasUnsavedChanges } = useTemplateStore();
   const setSaveMetadata = useTemplateStore((s) => s.setSaveMetadata);
@@ -37,7 +39,7 @@ export function TemplateDesigner() {
 
   const goToDashboard = () => {
     if (hasUnsavedChanges) {
-      const ok = window.confirm('You have unsaved changes. Leave the designer anyway?');
+      const ok = window.confirm(t('designer.unsavedChanges'));
       if (!ok) {
         return;
       }
@@ -48,29 +50,29 @@ export function TemplateDesigner() {
   // Initialize with a default template if none exists
   useEffect(() => {
     if (!currentTemplate) {
-      createTemplate('Untitled Template', DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
+      createTemplate(t('designer.untitledTemplate'), DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
       setDimensions(DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
     }
-  }, [currentTemplate, createTemplate, setDimensions]);
+  }, [currentTemplate, createTemplate, setDimensions, t]);
 
   const dashboardButton = (
     <button
       type="button"
       onClick={goToDashboard}
       className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-slate-600/80 bg-slate-700/80 px-2 py-1 text-left text-slate-200 transition hover:bg-slate-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-2.5 sm:py-1.5"
-      aria-label="Back to dashboard"
+      aria-label={t('common.back')}
     >
       <svg className="h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
       </svg>
-      <span className="whitespace-nowrap text-xs font-medium sm:text-sm">Inicio</span>
+      <span className="whitespace-nowrap text-xs font-medium sm:text-sm">{t('designer.backToDashboard')}</span>
     </button>
   );
 
   const appTitle = (
     <p className="min-w-0 select-none truncate text-xs text-slate-400 sm:text-sm">
-      <span className="text-slate-200">E-Cards Designer</span>
-      <span className="text-slate-500"> | Tools</span>
+      <span className="text-slate-200">{t('designer.appTitle')}</span>
+      <span className="text-slate-500"> | {t('designer.appSubtitle')}</span>
     </p>
   );
 

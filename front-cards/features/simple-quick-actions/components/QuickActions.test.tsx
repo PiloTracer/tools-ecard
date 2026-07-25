@@ -5,9 +5,10 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { QuickActions } from './QuickActions';
+import { renderWithLocale } from '@/features/i18n/testUtils';
 
 // Mock the useProjects hook
 jest.mock('../../simple-projects', () => ({
@@ -38,7 +39,7 @@ describe('QuickActions Component', () => {
     });
 
     it('renders all action buttons and components', () => {
-      render(
+      renderWithLocale(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
           onViewBatches={mockOnViewBatches}
@@ -55,7 +56,7 @@ describe('QuickActions Component', () => {
     });
 
     it('calls callbacks when buttons are clicked', () => {
-      render(
+      renderWithLocale(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
           onViewBatches={mockOnViewBatches}
@@ -70,7 +71,7 @@ describe('QuickActions Component', () => {
     });
 
     it('does not show warning message', () => {
-      render(<QuickActions />);
+      renderWithLocale(<QuickActions />);
       expect(screen.queryByText(/select a project to enable actions/i)).not.toBeInTheDocument();
     });
   });
@@ -84,7 +85,7 @@ describe('QuickActions Component', () => {
     });
 
     it('renders all action buttons disabled', () => {
-      render(
+      renderWithLocale(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
           onViewBatches={mockOnViewBatches}
@@ -99,7 +100,7 @@ describe('QuickActions Component', () => {
     });
 
     it('does not call callbacks when buttons are clicked', () => {
-      render(
+      renderWithLocale(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
           onViewBatches={mockOnViewBatches}
@@ -114,7 +115,7 @@ describe('QuickActions Component', () => {
     });
 
     it('shows warning message', () => {
-      render(<QuickActions />);
+      renderWithLocale(<QuickActions />);
       expect(screen.getByText(/select a project to enable actions/i)).toBeInTheDocument();
     });
   });
@@ -128,7 +129,7 @@ describe('QuickActions Component', () => {
     });
 
     it('renders all action buttons disabled', () => {
-      render(
+      renderWithLocale(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
           onViewBatches={mockOnViewBatches}
@@ -143,7 +144,7 @@ describe('QuickActions Component', () => {
     });
 
     it('shows loading state', () => {
-      render(<QuickActions />);
+      renderWithLocale(<QuickActions />);
       expect(screen.getByText(/loading projects/i)).toBeInTheDocument();
     });
   });
@@ -157,7 +158,7 @@ describe('QuickActions Component', () => {
     });
 
     it('applies custom className', () => {
-      const { container } = render(
+      const { container } = renderWithLocale(
         <QuickActions className="custom-class" />
       );
 
@@ -166,7 +167,7 @@ describe('QuickActions Component', () => {
     });
 
     it('has proper accessibility attributes', () => {
-      render(
+      renderWithLocale(
         <QuickActions
           onCreateTemplate={mockOnCreateTemplate}
           onViewBatches={mockOnViewBatches}

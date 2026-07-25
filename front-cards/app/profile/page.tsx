@@ -11,16 +11,19 @@ import { useAuth } from '@/features/auth';
 import { ProtectedRoute } from '@/features/auth';
 import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
 import Link from 'next/link';
+import { PageHeaderActions, useTranslation } from '@/features/i18n';
 
 function ProfileInner() {
   const { user, logout } = useAuth();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === 'es' ? 'es-MX' : 'en-US';
 
   if (!user) {
     return null;
   }
 
   const memberSince = user.createdAt
-    ? new Date(user.createdAt).toLocaleDateString('en-US', {
+    ? new Date(user.createdAt).toLocaleDateString(dateLocale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -54,20 +57,23 @@ function ProfileInner() {
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Dashboard
+                {t('common.dashboard')}
               </Link>
               <div className="h-5 w-px bg-gray-200" />
-              <h1 className="text-xl font-bold text-gray-900">Profile</h1>
+              <h1 className="text-xl font-bold text-gray-900">{t('profile.title')}</h1>
             </div>
-            <button
+            <div className="flex items-center gap-3">
+              <PageHeaderActions />
+              <button
               onClick={logout}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              Logout
+              {t('common.logout')}
             </button>
+            </div>
           </div>
         </div>
       </header>
@@ -90,7 +96,7 @@ function ProfileInner() {
               <div className="text-white">
                 <h2 className="text-2xl font-bold">{user.display_name || user.username}</h2>
                 <p className="text-blue-100 text-sm">{user.email}</p>
-                <p className="text-blue-200 text-xs mt-1">Member since {memberSince}</p>
+                <p className="text-blue-200 text-xs mt-1">{t('profile.memberSince')} {memberSince}</p>
               </div>
             </div>
           </div>
@@ -98,22 +104,22 @@ function ProfileInner() {
           {/* Profile Details */}
           <div className="px-6 py-5 space-y-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Account Details</h3>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('profile.accountDetails')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 mb-1">Display Name</p>
+                  <p className="text-xs text-gray-500 mb-1">{t('dashboard.displayName')}</p>
                   <p className="font-medium text-gray-900">{user.display_name || '—'}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 mb-1">Username</p>
+                  <p className="text-xs text-gray-500 mb-1">{t('dashboard.username')}</p>
                   <p className="font-medium text-gray-900">{user.username}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 mb-1">Email</p>
+                  <p className="text-xs text-gray-500 mb-1">{t('dashboard.email')}</p>
                   <p className="font-medium text-gray-900">{user.email}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 mb-1">User ID</p>
+                  <p className="text-xs text-gray-500 mb-1">{t('dashboard.userId')}</p>
                   <p className="font-mono text-sm text-gray-600 break-all">{user.id}</p>
                 </div>
               </div>
@@ -122,7 +128,7 @@ function ProfileInner() {
             {/* Subscription */}
             {user.subscription ? (
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Subscription</h3>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('profile.subscription')}</h3>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -139,7 +145,7 @@ function ProfileInner() {
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                     >
-                      Manage subscription →
+                      {t('dashboard.manageSubscription')}
                     </a>
                   </div>
 
@@ -147,7 +153,7 @@ function ProfileInner() {
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>Cards this period</span>
+                        <span>{t('profile.cardsThisPeriod')}</span>
                         <span>{user.subscription.currentUsage} / {user.subscription.cardsPerMonth}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -159,7 +165,7 @@ function ProfileInner() {
                     </div>
                     <div>
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>LLM Credits remaining</span>
+                        <span>{t('dashboard.llmCredits')}</span>
                         <span>{user.subscription.llmCredits}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -172,23 +178,23 @@ function ProfileInner() {
                   </div>
 
                   <p className="text-xs text-gray-400">
-                    Reset date: {new Date(user.subscription.resetDate).toLocaleDateString()}
+                    {t('profile.resetDate')} {new Date(user.subscription.resetDate).toLocaleDateString(dateLocale)}
                   </p>
                 </div>
               </div>
             ) : (
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Subscription</h3>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('profile.subscription')}</h3>
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <p className="text-sm text-amber-800">
-                    No subscription data available.{' '}
+                    {t('profile.noSubscription')}{' '}
                     <a
                       href={USER_SUBSCRIPTION_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-medium text-amber-900 underline"
                     >
-                      View plans
+                      {t('profile.viewPlans')}
                     </a>
                   </p>
                 </div>
@@ -199,7 +205,7 @@ function ProfileInner() {
 
         {/* Quick Actions */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Quick Actions</h3>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('quickActions.title')}</h3>
           <div className="flex flex-wrap gap-3">
             <Link
               href="/dashboard"
@@ -211,7 +217,7 @@ function ProfileInner() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
-              Dashboard
+              {t('common.dashboard')}
             </Link>
             <a
               href={USER_SUBSCRIPTION_URL}
@@ -222,7 +228,7 @@ function ProfileInner() {
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
-              Manage Plan
+              {t('profile.managePlan')}
             </a>
           </div>
         </div>
