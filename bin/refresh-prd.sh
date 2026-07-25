@@ -244,6 +244,13 @@ log "  Services:  ${SERVICES[*]}"
 log "  Build ID:  $ECARDS_API_BUILD_ID"
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Refresh is targeted-only: the stack must already be provisioned. First boot
+# (or a downed stack) goes through start.sh, which brings services up in
+# dependency order with the long health windows.
+if [[ -z "$(run_compose ps -aq 2>/dev/null | head -1)" ]]; then
+  die "Stack '$PROJ_NAME' is not provisioned on this host — run ./bin/start.sh ${MODE} up first (refresh is for targeted rebuilds of a running stack)."
+fi
+
 {
   echo ""
   echo "=== refresh-prd $(date -u +%Y-%m-%dT%H:%M:%SZ) services=${SERVICES[*]} sha=${ECARDS_API_BUILD_ID} ==="

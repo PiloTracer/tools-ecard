@@ -173,6 +173,8 @@ bash bin/verify-prd-env.sh .env.demo demo   # must exit 0; fails if DEMO_MODE=fa
 ./bin/refresh-demo.sh          # same, for the demo stack (= refresh-prd.sh demo)
 ```
 
+**Env files are per-host (gitignored — they hold secrets, `git pull` never delivers them).** One-time setup on each host: copy the canonical `.env.prd` / `.env.demo` to the host (e.g. `scp`, then `chmod 600`) or seed from `.env.prd.example` / `.env.demo.example` and fill secrets. After that, the steady-state loop is just `git pull` + `./bin/refresh-prd.sh` / `./bin/refresh-demo.sh`. Refresh scripts refuse to run on an unprovisioned stack — first boot is always `./bin/start.sh <mode> up`.
+
 **Migration note (one-time, when the demo used to run as the `_prd_tcrd` project):** the old demo's volumes are named `tools_dashboard_prd_tcrd_*_prd_data`. If production must start clean, remove them before the first `prd up` (`docker volume rm tools_dashboard_prd_tcrd_postgres_prd_data tools_dashboard_prd_tcrd_redis_prd_data tools_dashboard_prd_tcrd_cassandra_prd_data`); if the old demo data should be kept, clone it into the demo names first, e.g. `docker run --rm -v tools_dashboard_prd_tcrd_postgres_prd_data:/from -v tools_dashboard_demo_tcrd_postgres_demo_data:/to busybox sh -c 'cp -a /from/. /to/'` (repeat for redis/cassandra), then remove the old volumes.
 
 Compose project / volume names come from `.env.prd` (`COMPOSE_PROJECT_NAME`, typically `tools_dashboard_prd_tcrd`). Volume backups live under:
