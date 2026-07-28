@@ -4,6 +4,7 @@
  */
 
 import JSZip from 'jszip';
+import { decodeXmlEntities } from '../../shared/lib/decodeXmlEntities';
 import { capitalizeName, DEMO_PERSON_NAME_KEYS } from './nameCapitalize';
 
 export type DemoParsedTable = {
@@ -208,15 +209,6 @@ function normalizeHeaderKey(raw: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '');
-}
-
-function decodeXmlEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
 }
 
 function fileExtension(name: string): string {

@@ -13,6 +13,7 @@ import type { ContactRecord } from '@/features/batch-records/types';
 import { isDemoMode } from '@/features/demo/isDemoMode';
 import { generateVCardFromRecord } from './vcardGenerator';
 import { createOriginalPositionMap, applyLineCompaction, type PositionMap } from './lineCompactionService';
+import { decodeXmlEntities } from '@/shared/lib/decodeXmlEntities';
 
 /**
  * Batch record from API (ContactRecordFull type)
@@ -266,7 +267,7 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
 
         // Priority: record value > empty string (if no value, clear the field)
         // Do NOT re-capitalize here — casing is fixed at ingest; user edits must be preserved.
-        const newText = fieldValue || '';
+        const newText = fieldValue ? decodeXmlEntities(String(fieldValue)) : '';
 
         return {
           ...textElement,

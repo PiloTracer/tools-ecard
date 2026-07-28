@@ -304,6 +304,39 @@ describe('demoSpreadsheetParser', () => {
       ]);
     });
 
+    it('decodes numeric XML entities in sharedStrings (accented names)', async () => {
+      const zip = new JSZip();
+      zip.file(
+        'xl/sharedStrings.xml',
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+         <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4">
+           <si><t>Nombre</t></si><si><t>Correo</t></si>
+           <si><t>Pedro Elena L&#243;pez Ram&#237;rez</t></si><si><t>pedro@example.com</t></si>
+         </sst>`
+      );
+      zip.file(
+        'xl/worksheets/sheet1.xml',
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+           <sheetData>
+             <row r="1">
+               <c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>
+             </row>
+             <row r="2">
+               <c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c>
+             </row>
+           </sheetData>
+         </worksheet>`
+      );
+      const blob = await zip.generateAsync({ type: 'uint8array' });
+      const file = new File([new Uint8Array(blob)], 'accented.xlsx', {
+        type: 'application/vnd.openxmlformats.officedocument.spreadsheetml.sheet',
+      });
+
+      const table = await parseDemoSpreadsheetFile(file);
+      expect(table.rows[0][0]).toBe('Pedro Elena López Ramírez');
+    });
+
     it('rejects legacy .xls with a clear error', async () => {
       const file = new File([new Uint8Array([0xd0, 0xcf])], 'legacy.xls', {
         type: 'application/vnd.ms-excel',

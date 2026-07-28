@@ -5,6 +5,7 @@
 
 import { createCanvas, loadImage, type CanvasRenderingContext2D } from 'canvas';
 import QRCode from 'qrcode';
+import { decodeXmlEntities } from '../utils/decodeXmlEntities';
 
 export interface TemplateElementJson {
   id: string;
@@ -77,7 +78,8 @@ function resolveText(element: TemplateElementJson, record?: RecordFieldValues): 
     const value = record[key];
     if (value != null && String(value).trim() !== '') {
       // Use stored value as-is — casing is fixed at ingest; user edits must be preserved.
-      return String(value);
+      // Decode any XML/HTML entities left from legacy ingest paths.
+      return decodeXmlEntities(String(value));
     }
   }
   return element.text ?? '';

@@ -51,6 +51,28 @@ describe('fabricTemplateRenderer', () => {
     expect(buffer.length).toBeGreaterThan(100);
   });
 
+  it('decodes numeric XML entities in stored record values', async () => {
+    const { buffer } = await renderTemplateToPng(
+      {
+        width: 400,
+        height: 120,
+        elements: [
+          {
+            id: 'name',
+            type: 'text',
+            x: 10,
+            y: 10,
+            fieldId: 'full_name',
+            fontSize: 18,
+          },
+        ],
+      },
+      { fullName: 'Pedro Elena L&#243;pez Ram&#237;rez' }
+    );
+
+    expect(buffer.length).toBeGreaterThan(100);
+  });
+
   it('renders QR code elements', async () => {
     const { buffer } = await renderTemplateToPng({
       width: 200,
