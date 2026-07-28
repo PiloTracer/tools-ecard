@@ -1,21 +1,34 @@
 /**
- * Demo browser store — localStorage JSON + IndexedDB blobs
+ * Demo browser store — localStorage JSON + IndexedDB blobs, scoped per OAuth user.
  */
 
-import {
-  DEMO_BATCHES_KEY,
-  DEMO_BATCH_RECORDS_PREFIX,
-  DEMO_BLOB_STORE,
-  DEMO_FONTS_META_KEY,
-  DEMO_IDB_NAME,
-  DEMO_IDB_VERSION,
-  DEMO_PROJECTS_KEY,
-  DEMO_SELECTED_PROJECT_KEY,
-  DEMO_TEMPLATES_KEY,
-} from './demoConstants';
+import { isDemoMode } from './isDemoMode';
+import { resolveDemoStorageUserId, demoUserIdbName, demoUserStoragePrefix } from './demoStorageUserId';
+import { DEMO_BATCH_RECORDS_PREFIX, DEMO_BLOB_STORE, DEMO_IDB_VERSION } from './demoConstants';
 
-function lsGet<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
+const KEY_SUFFIX = {
+  projects: 'projects',
+  selectedProjectId: 'selectedProjectId',
+  templates: 'templates',
+  batches: 'batches',
+  fonts: 'fonts',
+} as const;
+
+let activeUserId: string | null = null;
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function requireUserId(): string | null {
+  return activeUserId;
+}
+
+function scopedKey(suffix: string): string | null {
+  const uid = requireUserId();
+  if (!uid) return null;
+  return `${demoUserStoragePrefix(uid)}${suffix}`;
+}
+
+function lsGet<T>(key: string | null, fallback: T): T {
+  if (!key || typeof window === 'undefined') return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return fallback;
@@ -25,25 +38,23 @@ function lsGet<T>(key: string, fallback: T): T {
   }
 }
 
-function lsSet(key: string, value: unknown): void {
-  if (typeof window === 'undefined') return;
+function lsSet(key: string | null, value: unknown): void {
+  if (!key || typeof window === 'undefined') return;
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-function lsRemove(key: string): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(key);
-}
-
-let dbPromise: Promise<IDBDatabase> | null = null;
-
 function openDb(): Promise<IDBDatabase> {
+  const uid = requireUserId();
+  if (!uid) {
+    return Promise.reject(new Error('Demo store: no active user'));
+  }
   if (typeof indexedDB === 'undefined') {
     return Promise.reject(new Error('IndexedDB unavailable'));
   }
+  const dbName = demoUserIdbName(uid);
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DEMO_IDB_NAME, DEMO_IDB_VERSION);
+      const req = indexedDB.open(dbName, DEMO_IDB_VERSION);
       req.onerror = () => reject(req.error);
       req.onsuccess = () => resolve(req.result);
       req.onupgradeneeded = () => {
@@ -58,58 +69,70 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 export const demoStore = {
+  setActiveUserId(userId: string | null): void {
+    if (activeUserId === userId) return;
+    activeUserId = userId;
+    dbPromise = null;
+  },
+
+  getActiveUserId(): string | null {
+    return activeUserId;
+  },
+
   getProjects<T>(): T[] {
-    return lsGet<T[]>(DEMO_PROJECTS_KEY, []);
+    return lsGet<T[]>(scopedKey(KEY_SUFFIX.projects), []);
   },
 
   setProjects<T>(projects: T[]): void {
-    lsSet(DEMO_PROJECTS_KEY, projects);
+    lsSet(scopedKey(KEY_SUFFIX.projects), projects);
   },
 
   getSelectedProjectId(): string | null {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(DEMO_SELECTED_PROJECT_KEY);
+    const key = scopedKey(KEY_SUFFIX.selectedProjectId);
+    if (!key || typeof window === 'undefined') return null;
+    return window.localStorage.getItem(key);
   },
 
   setSelectedProjectId(id: string | null): void {
-    if (typeof window === 'undefined') return;
+    const key = scopedKey(KEY_SUFFIX.selectedProjectId);
+    if (!key || typeof window === 'undefined') return;
     if (id == null) {
-      window.localStorage.removeItem(DEMO_SELECTED_PROJECT_KEY);
+      window.localStorage.removeItem(key);
     } else {
-      window.localStorage.setItem(DEMO_SELECTED_PROJECT_KEY, id);
+      window.localStorage.setItem(key, id);
     }
   },
 
   getTemplates<T>(): T[] {
-    return lsGet<T[]>(DEMO_TEMPLATES_KEY, []);
+    return lsGet<T[]>(scopedKey(KEY_SUFFIX.templates), []);
   },
 
   setTemplates<T>(templates: T[]): void {
-    lsSet(DEMO_TEMPLATES_KEY, templates);
+    lsSet(scopedKey(KEY_SUFFIX.templates), templates);
   },
 
   getBatches<T>(): T[] {
-    return lsGet<T[]>(DEMO_BATCHES_KEY, []);
+    return lsGet<T[]>(scopedKey(KEY_SUFFIX.batches), []);
   },
 
   setBatches<T>(batches: T[]): void {
-    lsSet(DEMO_BATCHES_KEY, batches);
+    lsSet(scopedKey(KEY_SUFFIX.batches), batches);
   },
 
   getBatchRecords<T>(batchId: string): T[] {
-    return lsGet<T[]>(`${DEMO_BATCH_RECORDS_PREFIX}${batchId}`, []);
+    return lsGet<T[]>(scopedKey(`${DEMO_BATCH_RECORDS_PREFIX}${batchId}`), []);
   },
 
   setBatchRecords<T>(batchId: string, records: T[]): void {
-    lsSet(`${DEMO_BATCH_RECORDS_PREFIX}${batchId}`, records);
+    lsSet(scopedKey(`${DEMO_BATCH_RECORDS_PREFIX}${batchId}`), records);
   },
 
   getFontsMeta<T>(): T[] {
-    return lsGet<T[]>(DEMO_FONTS_META_KEY, []);
+    return lsGet<T[]>(scopedKey(KEY_SUFFIX.fonts), []);
   },
 
   setFontsMeta<T>(fonts: T[]): void {
-    lsSet(DEMO_FONTS_META_KEY, fonts);
+    lsSet(scopedKey(KEY_SUFFIX.fonts), fonts);
   },
 
   async putBlob(id: string, data: string, mimeType: string): Promise<void> {
@@ -143,33 +166,39 @@ export const demoStore = {
   },
 
   async clearAll(): Promise<void> {
-    if (typeof window === 'undefined') return;
+    const uid = requireUserId();
+    if (!uid || typeof window === 'undefined') return;
+
+    const prefix = demoUserStoragePrefix(uid);
     const keysToRemove: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i);
-      if (k && k.startsWith('ecards:demo:') && k !== 'ecards:demo:enabled') {
+      if (k && k.startsWith(prefix)) {
         keysToRemove.push(k);
       }
     }
-    // also known keys
-    [
-      DEMO_PROJECTS_KEY,
-      DEMO_SELECTED_PROJECT_KEY,
-      DEMO_TEMPLATES_KEY,
-      DEMO_BATCHES_KEY,
-      DEMO_FONTS_META_KEY,
-    ].forEach((k) => lsRemove(k));
-    keysToRemove.forEach((k) => lsRemove(k));
+    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
 
+    const dbName = demoUserIdbName(uid);
     dbPromise = null;
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.deleteDatabase(DEMO_IDB_NAME);
+      const req = indexedDB.deleteDatabase(dbName);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
       req.onblocked = () => resolve();
     });
   },
 };
+
+export function bindDemoStoreToOAuthUser(
+  user: Pick<{ id: string; email: string }, 'id' | 'email'> | null
+): void {
+  if (!isDemoMode()) {
+    demoStore.setActiveUserId(null);
+    return;
+  }
+  demoStore.setActiveUserId(resolveDemoStorageUserId(user));
+}
 
 export function newDemoId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;

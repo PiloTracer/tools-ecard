@@ -143,8 +143,8 @@ class ResourceManager {
           continue;
         }
 
-        // Check local cache first
-        const cached = await browserStorageService.getResource(hash);
+        // Check local cache first (normal mode only — demo uses per-user demoStore)
+        const cached = isDemoMode() ? null : await browserStorageService.getResource(hash);
         if (cached && cached.url) {
           processed.push({
             originalData: resource.data,
@@ -162,14 +162,16 @@ class ResourceManager {
 
         const url = await uploadPromise;
 
-        // Cache the result
-        await browserStorageService.cacheResource({
-          hash,
-          url,
-          data: resource.data,
-          type: resource.type,
-          timestamp: Date.now()
-        });
+        // Cache the result (normal mode only)
+        if (!isDemoMode()) {
+          await browserStorageService.cacheResource({
+            hash,
+            url,
+            data: resource.data,
+            type: resource.type,
+            timestamp: Date.now()
+          });
+        }
 
         processed.push({
           originalData: resource.data,

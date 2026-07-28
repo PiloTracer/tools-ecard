@@ -3,17 +3,14 @@
  */
 
 export const DEMO_ENABLED_KEY = 'ecards:demo:enabled';
-export const DEMO_PROJECTS_KEY = 'ecards:demo:projects';
-export const DEMO_SELECTED_PROJECT_KEY = 'ecards:demo:selectedProjectId';
-export const DEMO_TEMPLATES_KEY = 'ecards:demo:templates';
-export const DEMO_BATCHES_KEY = 'ecards:demo:batches';
-export const DEMO_BATCH_RECORDS_PREFIX = 'ecards:demo:batchRecords:';
-export const DEMO_FONTS_META_KEY = 'ecards:demo:fonts';
-
-export const DEMO_IDB_NAME = 'ecards-demo';
+/** Suffix under per-user namespace — full key: ecards:demo:u:{userId}:batchRecords:{batchId} */
+export const DEMO_BATCH_RECORDS_PREFIX = 'batchRecords:';
 export const DEMO_IDB_VERSION = 1;
 export const DEMO_BLOB_STORE = 'blobs';
 
+/**
+ * @deprecated Demo auth uses real OAuth users. Kept for legacy tests/docs only.
+ */
 export const DEMO_USER = {
   id: 'demo-user',
   email: 'demo@localhost',

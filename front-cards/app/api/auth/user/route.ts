@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { oauthServerFetch } from '@/shared/server/oauth-fetch';
-import type { User } from '@/shared/types/auth';
+import { normalizeOAuthUser } from '@/shared/lib/normalizeOAuthUser';
 
 // OAuth configuration from environment variables
 const OAUTH_CONFIG = {
@@ -54,7 +54,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user: User = await userResponse.json();
+    const user = normalizeOAuthUser(await userResponse.json());
+    if (!user) {
+      return NextResponse.json({ authenticated: false as const });
+    }
 
     return NextResponse.json(user);
   } catch (error) {

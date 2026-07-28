@@ -6,6 +6,8 @@ import { projectService } from '../services/projectService';
 import { projectsErrorDisplayFromCaught } from '../services/projectsApiUserError';
 import type { Project, UpdateProjectRequest } from '../types';
 import type { ProjectsErrorDisplay } from '../types/errors';
+import { isDemoMode } from '@/features/demo/isDemoMode';
+import { demoStore } from '@/features/demo/demoStore';
 
 const SELECTED_PROJECT_KEY = 'ecards_selected_project';
 
@@ -64,9 +66,12 @@ export function ProjectsProvider({ children, sessionUserId }: ProjectsProviderPr
 
   // Sync selected project with localStorage
   useEffect(() => {
-    console.log('[ProjectsContext] selectedProjectId changed to:', selectedProjectId);
     if (selectedProjectId) {
-      localStorage.setItem(SELECTED_PROJECT_KEY, selectedProjectId);
+      if (isDemoMode()) {
+        demoStore.setSelectedProjectId(selectedProjectId);
+      } else {
+        localStorage.setItem(SELECTED_PROJECT_KEY, selectedProjectId);
+      }
     }
   }, [selectedProjectId]);
 
@@ -78,7 +83,9 @@ export function ProjectsProvider({ children, sessionUserId }: ProjectsProviderPr
       const response = await projectService.getProjects();
       setProjects(response.projects);
 
-      const storedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
+      const storedProjectId = isDemoMode()
+        ? demoStore.getSelectedProjectId()
+        : localStorage.getItem(SELECTED_PROJECT_KEY);
 
       if (storedProjectId && response.projects.find(p => p.id === storedProjectId)) {
         setSelectedProjectId(storedProjectId);
@@ -146,7 +153,9 @@ export function ProjectsProvider({ children, sessionUserId }: ProjectsProviderPr
     } catch (err) {
       console.error('[ProjectsContext.selectProject] ERROR:', err);
       setError(projectsErrorDisplayFromCaught(err));
-      const storedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
+      const storedProjectId = isDemoMode()
+        ? demoStore.getSelectedProjectId()
+        : localStorage.getItem(SELECTED_PROJECT_KEY);
       if (storedProjectId) {
         setSelectedProjectId(storedProjectId);
       }

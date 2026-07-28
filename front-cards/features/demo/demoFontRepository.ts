@@ -3,7 +3,6 @@
  */
 
 import type { Font } from '@/features/template-textile/services/fontService';
-import { DEMO_USER } from './demoConstants';
 import { demoStore, newDemoId } from './demoStore';
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -57,7 +56,7 @@ export const demoFontRepository = {
     await demoStore.putBlob(`font:${fontId}`, dataUrl, file.type || 'font/ttf');
     const font: Font = {
       fontId,
-      userId: DEMO_USER.id,
+      userId: demoStore.getActiveUserId() ?? 'unknown',
       fontName: metadata.fontName,
       fontFamily: metadata.fontFamily,
       fontCategory: metadata.fontCategory,

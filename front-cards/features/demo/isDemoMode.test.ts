@@ -5,10 +5,15 @@
 import { DEMO_ENABLED_KEY } from './demoConstants';
 import { enterDemoMode, exitDemoMode, isDemoMode } from './isDemoMode';
 import { demoStore, newDemoId } from './demoStore';
+import { resolveDemoStorageUserId } from './demoStorageUserId';
 
-describe('demo isDemoMode + store', () => {
+describe('demo isDemoMode + per-user store', () => {
+  const userA = { id: 'oauth-user-alice', email: 'alice@example.com' };
+  const userB = { id: 'oauth-user-bob', email: 'bob@example.com' };
+
   beforeEach(() => {
     window.localStorage.clear();
+    demoStore.setActiveUserId(null);
     delete (process.env as { NEXT_PUBLIC_DEMO_MODE?: string }).NEXT_PUBLIC_DEMO_MODE;
   });
 
@@ -25,9 +30,21 @@ describe('demo isDemoMode + store', () => {
     expect(isDemoMode()).toBe(false);
   });
 
-  it('projects round-trip in localStorage', () => {
-    const id = newDemoId('proj');
-    demoStore.setProjects([{ id, name: 'A' }]);
-    expect(demoStore.getProjects<{ id: string; name: string }>()).toEqual([{ id, name: 'A' }]);
+  it('isolates projects per OAuth user namespace', () => {
+    enterDemoMode();
+    const idA = newDemoId('proj');
+    demoStore.setActiveUserId(resolveDemoStorageUserId(userA));
+    demoStore.setProjects([{ id: idA, name: 'Alice Project' }]);
+
+    const idB = newDemoId('proj');
+    demoStore.setActiveUserId(resolveDemoStorageUserId(userB));
+    expect(demoStore.getProjects<{ id: string; name: string }>()).toEqual([]);
+
+    demoStore.setProjects([{ id: idB, name: 'Bob Project' }]);
+
+    demoStore.setActiveUserId(resolveDemoStorageUserId(userA));
+    expect(demoStore.getProjects<{ id: string; name: string }>()).toEqual([
+      { id: idA, name: 'Alice Project' },
+    ]);
   });
 });

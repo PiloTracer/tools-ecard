@@ -3,7 +3,6 @@
  */
 
 import type { Template } from '@/features/template-textile/types';
-import { DEMO_USER } from './demoConstants';
 import { demoStore, newDemoId } from './demoStore';
 
 export type DemoStorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
@@ -46,7 +45,7 @@ interface DemoTemplateRecord {
 function toMeta(t: DemoTemplateRecord): DemoTemplateMetadata {
   return {
     id: t.id,
-    userId: DEMO_USER.id,
+    userId: demoStore.getActiveUserId() ?? 'unknown',
     name: t.name,
     storageUrl: `demo://${t.id}`,
     storageMode: 'LOCAL_ONLY',
@@ -106,7 +105,7 @@ export const demoTemplateRepository = {
     if (!record) throw new Error('Template not found');
     return {
       id: record.id,
-      userId: DEMO_USER.id,
+      userId: demoStore.getActiveUserId() ?? 'unknown',
       name: record.name,
       data: record.data,
       resources: record.resources,

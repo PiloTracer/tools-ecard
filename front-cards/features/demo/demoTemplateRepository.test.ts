@@ -3,11 +3,15 @@
  */
 import { demoTemplateRepository } from './demoTemplateRepository';
 import { demoStore } from './demoStore';
+import { enterDemoMode } from './isDemoMode';
+import { resolveDemoStorageUserId } from './demoStorageUserId';
 import type { Template } from '@/features/template-textile/types';
 
 describe('demoTemplateRepository persistence', () => {
   beforeEach(() => {
     localStorage.clear();
+    enterDemoMode();
+    demoStore.setActiveUserId(resolveDemoStorageUserId({ id: 'test-oauth-user', email: 't@example.com' }));
     demoStore.setTemplates([]);
   });
 

@@ -4,16 +4,22 @@
 
 import { enterDemoMode, exitDemoMode } from '@/features/demo/isDemoMode';
 import { demoStore, newDemoId } from '@/features/demo/demoStore';
+import { resolveDemoStorageUserId } from '@/features/demo/demoStorageUserId';
 import { batchRecordService } from './batchRecordService';
 
 describe('batchRecordService (demo mode)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     enterDemoMode();
+    // Mirror the production auth flow: AuthContext binds the demoStore to the
+    // resolved OAuth user id. Without this, the per-user-scoped demoStore
+    // silently no-ops (no active user namespace) and the tests see no data.
+    demoStore.setActiveUserId(resolveDemoStorageUserId({ id: 'test-oauth-user', email: 't@example.com' }));
   });
 
   afterEach(() => {
     exitDemoMode();
+    demoStore.setActiveUserId(null);
   });
 
   it('preserves non-core fields (and headers/cols) across updateRecord', async () => {

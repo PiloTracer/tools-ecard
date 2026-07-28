@@ -10,7 +10,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthContext';
-import { isDemoMode } from '@/features/demo/isDemoMode';
 import { useTranslation } from '@/features/i18n';
 
 type ProtectedRouteProps = {
@@ -29,11 +28,9 @@ export function ProtectedRoute({
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isDemoMode()) {
-      // Store current path to redirect back after login
+    if (!isLoading && !isAuthenticated) {
       const currentPath = window.location.pathname + window.location.search;
       sessionStorage.setItem('redirect_after_login', currentPath);
-
       router.push(redirectTo);
     }
   }, [isAuthenticated, isLoading, router, redirectTo]);
@@ -76,7 +73,7 @@ export function ProtectedRoute({
   }
 
   // Show nothing while redirecting
-  if (!isAuthenticated && !isDemoMode()) {
+  if (!isAuthenticated) {
     return null;
   }
 
