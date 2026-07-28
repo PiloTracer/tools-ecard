@@ -52,7 +52,8 @@ class BatchParser:
         cassandra_keyspace: str = 'ecards',
         storage_mode: str = 'seaweedfs',
         work_phone_prefix: Optional[str] = None,
-        default_country_code: Optional[str] = None
+        default_country_code: Optional[str] = None,
+        max_records: Optional[int] = None
     ):
         self.batch_id = batch_id
         self.file_path = file_path
@@ -61,6 +62,7 @@ class BatchParser:
         self.cassandra_keyspace = cassandra_keyspace
         self.work_phone_prefix = work_phone_prefix
         self.default_country_code = default_country_code
+        self.max_records = max_records
 
         # Initialize components
         self.normalizer = DataNormalizer()
@@ -460,9 +462,21 @@ class BatchParser:
 
             logger.info(f"📊 Found {len(df)} rows to process")
 
+            rows_in_file = len(df)
+            limit_reached = False
+
             # Process each row
             records_processed = 0
             for idx, row in df.iterrows():
+                if self.max_records is not None and self.max_records >= 0:
+                    if records_processed >= self.max_records:
+                        limit_reached = True
+                        logger.info(
+                            f"⏹️  Reached batch record limit ({self.max_records}); "
+                            f"skipping remaining {rows_in_file - records_processed} row(s)"
+                        )
+                        break
+
                 try:
                     # Map row to vCard fields
                     mapped_record = self.map_row(row)
@@ -488,11 +502,11 @@ class BatchParser:
             # Update batch status to PARSED
             self.update_batch_status(
                 'PARSED',
-                records_count=len(df),
+                records_count=records_processed,
                 records_processed=records_processed
             )
 
-            logger.info(f"✅ Successfully processed {records_processed}/{len(df)} records")
+            logger.info(f"✅ Successfully processed {records_processed}/{rows_in_file} records")
 
             # Allow UI to show PARSED status for at least 1 second
             time.sleep(1)
@@ -500,15 +514,17 @@ class BatchParser:
             # Update batch status to LOADED (100% complete, ready for use)
             self.update_batch_status(
                 'LOADED',
-                records_count=len(df),
+                records_count=records_processed,
                 records_processed=records_processed
             )
 
             logger.info(f"🎉 Batch fully loaded and ready for use")
             return {
                 'success': True,
-                'records_total': len(df),
-                'records_processed': records_processed
+                'records_total': rows_in_file,
+                'records_processed': records_processed,
+                'records_imported': records_processed,
+                'limit_reached': limit_reached,
             }
 
         except Exception as e:
@@ -545,6 +561,7 @@ def main():
     # Phone formatting configuration
     parser.add_argument('--work-phone-prefix', help='Prefix for 4-digit work phone numbers (e.g., "2222")')
     parser.add_argument('--default-country-code', help='Default country code for 8-digit numbers (e.g., "+(506)")')
+    parser.add_argument('--max-records', type=int, help='Maximum records to import (-1 or omit = unlimited)')
 
     args = parser.parse_args()
 
@@ -563,7 +580,8 @@ def main():
         cassandra_keyspace=args.cassandra_keyspace,
         storage_mode=args.storage_mode,
         work_phone_prefix=args.work_phone_prefix,
-        default_country_code=args.default_country_code
+        default_country_code=args.default_country_code,
+        max_records=args.max_records,
     )
 
     try:

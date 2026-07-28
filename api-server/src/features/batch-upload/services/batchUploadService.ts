@@ -14,10 +14,16 @@ import { storageService } from './storageService';
 import { queueService } from './queueService';
 import { prisma } from '../../../core/database/prisma';
 import { batchRecordRepository } from '../../batch-parsing/repositories/batchRecordRepository';
+import { resolveServerBatchRecordLimit } from '../../../core/limits/batchRecordLimit';
 
 export class BatchUploadService {
   async uploadBatch(request: BatchUploadRequest): Promise<BatchUploadResponse> {
     const { file, userId, userEmail, projectId, projectName } = request;
+    // Caller (authenticated Fastify route) passes the per-user resolved limit;
+    // legacy/anonymous paths omit it. Always fall back to server env/fallback so
+    // the limit is never silently undefined (= unlimited) downstream.
+    const batchRecordLimit =
+      request.batchRecordLimit ?? resolveServerBatchRecordLimit(null).limit;
 
     try {
       // 1. Fetch project configuration for phone formatting
@@ -49,6 +55,7 @@ export class BatchUploadService {
         batchId: batch.id,
         filePath: uploadResult.filePath,
         userEmail,
+        batchRecordLimit,
         workPhonePrefix: project?.workPhonePrefix ?? undefined,
         defaultCountryCode: project?.defaultCountryCode ?? undefined,
       };
@@ -201,7 +208,12 @@ export class BatchUploadService {
     await batchRepository.delete(batchId);
   }
 
-  async retryBatch(userId: string, batchId: string): Promise<BatchUploadResponse> {
+  async retryBatch(
+    userId: string,
+    batchId: string,
+    batchRecordLimit?: number
+  ): Promise<BatchUploadResponse> {
+    const resolvedLimit = batchRecordLimit ?? resolveServerBatchRecordLimit(null).limit;
     const batch = await batchRepository.findByUserIdAndId(userId, batchId);
 
     if (!batch) {
@@ -237,6 +249,7 @@ export class BatchUploadService {
       batchId: batch.id,
       filePath: batch.filePath,
       userEmail: batch.userEmail,
+      batchRecordLimit: resolvedLimit,
       workPhonePrefix: project?.workPhonePrefix ?? undefined,
       defaultCountryCode: project?.defaultCountryCode ?? undefined,
     };

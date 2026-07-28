@@ -90,6 +90,7 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
         userEmail: request.user.email,
         projectId,
         projectName,
+        batchRecordLimit: request.user.batchRecordLimit,
       });
 
       return reply.code(201).send(result);
@@ -251,7 +252,8 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
 
       const result = await batchUploadService.retryBatch(
         request.user.id,
-        request.params.id
+        request.params.id,
+        request.user.batchRecordLimit
       );
 
       return reply.send(result);

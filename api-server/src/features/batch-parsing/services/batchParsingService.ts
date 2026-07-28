@@ -17,6 +17,8 @@ export interface BatchParsingOptions {
   verbose?: boolean;
   workPhonePrefix?: string;      // e.g., "2222" for Costa Rica landlines
   defaultCountryCode?: string;   // e.g., "+(506)" for Costa Rica
+  /** Max records to import; -1 = unlimited */
+  maxRecords?: number;
 }
 
 export interface BatchParsingResult {
@@ -54,7 +56,7 @@ export class BatchParsingService {
    * Spawns a child process and waits for completion
    */
   async parseBatch(options: BatchParsingOptions): Promise<BatchParsingResult> {
-    const { batchId, filePath, verbose = false, workPhonePrefix, defaultCountryCode } = options;
+    const { batchId, filePath, verbose = false, workPhonePrefix, defaultCountryCode, maxRecords } = options;
 
     return new Promise((resolve, reject) => {
       // Determine storage mode from environment
@@ -76,6 +78,9 @@ export class BatchParsingService {
       }
       if (defaultCountryCode) {
         args.push('--default-country-code', defaultCountryCode);
+      }
+      if (maxRecords !== undefined && maxRecords >= 0) {
+        args.push('--max-records', String(maxRecords));
       }
 
       if (verbose) {

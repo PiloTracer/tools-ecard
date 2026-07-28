@@ -7,6 +7,10 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { batchRecordService } from '../services/batchRecordService';
 import { RecordUpdateInput } from '../validators/recordValidator';
 import type { AuthenticatedUser } from '../../../core/middleware/authMiddleware';
+import {
+  effectivePageSize,
+  isUnlimitedBatchRecordLimit,
+} from '../../../core/limits/batchRecordLimit';
 
 interface AuthenticatedRequest extends FastifyRequest {
   user?: AuthenticatedUser;
@@ -41,7 +45,9 @@ export class BatchRecordController {
       const query = request.query as GetRecordsQuery;
 
       const page = query.page ? parseInt(query.page, 10) : 1;
-      const pageSize = query.pageSize ? parseInt(query.pageSize, 10) : 50;
+      const requestedPageSize = query.pageSize ? parseInt(query.pageSize, 10) : 50;
+      const userLimit = request.user.batchRecordLimit;
+      const pageSize = effectivePageSize(requestedPageSize, userLimit);
 
       // Validate pagination
       if (isNaN(page) || page < 1) {
@@ -51,10 +57,11 @@ export class BatchRecordController {
         });
       }
 
-      if (isNaN(pageSize) || pageSize < 1 || pageSize > 500) {
+      const maxPageSize = isUnlimitedBatchRecordLimit(userLimit) ? 500 : Math.min(500, userLimit);
+      if (isNaN(requestedPageSize) || requestedPageSize < 1 || requestedPageSize > maxPageSize) {
         return reply.code(400).send({
           success: false,
-          error: 'Invalid page size (1-500)',
+          error: `Invalid page size (1-${maxPageSize})`,
         });
       }
 

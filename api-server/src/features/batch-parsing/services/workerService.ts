@@ -46,7 +46,7 @@ export class BatchParsingWorkerService {
     const queue = this.initializeQueue();
 
     queue.process('parse-batch', 1, async (job) => {
-      const { batchId, filePath, userEmail, workPhonePrefix, defaultCountryCode } = job.data;
+      const { batchId, filePath, userEmail, workPhonePrefix, defaultCountryCode, batchRecordLimit } = job.data;
       log.info({ jobId: job.id, batchId }, 'Processing batch parse job');
 
       try {
@@ -60,6 +60,7 @@ export class BatchParsingWorkerService {
           verbose: false,
           workPhonePrefix,
           defaultCountryCode,
+          maxRecords: batchRecordLimit,
         });
 
         await job.progress(90);

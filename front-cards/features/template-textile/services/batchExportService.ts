@@ -14,6 +14,11 @@ import { isDemoMode } from '@/features/demo/isDemoMode';
 import { generateVCardFromRecord } from './vcardGenerator';
 import { createOriginalPositionMap, applyLineCompaction, type PositionMap } from './lineCompactionService';
 import { decodeXmlEntities } from '@/shared/lib/decodeXmlEntities';
+import {
+  effectiveExportPageSize,
+  getClientBatchRecordLimit,
+  isUnlimitedBatchRecordLimit,
+} from '@/shared/lib/batchRecordLimit';
 
 /**
  * Batch record from API (ContactRecordFull type)
@@ -99,6 +104,8 @@ export interface BatchExportOptions {
   width?: number;
   height?: number;
   backgroundColor?: string;
+  /** Resolved batch record cap; defaults to client/env resolution */
+  recordLimit?: number;
   onProgress?: (current: number, total: number, status: string) => void;
   onCancel?: () => boolean; // Return true to cancel
 }
@@ -121,7 +128,6 @@ export interface BatchExportResult {
  * Memory limits
  */
 const MEMORY_WARNING_THRESHOLD = 1000;
-const MEMORY_MAX_LIMIT = 2000;
 const CHUNK_SIZE = 100;
 
 function contactToBatchRecord(record: ContactRecord): BatchRecord {
@@ -135,7 +141,14 @@ function contactToBatchRecord(record: ContactRecord): BatchRecord {
 /**
  * Fetch all batch records (handles pagination)
  */
-export async function fetchBatchRecords(batchId: string): Promise<{ records: BatchRecord[]; batchName: string }> {
+export async function fetchBatchRecords(
+  batchId: string,
+  options?: { recordLimit?: number }
+): Promise<{ records: BatchRecord[]; batchName: string }> {
+  const resolved = options?.recordLimit ?? getClientBatchRecordLimit().limit;
+  const pageSize = effectiveExportPageSize(resolved);
+  const maxRecords = isUnlimitedBatchRecordLimit(resolved) ? Number.POSITIVE_INFINITY : resolved;
+
   const allRecords: BatchRecord[] = [];
   let page = 1;
   let hasMore = true;
@@ -143,12 +156,16 @@ export async function fetchBatchRecords(batchId: string): Promise<{ records: Bat
 
   try {
     while (hasMore) {
-      console.log('[BatchExport] Fetching batch records:', { batchId, page, demo: isDemoMode() });
+      console.log('[BatchExport] Fetching batch records:', { batchId, page, demo: isDemoMode(), recordLimit: resolved });
 
       const data = isDemoMode()
-        ? await batchRecordService.fetchRecordsForBatch(batchId, { page, pageSize: 500 })
+        ? await batchRecordService.fetchRecordsForBatch(batchId, {
+            page,
+            pageSize,
+            recordLimit: resolved,
+          })
         : await apiClient.get<BatchRecordsResponse>(
-            `/api/batches/${batchId}/records?page=${page}&pageSize=500`
+            `/api/batches/${batchId}/records?page=${page}&pageSize=${pageSize}`
           );
       console.log('[BatchExport] Batch records response:', data);
 
@@ -162,14 +179,16 @@ export async function fetchBatchRecords(batchId: string): Promise<{ records: Bat
       allRecords.push(...pageRecords);
       batchName = data.data.batchFileName;
 
+      if (allRecords.length >= maxRecords) {
+        if (!isUnlimitedBatchRecordLimit(resolved) && allRecords.length > maxRecords) {
+          allRecords.length = maxRecords;
+        }
+        break;
+      }
+
       // Check if there are more pages
       hasMore = page < data.data.pagination.totalPages;
       page++;
-
-      // Safety check to prevent infinite loops
-      if (allRecords.length >= MEMORY_MAX_LIMIT) {
-        throw new Error(`Record limit exceeded (max ${MEMORY_MAX_LIMIT} records)`);
-      }
     }
 
     return { records: allRecords, batchName };
@@ -371,7 +390,9 @@ export async function exportTemplateToBatch(
       options.onProgress(0, 100, 'Fetching batch records...');
     }
 
-    const { records, batchName } = await fetchBatchRecords(batchId);
+    const { records, batchName } = await fetchBatchRecords(batchId, {
+      recordLimit: options.recordLimit,
+    });
     const totalRecords = records.length;
 
     // Memory warning

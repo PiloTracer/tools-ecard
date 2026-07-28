@@ -7,6 +7,8 @@ export interface BatchUploadRequest {
   userEmail: string;
   projectId: string;
   projectName: string;
+  /** Max records to import; -1 = unlimited. Omitted → server env/fallback applies. */
+  batchRecordLimit?: number;
 }
 
 export interface BatchUploadResponse {
@@ -82,6 +84,8 @@ export interface BatchProcessingJob {
   batchId: string;
   filePath: string;
   userEmail: string;
+  /** Max records to import; -1 = unlimited. Always set by BatchUploadService before enqueue. */
+  batchRecordLimit: number;
   // Phone formatting configuration from project settings
   workPhonePrefix?: string;      // e.g., "2222" for Costa Rica landlines
   defaultCountryCode?: string;   // e.g., "+(506)" for Costa Rica

@@ -14,6 +14,7 @@ import type { ExportOptions } from '../../services/exportService';
 import type { Template } from '../../types';
 import type { Batch } from '@/features/batch-view/types';
 import { batchViewService } from '@/features/batch-view/services/batchViewService';
+import { useBatchRecordLimit } from '@/features/batch-records/hooks/useBatchRecordLimit';
 import { useTemplateStore } from '../../stores/templateStore';
 import { fromPixels, toPixels, unitLabel, type LengthUnit } from '../../utils/lengthUnits';
 
@@ -74,6 +75,7 @@ export function OffscreenExportButton({
   const storeExportWidth = useTemplateStore((s) => s.exportWidth);
   const storeCanvasSizeUnit = useTemplateStore((s) => s.canvasSizeUnit);
   const setStoreExportWidth = useTemplateStore((s) => s.setExportWidth);
+  const { limit: recordLimit } = useBatchRecordLimit();
 
   const isEditorTemplate = Boolean(
     template && currentTemplate && template.id === currentTemplate.id
@@ -293,6 +295,7 @@ export function OffscreenExportButton({
         width,
         height: calculatedHeight,
         backgroundColor: finalBackgroundColor,
+        recordLimit,
         onProgress: (current: number, total: number, status: string) => {
           setBatchProgress({ current, total });
           setExportStep(status);

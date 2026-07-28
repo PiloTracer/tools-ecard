@@ -29,6 +29,13 @@ export type User = {
     currentUsage: number;
     llmCredits: number;
     resetDate: string; // ISO date string
+    features?: {
+      /** Per-user override from Tools Dashboard Access tab; -1 = unlimited */
+      batch_size_limit?: number;
+      template_limit?: number;
+      ecards_enabled?: boolean;
+      [key: string]: unknown;
+    };
   };
   createdAt?: string; // ISO date string
   updatedAt?: string; // ISO date string

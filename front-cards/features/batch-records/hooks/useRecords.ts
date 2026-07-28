@@ -5,6 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { batchRecordService } from '../services/batchRecordService';
+import { useBatchRecordLimit } from './useBatchRecordLimit';
 import { useState, useMemo } from 'react';
 import { searchRecords } from '../utils/recordSearcher';
 
@@ -17,14 +18,16 @@ export interface UseRecordsOptions {
 
 export function useRecords(options: UseRecordsOptions) {
   const { batchId, page = 1, pageSize = 50, searchQuery = '' } = options;
+  const { limit: recordLimit } = useBatchRecordLimit();
 
   const [clientSearch, setClientSearch] = useState(searchQuery);
 
-  const queryKey = ['batch-records', batchId, page, pageSize];
+  const queryKey = ['batch-records', batchId, page, pageSize, recordLimit];
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey,
-    queryFn: () => batchRecordService.fetchRecordsForBatch(batchId, { page, pageSize }),
+    queryFn: () =>
+      batchRecordService.fetchRecordsForBatch(batchId, { page, pageSize, recordLimit }),
     staleTime: 30000, // Cache for 30 seconds
     retry: 2,
   });

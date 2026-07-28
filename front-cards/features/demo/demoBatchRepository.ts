@@ -17,6 +17,7 @@ import {
   mapRowToContactFields,
   parseDemoSpreadsheetFile,
 } from './demoSpreadsheetParser';
+import { capBatchRecords, getClientBatchRecordLimit } from '@/shared/lib/batchRecordLimit';
 
 interface DemoBatchRecord {
   id: string;
@@ -51,9 +52,11 @@ export const demoBatchRepository = {
     const project = projects.find((p) => p.id === projectId);
     const workPhonePrefix = project?.workPhonePrefix ?? null;
     const table = await parseDemoSpreadsheetFile(file);
-    const dataRows = table.rows.filter((cols) =>
+    const usefulRows = table.rows.filter((cols) =>
       isUsefulDemoContactRow(table.headers, cols)
     );
+    const { limit } = getClientBatchRecordLimit();
+    const { records: dataRows, truncated } = capBatchRecords(usefulRows, limit);
     const totalRecords = dataRows.length;
 
     const records = dataRows.map((cols, i) => {
@@ -96,7 +99,9 @@ export const demoBatchRepository = {
     return {
       id,
       status: BatchStatus.LOADED,
-      message: 'Demo batch stored in browser only (render mocked)',
+      message: truncated
+        ? `Demo batch stored (${totalRecords} of ${usefulRows.length} rows; limit ${limit}). Render mocked.`
+        : 'Demo batch stored in browser only (render mocked)',
     };
   },
 

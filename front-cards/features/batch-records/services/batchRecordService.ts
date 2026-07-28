@@ -14,6 +14,12 @@ import type {
 } from '../types';
 import { isDemoMode } from '@/features/demo/isDemoMode';
 import { demoBatchRepository } from '@/features/demo/demoBatchRepository';
+import {
+  capBatchRecords,
+  effectivePageSize,
+  getClientBatchRecordLimit,
+  isUnlimitedBatchRecordLimit,
+} from '@/shared/lib/batchRecordLimit';
 
 function emptyContact(batchId: string, id: string): ContactRecord {
   return {
@@ -107,11 +113,20 @@ export const batchRecordService = {
       page?: number;
       pageSize?: number;
       search?: string;
+      recordLimit?: number;
     } = {}
   ): Promise<RecordsListResponse> {
+    const resolvedLimit =
+      options.recordLimit ?? getClientBatchRecordLimit().limit;
+
     if (isDemoMode()) {
       const { page = 1, pageSize = 50, search } = options;
+      const cappedPageSize = effectivePageSize(pageSize, resolvedLimit);
       let records = demoBatchRepository.getRecords(batchId).map((r) => mapDemoRecord(r, batchId));
+      if (!isUnlimitedBatchRecordLimit(resolvedLimit)) {
+        const capped = capBatchRecords(records, resolvedLimit);
+        records = capped.records;
+      }
       if (search) {
         const q = search.toLowerCase();
         records = records.filter(
@@ -120,8 +135,8 @@ export const batchRecordService = {
             (r.email || '').toLowerCase().includes(q)
         );
       }
-      const start = (page - 1) * pageSize;
-      const slice = records.slice(start, start + pageSize);
+      const start = (page - 1) * cappedPageSize;
+      const slice = records.slice(start, start + cappedPageSize);
       const status = await demoBatchRepository.getBatchStatus(batchId).catch(() => null);
       return {
         success: true,
@@ -133,17 +148,18 @@ export const batchRecordService = {
           pagination: {
             total: records.length,
             page,
-            pageSize,
-            totalPages: Math.max(1, Math.ceil(records.length / pageSize)),
+            pageSize: cappedPageSize,
+            totalPages: Math.max(1, Math.ceil(records.length / cappedPageSize)),
           },
         },
       };
     }
 
     const { page = 1, pageSize = 50, search } = options;
+    const cappedPageSize = effectivePageSize(pageSize, resolvedLimit);
     const params = new URLSearchParams();
     params.append('page', page.toString());
-    params.append('pageSize', pageSize.toString());
+    params.append('pageSize', cappedPageSize.toString());
     if (search) {
       params.append('search', search);
     }

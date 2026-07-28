@@ -25,6 +25,7 @@ import { batchImportRoutesFastify } from './features/batch-import';
 import batchParsingRoutes from './features/batch-parsing/routes.fastify';
 import diagnosticRoutes from './features/batch-parsing/routes/diagnostics.fastify';
 import batchRecordRoutes from './features/batch-records/routes.fastify';
+import limitsRoutes from './features/limits/routes.fastify';
 import fontRoutes from './features/font-management/routes/fontRoutes';
 // import { templateRoutes } from './features/templates/routes';
 // import { batchRoutes } from './features/batches/routes';
@@ -152,6 +153,8 @@ export async function buildApp() {
 
   // Register diagnostic routes (queue/worker monitoring)
   await app.register(diagnosticRoutes, { prefix: '/api/diagnostics' });
+
+  await app.register(limitsRoutes, { prefix: '/api/limits' });
 
   // Register font-management routes (already prefixed in route definitions)
   await app.register(fontRoutes);

@@ -13,6 +13,10 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { userOperations, projectOperations } from '../prisma/client';
 import { createLogger } from '../utils/logger';
 import { oauthServerFetch } from '../oauthFetch';
+import {
+  extractUserBatchSizeLimit,
+  resolveServerBatchRecordLimit,
+} from '../limits/batchRecordLimit';
 
 const log = createLogger('AuthMiddleware');
 
@@ -32,6 +36,9 @@ export interface AuthenticatedUser {
   username: string;
   displayName: string;
   oauthId?: string;
+  /** Resolved batch record cap for import/view/export; -1 = unlimited */
+  batchRecordLimit: number;
+  batchRecordLimitUnlimited: boolean;
 }
 
 declare module 'fastify' {
@@ -111,12 +118,16 @@ async function fetchAndCacheUser(accessToken: string): Promise<AuthenticatedUser
 
     const userData = (await userResponse.json()) as Record<string, any>;
 
+    const resolvedLimit = resolveServerBatchRecordLimit(extractUserBatchSizeLimit(userData));
+
     const user: AuthenticatedUser = {
       id: userData.email,
       email: userData.email,
       username: userData.username || userData.email,
       displayName: userData.displayName || userData.name || userData.username || userData.email,
       oauthId: userData.id?.toString(),
+      batchRecordLimit: resolvedLimit.limit,
+      batchRecordLimitUnlimited: resolvedLimit.unlimited,
     };
 
     setCachedUser(accessToken, user);

@@ -2,11 +2,13 @@
 
 ## Session status
 
-**Open:** 2026-07-24 — goal: production cutover — drop in-stack nginx in favour of the host nginx, set up TLS behind Cloudflare (proxied) for target host 217.216.65.112, fix render-worker unhealthy, and make `bin/start.sh` correct for both dev and prd
+**Open:** 2026-07-28 — goal: *(unset — pick up from §Recommended next or state your task)*
+
+**Prior:** Open 2026-07-24 — production cutover (host nginx, TLS/Cloudflare, render-worker health, `bin/start.sh` dev+prd); landed on `main` (see recent commits). Closed without explicit `@session-control close` in HANDOFF.
 
 **Prior:** Closed 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
 
-**Updated:** 2026-07-24
+**Updated:** 2026-07-28
 
 **Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
