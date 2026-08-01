@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { generateAuthorizationUrl, getOAuthErrorMessage } from '@/shared/lib/oauth-utils';
-import { OAUTH_CONFIG, USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
+import { OAUTH_CONFIG, USER_SUBSCRIPTION_URL, TOOLS_DASHBOARD_HOME_URL } from '@/shared/lib/oauth-config';
 import { LanguageSwitcher, useTranslation } from '@/features/i18n';
 
 function LoginPageContent() {
@@ -161,6 +161,14 @@ function LoginPageContent() {
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="text-center space-y-2">
+              <a
+                href={TOOLS_DASHBOARD_HOME_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-sm text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                {t('login.goToToolsDashboard')}
+              </a>
               <a
                 href={USER_SUBSCRIPTION_URL}
                 target="_blank"

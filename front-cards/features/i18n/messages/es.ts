@@ -63,6 +63,7 @@ export const esMessages: MessageTree = {
     firstTime:
       '¿Primera vez aquí? Serás redirigido al Tools Dashboard para autenticarte. Si no tienes cuenta, puedes registrarte allí.',
     manageSubscription: 'Gestionar suscripción',
+    goToToolsDashboard: 'Ir a Tools Dashboard',
     securedBy: 'Protegido con OAuth 2.0 y PKCE',
     termsPrefix: 'Al iniciar sesión, aceptas nuestros',
     terms: 'Términos de servicio',

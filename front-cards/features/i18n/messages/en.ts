@@ -63,6 +63,7 @@ export const enMessages: MessageTree = {
     firstTime:
       "First time here? You'll be redirected to the Tools Dashboard to authenticate. If you don't have an account, you can sign up there.",
     manageSubscription: 'Manage Subscription',
+    goToToolsDashboard: 'Go to Tools Dashboard',
     securedBy: 'Secured by OAuth 2.0 with PKCE',
     termsPrefix: 'By signing in, you agree to our',
     terms: 'Terms of Service',

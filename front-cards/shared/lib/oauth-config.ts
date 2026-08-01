@@ -43,6 +43,19 @@ export const USER_SUBSCRIPTION_URL =
   'https://dev.aiepic.app/app/features/user-subscription';
 
 /**
+ * Tools Dashboard home (app library) — derived from the subscription URL's
+ * origin so it follows the same per-environment config
+ * (dev.aiepic.app / tools.datawork.top), path fixed to the app library.
+ */
+export const TOOLS_DASHBOARD_HOME_URL = (() => {
+  try {
+    return `${new URL(USER_SUBSCRIPTION_URL).origin}/app/features/app-library`;
+  } catch {
+    return 'https://dev.aiepic.app/app/features/app-library';
+  }
+})();
+
+/**
  * After OAuth completes (server /oauth/complete or client /auth/callback), browser goes here.
  * Default: stay on E-Cards (`/dashboard`). Set to an absolute URL (e.g. Tools Dashboard app
  * library) if you want users sent off-host after login (uses /auth/continue so cookies stick).
