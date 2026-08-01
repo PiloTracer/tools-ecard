@@ -74,6 +74,6 @@ export interface FileValidationError {
   message: string;
 }
 
-export const ALLOWED_FILE_EXTENSIONS = ['.csv', '.txt', '.vcf', '.xls', '.xlsx'];
+export const ALLOWED_FILE_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
 export const MAX_FILE_SIZE_MB = 10;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;

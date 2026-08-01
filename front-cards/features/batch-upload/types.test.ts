@@ -128,10 +128,11 @@ describe('Batch Upload Types', () => {
   it('should have correct file extension constants', () => {
     expect(ALLOWED_FILE_EXTENSIONS).toContain('.csv');
     expect(ALLOWED_FILE_EXTENSIONS).toContain('.txt');
+    expect(ALLOWED_FILE_EXTENSIONS).toContain('.md');
     expect(ALLOWED_FILE_EXTENSIONS).toContain('.vcf');
     expect(ALLOWED_FILE_EXTENSIONS).toContain('.xls');
     expect(ALLOWED_FILE_EXTENSIONS).toContain('.xlsx');
-    expect(ALLOWED_FILE_EXTENSIONS).toHaveLength(5);
+    expect(ALLOWED_FILE_EXTENSIONS).toHaveLength(6);
   });
 
   it('should have correct file size constants', () => {

@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import operatorSamples from './fixtures/operator_batch_samples.json';
 import {
   applyWorkPhonePrefix,
   findHeaderRowIndex,
@@ -173,6 +174,32 @@ describe('demoSpreadsheetParser', () => {
       const brandon = mapRowToContactFields(table.headers, table.rows[2]);
       expect(brandon.fullName).toBe('Brandon Alvarez Quiros');
       expect(brandon.email).toBe('balavez@code-cr.com');
+    });
+
+    it.each(operatorSamples as Array<{
+      id: number;
+      text: string;
+      minContacts: number;
+      emails: string[];
+      nameIncludes?: string;
+    }>)('parses operator feedback sample #$id', (sample) => {
+      const table = parseCsvText(sample.text);
+      const contacts = table.rows
+        .filter((cols) => isUsefulDemoContactRow(table.headers, cols))
+        .map((cols) => mapRowToContactFields(table.headers, cols));
+      expect(contacts.length).toBeGreaterThanOrEqual(sample.minContacts);
+      for (const email of sample.emails) {
+        expect(contacts.some((c) => c.email === email)).toBe(true);
+      }
+      if (sample.nameIncludes) {
+        expect(
+          contacts.some((c) => (c.fullName || '').includes(sample.nameIncludes!))
+        ).toBe(true);
+      }
+      if (sample.id === 1 || sample.id === 6) {
+        const pablo = contacts.find((c) => c.email === 'plopez@code-cr.com');
+        expect(pablo?.fullName).toBe('Pablo López Moreira');
+      }
     });
   });
 

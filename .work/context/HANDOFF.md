@@ -2,7 +2,7 @@
 
 ## Session status
 
-**Open:** 2026-08-01 — goal: *(unset — pick up from §Recommended next or state your task)*
+**Closed:** 2026-08-01 — goal: verify uncommitted batch-import fixes against 6 operator samples (`.work/feedback/test-data.md`) for `.txt`/`.md` upload and clipboard paste, both Demo and Normal modes. All 6 samples parse correctly in both parsers (names, titles, emails, phones/exts); `.md` now accepted end-to-end; permanent fixture-based regression tests added (`operator_batch_samples.json` in `api-server/batch-parsing/fixtures/` + `front-cards/features/demo/fixtures/`). Verified: python unittest 28/28, front-cards jest 191, api-server batch-upload jest 46 passed; eslint clean (1 pre-existing warning). Committed + pushed.
 
 **Prior:** Open 2026-07-28 — goal unset; HANDOFF not formally closed. `main` advanced since (demo OAuth scoping, batch record limits, XML entity decode — see recent commits).
 
@@ -14,7 +14,7 @@
 
 **Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
-**Repository state:** `main` clean and synced with `origin/main`. Recent commits (post-2026-07-28): demo storage scoped per OAuth user + real account display; configurable batch record limits (import/view/export); numeric XML entity decode for accented names in card export. Prior baseline: feedback UX slice (profile, clipShape, canvas units, ingest-only capitalize); api-server `run-tests.cjs`. **Dev stack:** not running (`docker compose ps` empty). **Residual:** manual browser click-through; owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
+**Repository state:** `main` clean and synced with `origin/main`. Recent commits (post-2026-07-28): demo storage scoped per OAuth user + real account display; configurable batch record limits (import/view/export); numeric XML entity decode for accented names in card export; operator batch-sample parsing fixes (`.md` support, key-value/vertical paste blocks, label stripping) with fixture regression tests. Prior baseline: feedback UX slice (profile, clipShape, canvas units, ingest-only capitalize); api-server `run-tests.cjs`. **Dev stack:** dev compose up during session (api/front/postgres/cassandra/redis). **Residual:** manual browser click-through (paste Sample #4, import Sample #6 as `.md`); owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -115,6 +115,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-17 | x-director M5 gap closure | Playwright smoke + CI; render-worker PNG (text/shapes/images/QR); parser golden fixtures; ops runbook; TS fixes; fake-indexeddb persistence test; render-status storageUrl; verification green (jest 137, render-worker 13, python 23, tsc 0) |
 | 2026-07-16 | Operator feedback intake + x-director fixes | `.work/feedback/` from ODT; F8 focus fix; F1/F3 export+render-retry; F2/F7 nav+defaults; F10/F11 UI; jest 138 green; `close commit push` |
 | 2026-07-16 | Feedback F4–F6/F9/F12 + ingest-only capitalize | Profile page; clipShape live+export+worker; canvas units; capitalize at Demo ingest only; api `run-tests.cjs`; MOD-06; jest 147 |
+| 2026-08-01 | Operator batch-sample verify + close | 6 samples (`.work/feedback/test-data.md`) verified via `.txt`/`.md` upload + paste, Demo + Normal; fixture regression tests; python 28, jest 191 + 46 green |
 
 ---
 
@@ -268,11 +269,11 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ## Latest action (@session-control close)
 
-**Date:** 2026-07-16  
+**Date:** 2026-08-01  
 **Request:** `@session-control close commit push`  
-**Session result:** Closed; no product code changes. Clone-size diagnosis only (local deps ≠ git).  
-**Production readiness:** Unchanged — engineering ready for `./bin/start.sh prd up` when operator owns DNS/TLS and deploy path.  
-**Blockers remaining:** U6; DNS/TLS; owner deploy / Demo cutover  
+**Session result:** Closed. Verified uncommitted batch-import fixes against all 6 operator samples — both parsers (Demo TS + Normal Python), both `.txt`/`.md` upload and paste paths; all contacts/fields parse correctly. Added permanent fixture regression tests (`operator_batch_samples.json` ×2 + tests in both suites). Verification: python unittest 28/28, front-cards jest 29 suites/191, api-server batch-upload jest 46 passed, eslint 0 errors (1 pre-existing warning). Committed and pushed to `origin/main`.  
+**Production readiness:** Unchanged.  
+**Blockers remaining:** manual browser click-through of paste/upload; DNS/TLS; owner deploy / Demo cutover  
 
 ---
 

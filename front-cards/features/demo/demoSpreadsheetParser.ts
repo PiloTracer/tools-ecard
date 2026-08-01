@@ -316,6 +316,17 @@ const KEY_VALUE_LINE_RE = /^\s*([^:\n]+?)\s*:\s*(.+?)\s*$/;
 function splitTextSections(text: string): string[] {
   const cleaned = text.replace(/^\uFEFF/, '').trim();
   if (!cleaned) return [];
+
+  // Key-value paste blocks often have blank lines between label:value rows (HTML
+  // table copy). Treat the whole block as one section — not separate records.
+  const lines = cleaned.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (
+    lines.length >= 2 &&
+    lines.every((l) => KEY_VALUE_LINE_RE.test(l) || isVerticalSectionTitle(l))
+  ) {
+    return [lines.join('\n')];
+  }
+
   const sections = cleaned.split(/\n\s*\n+/).map((s) => s.trim()).filter(Boolean);
   return sections.length > 0 ? sections : [cleaned];
 }
@@ -548,17 +559,17 @@ export function parseVerticalContacts(text: string): DemoParsedTable {
     let name = '';
     let title = '';
     if (emailIdx >= 2) {
-      title = cleanLines[emailIdx - 1];
-      name = cleanLines[emailIdx - 2];
+      title = stripPastedCellValue(cleanLines[emailIdx - 1]);
+      name = stripPastedCellValue(cleanLines[emailIdx - 2]);
     } else if (emailIdx === 1) {
-      name = cleanLines[emailIdx - 1];
+      name = stripPastedCellValue(cleanLines[emailIdx - 1]);
     }
 
-    const email = cleanLines[emailIdx];
+    const email = stripPastedCellValue(cleanLines[emailIdx]);
     const rawPhones: string[] = [];
     let pIdx = emailIdx + 1;
     while (pIdx < cleanLines.length) {
-      const val = cleanLines[pIdx];
+      const val = stripPastedCellValue(cleanLines[pIdx]);
       if (digitsOnly(val).length >= 4) {
         rawPhones.push(val);
         pIdx += 1;
@@ -626,7 +637,7 @@ export function parseCsvText(text: string): DemoParsedTable {
 }
 
 function looksLikeEmail(value: string): boolean {
-  const v = value.trim();
+  const v = stripPastedCellValue(value).trim();
   return v.includes('@') && !/\s/.test(v);
 }
 

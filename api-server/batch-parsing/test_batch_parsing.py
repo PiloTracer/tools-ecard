@@ -269,6 +269,43 @@ class FileParserFlexibilityTests(unittest.TestCase):
         self.assertEqual(mapped["email"], "plopez@code-cr.com")
         self.assertIn("Pablo", mapped["full_name"] or mapped["first_name"] or "")
 
+    def test_operator_feedback_samples(self):
+        import json
+
+        fixtures_path = os.path.join(os.path.dirname(__file__), "fixtures", "operator_batch_samples.json")
+        with open(fixtures_path, encoding="utf-8") as f:
+            samples = json.load(f)
+
+        for sample in samples:
+            with self.subTest(sample_id=sample["id"]):
+                path = self._write_tmp(sample["text"], ".txt")
+                df = self.parser.parse_file(path)
+                self.assertGreaterEqual(
+                    len(df),
+                    sample["minContacts"],
+                    msg=f"sample #{sample['id']} produced too few rows",
+                )
+                mapped_rows = [_make_batch_parser().map_row(row) for _, row in df.iterrows()]
+                emails = [m.get("email") for m in mapped_rows]
+                for expected_email in sample["emails"]:
+                    self.assertIn(expected_email, emails)
+                if sample.get("nameIncludes"):
+                    names = [m.get("full_name") or m.get("first_name") or "" for m in mapped_rows]
+                    self.assertTrue(
+                        any(sample["nameIncludes"] in n for n in names),
+                        msg=f"sample #{sample['id']} missing name fragment",
+                    )
+                if sample["id"] in (1, 6):
+                    pablo = next(m for m in mapped_rows if m.get("email") == "plopez@code-cr.com")
+                    self.assertIn("Pablo", pablo.get("full_name") or pablo.get("first_name") or "")
+                    self.assertNotIn("Nombre:", pablo.get("full_name") or pablo.get("first_name") or "")
+
+    def test_md_extension_parsed_like_txt(self):
+        content = "Nombre\tCorreo\nAna Gomez\tana@example.com\n"
+        path = self._write_tmp(content, ".md")
+        df = self.parser.parse_file(path)
+        self.assertEqual(df.iloc[0]["Correo"], "ana@example.com")
+
 
 class WorkPhonePrefixPolicyTests(unittest.TestCase):
     def setUp(self):

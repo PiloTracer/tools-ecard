@@ -36,7 +36,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
   const isDisabled = !selectedProjectId || loading;
 
-  const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.vcf', '.xls', '.xlsx'];
+  const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
   const MAX_SIZE_MB = 10;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
@@ -70,7 +70,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     if (!trimmed) {
       throw new Error('Batch name is required');
     }
-    if (/\.(csv|txt|vcf|xls|xlsx)$/i.test(trimmed)) {
+    if (/\.(csv|txt|md|vcf|xls|xlsx)$/i.test(trimmed)) {
       return trimmed.slice(0, 120);
     }
     const ext = batchFileExtension(sourceFile.name);
@@ -373,7 +373,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
             {isUploading ? 'Uploading...' : isDragging ? 'Drop file here' : 'Import Batch'}
           </p>
           <p className={getDescriptionClasses()}>
-            .csv, .txt, .vcf, .xls, .xlsx up to {MAX_SIZE_MB}MB
+            .csv, .txt, .md, .vcf, .xls, .xlsx up to {MAX_SIZE_MB}MB
           </p>
           {!isDisabled && !isUploading && !isDragging && (
             <p className="text-xs text-gray-400 mt-1">

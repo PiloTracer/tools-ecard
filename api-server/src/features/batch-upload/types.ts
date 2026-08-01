@@ -102,7 +102,7 @@ export class BatchUploadError extends Error {
   }
 }
 
-export const ALLOWED_FILE_TYPES = ['.csv', '.txt', '.vcf', '.xls', '.xlsx'];
+export const ALLOWED_FILE_TYPES = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 export const BATCH_UPLOAD_QUEUE = 'batch-upload-queue';
 export const BATCH_PARSE_QUEUE = 'batch-parse-queue';

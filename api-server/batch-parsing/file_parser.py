@@ -123,8 +123,28 @@ class FileParser:
         cleaned = text.replace('\ufeff', '').strip()
         if not cleaned:
             return []
+        lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
+        if len(lines) >= 2 and all(
+            KEY_VALUE_LINE_RE.match(ln) or self._is_vertical_section_title(ln) for ln in lines
+        ):
+            return ['\n'.join(lines)]
         sections = [s.strip() for s in re.split(r'\n\s*\n+', cleaned) if s.strip()]
         return sections if sections else [cleaned]
+
+    def _strip_labeled_value(self, line: str) -> str:
+        stripped = line.strip()
+        match = KEY_VALUE_LINE_RE.match(stripped)
+        if match:
+            return match.group('value').strip()
+        return stripped
+
+    def _looks_like_email(self, value: str) -> bool:
+        v = self._strip_labeled_value(value).strip()
+        return '@' in v and ' ' not in v
+
+    def _is_vertical_section_title(self, line: str) -> bool:
+        s = line.strip()
+        return s.endswith(':') and '@' not in s and len(s) < 48
 
     def _is_key_value_section(self, lines: List[str]) -> bool:
         non_empty = [ln for ln in lines if ln.strip()]
@@ -341,18 +361,22 @@ class FileParser:
                 if "DEVELOPER NOTE" in line:
                     break
                 s = line.strip()
-                if s and not s.startswith("#") and s.lower() not in [
-                    "nombre", "puesto", "correo", "ext", "usuario"
-                ] and not (s.endswith(':') and '@' not in s and len(s) < 48):
-                    clean_lines.append(s)
+                if not s or s.startswith("#"):
+                    continue
+                norm = _normalize_header_token(s)
+                if norm in ["nombre", "puesto", "correo", "ext", "usuario"]:
+                    continue
+                if self._is_vertical_section_title(s):
+                    continue
+                clean_lines.append(s)
 
             # Scan for emails and anchor around them
             i = 0
             while i < len(clean_lines):
                 # Find next email
                 email_idx = -1
-                for j in range(i, min(i + 10, len(clean_lines))):
-                    if "@" in clean_lines[j] and " " not in clean_lines[j]:
+                for j in range(i, min(i + 12, len(clean_lines))):
+                    if self._looks_like_email(clean_lines[j]):
                         email_idx = j
                         break
 
@@ -364,18 +388,18 @@ class FileParser:
                 title = ""
 
                 if email_idx >= 2:
-                    title = clean_lines[email_idx - 1]
-                    name = clean_lines[email_idx - 2]
+                    title = self._strip_labeled_value(clean_lines[email_idx - 1])
+                    name = self._strip_labeled_value(clean_lines[email_idx - 2])
                 elif email_idx == 1:
-                    name = clean_lines[email_idx - 1]
+                    name = self._strip_labeled_value(clean_lines[email_idx - 1])
 
-                email = clean_lines[email_idx]
+                email = self._strip_labeled_value(clean_lines[email_idx])
 
                 # Extract phones after email
                 p_idx = email_idx + 1
                 raw_phones = []
                 while p_idx < len(clean_lines):
-                    val = clean_lines[p_idx]
+                    val = self._strip_labeled_value(clean_lines[p_idx])
                     digit_count = sum(c.isdigit() for c in val)
                     if digit_count >= 4:
                         raw_phones.append(val)
@@ -455,7 +479,7 @@ class FileParser:
                 except Exception:
                     df = pd.read_excel(file_path, engine='xlrd', header=header_idx)
 
-            elif ext == '.txt':
+            elif ext in ['.txt', '.md']:
                 with open(file_path, 'r', encoding=encoding, errors='replace') as f:
                     raw_text = f.read()
                 lines = [ln for ln in raw_text.splitlines() if ln.strip()]
