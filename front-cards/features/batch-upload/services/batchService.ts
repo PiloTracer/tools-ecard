@@ -91,6 +91,7 @@ class BatchService {
     const url = `${getApiBaseUrl()}/api/batches${queryParams.toString() ? `?${queryParams}` : ''}`;
 
     const response = await fetch(url, {
+      credentials: 'include', // Include cookies for auth (cookie is httpOnly; Bearer below is best-effort)
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
@@ -109,6 +110,7 @@ class BatchService {
     if (isDemoMode()) return demoBatchRepository.deleteBatch(batchId);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}`, {
       method: 'DELETE',
+      credentials: 'include', // Include cookies for auth
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
@@ -125,6 +127,7 @@ class BatchService {
     if (isDemoMode()) return demoBatchRepository.retryBatch(batchId);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/${batchId}/retry`, {
       method: 'POST',
+      credentials: 'include', // Include cookies for auth
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
@@ -142,6 +145,7 @@ class BatchService {
   async getBatchStats(): Promise<BatchStats> {
     if (isDemoMode()) return demoBatchRepository.getBatchStats();
     const response = await fetch(`${getApiBaseUrl()}/api/batches/stats`, {
+      credentials: 'include', // Include cookies for auth
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
@@ -159,6 +163,7 @@ class BatchService {
   async getRecentBatches(limit: number = 5): Promise<Batch[]> {
     if (isDemoMode()) return demoBatchRepository.getRecentBatches(limit);
     const response = await fetch(`${getApiBaseUrl()}/api/batches/recent?limit=${limit}`, {
+      credentials: 'include', // Include cookies for auth
       headers: {
         ...this.getAuthHeaders(),
         'Content-Type': 'application/json',

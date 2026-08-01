@@ -79,11 +79,17 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
   const promptBatchName = useCallback(async (file: File) => {
     const { batchService } = await import('../services/batchService');
-    const existing = await batchService.listBatches({ limit: 200 });
-    const suggested = suggestBatchFileName(
-      file,
-      existing.batches.map((b) => b.fileName)
-    );
+    // Existing names are only used to dedup the suggestion — a failure to list
+    // batches must not silently block the upload flow (the modal is the only
+    // path to upload, and the upload call itself surfaces auth/server errors).
+    let existingNames: string[] = [];
+    try {
+      const existing = await batchService.listBatches({ limit: 200 });
+      existingNames = existing.batches.map((b) => b.fileName);
+    } catch (error) {
+      console.warn('[UploadBatch] Could not list existing batches for name suggestion:', error);
+    }
+    const suggested = suggestBatchFileName(file, existingNames);
     setPendingFile(file);
     setSuggestedBatchName(suggested);
     setShowNameModal(true);

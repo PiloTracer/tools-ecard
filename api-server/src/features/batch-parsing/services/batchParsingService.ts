@@ -114,10 +114,12 @@ export class BatchParsingService {
         }
       });
 
-      // Collect stderr (logs and errors)
+      // Collect stderr (logs and errors). NOTE: Python's logging writes INFO/WARNING
+      // to stderr by default, so stderr output is not necessarily an error — real
+      // failures are reported on non-zero exit below.
       pythonProcess.stderr.on('data', (data) => {
         stderrData += data.toString();
-        log.error({ batchId, output: data.toString().trim() }, 'Python stderr');
+        log.warn({ batchId, output: data.toString().trim() }, 'Python stderr');
       });
 
       // Handle process completion
