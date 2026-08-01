@@ -82,6 +82,81 @@ describe('demoSpreadsheetParser', () => {
       expect(fields.workPhone).toBe('2459-7578');
     });
 
+    it('parses usuario header alias and vertical stacked contacts', () => {
+      const usuarioTable = parseCsvText(
+        'usuario\tPuesto\tCorreo\text\nNatalia Sandi Flores\tAuxiliar de Tesorería\tnsandi@code-cr.com\t6064\n'
+      );
+      const usuarioFields = mapRowToContactFields(usuarioTable.headers, usuarioTable.rows[0]);
+      expect(usuarioFields.fullName).toContain('Natalia');
+      expect(usuarioFields.email).toBe('nsandi@code-cr.com');
+
+      const vertical = parseCsvText(
+        [
+          'Damark Beale Nelson',
+          'Ingeniero Aseguramiento Calidad',
+          'dbeale@code-cr.com',
+          '2459-7569',
+          '8640-2373',
+          '',
+          'Gustavo Alpizar Hidalgo',
+          'Gerente de Proyecto Electromecánico',
+          'galpizar@code-cr.com',
+          '2459-7569',
+          '8865-2411',
+        ].join('\n')
+      );
+      expect(vertical.rows.length).toBeGreaterThanOrEqual(2);
+      const damark = mapRowToContactFields(vertical.headers, vertical.rows[0]);
+      expect(damark.email).toBe('dbeale@code-cr.com');
+      expect(damark.fullName).toContain('Damark');
+    });
+
+    it('reconstructs messy HTML table paste (one cell per line)', () => {
+      const table = parseCsvText(
+        [
+          'Nombre',
+          'Puesto',
+          'Correo',
+          'Ext',
+          'Nombre: Pablo López Moreira',
+          'Gerente de Operaciones y Facilidades',
+          'plopez@code-cr.com',
+          '24596057',
+          '86729333',
+        ].join('\n')
+      );
+      const useful = table.rows.filter((cols) => isUsefulDemoContactRow(table.headers, cols));
+      expect(useful.length).toBeGreaterThanOrEqual(1);
+      const fields = mapRowToContactFields(table.headers, useful[0]);
+      expect(fields.email).toBe('plopez@code-cr.com');
+      expect(fields.fullName).toContain('Pablo');
+    });
+
+    it('parses vertical paste with section title and blank lines between name/title', () => {
+      const table = parseCsvText(
+        [
+          'Actualizaciones:',
+          '',
+          'Ingrid Amador',
+          'Gerente de Contabilidad',
+          '',
+          'iamador@code-cr.com',
+          '2435-6055',
+          '',
+          'Cristal Morales',
+          'Asistente de Presupuestos',
+          'cmorales@code-cr.com',
+          '2435-6043',
+          '6032-2923',
+        ].join('\n')
+      );
+      const contacts = table.rows
+        .filter((cols) => isUsefulDemoContactRow(table.headers, cols))
+        .map((cols) => mapRowToContactFields(table.headers, cols));
+      expect(contacts.some((c) => c.email === 'iamador@code-cr.com')).toBe(true);
+      expect(contacts.some((c) => c.email === 'cmorales@code-cr.com')).toBe(true);
+    });
+
     it('merges multiple pasted table sections and skips repeated header rows', () => {
       const table = parseCsvText(
         [

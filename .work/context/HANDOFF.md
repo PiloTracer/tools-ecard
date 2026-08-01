@@ -2,17 +2,19 @@
 
 ## Session status
 
-**Open:** 2026-07-28 — goal: *(unset — pick up from §Recommended next or state your task)*
+**Open:** 2026-08-01 — goal: *(unset — pick up from §Recommended next or state your task)*
+
+**Prior:** Open 2026-07-28 — goal unset; HANDOFF not formally closed. `main` advanced since (demo OAuth scoping, batch record limits, XML entity decode — see recent commits).
 
 **Prior:** Open 2026-07-24 — production cutover (host nginx, TLS/Cloudflare, render-worker health, `bin/start.sh` dev+prd); landed on `main` (see recent commits). Closed without explicit `@session-control close` in HANDOFF.
 
 **Prior:** Closed 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
 
-**Updated:** 2026-07-28
+**Updated:** 2026-08-01
 
 **Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
-**Repository state:** Feedback UX slice landed on `main`. Profile page + dashboard link; image `clipShape` (designer + export + render-worker); canvas length units in PropertyPanel; person-name title case **at ingest only** (Demo `mapRowToContactFields`; Normal `DataNormalizer`); export/render do not rewrite casing; `business_name` exempt. api-server `test` uses `run-tests.cjs` (clears `DEBUG=*`). **Verification:** front-cards jest **147** pass; render-worker **13**; api-server **137**; touch-scope pass; blast-radius warn (scoped). **Residual:** manual browser click-through; owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
+**Repository state:** `main` clean and synced with `origin/main`. Recent commits (post-2026-07-28): demo storage scoped per OAuth user + real account display; configurable batch record limits (import/view/export); numeric XML entity decode for accented names in card export. Prior baseline: feedback UX slice (profile, clipShape, canvas units, ingest-only capitalize); api-server `run-tests.cjs`. **Dev stack:** not running (`docker compose ps` empty). **Residual:** manual browser click-through; owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 

@@ -18,7 +18,7 @@ FIELD_MAPPING = {
     # Core
     "first_name": ["first_name", "firstName", "first name", "firstname", "fname", "given name", "nombre"],
     "last_name": ["last_name", "lastName", "last name", "lastname", "lname", "surname", "family name", "apellidos"],
-    "full_name": ["full_name", "fullName", "full name", "nombre completo"],
+    "full_name": ["full_name", "fullName", "full name", "nombre completo", "usuario"],
     "email": ["email", "e-mail", "mail", "email address", "correo", "correo electrónico", "correo electronico"],
     "work_phone": ["work_phone", "workPhone", "work phone", "office phone", "business phone", "tel", "phone", "telefono", "teléfono", "telefono ofi", "teléfono ofi"],
     "work_phone_ext": ["work_phone_ext", "ext", "extension", "extensión"],

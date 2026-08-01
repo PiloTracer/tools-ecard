@@ -15,7 +15,7 @@ from typing import List
 import pandas as pd
 import chardet
 
-from data_normalizer import FIELD_MAPPING, _normalize_header_token
+from data_normalizer import FIELD_MAPPING, _alias_tokens, _normalize_header_token, find_fuzzy_field_match
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +176,107 @@ class FileParser:
         best = max(counts, key=lambda d: counts[d])
         return best if counts[best] > 0 else '\t'
 
+    def _line_looks_like_header_label(self, line: str) -> bool:
+        stripped = line.strip()
+        match = KEY_VALUE_LINE_RE.match(stripped)
+        if match:
+            value = match.group('value').strip()
+            if value and (
+                '@' in value
+                or sum(c.isdigit() for c in value) >= 4
+                or (len(value.split()) >= 2 and not any(
+                    _normalize_header_token(value) in _alias_tokens(aliases)
+                    for aliases in FIELD_MAPPING.values()
+                ))
+            ):
+                return False
+            label = match.group('key').strip()
+        else:
+            label = stripped.split(':', 1)[0].strip()
+        key = _normalize_header_token(label)
+        if not key:
+            return False
+        for aliases in FIELD_MAPPING.values():
+            if key in _alias_tokens(aliases):
+                return True
+        return find_fuzzy_field_match(label) is not None
+
+    def _strip_pasted_cell_value(self, line: str) -> str:
+        stripped = line.rstrip('\t').strip()
+        match = KEY_VALUE_LINE_RE.match(stripped)
+        if match:
+            return match.group('value').strip()
+        return stripped
+
+    def _reconstruct_stacked_table_paste(self, text: str) -> pd.DataFrame:
+        """
+        HTML tables copied from browsers often arrive as one cell per line (headers
+        stacked vertically, then each data row stacked the same way). Rebuild a grid.
+        """
+        lines = [ln.rstrip('\t').strip() for ln in text.splitlines() if ln.strip()]
+        if len(lines) < 4:
+            return pd.DataFrame()
+
+        header_end = 0
+        while header_end < len(lines) and header_end < 12 and self._line_looks_like_header_label(lines[header_end]):
+            header_end += 1
+        if header_end < 2:
+            return pd.DataFrame()
+
+        headers = []
+        for ln in lines[:header_end]:
+            raw = self._strip_pasted_cell_value(ln)
+            if ':' in raw and '@' not in raw and raw.index(':') < 24:
+                headers.append(raw.split(':', 1)[0].strip())
+            else:
+                headers.append(raw)
+
+        col_count = len(headers)
+        data_lines = [self._strip_pasted_cell_value(ln) for ln in lines[header_end:]]
+        rows: List[List[str]] = []
+        idx = 0
+        while idx < len(data_lines):
+            chunk = data_lines[idx: idx + col_count]
+            if not chunk:
+                break
+            row = chunk + [''] * max(0, col_count - len(chunk))
+            rows.append(row[:col_count])
+            idx += col_count
+
+            while idx < len(data_lines):
+                val = data_lines[idx]
+                if '@' in val and ' ' not in val.strip():
+                    break
+                if sum(c.isdigit() for c in val) >= 4 and not any(ch.isalpha() for ch in val.replace('-', '')):
+                    extra = data_lines[idx]
+                    idx += 1
+                    ext_col = next((i for i, h in enumerate(headers) if _normalize_header_token(h) == 'ext'), -1)
+                    if ext_col >= 0 and not row[ext_col].strip():
+                        row[ext_col] = extra
+                    elif ext_col >= 0:
+                        row[ext_col] = f"{row[ext_col]}\n{extra}".strip()
+                    continue
+                break
+
+        if not rows:
+            return pd.DataFrame()
+        return pd.DataFrame(rows, columns=headers)
+
+    def _is_good_dataframe(self, df: pd.DataFrame) -> bool:
+        if df.empty:
+            return False
+        cols = [str(c).strip() for c in df.columns]
+        all_keywords = [kw.lower() for sublist in FIELD_MAPPING.values() for kw in sublist]
+        matches = sum(
+            1 for c in cols
+            if any(kw in _normalize_header_token(c) or _normalize_header_token(c) in kw for kw in all_keywords)
+        )
+        if matches >= 2:
+            return True
+        if any(sum(ch.isdigit() for ch in str(c)) >= 7 and '@' not in str(c) for c in cols):
+            return False
+        return any('@' in str(v) for _, row in df.iterrows() for v in row.tolist())
+
     def _row_echoes_header(self, headers: List[str], row: List[str]) -> bool:
         if not headers or not row:
             return False
@@ -240,7 +341,9 @@ class FileParser:
                 if "DEVELOPER NOTE" in line:
                     break
                 s = line.strip()
-                if s and not s.startswith("#") and s not in ["Nombre", "Puesto", "Correo", "Ext"]:
+                if s and not s.startswith("#") and s.lower() not in [
+                    "nombre", "puesto", "correo", "ext", "usuario"
+                ] and not (s.endswith(':') and '@' not in s and len(s) < 48):
                     clean_lines.append(s)
 
             # Scan for emails and anchor around them
@@ -361,8 +464,16 @@ class FileParser:
                 # email-anchor parser — it mis-identifies the header row as a name.
                 if self._looks_like_tabular_text(lines) or self._is_key_value_section(lines):
                     df = self._parse_plain_text_sections(raw_text, encoding)
+                    if not self._is_good_dataframe(df):
+                        stacked = self._reconstruct_stacked_table_paste(raw_text)
+                        if not stacked.empty:
+                            df = stacked
                 else:
                     df = self._parse_vertical_txt(file_path, encoding)
+                    if df.empty:
+                        stacked = self._reconstruct_stacked_table_paste(raw_text)
+                        if not stacked.empty:
+                            df = stacked
                     if df.empty:
                         delimiter = self._detect_delimiter(file_path, encoding)
                         df_temp = self._read_raw_matrix(file_path, encoding, delimiter=delimiter)

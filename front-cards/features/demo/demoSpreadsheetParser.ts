@@ -52,6 +52,7 @@ const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
   fullname: 'fullName',
   name: 'fullName',
   nombre_completo: 'fullName',
+  usuario: 'fullName',
   email: 'email',
   e_mail: 'email',
   mail: 'email',
@@ -402,13 +403,226 @@ function parseSingleTextSection(text: string): DemoParsedTable {
   return parseDelimitedSection(lines);
 }
 
-/** Parse pasted/plain text: key-value blocks, tabular CSV/TSV, or multiple sections. */
-export function parseCsvText(text: string): DemoParsedTable {
+function looksLikeTabularText(text: string): boolean {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return false;
+  const delimiter = detectDelimiter(lines.slice(0, 5).join('\n'));
+  const matrix = lines.slice(0, 20).map((line) => splitDelimitedLine(line, delimiter));
+  if (!matrix[0] || matrix[0].length < 2) return false;
+  return headerRowMatchScore(matrix[findHeaderRowIndex(matrix)] || []) >= 2;
+}
+
+/** Strip optional "label: value" prefix from a pasted cell line. */
+function stripPastedCellValue(line: string): string {
+  const trimmed = line.replace(/\t+$/, '').trim();
+  const kv = trimmed.match(KEY_VALUE_LINE_RE);
+  if (kv) return kv[2].trim();
+  return trimmed;
+}
+
+function lineLooksLikeHeaderLabel(line: string): boolean {
+  const trimmed = line.trim();
+  const kv = trimmed.match(KEY_VALUE_LINE_RE);
+  if (kv) {
+    const value = kv[2].trim();
+    if (
+      value &&
+      (value.includes('@') ||
+        digitsOnly(value).length >= 4 ||
+        (value.split(/\s+/).length >= 2 && !HEADER_ALIASES[normalizeHeaderKey(value)]))
+    ) {
+      return false;
+    }
+  }
+  const label = stripPastedCellValue(line).split(':')[0]?.trim() ?? '';
+  const key = normalizeHeaderKey(label);
+  if (!key) return false;
+  if (HEADER_ALIASES[key]) return true;
+  return findFuzzyFieldMatch(key) !== null;
+}
+
+/**
+ * Reconstruct tabular data when HTML tables are copied as one cell per line
+ * (headers stacked vertically, then data rows stacked the same way).
+ */
+function reconstructStackedTablePaste(text: string): DemoParsedTable | null {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\t+$/, '').trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.length < 4) return null;
+
+  let headerEnd = 0;
+  while (headerEnd < lines.length && headerEnd < 12 && lineLooksLikeHeaderLabel(lines[headerEnd])) {
+    headerEnd += 1;
+  }
+  if (headerEnd < 2) return null;
+
+  const headers = lines.slice(0, headerEnd).map((l) => {
+    const raw = stripPastedCellValue(l);
+    const colon = raw.indexOf(':');
+    if (colon > 0 && colon < 24 && !raw.includes('@')) {
+      return raw.slice(0, colon).trim();
+    }
+    return raw;
+  });
+
+  const colCount = headers.length;
+  const dataLines = lines.slice(headerEnd).map(stripPastedCellValue);
+  const rows: string[][] = [];
+
+  let idx = 0;
+  while (idx < dataLines.length) {
+    const chunk = dataLines.slice(idx, idx + colCount);
+    if (chunk.length === 0) break;
+    const row = [...chunk];
+    while (row.length < colCount) row.push('');
+    rows.push(row.slice(0, colCount));
+    idx += colCount;
+
+    // Overflow phone lines after a full row (common when Ext holds two numbers).
+    while (
+      idx < dataLines.length &&
+      !looksLikeEmail(dataLines[idx]) &&
+      !looksLikePersonName(dataLines[idx]) &&
+      digitsOnly(dataLines[idx]).length >= 4
+    ) {
+      const extra = dataLines[idx++];
+      const last = rows[rows.length - 1];
+      const extCol = headers.findIndex((h) => normalizeHeaderKey(h) === 'ext');
+      const phoneCol = headers.findIndex((h) => {
+        const k = normalizeHeaderKey(h);
+        return k === 'telefono' || k === 'phone' || HEADER_ALIASES[k] === 'workPhone';
+      });
+      if (extCol >= 0 && !last[extCol]?.trim()) {
+        last[extCol] = extra;
+      } else if (phoneCol >= 0 && !last[phoneCol]?.trim()) {
+        last[phoneCol] = extra;
+      } else if (extCol >= 0) {
+        last[extCol] = [last[extCol], extra].filter(Boolean).join('\n');
+      }
+    }
+  }
+
+  return rows.length > 0 ? { headers, rows } : null;
+}
+
+const VERTICAL_SKIP_HEADERS = new Set(['nombre', 'puesto', 'correo', 'ext', 'usuario']);
+
+function isVerticalSectionTitle(line: string): boolean {
+  const s = line.trim();
+  return s.endsWith(':') && !s.includes('@') && s.length < 48;
+}
+
+/**
+ * Parse vertically stacked contacts (name → title → email → phone(s) per person).
+ * Mirrors api-server file_parser._parse_vertical_txt for Demo/Normal parity.
+ */
+export function parseVerticalContacts(text: string): DemoParsedTable {
+  const cleanLines: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (line.includes('DEVELOPER NOTE')) break;
+    const s = line.trim();
+    if (!s || s.startsWith('#')) continue;
+    const norm = normalizeHeaderKey(s);
+    if (VERTICAL_SKIP_HEADERS.has(norm)) continue;
+    if (isVerticalSectionTitle(s)) continue;
+    cleanLines.push(s);
+  }
+
+  const headers = ['Nombre', 'Puesto', 'Correo', 'Teléfono', 'Móvil', 'Ext'];
+  const rows: string[][] = [];
+
+  let i = 0;
+  while (i < cleanLines.length) {
+    let emailIdx = -1;
+    for (let j = i; j < Math.min(i + 12, cleanLines.length); j++) {
+      if (looksLikeEmail(cleanLines[j])) {
+        emailIdx = j;
+        break;
+      }
+    }
+    if (emailIdx === -1) break;
+
+    let name = '';
+    let title = '';
+    if (emailIdx >= 2) {
+      title = cleanLines[emailIdx - 1];
+      name = cleanLines[emailIdx - 2];
+    } else if (emailIdx === 1) {
+      name = cleanLines[emailIdx - 1];
+    }
+
+    const email = cleanLines[emailIdx];
+    const rawPhones: string[] = [];
+    let pIdx = emailIdx + 1;
+    while (pIdx < cleanLines.length) {
+      const val = cleanLines[pIdx];
+      if (digitsOnly(val).length >= 4) {
+        rawPhones.push(val);
+        pIdx += 1;
+      } else {
+        break;
+      }
+    }
+
+    let workPhone = '';
+    let mobilePhone = '';
+    let workPhoneExt = '';
+    for (const p of rawPhones) {
+      const digits = digitsOnly(p);
+      if (digits.length < 8) {
+        workPhoneExt = p;
+      } else if (digits.startsWith('6') || digits.startsWith('7') || digits.startsWith('8')) {
+        mobilePhone = p;
+      } else {
+        workPhone = p;
+      }
+    }
+
+    rows.push([name, title, email, workPhone, mobilePhone, workPhoneExt]);
+    i = pIdx;
+  }
+
+  return { headers, rows };
+}
+
+function isGoodParsedTable(table: DemoParsedTable): boolean {
+  if (table.rows.length === 0) return false;
+  if (headerRowMatchScore(table.headers) >= 2) return true;
+  if (table.headers.some((h) => digitsOnly(h).length >= 7 && !h.includes('@'))) return false;
+  return table.rows.some((cols) => isUsefulDemoContactRow(table.headers, cols));
+}
+
+function parseCsvTextStandard(text: string): DemoParsedTable {
   const sections = splitTextSections(text);
   if (sections.length <= 1) {
     return parseSingleTextSection(text.replace(/^\uFEFF/, '').trim());
   }
   return mergeParsedTables(sections.map(parseSingleTextSection));
+}
+
+/** Parse pasted/plain text: key-value blocks, tabular CSV/TSV, stacked HTML cells, or vertical stacks. */
+export function parseCsvText(text: string): DemoParsedTable {
+  const cleaned = text.replace(/^\uFEFF/, '').trim();
+  if (!cleaned) return { headers: [], rows: [] };
+
+  if (looksLikeTabularText(cleaned)) {
+    const standard = parseCsvTextStandard(cleaned);
+    if (isGoodParsedTable(standard)) return standard;
+    const stacked = reconstructStackedTablePaste(cleaned);
+    if (stacked && isGoodParsedTable(stacked)) return stacked;
+    return standard.rows.length > 0 ? standard : stacked ?? standard;
+  }
+
+  const vertical = parseVerticalContacts(cleaned);
+  if (vertical.rows.length > 0) return vertical;
+
+  const stacked = reconstructStackedTablePaste(cleaned);
+  if (stacked && isGoodParsedTable(stacked)) return stacked;
+
+  return parseCsvTextStandard(cleaned);
 }
 
 function looksLikeEmail(value: string): boolean {

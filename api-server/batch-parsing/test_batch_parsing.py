@@ -219,6 +219,56 @@ class FileParserFlexibilityTests(unittest.TestCase):
         self.assertEqual(len(df), 2)
         self.assertEqual(df.iloc[1]["Correo"], "balavez@code-cr.com")
 
+    def test_usuario_header_alias(self):
+        content = (
+            "usuario\tPuesto\tCorreo\text\n"
+            "Natalia Sandi Flores\tAuxiliar de Tesorería\tnsandi@code-cr.com\t6064\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        mapped = _make_batch_parser().map_row(df.iloc[0])
+        self.assertEqual(mapped["email"], "nsandi@code-cr.com")
+        self.assertIn("Natalia", mapped["full_name"] or mapped["first_name"] or "")
+
+    def test_vertical_stacked_paste(self):
+        content = (
+            "Damark Beale Nelson\n"
+            "Ingeniero Aseguramiento Calidad\n"
+            "dbeale@code-cr.com\n"
+            "2459-7569\n"
+            "8640-2373\n"
+            "\n"
+            "Gustavo Alpizar Hidalgo\n"
+            "Gerente de Proyecto Electromecánico\n"
+            "galpizar@code-cr.com\n"
+            "2459-7569\n"
+            "8865-2411\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertGreaterEqual(len(df), 2)
+        emails = [str(v) for v in df["email"].tolist()] if "email" in df.columns else []
+        if not emails:
+            mapped = [_make_batch_parser().map_row(row) for _, row in df.iterrows()]
+            emails = [m.get("email") for m in mapped]
+        self.assertIn("dbeale@code-cr.com", emails)
+        self.assertIn("galpizar@code-cr.com", emails)
+
+    def test_messy_html_table_paste_one_cell_per_line(self):
+        content = (
+            "Nombre\nPuesto\nCorreo\nExt\n"
+            "Nombre: Pablo López Moreira\n"
+            "Gerente de Operaciones y Facilidades\n"
+            "plopez@code-cr.com\n"
+            "24596057\n"
+            "86729333\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        mapped = _make_batch_parser().map_row(df.iloc[0])
+        self.assertEqual(mapped["email"], "plopez@code-cr.com")
+        self.assertIn("Pablo", mapped["full_name"] or mapped["first_name"] or "")
+
 
 class WorkPhonePrefixPolicyTests(unittest.TestCase):
     def setUp(self):
