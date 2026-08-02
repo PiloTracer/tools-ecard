@@ -270,7 +270,9 @@ services:
         NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT: ${NEXT_PUBLIC_OAUTH_USER_INFO_ENDPOINT:-https://aiepic.app/api/users/me}
         NEXT_PUBLIC_USER_SUBSCRIPTION_URL: ${NEXT_PUBLIC_USER_SUBSCRIPTION_URL:-}
         NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL: ${NEXT_PUBLIC_POST_LOGIN_REDIRECT_URL:-/dashboard}
-    image: ${ECARDS_FRONT_IMAGE:-ecards-front:prd}
+    # Distinct image tag from the prd stack — sharing ecards-front:prd let the
+    # last build clobber the other stack's front (build-time NEXT_PUBLIC_* bake).
+    image: ${ECARDS_FRONT_IMAGE:-ecards-front:demo}
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-frontend
     restart: unless-stopped
     env_file:

@@ -2,55 +2,103 @@
   {
     "id": 1,
     "text": "Nombre \n\t\n\nPuesto\n\t\n\nCorreo\n\t\n\nExt\n\nNombre: Pablo López Moreira\n\t\n\nGerente de Operaciones y Facilidades\n\t\n\nplopez@code-cr.com\n\t\n\n24596057\n86729333",
-    "minContacts": 1,
+    "expectedCount": 1,
     "emails": [
       "plopez@code-cr.com"
     ],
-    "nameIncludes": "Pablo"
+    "expectedNames": [
+      "Pablo López Moreira"
+    ]
   },
   {
     "id": 2,
-    "text": "Nombre \n\t\n\nPuesto\n\t\n\nCorreo\n\t\n\nExt\n\nJorge Arturo Monge Víquez\n\t\n\nGeneral Director\n\t\n\njmonge@code-ccr.com\n\t\n\n2435-6010\n\n8855-7055",
-    "minContacts": 1,
+    "text": " Nombre \n\t\n\nPuesto\n\t\n\nCorreo\n\t\n\nExt\n\nJorge Arturo Monge Víquez\n\t\n\nGeneral Director\n\t\n\njmonge@code-ccr.com\n\t\n\n2435-6010\n\n8855-7055",
+    "expectedCount": 1,
     "emails": [
       "jmonge@code-ccr.com"
     ],
-    "nameIncludes": "Jorge"
+    "expectedNames": [
+      "Jorge Arturo Monge Víquez"
+    ]
   },
   {
     "id": 3,
     "text": "Nombre \tPuesto \tCorreo \tExt\nBrandon Alvarez Quiros \tAuxiliar de Logistica y Compras \tbalavez@code-cr.com \t6088\nLuis Angel Arispe Córdoba \tSupervisor de Contabilidad \tlarispe@code-cr.com \t7582\nSilvia Rivera Salazar \tAuxiliar de Tesoreria \tsrivera@code-cr.com \t7583\nJose Andres Villalobos Herrera \tAsistente Ingeneria \tavillalobos@code-cr.com \t7562",
-    "minContacts": 4,
+    "expectedCount": 4,
     "emails": [
       "balavez@code-cr.com",
-      "larispe@code-cr.com"
+      "larispe@code-cr.com",
+      "srivera@code-cr.com",
+      "avillalobos@code-cr.com"
+    ],
+    "expectedNames": [
+      "Brandon Alvarez Quiros",
+      "Luis Angel Arispe Córdoba",
+      "Silvia Rivera Salazar",
+      "Jose Andres Villalobos Herrera"
     ]
   },
   {
     "id": 4,
     "text": "usuario\n\t\n\nPuesto \n\t\n\nCorreo\n\t\n\next\n\nNatalia Sandi Flores\n\t\n\nAuxiliar de Tesorería\n\t\n\nnsandi@code-cr.com\n\t\n\n6064\n\nSylvia Mora Jimenez\n\t\n\nCoordinadora de Diseño Arquitectónico\n\t\n\nsmora@code-cr.com\n\t\n\n7540\n\nAdrián Rojas Espinoza\n\t\n\nAuxiliar del Proceso de Compras\n\t\n\narojas@code-cr.com\n\t\n\n6088\n\nBrenda Vargas Guevara\n\t\n\nAsistente Administrativa\n\t\n\nbvargas@code-cr.com\n\t\n\n7573\n\nRachael María Gonzalez Canales\n\t\n\nAuxiliar Administrativa\n\t\n\nrgonzalez@code-cr.com\n\t\n\n7574\n\nPablo Cerdas Gamboa\n\t\n\nIng. Proyecto - Auxiliar de Adquisiciones\n\t\n\npcerdas@code-cr.com\n\t\n\n7575\n\nIsaac Flores Arguedas\n\t\n\nTécnico de mantenimiento\n\t\n\niflores@code-cr.com\n\t\n\n7576\n\nJorge Luis Herrera Quesada\n\t\n\nIT Manager - SoporteXperto\n\t\n\nit1@code-cr.com\n\t\n\n6032\n\nAndrey Herrera Quesada\n\t\n\nHelpdesk - SoporteXperto\n\t\n\nit3@code-cr.com\n\t\n\n6032\n\nDalay Carrillo Flores\n\t\n\nHelpdesk - SoporteXperto\n\t\n\nit2@code-cr.com\n\t\n\n6032",
-    "minContacts": 10,
+    "expectedCount": 10,
     "emails": [
       "nsandi@code-cr.com",
+      "smora@code-cr.com",
+      "arojas@code-cr.com",
+      "bvargas@code-cr.com",
+      "rgonzalez@code-cr.com",
+      "pcerdas@code-cr.com",
+      "iflores@code-cr.com",
+      "it1@code-cr.com",
+      "it3@code-cr.com",
       "it2@code-cr.com"
+    ],
+    "expectedNames": [
+      "Natalia Sandi Flores",
+      "Sylvia Mora Jimenez",
+      "Adrián Rojas Espinoza",
+      "Brenda Vargas Guevara",
+      "Rachael María Gonzalez Canales",
+      "Pablo Cerdas Gamboa",
+      "Isaac Flores Arguedas",
+      "Jorge Luis Herrera Quesada",
+      "Andrey Herrera Quesada",
+      "Dalay Carrillo Flores"
     ]
   },
   {
     "id": 5,
-    "text": "Damark Beale Nelson \nIngeniero Aseguramiento Calidad  \ndbeale@code-cr.com \n2459-7569\n8640-2373\n\nGustavo Alpizar Hidalgo  \nGerente de Proyecto Electromecánico \ngalpizar@code-cr.com \n2459-7569\n8865-2411\n\nSylvia Mora Jiménez  \nCoordinador de Diseño Arquitectónico   \nwzelaya@code-cr.com \n2459-7540\n8814-3711\n\nMelania Sauma Masís \nCoordinadora del SIG\nmsauma@code-cr.com \n2459-7571\n8704-8282\n\nByron Daniel Monge Garro  \nIngeniero de Proyectos  \nbmonge@code-cr.com \n2459-7544\n8636-9797\n\nActualizaciones:\n\nIngrid Amador\nGerente de Contabilidad\n\niamador@code-cr.com\n2435-6055\n\nCristal Morales\nAsistente de Presupuestos\ncmorales@code-cr.com\n2435-6043\n6032-2923",
-    "minContacts": 7,
+    "text": " Damark Beale Nelson \nIngeniero Aseguramiento Calidad  \ndbeale@code-cr.com \n2459-7569\n8640-2373\n\nGustavo Alpizar Hidalgo  \nGerente de Proyecto Electromecánico \ngalpizar@code-cr.com \n2459-7569\n8865-2411\n\nSylvia Mora Jiménez  \nCoordinador de Diseño Arquitectónico   \nwzelaya@code-cr.com \n2459-7540\n8814-3711\n\nMelania Sauma Masís \nCoordinadora del SIG\nmsauma@code-cr.com \n2459-7571\n8704-8282\n\nByron Daniel Monge Garro  \nIngeniero de Proyectos  \nbmonge@code-cr.com \n2459-7544\n8636-9797\n\nActualizaciones:\n\nIngrid Amador\nGerente de Contabilidad\n\niamador@code-cr.com\n2435-6055\n\nCristal Morales\nAsistente de Presupuestos\ncmorales@code-cr.com\n2435-6043\n6032-2923",
+    "expectedCount": 7,
     "emails": [
       "dbeale@code-cr.com",
+      "galpizar@code-cr.com",
+      "wzelaya@code-cr.com",
+      "msauma@code-cr.com",
+      "bmonge@code-cr.com",
+      "iamador@code-cr.com",
       "cmorales@code-cr.com"
+    ],
+    "expectedNames": [
+      "Damark Beale Nelson",
+      "Gustavo Alpizar Hidalgo",
+      "Sylvia Mora Jiménez",
+      "Melania Sauma Masís",
+      "Byron Daniel Monge Garro",
+      "Ingrid Amador",
+      "Cristal Morales"
     ]
   },
   {
     "id": 6,
     "text": "Nombre: Pablo López Moreira\n\t\n\nPuesto: Gerente de Operaciones y Facilidades\n\t\n\nCorreo: plopez@code-cr.com\n\t\n\nExt: 24596057\n\nCelular: 86729333",
-    "minContacts": 1,
+    "expectedCount": 1,
     "emails": [
       "plopez@code-cr.com"
     ],
-    "nameIncludes": "Pablo"
+    "expectedNames": [
+      "Pablo López Moreira"
+    ]
   }
 ]

@@ -1,5 +1,10 @@
 import JSZip from 'jszip';
+import { TextDecoder as NodeTextDecoder } from 'util';
 import operatorSamples from './fixtures/operator_batch_samples.json';
+
+// This repo's jsdom predates a global TextDecoder; browsers always provide it.
+(global as unknown as { TextDecoder?: unknown }).TextDecoder ??= NodeTextDecoder;
+
 import {
   applyWorkPhonePrefix,
   findHeaderRowIndex,
@@ -179,28 +184,54 @@ describe('demoSpreadsheetParser', () => {
     it.each(operatorSamples as Array<{
       id: number;
       text: string;
-      minContacts: number;
+      expectedCount: number;
       emails: string[];
-      nameIncludes?: string;
-    }>)('parses operator feedback sample #$id', (sample) => {
+      expectedNames: string[];
+    }>)('parses operator feedback sample #$id (every record)', (sample) => {
       const table = parseCsvText(sample.text);
       const contacts = table.rows
         .filter((cols) => isUsefulDemoContactRow(table.headers, cols))
         .map((cols) => mapRowToContactFields(table.headers, cols));
-      expect(contacts.length).toBeGreaterThanOrEqual(sample.minContacts);
+      expect(contacts.length).toBe(sample.expectedCount);
       for (const email of sample.emails) {
         expect(contacts.some((c) => c.email === email)).toBe(true);
       }
-      if (sample.nameIncludes) {
-        expect(
-          contacts.some((c) => (c.fullName || '').includes(sample.nameIncludes!))
-        ).toBe(true);
+      for (const name of sample.expectedNames) {
+        expect(contacts.some((c) => c.fullName === name)).toBe(true);
       }
       if (sample.id === 1 || sample.id === 6) {
         const pablo = contacts.find((c) => c.email === 'plopez@code-cr.com');
         expect(pablo?.fullName).toBe('Pablo López Moreira');
       }
     });
+
+    // The upload/paste flows both call parseDemoSpreadsheetFile: paste creates a
+    // File named pasted-content.txt; file import passes the operator's .txt/.md.
+    describe.each(['pasted-content.txt', 'sample.txt', 'sample.md'])(
+      'parseDemoSpreadsheetFile via %s',
+      (fileName) => {
+        it.each(operatorSamples as Array<{
+          id: number;
+          text: string;
+          expectedCount: number;
+          emails: string[];
+          expectedNames: string[];
+        }>)('imports every record of sample #$id', async (sample) => {
+          const file = new File([sample.text], fileName, { type: 'text/plain' });
+          const table = await parseDemoSpreadsheetFile(file);
+          const contacts = table.rows
+            .filter((cols) => isUsefulDemoContactRow(table.headers, cols))
+            .map((cols) => mapRowToContactFields(table.headers, cols));
+          expect(contacts.length).toBe(sample.expectedCount);
+          for (const email of sample.emails) {
+            expect(contacts.some((c) => c.email === email)).toBe(true);
+          }
+          for (const name of sample.expectedNames) {
+            expect(contacts.some((c) => c.fullName === name)).toBe(true);
+          }
+        });
+      }
+    );
   });
 
   describe('matrixToTable', () => {
