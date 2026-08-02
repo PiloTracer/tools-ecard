@@ -5,11 +5,27 @@
  */
 
 import { spawn } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import { appConfig } from '../../../core/config';
 import { createLogger } from '../../../core/utils/logger';
 
 const log = createLogger('BatchParsing');
+
+/**
+ * Resolve a file inside the api-server/batch-parsing directory.
+ * Dev runs unbundled (src/features/batch-parsing/services → up 4 = app root),
+ * but the prd image bundles to a single dist/server.js — there __dirname is
+ * /app/dist and the up-4 relative path lands at '/'. Fall back to the process
+ * working directory (the app root in every deployment).
+ */
+function resolveBatchParsingPath(filename: string): string {
+  const fromDirname = path.join(__dirname, '../../../../batch-parsing', filename);
+  if (fs.existsSync(fromDirname)) {
+    return fromDirname;
+  }
+  return path.join(process.cwd(), 'batch-parsing', filename);
+}
 
 export interface BatchParsingOptions {
   batchId: string;
@@ -39,11 +55,8 @@ export class BatchParsingService {
     // Python executable path (use 'python3' or 'python' depending on system)
     this.pythonPath = process.env.PYTHON_PATH || 'python3';
 
-    // Path to parser.py script
-    this.parserScriptPath = path.join(
-      __dirname,
-      '../../../../batch-parsing/parser.py'
-    );
+    // Path to parser.py script (bundle-safe — see resolveBatchParsingPath)
+    this.parserScriptPath = resolveBatchParsingPath('parser.py');
 
     // Database connection parameters
     this.postgresUrl = process.env.DATABASE_URL || '';
@@ -196,10 +209,7 @@ export class BatchParsingService {
    * Install Python dependencies from requirements.txt
    */
   async installDependencies(): Promise<void> {
-    const requirementsPath = path.join(
-      __dirname,
-      '../../../../batch-parsing/requirements.txt'
-    );
+    const requirementsPath = resolveBatchParsingPath('requirements.txt');
 
     return new Promise((resolve, reject) => {
       log.info('Installing Python dependencies');
