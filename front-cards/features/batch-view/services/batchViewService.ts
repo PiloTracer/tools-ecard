@@ -35,6 +35,8 @@ export const batchViewService = {
           fileName: b.fileName,
           fileSize: b.fileSize,
           status: b.status as BatchListResponse['batches'][number]['status'],
+          recordsCount: b.recordsCount ?? null,
+          recordsProcessed: b.recordsProcessed ?? null,
           createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : String(b.createdAt),
           updatedAt: b.updatedAt instanceof Date ? b.updatedAt.toISOString() : String(b.updatedAt),
         })),
@@ -77,6 +79,8 @@ export const batchViewService = {
           fileName: status.fileName,
           fileSize: status.fileSize,
           status: status.status as BatchListResponse['batches'][number]['status'],
+          recordsCount: status.recordsCount ?? null,
+          recordsProcessed: status.recordsProcessed ?? null,
           createdAt:
             status.createdAt instanceof Date ? status.createdAt.toISOString() : String(status.createdAt),
           updatedAt:

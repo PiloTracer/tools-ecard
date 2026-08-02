@@ -15,6 +15,8 @@ export interface Batch {
   status: BatchStatus;
   errorMessage?: string | null;
   progress?: number;
+  recordsCount?: number | null;
+  recordsProcessed?: number | null;
   createdAt: Date;
   updatedAt: Date;
   processedAt?: Date | null;
@@ -33,6 +35,8 @@ export interface BatchStatusResponse {
   errorMessage?: string | null;
   fileName: string;
   fileSize: number;
+  recordsCount?: number | null;
+  recordsProcessed?: number | null;
   createdAt: Date;
   updatedAt: Date;
   processedAt?: Date | null;

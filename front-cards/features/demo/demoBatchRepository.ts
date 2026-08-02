@@ -41,6 +41,8 @@ function toBatch(b: DemoBatchRecord): Batch {
     createdAt: new Date(b.createdAt),
     updatedAt: new Date(b.updatedAt),
     progress: 100,
+    recordsCount: b.totalRecords,
+    recordsProcessed: b.processedRecords,
   };
 }
 
@@ -114,6 +116,8 @@ export const demoBatchRepository = {
       progress: 100,
       fileName: batch.fileName,
       fileSize: batch.fileSize,
+      recordsCount: batch.totalRecords,
+      recordsProcessed: batch.processedRecords,
       createdAt: new Date(batch.createdAt),
       updatedAt: new Date(batch.updatedAt),
     };
