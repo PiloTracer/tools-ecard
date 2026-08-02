@@ -2,6 +2,10 @@
 
 ## Session status
 
+**Closed:** 2026-08-01 (PM) — goal: make batch import + login work across dev / prd / demo. Done: (1) dev Normal-mode upload fixed end-to-end — dev `.env` flipped to `USE_LOCAL_STORAGE=true` (host SeaweedFS down with the tools-dashboard stack), `batchService` now sends `credentials: 'include'` on all reads (httpOnly cookie made the Bearer fallback empty → silent 401 → "nothing happens" on file select), name modal no longer blocks on list failure, Python-stderr log noise downgraded to warn; all 6 operator samples verified through the full pipeline (storage→queue→worker→parser→Postgres+Cassandra), 7/7 LOADED (`6d34bf4`). (2) Login: `subscription` scope dropped everywhere (provider registrations only allow `profile email`; requesting more rejected every login) — code defaults + `.env`/`.env.prd`/`.env.demo`; OAuth failures now redirect to the Tools Dashboard app library instead of an e-cards error screen; "Go to Tools Dashboard" link added on the login page (`65af773`). Verified: jest 191, api jest 46, python 28, tsc both apps, live `scope=profile email` from `/api/auth/login`. Committed + pushed.
+
+**Residual / owner actions:** prd host still runs pre-fix code AND its parse jobs die before PARSING (batches stuck UPLOADED + "0 records" in batch view — points at Cassandra/keyspace reachability from the worker, not parse logic). On the prd host: edit `.env.prd` (`OAUTH_SCOPES=profile email`), `git pull --ff-only`, `./bin/refresh-prd.sh --app`, then retry the failed batches; diagnose Cassandra if still stuck. Demo stack: `./bin/refresh-prd.sh demo ui`. Dev login 502 = local `tools-dashboard` stack down (sibling project). Dev DB holds synthetic `e2e_*` test batches (cleanup offered, not approved). Manual browser click-through still pending. Prd host unreachable from this machine (no ssh) — agent offered to run the deploy if given access.
+
 **Closed:** 2026-08-01 — goal: verify uncommitted batch-import fixes against 6 operator samples (`.work/feedback/test-data.md`) for `.txt`/`.md` upload and clipboard paste, both Demo and Normal modes. All 6 samples parse correctly in both parsers (names, titles, emails, phones/exts); `.md` now accepted end-to-end; permanent fixture-based regression tests added (`operator_batch_samples.json` in `api-server/batch-parsing/fixtures/` + `front-cards/features/demo/fixtures/`). Verified: python unittest 28/28, front-cards jest 191, api-server batch-upload jest 46 passed; eslint clean (1 pre-existing warning). Committed + pushed.
 
 **Prior:** Open 2026-07-28 — goal unset; HANDOFF not formally closed. `main` advanced since (demo OAuth scoping, batch record limits, XML entity decode — see recent commits).
@@ -116,6 +120,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | Operator feedback intake + x-director fixes | `.work/feedback/` from ODT; F8 focus fix; F1/F3 export+render-retry; F2/F7 nav+defaults; F10/F11 UI; jest 138 green; `close commit push` |
 | 2026-07-16 | Feedback F4–F6/F9/F12 + ingest-only capitalize | Profile page; clipShape live+export+worker; canvas units; capitalize at Demo ingest only; api `run-tests.cjs`; MOD-06; jest 147 |
 | 2026-08-01 | Operator batch-sample verify + close | 6 samples (`.work/feedback/test-data.md`) verified via `.txt`/`.md` upload + paste, Demo + Normal; fixture regression tests; python 28, jest 191 + 46 green |
+| 2026-08-01 PM | Normal-mode upload + login fixes | Dev storage flip (local), batchService credentials + modal silent-failure fix, python stderr log level; prd parse-failure diagnosis (needs redeploy + Cassandra check); OAuth scopes `profile email` + failure→Dashboard redirect + login-page Dashboard link; full-pipeline e2e 7/7 LOADED |
 
 ---
 
@@ -269,11 +274,11 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ## Latest action (@session-control close)
 
-**Date:** 2026-08-01  
+**Date:** 2026-08-01 (PM)  
 **Request:** `@session-control close commit push`  
-**Session result:** Closed. Verified uncommitted batch-import fixes against all 6 operator samples — both parsers (Demo TS + Normal Python), both `.txt`/`.md` upload and paste paths; all contacts/fields parse correctly. Added permanent fixture regression tests (`operator_batch_samples.json` ×2 + tests in both suites). Verification: python unittest 28/28, front-cards jest 29 suites/191, api-server batch-upload jest 46 passed, eslint 0 errors (1 pre-existing warning). Committed and pushed to `origin/main`.  
-**Production readiness:** Unchanged.  
-**Blockers remaining:** manual browser click-through of paste/upload; DNS/TLS; owner deploy / Demo cutover  
+**Session result:** Closed. Fixed dev Normal-mode upload (storage config + credentials + silent-failure UX), verified all 6 operator samples through the full server pipeline (7/7 LOADED, Postgres + Cassandra), fixed OAuth login (scope reduced to provider-supported `profile email`; failures redirect to Tools Dashboard app library; added login-page Dashboard link). Diagnosed prd parse failures to the extent remotely possible — needs prd-host redeploy + Cassandra check. Verification: front jest 191, api jest 46, python 28, tsc clean both apps, live scope check. Committed and pushed to `origin/main`.  
+**Production readiness:** Code ready on `main`; prd/demo NOT updated — requires on-host: `.env.prd` scope edit + `git pull --ff-only` + `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo ui`, then retry failed batches.  
+**Blockers remaining:** prd host access/redeploy; prd Cassandra reachability (batches stuck UPLOADED); tools-dashboard dev stack down (dev login 502); manual browser click-through; dev-DB `e2e_*` cleanup (awaiting approval)  
 
 ---
 

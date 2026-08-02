@@ -46,8 +46,28 @@ export function getAuthorizationEndpoint(): string {
   );
 }
 
+/**
+ * Tools Dashboard home (app library). When the OAuth flow itself fails, users
+ * are sent here instead of being stranded on an e-cards error screen — they
+ * can sign in or manage apps directly at the provider.
+ */
+export function getToolsDashboardHomeUrl(): string {
+  const sub =
+    process.env.USER_SUBSCRIPTION_URL?.trim() ||
+    process.env.NEXT_PUBLIC_USER_SUBSCRIPTION_URL?.trim() ||
+    'https://dev.aiepic.app/app/features/user-subscription';
+  try {
+    return `${new URL(sub).origin}/app/features/app-library`;
+  } catch {
+    return 'https://dev.aiepic.app/app/features/app-library';
+  }
+}
+
 export function getOAuthScopes(): string[] {
-  return (process.env.OAUTH_SCOPES || 'profile email subscription')
+  // The Tools Dashboard client registration only supports 'profile' and 'email';
+  // requesting anything else (e.g. the old 'subscription' scope) makes the
+  // provider reject the authorize request and login fails outright.
+  return (process.env.OAUTH_SCOPES || 'profile email')
     .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);

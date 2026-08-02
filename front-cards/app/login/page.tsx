@@ -70,12 +70,9 @@ function LoginPageContent() {
       window.location.href = data.authorizationUrl;
     } catch (err) {
       console.error('Error initiating login:', err);
-      setError(
-        t('login.loginFailed', {
-          message: err instanceof Error ? err.message : 'Unknown error',
-        })
-      );
-      setIsLoading(false);
+      // Per product decision: a failed login sends the user to the Tools
+      // Dashboard home instead of stranding them on an e-cards error screen.
+      window.location.href = TOOLS_DASHBOARD_HOME_URL;
     }
   };
 

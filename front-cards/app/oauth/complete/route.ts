@@ -18,6 +18,7 @@ import {
   getOAuthClientSecret,
   getOAuthRedirectUri,
   getTokenEndpoint,
+  getToolsDashboardHomeUrl,
   getUserInfoEndpoint,
 } from '@/shared/server/oauth-routes-config';
 
@@ -109,12 +110,14 @@ const COOKIE_CONFIG = {
 };
 
 /**
- * Redirect back to /login after a failed callback, dropping the one-shot PKCE cookies.
- * Keeping them would let a stale state collide with every retry until its 10 minute TTL
- * expires — including app-library launches, whose state can never match a local cookie.
+ * On OAuth failure, send the user to the Tools Dashboard home (app library) —
+ * they can sign in or manage apps there instead of being stranded on an
+ * e-cards error screen. Error details stay in the server logs (logged above
+ * at each failure site). Also drops the one-shot PKCE cookies so a stale
+ * state cannot collide with the next attempt.
  */
-function failureRedirect(url: string): NextResponse {
-  const response = NextResponse.redirect(url);
+function failureRedirect(): NextResponse {
+  const response = NextResponse.redirect(getToolsDashboardHomeUrl());
   response.cookies.delete(COOKIE_CONFIG.state.name);
   response.cookies.delete(COOKIE_CONFIG.codeVerifier.name);
   return response;
@@ -142,21 +145,19 @@ export async function GET(request: NextRequest) {
     // Check for OAuth errors
     if (error) {
       console.error('OAuth error received:', error, errorDescription);
-      return failureRedirect(
-        `${getBaseUrl()}/login?error=${error}&description=${encodeURIComponent(errorDescription || '')}`
-      );
+      return failureRedirect();
     }
 
     // Validate authorization code
     if (!code) {
       console.error('No authorization code received');
-      return failureRedirect(`${getBaseUrl()}/login?error=no_code`);
+      return failureRedirect();
     }
 
     // Validate client secret is configured
     if (!OAUTH_CONFIG.clientSecret) {
       console.error('OAUTH_CLIENT_SECRET is not configured in environment');
-      return failureRedirect(`${getBaseUrl()}/login?error=server_misconfigured`);
+      return failureRedirect();
     }
 
     const storedState = request.cookies.get(COOKIE_CONFIG.state.name)?.value;
@@ -164,11 +165,11 @@ export async function GET(request: NextRequest) {
 
     // Both must match for the PKCE flow; otherwise we would trade the code without code_verifier and the IdP would reject.
     if (storedState && receivedState && storedState !== receivedState) {
-      return failureRedirect(
-        `${getBaseUrl()}/login?error=state_mismatch&description=${encodeURIComponent(
-          'The OAuth state did not match. Start a new sign-in (do not open the return URL in another browser or a preview tool).',
-        )}`,
-      );
+      console.error('OAuth state mismatch', {
+        stored: storedState.substring(0, 10),
+        received: receivedState.substring(0, 10),
+      });
+      return failureRedirect();
     }
 
     // Check if this is a manual login flow (state matches)
@@ -189,7 +190,7 @@ export async function GET(request: NextRequest) {
 
       if (!storedCodeVerifier) {
         console.error('No code verifier found in cookies for manual login');
-        return failureRedirect(`${getBaseUrl()}/login?error=missing_code_verifier`);
+        return failureRedirect();
       }
 
       codeVerifier = storedCodeVerifier;
@@ -235,15 +236,7 @@ export async function GET(request: NextRequest) {
         error_description?: string;
       };
       console.error('Token exchange failed:', errorData);
-      const serverDesc = (errorData.error_description || errorData.error || '').trim();
-      const hint =
-        !codeVerifier &&
-        (errorData.error === 'invalid_grant' || /code|expired|invalid/i.test(serverDesc))
-          ? ' This often happens if PKCE is required (you used "Sign in") but cookies were not sent on the redirect back, or the authorization code was already used—open the app at the same host you started from, allow cookies, click Sign in once, and do not refresh the return URL.'
-          : '';
-      return failureRedirect(
-        `${getBaseUrl()}/login?error=token_exchange_failed&description=${encodeURIComponent(serverDesc + hint)}`
-      );
+      return failureRedirect();
     }
 
     const tokens: OAuthTokenResponse = await tokenResponse.json();
@@ -261,7 +254,7 @@ export async function GET(request: NextRequest) {
 
     if (!userResponse.ok) {
       console.error('Failed to fetch user info:', userResponse.status);
-      return failureRedirect(`${getBaseUrl()}/login?error=user_info_failed`);
+      return failureRedirect();
     }
 
     const user: User = await userResponse.json();
@@ -322,8 +315,6 @@ export async function GET(request: NextRequest) {
     console.error('=== OAuth Callback Error ===');
     console.error('Error:', err);
     console.error('Stack trace:', err instanceof Error ? err.stack : 'N/A');
-    return failureRedirect(
-      `${getBaseUrl()}/login?error=server_error&description=${encodeURIComponent(err instanceof Error ? err.message : 'Unknown error')}`
-    );
+    return failureRedirect();
   }
 }

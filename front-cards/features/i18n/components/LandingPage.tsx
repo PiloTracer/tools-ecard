@@ -1,16 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth';
 import { isDemoMode } from '@/features/demo/isDemoMode';
 import { LanguageSwitcher, useTranslation } from '@/features/i18n';
-import { USER_SUBSCRIPTION_URL } from '@/shared/lib/oauth-config';
+import { USER_SUBSCRIPTION_URL, TOOLS_DASHBOARD_HOME_URL } from '@/shared/lib/oauth-config';
 import { generateAuthorizationUrl } from '@/shared/lib/oauth-utils';
 import { useState } from 'react';
 
 export function LandingPage() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -23,8 +21,8 @@ export function LandingPage() {
       window.location.href = authUrl;
     } catch (error) {
       console.error('Error initiating OAuth:', error);
-      setIsRedirecting(false);
-      router.push('/login');
+      // Failed login goes to the Tools Dashboard home, not an error screen.
+      window.location.href = TOOLS_DASHBOARD_HOME_URL;
     }
   };
 

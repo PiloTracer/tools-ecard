@@ -18,8 +18,9 @@ export const OAUTH_CONFIG = {
     oauth: `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:7300'}/oauth/complete`,
   },
 
-  // Requested scopes
-  scopes: ['profile', 'email', 'subscription'],
+  // Requested scopes — limited to what the Tools Dashboard client
+  // registration supports ('profile', 'email'); see oauth-routes-config.ts.
+  scopes: ['profile', 'email'],
 
   // PKCE configuration
   pkce: {
