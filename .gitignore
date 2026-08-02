@@ -189,3 +189,4 @@ credentials/
 # Local agent/tool scratch (do not commit)
 .reasonix/
 .env.demo
+**/uploads/batches/**
