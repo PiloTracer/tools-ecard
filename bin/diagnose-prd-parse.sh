@@ -103,6 +103,13 @@ else
   log "  --- end parser output ---"
 fi
 
+step "7. Worker/spawn errors in api logs (last 3h)"
+log "  (if empty: retry a batch in the UI first, then re-run this script)"
+docker logs "$API" --since 3h 2>&1 \
+  | grep -iE "BatchParsing|Python parser|spawn|ENOENT|Failed to start Python|Batch parse job failed|Batch parsing job failed" \
+  | grep -vE '"level":30|INFO' \
+  | tail -40
+
 step "Summary"
 cat <<'EOF'
   Read it top-down; the first FAIL is your culprit:
@@ -111,4 +118,7 @@ cat <<'EOF'
   - Step 5 cassandra FAIL  → Cassandra down/unreachable from api: docker ps -a, docker logs <cassandra>
   - Step 5 postgres FAIL   → DATABASE_URL wrong for python (check .env.prd host part is "postgres")
   - Step 6 error text      → the literal exception the worker hits every time
+  - Step 7                 → the worker-side error (spawn failure, exit code, argparse
+                             mismatch). If step 6 succeeds but step 7 shows an error,
+                             the difference is in HOW the worker spawns the parser.
 EOF
