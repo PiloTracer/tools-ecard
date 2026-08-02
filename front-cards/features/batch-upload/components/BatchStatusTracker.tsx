@@ -22,8 +22,10 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
       setStatus(response);
       setError(null);
 
-      // Check if processing is complete
-      if (response.status === BatchStatus.PARSED || response.status === BatchStatus.LOADED) {
+      // Check if processing is complete. Only LOADED is terminal for the UI:
+      // the parser writes PARSED ~1s before LOADED, so stopping at PARSED
+      // would freeze the bar at 80% with the batch actually done.
+      if (response.status === BatchStatus.LOADED) {
         // Stop polling
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
@@ -184,6 +186,15 @@ export const BatchStatusTracker: React.FC<BatchStatusTrackerProps> = ({
             ></div>
           </div>
         </div>
+      )}
+
+      {/* Transient refresh failure — polling continues in the background;
+          without this the bar silently freezes at the last good status. */}
+      {error && status && status.status !== BatchStatus.LOADED && status.status !== BatchStatus.PARSED && (
+        <p className="mb-4 text-xs text-amber-600">
+          Having trouble refreshing status — still retrying in the background. The batch
+          keeps processing on the server regardless.
+        </p>
       )}
 
       {/* Error Message */}

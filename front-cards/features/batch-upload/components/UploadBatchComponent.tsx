@@ -82,9 +82,10 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     // Existing names are only used to dedup the suggestion — a failure to list
     // batches must not silently block the upload flow (the modal is the only
     // path to upload, and the upload call itself surfaces auth/server errors).
+    // Note: the API caps list limit at 100 (listBatchesSchema).
     let existingNames: string[] = [];
     try {
-      const existing = await batchService.listBatches({ limit: 200 });
+      const existing = await batchService.listBatches({ limit: 100 });
       existingNames = existing.batches.map((b) => b.fileName);
     } catch (error) {
       console.warn('[UploadBatch] Could not list existing batches for name suggestion:', error);
