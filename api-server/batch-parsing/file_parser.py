@@ -28,6 +28,34 @@ logger = logging.getLogger(__name__)
 
 KEY_VALUE_LINE_RE = re.compile(r'^\s*(?P<key>[^:]+?)\s*:\s*(?P<value>.+?)\s*$')
 
+# Whitespace-separated key-value paste: "full_name    John Doe" / "full_name\tJohn Doe"
+# (no colon). Only accepted via _match_key_value_line, which requires the label to be a
+# known field alias — otherwise ordinary prose or table rows would be hijacked.
+KEY_VALUE_WS_LINE_RE = re.compile(r'^\s*(?P<key>[^:\n]+?)(?:\t+| {2,})(?P<value>.+?)\s*$')
+
+
+def _match_key_value_line(line: str):
+    """Match a pasted 'label: value' or 'label<tab/2+ spaces>value' line.
+
+    Returns (key, value) or None. The whitespace form additionally requires the label
+    to resolve to a known field (canonical or fuzzy) and the value to NOT be a known
+    field alias itself — that keeps genuine table header rows (e.g. a TSV line
+    'full_name\\temail', where both cells are aliases) on the tabular parsing path.
+    """
+    match = KEY_VALUE_LINE_RE.match(line.strip())
+    if match:
+        return match.group('key').strip(), match.group('value').strip()
+    ws = KEY_VALUE_WS_LINE_RE.match(line.strip())
+    if not ws:
+        return None
+    key = ws.group('key').strip()
+    value = ws.group('value').strip()
+    if _canonical_header_key(key) not in CANONICAL_FIELD_MAP and find_fuzzy_field_match(key) is None:
+        return None
+    if _canonical_header_key(value) in CANONICAL_FIELD_MAP:
+        return None
+    return key, value
+
 
 class FileParser:
     """
@@ -132,7 +160,7 @@ class FileParser:
             return []
         lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
         if len(lines) >= 2 and all(
-            KEY_VALUE_LINE_RE.match(ln) or self._is_vertical_section_title(ln) for ln in lines
+            _match_key_value_line(ln) or self._is_vertical_section_title(ln) for ln in lines
         ):
             return ['\n'.join(lines)]
         sections = [s.strip() for s in re.split(r'\n\s*\n+', cleaned) if s.strip()]
@@ -157,18 +185,19 @@ class FileParser:
         non_empty = [ln for ln in lines if ln.strip()]
         if not non_empty:
             return False
-        kv_count = sum(1 for ln in non_empty if KEY_VALUE_LINE_RE.match(ln.strip()))
+        kv_count = sum(1 for ln in non_empty if _match_key_value_line(ln.strip()))
         return kv_count >= 2 and kv_count / len(non_empty) >= 0.6
 
     def _parse_key_value_section(self, lines: List[str]) -> pd.DataFrame:
         headers: List[str] = []
         values: List[str] = []
         for line in lines:
-            match = KEY_VALUE_LINE_RE.match(line.strip())
+            match = _match_key_value_line(line.strip())
             if not match:
                 continue
-            headers.append(match.group('key').strip())
-            values.append(match.group('value').strip())
+            key, value = match
+            headers.append(key)
+            values.append(value)
         if not headers:
             return pd.DataFrame()
         return pd.DataFrame([values], columns=headers)

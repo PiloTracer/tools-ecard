@@ -254,6 +254,47 @@ class FileParserFlexibilityTests(unittest.TestCase):
         self.assertEqual(df.iloc[0]["nombre"], "Pilo Montaneno Pulmoclas")
         self.assertEqual(df.iloc[0]["website"], "www.logicbison.com")
 
+    def test_key_value_paste_without_colons_tabs(self):
+        # vCard field-name paste with tab separators instead of "label: value".
+        content = (
+            "full_name\tJohn Doe\n"
+            "first_name\tJohn\n"
+            "last_name\tDoe\n"
+            "work_phone\t+506 2222-1234\n"
+            "work_phone_ext\t123\n"
+            "mobile_phone\t+506 8888-9999\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["full_name"], "John Doe")
+        self.assertEqual(df.iloc[0]["work_phone"], "+506 2222-1234")
+        self.assertEqual(df.iloc[0]["mobile_phone"], "+506 8888-9999")
+
+    def test_key_value_paste_without_colons_spaces(self):
+        # Same paste layout but aligned with multiple spaces instead of tabs.
+        content = (
+            "full_name    John Doe\n"
+            "work_phone    +506 2222-1234\n"
+            "mobile_phone    +506 8888-9999\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["full_name"], "John Doe")
+        self.assertEqual(df.iloc[0]["work_phone"], "+506 2222-1234")
+
+    def test_tsv_with_alias_only_header_row_stays_tabular(self):
+        # Both cells of the header line are known aliases — must NOT be read as a
+        # key-value line ("full_name" -> "email"); it is a real 2-column table.
+        content = "full_name\temail\nJohn Doe\tjohn@example.com\n"
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(list(df.columns), ["full_name", "email"])
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["full_name"], "John Doe")
+        self.assertEqual(df.iloc[0]["email"], "john@example.com")
+
     def test_tabular_paste_does_not_use_vertical_parser(self):
         content = (
             "Nombre\tPuesto\tCorreo\tExt\n"

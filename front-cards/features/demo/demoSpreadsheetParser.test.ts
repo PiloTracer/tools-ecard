@@ -77,6 +77,48 @@ describe('demoSpreadsheetParser', () => {
       expect(isUsefulDemoContactRow(table.headers, table.rows[0])).toBe(true);
     });
 
+    it('parses key-value paste separated by tabs (no colons)', () => {
+      const table = parseCsvText(
+        [
+          'full_name\tJohn Doe',
+          'first_name\tJohn',
+          'last_name\tDoe',
+          'work_phone\t+506 2222-1234',
+          'work_phone_ext\t123',
+          'mobile_phone\t+506 8888-9999',
+        ].join('\n')
+      );
+      expect(table.rows).toHaveLength(1);
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('John Doe');
+      expect(fields.firstName).toBe('John');
+      expect(fields.lastName).toBe('Doe');
+      expect(fields.workPhone).toBe('+506 2222-1234');
+      expect(fields.workPhoneExt).toBe('123');
+      expect(fields.mobilePhone).toBe('+506 8888-9999');
+    });
+
+    it('parses key-value paste separated by multiple spaces (no colons)', () => {
+      const table = parseCsvText(
+        [
+          'full_name    John Doe',
+          'work_phone    +506 2222-1234',
+          'mobile_phone    +506 8888-9999',
+        ].join('\n')
+      );
+      expect(table.rows).toHaveLength(1);
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('John Doe');
+      expect(fields.workPhone).toBe('+506 2222-1234');
+      expect(fields.mobilePhone).toBe('+506 8888-9999');
+    });
+
+    it('keeps genuine TSV tables with alias-only header rows on the tabular path', () => {
+      const table = parseCsvText('full_name\temail\nJohn Doe\tjohn@example.com\n');
+      expect(table.headers).toEqual(['full_name', 'email']);
+      expect(table.rows).toEqual([['John Doe', 'john@example.com']]);
+    });
+
     it('parses tab-separated paste with Ext column holding full phone numbers', () => {
       const table = parseCsvText(
         'Nombre\tPuesto\tCorreo\tExt\nCamila Castro Cordero\tAsistente de Ingeniería\tccastro@code-cr.com\t2459-7578\n'

@@ -366,6 +366,29 @@ function looksLikeSectionOrTitle(value: string): boolean {
 
 const KEY_VALUE_LINE_RE = /^\s*([^:\n]+?)\s*:\s*(.+?)\s*$/;
 
+/** Whitespace-separated key-value paste: "full_name    John Doe" / tab-separated,
+ *  no colon. Only accepted via matchKeyValueLine, which requires the label to be a
+ *  known field alias — otherwise ordinary prose or table rows would be hijacked. */
+const KEY_VALUE_WS_LINE_RE = /^\s*([^:\n]+?)(?:\t+| {2,})(.+?)\s*$/;
+
+/** Match a pasted 'label: value' or 'label<tab/2+ spaces>value' line.
+ *  The whitespace form additionally requires the label to resolve to a known field
+ *  (exact or fuzzy) and the value to NOT be a known alias itself — that keeps genuine
+ *  table header rows (e.g. a TSV line "full_name\temail", both cells aliases) on the
+ *  tabular parsing path. Mirrors api-server file_parser._match_key_value_line. */
+function matchKeyValueLine(line: string): [string, string] | null {
+  const kv = line.trim().match(KEY_VALUE_LINE_RE);
+  if (kv) return [kv[1].trim(), kv[2].trim()];
+  const ws = line.trim().match(KEY_VALUE_WS_LINE_RE);
+  if (!ws) return null;
+  const key = ws[1].trim();
+  const value = ws[2].trim();
+  const normKey = normalizeHeaderKey(key);
+  if (!HEADER_ALIASES[normKey] && findFuzzyFieldMatch(normKey) === null) return null;
+  if (HEADER_ALIASES[normalizeHeaderKey(value)]) return null;
+  return [key, value];
+}
+
 function splitTextSections(text: string): string[] {
   const cleaned = text.replace(/^\uFEFF/, '').trim();
   if (!cleaned) return [];
@@ -375,7 +398,7 @@ function splitTextSections(text: string): string[] {
   const lines = cleaned.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (
     lines.length >= 2 &&
-    lines.every((l) => KEY_VALUE_LINE_RE.test(l) || isVerticalSectionTitle(l))
+    lines.every((l) => matchKeyValueLine(l) !== null || isVerticalSectionTitle(l))
   ) {
     return [lines.join('\n')];
   }
@@ -387,7 +410,7 @@ function splitTextSections(text: string): string[] {
 function isKeyValueSection(lines: string[]): boolean {
   const nonEmpty = lines.filter((l) => l.trim());
   if (nonEmpty.length === 0) return false;
-  const kvCount = nonEmpty.filter((l) => KEY_VALUE_LINE_RE.test(l.trim())).length;
+  const kvCount = nonEmpty.filter((l) => matchKeyValueLine(l.trim()) !== null).length;
   return kvCount >= 2 && kvCount / nonEmpty.length >= 0.6;
 }
 
@@ -395,10 +418,10 @@ function parseKeyValueSection(lines: string[]): DemoParsedTable {
   const headers: string[] = [];
   const values: string[] = [];
   for (const line of lines) {
-    const m = line.trim().match(KEY_VALUE_LINE_RE);
-    if (!m) continue;
-    headers.push(m[1].trim());
-    values.push(m[2].trim());
+    const kv = matchKeyValueLine(line.trim());
+    if (!kv) continue;
+    headers.push(kv[0]);
+    values.push(kv[1]);
   }
   return { headers, rows: values.length ? [values] : [] };
 }
