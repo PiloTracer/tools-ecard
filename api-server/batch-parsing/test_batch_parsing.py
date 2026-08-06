@@ -18,7 +18,12 @@ import unittest
 
 import pandas as pd
 
-from data_normalizer import DataNormalizer, find_fuzzy_field_match
+from data_normalizer import (
+    DataNormalizer,
+    CANONICAL_FIELD_MAP,
+    _canonical_header_key,
+    find_fuzzy_field_match,
+)
 from file_parser import FileParser
 from parser import BatchParser
 
@@ -45,6 +50,60 @@ class FuzzyFieldMatchTests(unittest.TestCase):
         # too (single token = the alias itself), since map_row only calls this for
         # headers the exact pass didn't already claim.
         self.assertEqual(find_fuzzy_field_match("celular"), "mobile_phone")
+
+
+class CanonicalFieldMatchTests(unittest.TestCase):
+    """Semantics: vCard field names are matched regardless of case and of `_` vs spaces."""
+
+    def test_canonical_key_ignores_case_underscore_spaces(self):
+        for variant in (
+            "Business Address Street",
+            "BUSINESS_ADDRESS_STREET",
+            "business address street",
+            "Business Address_Street",
+        ):
+            self.assertEqual(
+                _canonical_header_key(variant), "business_address_street", variant
+            )
+
+    def test_canonical_map_covers_all_field_ids(self):
+        import data_normalizer as dn
+
+        for field in dn.FIELD_MAPPING:
+            self.assertEqual(
+                CANONICAL_FIELD_MAP.get(field),
+                field,
+                msg=f"canonical map missing {field!r}",
+            )
+
+    def test_map_row_spaced_headers_cover_full_vcard_set(self):
+        row = pd.Series({
+            "Business Address Street": "456 Business Ave",
+            "Business Hours": "Mon-Fri 9AM",
+            "Social Instagram": "@acme",
+            "Personal URL": "https://acme.com",
+            "Birthday": "1990-05-15",
+            "LinkedIn": "linkedin.com/in/acme",
+            "Company Twitter": "@acme_tw",
+        })
+        mapped = _make_batch_parser().map_row(row)
+        self.assertEqual(mapped["business_address_street"], "456 Business Ave")
+        self.assertEqual(mapped["business_hours"], "Mon-Fri 9Am")
+        self.assertEqual(mapped["social_instagram"], "@acme")
+        self.assertEqual(mapped["personal_url"], "https://acme.com")
+        self.assertEqual(mapped["personal_birthday"], "1990-05-15")
+        self.assertEqual(mapped["business_linkedin"], "linkedin.com/in/acme")
+        self.assertEqual(mapped["business_twitter"], "@Acme_Tw")
+
+    def test_map_row_underscore_variant_equals_spaced_variant(self):
+        spaced = _make_batch_parser().map_row(pd.Series({
+            "Business Address Street": "456 Business Ave",
+        }))
+        underscored = _make_batch_parser().map_row(pd.Series({
+            "BUSINESS_ADDRESS_STREET": "456 Business Ave",
+        }))
+        self.assertEqual(spaced["business_address_street"], "456 Business Ave")
+        self.assertEqual(underscored["business_address_street"], "456 Business Ave")
 
 
 class PhoneExtensionReconciliationTests(unittest.TestCase):

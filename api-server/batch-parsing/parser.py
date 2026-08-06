@@ -23,7 +23,13 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 # Import parsing logic (will be in same directory)
-from data_normalizer import DataNormalizer, FIELD_MAPPING, find_fuzzy_field_match
+from data_normalizer import (
+    DataNormalizer,
+    FIELD_MAPPING,
+    CANONICAL_FIELD_MAP,
+    find_fuzzy_field_match,
+    _canonical_header_key,
+)
 from file_parser import FileParser
 from storage_client import StorageClient
 
@@ -281,6 +287,22 @@ class BatchParser:
                     matched_keys.add(alias_lower)
             if not found:
                 mapped[target_field] = None
+
+        # Pass 1b: canonical separator-insensitive matching — treats `_` and spaces as
+        # interchangeable and ignores case, so a header like "Business Address Street"
+        # (or BUSINESS_ADDRESS_STREET / business address street) resolves to
+        # business_address_street. Additive: never overwrites a field an exact alias
+        # already claimed.
+        for header_key, original_key in row_keys.items():
+            if header_key in matched_keys:
+                continue
+            canonical = _canonical_header_key(header_key)
+            if not canonical:
+                continue
+            target_field = CANONICAL_FIELD_MAP.get(canonical)
+            if target_field and not mapped.get(target_field):
+                if _assign(target_field, row[original_key]):
+                    matched_keys.add(header_key)
 
         # Pass 2: fuzzy fallback for headers that didn't exactly match any alias
         # (label mismatches like "Teléfono Oficina 2", "Cel./WhatsApp"). Never

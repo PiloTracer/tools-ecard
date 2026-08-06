@@ -26,11 +26,24 @@ export type DemoContactFields = {
   addressState?: string | null;
   addressPostal?: string | null;
   addressCountry?: string | null;
+  socialInstagram?: string | null;
+  socialTwitter?: string | null;
+  socialFacebook?: string | null;
   businessName?: string | null;
   businessTitle?: string | null;
   businessDepartment?: string | null;
   businessUrl?: string | null;
+  businessHours?: string | null;
+  businessAddressStreet?: string | null;
+  businessAddressCity?: string | null;
+  businessAddressState?: string | null;
+  businessAddressPostal?: string | null;
+  businessAddressCountry?: string | null;
+  businessLinkedin?: string | null;
+  businessTwitter?: string | null;
+  personalUrl?: string | null;
   personalBio?: string | null;
+  personalBirthday?: string | null;
 };
 
 const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
@@ -115,7 +128,47 @@ const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
   business_url: 'businessUrl',
   website: 'businessUrl',
   url: 'businessUrl',
+  business_hours: 'businessHours',
+  hours: 'businessHours',
+  horario: 'businessHours',
+  business_address_street: 'businessAddressStreet',
+  business_address: 'businessAddressStreet',
+  business_street: 'businessAddressStreet',
+  direccion_trabajo: 'businessAddressStreet',
+  business_address_city: 'businessAddressCity',
+  business_city: 'businessAddressCity',
+  ciudad_trabajo: 'businessAddressCity',
+  business_address_state: 'businessAddressState',
+  business_state: 'businessAddressState',
+  estado_trabajo: 'businessAddressState',
+  business_address_postal: 'businessAddressPostal',
+  business_postal: 'businessAddressPostal',
+  business_zip: 'businessAddressPostal',
+  postal_trabajo: 'businessAddressPostal',
+  business_address_country: 'businessAddressCountry',
+  business_country: 'businessAddressCountry',
+  pais_trabajo: 'businessAddressCountry',
+  business_linkedin: 'businessLinkedin',
+  linkedin: 'businessLinkedin',
+  business_twitter: 'businessTwitter',
+  company_twitter: 'businessTwitter',
+  social_instagram: 'socialInstagram',
+  instagram: 'socialInstagram',
+  ig: 'socialInstagram',
+  social_twitter: 'socialTwitter',
+  twitter: 'socialTwitter',
+  social_facebook: 'socialFacebook',
+  facebook: 'socialFacebook',
+  fb: 'socialFacebook',
+  personal_url: 'personalUrl',
+  personal_website: 'personalUrl',
+  sitio_personal: 'personalUrl',
   personal_bio: 'personalBio',
+  personal_birthday: 'personalBirthday',
+  birthday: 'personalBirthday',
+  dob: 'personalBirthday',
+  fecha_nacimiento: 'personalBirthday',
+  cumpleanos: 'personalBirthday',
   notes: 'personalBio',
   comments: 'personalBio',
   notas: 'personalBio',

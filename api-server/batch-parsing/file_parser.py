@@ -15,7 +15,14 @@ from typing import List
 import pandas as pd
 import chardet
 
-from data_normalizer import FIELD_MAPPING, _alias_tokens, _normalize_header_token, find_fuzzy_field_match
+from data_normalizer import (
+    FIELD_MAPPING,
+    CANONICAL_FIELD_MAP,
+    _alias_tokens,
+    _normalize_header_token,
+    _canonical_header_key,
+    find_fuzzy_field_match,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +223,8 @@ class FileParser:
         key = _normalize_header_token(label)
         if not key:
             return False
+        if _canonical_header_key(label) in CANONICAL_FIELD_MAP:
+            return True
         for aliases in FIELD_MAPPING.values():
             if key in _alias_tokens(aliases):
                 return True

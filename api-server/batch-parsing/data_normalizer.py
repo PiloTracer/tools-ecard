@@ -85,6 +85,28 @@ def _alias_tokens(aliases) -> set:
     return tokens
 
 
+def _canonical_header_key(text: str) -> str:
+    """Canonical header key: lowercase, accent-stripped, every run of non-alphanumeric
+    characters (spaces, underscores, hyphens) collapsed to a single underscore — exactly
+    like demoSpreadsheetParser.ts normalizeHeaderKey. Makes `business_address_street`,
+    "Business Address Street" and "BUSINESS_ADDRESS_STREET" all identical."""
+    return re.sub(
+        r'[^a-z0-9]+', '_', ''.join(
+            c for c in unicodedata.normalize('NFD', str(text).lower())
+            if unicodedata.category(c) != 'Mn'
+        )
+    ).strip('_')
+
+
+# Canonical alias map: every FIELD_MAPPING alias (plus its own snake_case id) under its
+# canonical key. Enables field-name matching regardless of case or of `_` vs spaces,
+# e.g. a header "Business Address Street" resolves to business_address_street.
+CANONICAL_FIELD_MAP: Dict[str, str] = {}
+for _field, _aliases in FIELD_MAPPING.items():
+    for _alias in [*_aliases, _field]:
+        CANONICAL_FIELD_MAP.setdefault(_canonical_header_key(_alias), _field)
+
+
 def find_fuzzy_field_match(header: str) -> Optional[str]:
     """
     Fallback for headers that don't exactly match a `FIELD_MAPPING` alias — e.g. "Teléfono

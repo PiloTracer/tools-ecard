@@ -300,6 +300,74 @@ describe('demoSpreadsheetParser', () => {
       expect(fields.fullName).toBe('Ada Lovelace');
     });
 
+    describe('full vCard field coverage (all 30 fields)', () => {
+      it('maps canonical snake_case vcard field names to camelCase demo fields', () => {
+        const headers = [
+          'full_name', 'first_name', 'last_name', 'work_phone', 'work_phone_ext',
+          'mobile_phone', 'email', 'address_street', 'address_city', 'address_state',
+          'address_postal', 'address_country', 'social_instagram', 'social_twitter',
+          'social_facebook', 'business_name', 'business_title', 'business_department',
+          'business_url', 'business_hours', 'business_address_street',
+          'business_address_city', 'business_address_state', 'business_address_postal',
+          'business_address_country', 'business_linkedin', 'business_twitter',
+          'personal_url', 'personal_bio', 'personal_birthday',
+        ];
+        const cols = [
+          'Ada Lovelace', 'Ada', 'Lovelace', '555-0100', '101', '555-0200',
+          'ada@example.com', '12 Main St', 'San Jose', 'CA', '94107', 'USA',
+          '@adalove', '@adalove_dev', 'adalove', 'Acme', 'Engineer', 'Engineering',
+          'https://acme.com', 'Mon-Fri 9AM', '456 Business Ave', 'San Francisco',
+          'CA', '94108', 'USA', 'linkedin.com/in/adalove', '@acme_tw',
+          'https://ada.dev', 'Founder engineer', '1990-05-15',
+        ];
+        const fields = mapRowToContactFields(headers, cols);
+        expect(fields.fullName).toBe('Ada Lovelace');
+        expect(fields.email).toBe('ada@example.com');
+        expect(fields.businessName).toBe('Acme');
+        expect(fields.socialInstagram).toBe('@adalove');
+        expect(fields.socialTwitter).toBe('@adalove_dev');
+        expect(fields.socialFacebook).toBe('adalove');
+        expect(fields.businessHours).toBe('Mon-Fri 9AM');
+        expect(fields.businessAddressStreet).toBe('456 Business Ave');
+        expect(fields.businessAddressCity).toBe('San Francisco');
+        expect(fields.businessLinkedin).toBe('linkedin.com/in/adalove');
+        expect(fields.businessTwitter).toBe('@acme_tw');
+        expect(fields.personalUrl).toBe('https://ada.dev');
+        expect(fields.personalBio).toBe('Founder engineer');
+        expect(fields.personalBirthday).toBe('1990-05-15');
+      });
+
+      it('maps spaced/mixed-case headers the same as snake_case', () => {
+        const headers = [
+          'Business Address Street',
+          'BUSINESS_HOURS',
+          'Instagram',
+          'Company Twitter',
+          'Personal Website',
+          'LinkedIn',
+        ];
+        const fields = mapRowToContactFields(headers, [
+          '456 Business Ave', 'Mon-Fri 9AM', '@acme', '@acme_co',
+          'https://acme.dev', 'in/acme',
+        ]);
+        expect(fields.businessAddressStreet).toBe('456 Business Ave');
+        expect(fields.businessHours).toBe('Mon-Fri 9AM');
+        expect(fields.socialInstagram).toBe('@acme');
+        expect(fields.businessTwitter).toBe('@acme_co');
+        expect(fields.personalUrl).toBe('https://acme.dev');
+        expect(fields.businessLinkedin).toBe('in/acme');
+      });
+
+      it('is case/layout insensitive for core fields', () => {
+        const fields = mapRowToContactFields(
+          ['Nombre completo', 'Correo', 'WORK PHONE'],
+          ['Ada Lovelace', 'ada@example.com', '2222-1111']
+        );
+        expect(fields.fullName).toBe('Ada Lovelace');
+        expect(fields.workPhone).toBe('2222-1111');
+      });
+    });
+
     describe('fuzzy header fallback (label mismatches)', () => {
       it('maps a header that only partially matches a known alias', () => {
         const headers = ['Nombre', 'Correo', 'Teléfono Oficina 2'];
