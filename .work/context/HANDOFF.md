@@ -2,6 +2,8 @@
 
 ## Session status
 
+**Closed:** 2026-08-11 — goal: verify `.cursorrules` consistency & reliability after the framework path migration. Read-only audit: all 4 source pointers (`/mnt/work/Projects/.ai*`) resolve; all 16 Agent OS + 6 SOC skill handles exist; every local `.work/`, `.work.soc/`, `.work.ui/` reference resolves; `soc-deploy-basic.sh verify` → all checks passed; `deploy-basic.sh status` → cursorrules-verify PASS; zero stale `/data/Projects` refs. Findings (not fixed, pending decision): stale `nginx` row in §Docker compose table (TLS is host-level nginx, explicitly not part of the stack); SOC unreachable-source fallback contradicts the Agent OS/UI stop-policy (SOC block is generator-owned — fix upstream). No code changes this session.
+
 **Closed:** 2026-08-01 (PM) — goal: make batch import + login work across dev / prd / demo. Done: (1) dev Normal-mode upload fixed end-to-end — dev `.env` flipped to `USE_LOCAL_STORAGE=true` (host SeaweedFS down with the tools-dashboard stack), `batchService` now sends `credentials: 'include'` on all reads (httpOnly cookie made the Bearer fallback empty → silent 401 → "nothing happens" on file select), name modal no longer blocks on list failure, Python-stderr log noise downgraded to warn; all 6 operator samples verified through the full pipeline (storage→queue→worker→parser→Postgres+Cassandra), 7/7 LOADED (`6d34bf4`). (2) Login: `subscription` scope dropped everywhere (provider registrations only allow `profile email`; requesting more rejected every login) — code defaults + `.env`/`.env.prd`/`.env.demo`; OAuth failures now redirect to the Tools Dashboard app library instead of an e-cards error screen; "Go to Tools Dashboard" link added on the login page (`65af773`). Verified: jest 191, api jest 46, python 28, tsc both apps, live `scope=profile email` from `/api/auth/login`. Committed + pushed.
 
 **Residual / owner actions:** prd host still runs pre-fix code AND its parse jobs die before PARSING (batches stuck UPLOADED + "0 records" in batch view — points at Cassandra/keyspace reachability from the worker, not parse logic). On the prd host: edit `.env.prd` (`OAUTH_SCOPES=profile email`), `git pull --ff-only`, `./bin/refresh-prd.sh --app`, then retry the failed batches; diagnose Cassandra if still stuck. Demo stack: `./bin/refresh-prd.sh demo ui`. Dev login 502 = local `tools-dashboard` stack down (sibling project). Dev DB holds synthetic `e2e_*` test batches (cleanup offered, not approved). Manual browser click-through still pending. Prd host unreachable from this machine (no ssh) — agent offered to run the deploy if given access.
@@ -14,15 +16,15 @@
 
 **Prior:** Closed 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
 
-**Updated:** 2026-08-01
+**Updated:** 2026-08-11
 
 **Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
-**Repository state:** `main` clean and synced with `origin/main`. Recent commits (post-2026-07-28): demo storage scoped per OAuth user + real account display; configurable batch record limits (import/view/export); numeric XML entity decode for accented names in card export; operator batch-sample parsing fixes (`.md` support, key-value/vertical paste blocks, label stripping) with fixture regression tests. Prior baseline: feedback UX slice (profile, clipShape, canvas units, ingest-only capitalize); api-server `run-tests.cjs`. **Dev stack:** dev compose up during session (api/front/postgres/cassandra/redis). **Residual:** manual browser click-through (paste Sample #4, import Sample #6 as `.md`); owner DNS/TLS/Demo deploy; M1/M2 placeholders; monitoring.
+**Repository state:** `main` synced with `origin/main`; working tree holds uncommitted framework-migration leftovers: `.cursorrules` (path migration `/data/Projects` → `/mnt/work/Projects` + expanded SOC block — outside `.work/`, not staged by session commits) and `.work.soc/plans/NEXT_SOC.md` (stale `@session-soc` → `@soc-session` handle fix); untracked `.qwen/` (agent tool state — keep untracked). 2026-08-11 session committed `.work/` bookkeeping only. **Residual:** commit the `.cursorrules` migration + decide the stale `nginx` row; manual browser click-through; owner DNS/TLS/Demo deploy; prd redeploy + Cassandra check; M1/M2 placeholders; monitoring.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
-**Lost or new?** Read `.ai/START_HERE.md` (via `$AGENT_OS_SOURCE=/data/Projects/.ai`).
+**Lost or new?** Read `.ai/START_HERE.md` (via `$AGENT_OS_SOURCE=/mnt/work/Projects/.ai`).
 
 ### UI layer (see `.work.ui/`)
 
@@ -73,6 +75,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 4 | Manual browser click-through of Demo fixes (upload real `.xlsx`, run batch export, visually confirm name + font on output PNG) | Confidence in Demo fix | eng/owner |
 | 5 | Pre-existing `traceability-verify.sh` gap: FR1-FR4, FR7-FR10 not mapped to `M{N}-T{N}` tasks in master plan (unrelated to this session's work; found while running the close pre-check) | Plan hygiene | eng |
 | 6 | Manual browser click-through of import-persistence fix (import a `.zip`/`.json` design in Demo + Normal, close tab without Save, reopen, confirm it's listed in Open Template and loads correctly) — could not be unit-tested because `demoStore`/`browserStorageService` need `indexedDB`, unavailable in this repo's jsdom jest setup with no polyfill installed | Confidence in import-persistence fix | eng/owner |
+| 7 | Commit `.cursorrules` framework path migration + expanded SOC block and `.work.soc/plans/NEXT_SOC.md` handle fix (both outside `.work/` session-commit scope); decide fix for stale `nginx` compose-table row first | `.cursorrules` reliability | eng/owner |
 
 ---
 
@@ -121,6 +124,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-07-16 | Feedback F4–F6/F9/F12 + ingest-only capitalize | Profile page; clipShape live+export+worker; canvas units; capitalize at Demo ingest only; api `run-tests.cjs`; MOD-06; jest 147 |
 | 2026-08-01 | Operator batch-sample verify + close | 6 samples (`.work/feedback/test-data.md`) verified via `.txt`/`.md` upload + paste, Demo + Normal; fixture regression tests; python 28, jest 191 + 46 green |
 | 2026-08-01 PM | Normal-mode upload + login fixes | Dev storage flip (local), batchService credentials + modal silent-failure fix, python stderr log level; prd parse-failure diagnosis (needs redeploy + Cassandra check); OAuth scopes `profile email` + failure→Dashboard redirect + login-page Dashboard link; full-pipeline e2e 7/7 LOADED |
+| 2026-08-11 | `.cursorrules` verify + close | Read-only consistency/reliability audit of the path migration: source pointers, skill handles, local refs, built-in verifier audits — all green; stale `nginx` row + SOC fallback inconsistency flagged (unfixed); HANDOFF/NEXT refreshed |
 
 ---
 
@@ -274,11 +278,10 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ## Latest action (@session-control close)
 
-**Date:** 2026-08-01 (PM)  
-**Request:** `@session-control close commit push`  
-**Session result:** Closed. Fixed dev Normal-mode upload (storage config + credentials + silent-failure UX), verified all 6 operator samples through the full server pipeline (7/7 LOADED, Postgres + Cassandra), fixed OAuth login (scope reduced to provider-supported `profile email`; failures redirect to Tools Dashboard app library; added login-page Dashboard link). Diagnosed prd parse failures to the extent remotely possible — needs prd-host redeploy + Cassandra check. Verification: front jest 191, api jest 46, python 28, tsc clean both apps, live scope check. Committed and pushed to `origin/main`.  
-**Production readiness:** Code ready on `main`; prd/demo NOT updated — requires on-host: `.env.prd` scope edit + `git pull --ff-only` + `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo ui`, then retry failed batches.  
-**Blockers remaining:** prd host access/redeploy; prd Cassandra reachability (batches stuck UPLOADED); tools-dashboard dev stack down (dev login 502); manual browser click-through; dev-DB `e2e_*` cleanup (awaiting approval)  
+**Date:** 2026-08-11
+**Request:** `@session-control close commit push`
+**Session result:** Closed. Verified `.cursorrules` consistency & reliability after the `/data/Projects` → `/mnt/work/Projects` framework path migration: all source pointers, skill handles (16 Agent OS + 6 SOC), and local `.work*` references resolve; built-in audits green (`soc-deploy-basic.sh verify` → all checks passed; `deploy-basic.sh status` → cursorrules-verify PASS); zero stale old-prefix refs. Traceability pre-check re-confirmed the known FR-mapping gap (owner action #5). Findings flagged, not fixed: stale `nginx` row in §Docker table; SOC unreachable-source fallback contradicts Agent OS/UI stop-policy (generator-owned block — fix upstream). No code changes; `.work/` bookkeeping committed + pushed.
+**Blockers remaining:** `.cursorrules` migration itself uncommitted (outside `.work/` session scope — separate commit); stale `nginx` row decision; manual browser click-through; prd redeploy + Cassandra check (carried from 2026-08-01)
 
 ---
 

@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-07-16 (post feedback F4–F6/F9/F12 commit)
+**Updated:** 2026-08-11 (post `.cursorrules` verify + close)
 
 ---
 
@@ -23,6 +23,7 @@
 | Operator feedback intake (2026-07-16) | `.work/feedback/README.md`, `20260717-system-observations.md` (12 items from ODT) |
 | Feedback fixes F1–F3, F7–F8, F10–F11 | Export height parity; render-retry API; RecordEditModal focus; 1076×380 defaults; home nav; steppers; multi-delete guard |
 | Feedback F4–F6/F9/F12 (2026-07-16) | Profile + subscription UI; ingest-only person-name capitalize; image clip shapes; canvas units; api-server jest runner |
+| `.cursorrules` thin-client verify (2026-08-11) | Path-migration audit green (all pointers/skills/local refs resolve; `soc-deploy-basic verify` + `deploy-basic status` PASS); stale `nginx` compose row + SOC fallback inconsistency flagged |
 
 ---
 
@@ -47,11 +48,12 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font+clip on PNG; import design, close tab, reopen; profile; units |
-| **1** | Production deploy cutover | `./bin/start.sh prd up`; DNS/TLS; Demo flags on clean host |
-| **2** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
-| **3** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
-| **4** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
+| **0** | Commit framework path migration | `.cursorrules` + `.work.soc/plans/NEXT_SOC.md` (left out of the `.work/`-scoped session commit); decide the stale `nginx` compose-table row first |
+| **1** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font+clip on PNG; import design, close tab, reopen; profile; units |
+| **2** | Production deploy cutover | `./bin/start.sh prd up`; DNS/TLS; Demo flags on clean host |
+| **3** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
+| **4** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
+| **5** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
 
 ---
 
