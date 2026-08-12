@@ -2,7 +2,9 @@
 
 ## Session status
 
-**No open session.** Next session starts with `@session-control start`.
+**Closed:** 2026-08-12 (eve) — goal: verify/fix demo paste-import field-mapping (import-ux plan Pass 3). Root cause (both symptoms, one mechanism): whitespace-KV paste lines with unknown labels ("telefono trabajo", "extension trabajo") failed the alias-gated KV matcher — fuzzy returned ambiguous-null because "trabajo" substring-hits the five `*_trabajo` business-address aliases — and were silently dropped before becoming columns, so the FieldMappingModal auto-open condition (any column `confidence: 'none'`) never fired. Fixed in both parsers (demo TS + Python, parity kept): (1) aliases `telefono_trabajo`/`extension_trabajo` (+ "apellido" singular on Python for parity); (2) unknown-label KV lines inside a KV section are kept as unmapped columns instead of dropped → modal auto-opens with values visible; (3) fuzzy pass gained exact-token-priority per owner heuristic (a token that IS a full alias — correo/email/telefono/direccion — beats filler-token substring noise like "trabajo"; 2+ distinct strong tokens e.g. "nombre y apellido" still ambiguous by design). Regression tests: +3 front, +3 python. Gates: front jest 45 suites/311 passed · api jest 24 suites/207 passed+3 skip · python 67 OK+1 expected skip · front tsc clean · eslint clean. Committed + pushed (`.work/` session commit + separate `fix:` app-code commit).
+
+**Residual / owner actions:** browser re-test in Demo (user's paste auto-maps; unknown label opens the mapping modal — agent verified at parser/unit level only, no live click-through); prd/demo redeploy to ship the fixes (`git pull --ff-only` + `./bin/refresh-prd.sh --app` / `demo`; migrations auto-apply via `prisma-start-prd.sh`; one-time `.env.prd` `OAUTH_SCOPES=profile email` check; browser hard-refresh for the client-side demo parser); pre-existing fuzzy gap remains for non-alias filler combos not covered by exact tokens — surfaces in modal instead of being lost; KV pastes mixing blank-line blocks with unknown labels can still fall to the delimited path (pre-existing sectioning limitation).
 
 **Closed:** 2026-08-12 (PM) — goal: implement import-ux + templates plan (owner-approved). Done: **all 7 passes implemented and gate-verified** — P0 baseline hardening (env-leak test, `is_public` migration after non-destructive prisma baseline, unmapped-column preservation, canonical 30-field list + 3-way parity tests) · P1 downloadable horizontal/vertical template XLSX + transposed-XLSX parsing both parsers · P2 full `.vcf` vCard import (2.1 QP/3.0/4.0, multi-card) both parsers with fixture parity · P3 field-mapping (`/api/batch-import/preview` + explicit `--mapping` + `FieldMappingPreset` CRUD + `FieldMappingModal` upload+paste, Demo parity) · P4 `TemplateMetadata.kind` + fork-on-save semantics + gallery filters · P5 role-gated global templates (`app_roles` claim + `requireAppRole` via authoritative `validate-token`, `appsuper`|`appglobal`, deny-by-default; API channel via `isPublic` + bundled channel `front-cards/public/templates/globals/` + manifest script) · P6 Playwright smoke specs + runbook/README + RISK_REGISTRY (R2 closed, R11–R15) + plan §9 implementation record. Final gates (reproduced twice, no flake): python 64 OK+1 expected skip · api 207 pass/0 fail/3 skip · front 307 pass/45 suites · front tsc clean · prisma 5 migrations clean · eslint zero new issues. Walkthrough docs for the later cross-LLM verification: `.work/plans/20260812-import-ux-templates-list.md` (full change inventory + test matrix) and `-highlights.md` (owner-facing features). Committed + pushed (app code in a separate feat commit).
 
@@ -30,7 +32,7 @@ Treat prior closed sessions as historical only; see "What this cycle produced" b
 
 **Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
-**Repository state:** `main` synced with `origin/main` post-close. Framework-migration leftovers resolved by owner commit `247357a` (`.cursorrules` + `.work.soc/plans/NEXT_SOC.md` + `.qwen/settings.json`). Untracked at root: `reasonix.toml` (outside session scope, untouched). Chat export lives in `tmp/` (gitignored). **Residual:** import-ux plan v3 approval → Pass 0; Express batch-import routes deletion approval; stale `nginx` row decision; `.qwen/` gitignore decision; manual browser click-through; owner DNS/TLS/Demo deploy; prd redeploy + Cassandra check; M1/M2 placeholders; monitoring.
+**Repository state:** `main` synced with `origin/main` post-close; import-ux feature set + demo paste-mapping fixes all committed and pushed (latest: `fix:` KV-paste mapping commit + `docs:` session close). Untracked at root: `reasonix.toml` (outside session scope, untouched). Chat export lives in `tmp/` (gitignored). **Residual:** prd/demo redeploy to ship the fixes (+ one-time `.env.prd` OAUTH_SCOPES check, prd Cassandra parse-job recheck); browser click-through (Demo paste → mapping modal; import-persistence); Express batch-import routes deletion approval; stale `nginx` row decision; `.qwen/` gitignore decision; owner DNS/TLS/Demo cutover; M1/M2 placeholders; monitoring.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -86,7 +88,8 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 5 | Pre-existing `traceability-verify.sh` gap: FR1-FR4, FR7-FR10 not mapped to `M{N}-T{N}` tasks in master plan (unrelated to this session's work; found while running the close pre-check) | Plan hygiene | eng |
 | 6 | Manual browser click-through of import-persistence fix (import a `.zip`/`.json` design in Demo + Normal, close tab without Save, reopen, confirm it's listed in Open Template and loads correctly) — could not be unit-tested because `demoStore`/`browserStorageService` need `indexedDB`, unavailable in this repo's jsdom jest setup with no polyfill installed | Confidence in import-persistence fix | eng/owner |
 | 7 | ~~Commit `.cursorrules` framework path migration + NEXT_SOC fix~~ — **Done** in owner commit `247357a`. Residual: decide the stale `nginx` compose-table row (TLS is host-level, not a compose service) | `.cursorrules` reliability | eng/owner |
-| 8 | Approve import-ux plan v3 (`.work/plans/20260812-import-ux-templates-plan.md`) → start Pass 0; approve deletion of dead Express `batch-import/routes.ts`+`controllers/`; decide `.qwen/` gitignore; decide untracked `reasonix.toml` | Import-ux implementation | owner |
+| 8 | ~~Approve import-ux plan v3 → start Pass 0~~ — **Done** 2026-08-12 (plan implemented Passes 0–6). Still open: approve deletion of dead Express `batch-import/routes.ts`+`controllers/`; decide `.qwen/` gitignore; decide untracked `reasonix.toml` | Housekeeping | owner |
+| 9 | Redeploy prd + demo to ship import-ux + paste-mapping fixes (`git pull --ff-only` → `./bin/refresh-prd.sh --app` and `./bin/refresh-prd.sh demo`; `.env.prd` `OAUTH_SCOPES=profile email` check; recheck prd parse jobs / Cassandra; browser hard-refresh for client-side demo parser) | Ship fixes to users | owner |
 
 ---
 
@@ -138,6 +141,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-08-11 | `.cursorrules` verify + close | Read-only consistency/reliability audit of the path migration: source pointers, skill handles, local refs, built-in verifier audits — all green; stale `nginx` row + SOC fallback inconsistency flagged (unfixed); HANDOFF/NEXT refreshed |
 | 2026-08-12 | Import-ux plan v3 + review fixes + close | Recovered interrupted session (verifications 1–5 done, no plan/code); wrote `.work/plans/20260812-import-ux-templates-plan.md` Passes 0–6; owner resolved D1–D4; independent review (`.work/feedback/20260811-uncommitted-review-import-ux.md`) claim-verified — all critical findings true, fixes applied (isPublic migration precondition, Fastify-only endpoint strategy, Pass 0 path, Bull wording, 3 env examples, parity casing); chat export → `tmp/`; no app code changed |
 | 2026-08-12 PM | Import-ux plan implemented (Passes 0–6) + close | All 7 passes gate-verified: baseline hardening, template XLSX + transposed parsing, `.vcf` import, field-mapping + presets, template kinds, role-gated global templates (API + bundled), e2e/docs. Final: python 64, api 207/0/3, front 307/45 suites, tsc clean, prisma 5 migrations clean — reproduced twice, no flake. Walkthrough docs `-list.md` + `-highlights.md` for cross-LLM verification |
+| 2026-08-12 eve | Demo KV-paste field-mapping fix + close | Root-caused dropped "telefono trabajo"/"extension trabajo" paste lines (alias-gated KV matcher + silent line drop starved the mapping modal); fixed both parsers: new aliases, unknown-label KV lines kept as unmapped columns (modal auto-opens), fuzzy exact-token-priority rule (owner's correo/direccion heuristic); +3 front / +3 python regression tests; gates green (front 311, api 207/0/3, python 67, tsc, eslint) |
 
 ---
 
@@ -291,10 +295,70 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ## Latest action (@session-control close)
 
-**Date:** 2026-08-12 (PM)
+**Date:** 2026-08-12 (eve)
 **Request:** `@session-control close commit push`
-**Session result:** Closed. Implemented the owner-approved import-ux plan end-to-end (Passes 0–6): baseline hardening (env-leak test, `is_public` migration, unmapped-column preservation, canonical field list + parity tests) → template XLSX downloads + transposed parsing → `.vcf` vCard import → field-mapping (preview API, explicit mapping, presets, modal, Demo parity) → template kinds + fork-on-save → role-gated global templates (`app_roles` + `validate-token`, API + bundled channels) → Playwright smoke + docs + risk registry. Final gates reproduced twice with zero flake: python 64 OK (+1 expected in-container skip), api 207/0/3, front 307/45 suites, front tsc clean, prisma 5 migrations clean, eslint zero new issues. 4 gap tests added during the final audit (transposed+mapping combined, inspect-on-transposed, demo vcf/mapping round-trips). Walkthrough docs for the planned cross-LLM verification: `.work/plans/20260812-import-ux-templates-list.md` + `-highlights.md`. `.work/` committed + pushed; app code committed + pushed in a separate `feat` commit; `.work.ui/` closed via `@ui-session close commit push`.
-**Blockers remaining:** full Playwright run needs CI (Alpine/musl dev container); live `app_roles`/`validate-token` check against real tools-dashboard (dev+prd); browser click-throughs; Express batch-import routes deletion approval; stale `nginx` row decision; `.qwen/` gitignore decision; prd redeploy + Cassandra check (carried from 2026-08-01)
+**Session result:** Closed. Verified + fixed demo paste-import field-mapping per owner report: whitespace-KV paste lines with unknown labels were silently dropped (fuzzy ambiguous-null from "trabajo" filler token + alias-gated KV matcher), so the mapping modal never opened. Both parsers fixed in parity: `telefono_trabajo`/`extension_trabajo` aliases, unknown-label KV lines preserved as unmapped columns (modal auto-opens), fuzzy exact-token-priority rule (owner's correo/direccion heuristic), Python "apellido" alias. Gates: front jest 45 suites/311 · api jest 24 suites/207+3 skip · python 67 OK+1 skip · tsc + eslint clean. `.work/` committed + pushed; app code committed + pushed in a separate `fix:` commit.
+**Blockers remaining:** browser re-test in Demo (paste → auto-map / unknown label → mapping modal — unit-verified only, no live click-through); prd/demo redeploy to ship fixes (+ `.env.prd` OAUTH_SCOPES check, prd Cassandra parse-job recheck); full Playwright run needs CI; live `app_roles`/`validate-token` check against real tools-dashboard; Express batch-import routes deletion approval; stale `nginx` row decision; `.qwen/` gitignore decision
+
+---
+
+## Cross-framework action (@x-director) — 2026-08-12 demo KV-paste field-mapping fix
+
+**Date:** 2026-08-12
+**Request:** "GOAL: verify the recently added features, according to plan 20260812-import-ux-templates-plan.md, when the user is importing a file or pasting data, if any fields are not mapped, the user should be presented with the functionality to properly map all fields. However, the functionality was not presented, and some fields like 'telefono trabajo' and 'extension trabajo' were not parsed and the information was omitted… Note: I'm testing this in demo environment." (paste sample: nombre completo/nombre/apellido/telefono trabajo/extension trabajo/movil/correo)
+**Frameworks involved:** .ai
+**Classified framework bucket(s):** engineering (code-verify → code-repair)
+**Routing confidence:** high
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz yes | .ai.soc yes (only .ai needed)
+
+**Root cause (confirmed by code trace + regression tests, both parsers):**
+1. Whitespace-form KV lines ("telefono trabajo\t+506 2222 0000") are gated on the label resolving to a known field (`matchKeyValueLine` / `_match_key_value_line`). No exact alias existed, and the fuzzy matcher returned ambiguous-null: token "trabajo" substring-hits the five `*_trabajo` business-address aliases while "telefono"/"extension" hit `work_phone`/`work_phone_ext` → >1 distinct field → null.
+2. `parseKeyValueSection` / `_parse_key_value_section` then silently skipped those lines — the values never became columns.
+3. Because the dropped lines never became columns, `analyzeHeaders` saw only fully-mapped columns → no `confidence: 'none'` → the FieldMappingModal auto-open condition (`UploadBatchComponent.tsx` — any column unmapped) never fired. Both reported symptoms, one mechanism.
+
+**Executed:**
+1. Demo parser (`front-cards/features/demo/demoSpreadsheetParser.ts`): added aliases `telefono_trabajo`→workPhone, `extension_trabajo`→workPhoneExt; unknown-label whitespace KV lines inside a KV section are now kept as columns instead of dropped.
+2. Python mirror (`api-server/batch-parsing/data_normalizer.py` FIELD_MAPPING + `file_parser.py._parse_key_value_section`): same aliases ("telefono trabajo"/"teléfono trabajo" → work_phone; "extension trabajo"/"extensión trabajo" → work_phone_ext) + same unknown-KV preservation.
+3. Regression tests: +2 front (`demoSpreadsheetParser.test.ts`: user's exact paste; unknown-label KV kept as column), +1 front (`demoMappingAnalysis.test.ts`: unknown KV label → confidence 'none' = modal trigger), +2 python (`test_batch_parsing.py`: same paste + unknown-label preservation + alias wiring).
+
+**Verification (inside dev containers):** front jest 45 suites / 310 passed (307 baseline + 3 new); api jest 24 suites / 207 passed, 3 skipped (baseline unchanged); python unittest 66 OK, 1 expected skip; front `tsc --noEmit` clean; eslint on touched files clean. Behavior now: the user's exact paste auto-maps all 7 lines (no modal needed); any genuinely unknown KV label survives as an unmapped column → preview flags `confidence: 'none'` → mapping modal auto-opens with the value visible for manual mapping.
+
+**User correction:** none
+
+**Coordination notes:** Confirm gate auto-approved (auto permission mode). No schema/API changes; modal wiring itself was already correct — the parser starved it of unmapped columns.
+
+**Blockers:** none
+
+**Residual (noted, not fixed — out of minimal scope):** fuzzy matcher still returns ambiguous-null for other "X trabajo" label variants (e.g. "correo trabajo") — those now surface in the mapping modal instead of being lost, but exact-token-priority in the fuzzy pass would auto-map more of them; KV pastes mixing blank-line-separated blocks with unknown labels can still fall to the delimited path (pre-existing sectioning limitation).
+
+**Next recommended:** manual browser re-test in Demo with the same paste (mapping modal walk-through for a genuinely unknown label); then `@session-control close commit` when ready to persist.
+
+---
+
+## Cross-framework action (@x-director) — 2026-08-12 fuzzy strong-token priority
+
+**Date:** 2026-08-12
+**Request:** "usually if a user uses 'correo'/'correo electronico'/'email'/'e-mail' it means 'email address', for any physical address a user will use 'direccion'/'address'" (after confirming the mapping modal auto-pairing worked and asking whether fuzzy EN/ES pre-matching exists)
+**Frameworks involved:** .ai
+**Classified framework bucket(s):** engineering (code-verify → code-repair)
+**Routing confidence:** high
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz yes | .ai.soc yes (only .ai needed)
+
+**Findings / Executed:**
+1. Answered with evidence: fuzzy EN/ES auto-matching already existed (alias table + `findFuzzyFieldMatch`/`find_fuzzy_field_match`, modal preselects `autoField`); the observed "all fields paired" was that feature + the same-day new aliases.
+2. Encoded the user's heuristic as an exact-token-priority rule in the fuzzy pass, both parsers: a token that IS a full alias (correo, email, telefono, direccion…) now wins over substring noise from filler tokens (trabajo, oficina, personal) — "Correo Trabajo" → email, "Telefono del Trabajo" → work_phone. 2+ distinct strong hits (e.g. "nombre y apellido") still return null → caller's positional/name fallback, unchanged.
+3. Python parity fix: added singular "apellido" to `last_name` aliases (TS already had it; required so "nombre y apellido" keeps its deliberate ambiguity under the new rule).
+4. Tests: +1 front (`demoMappingAnalysis.test.ts` strong-token case), +1 python (`test_strong_alias_token_wins_over_filler_noise`); all pre-existing fuzzy/ambiguity tests unchanged and green.
+
+**Verification (inside dev containers):** python unittest 67 OK, 1 expected skip (incl. new test); front jest full 45 suites / 311 passed (incl. new strong-token test); api jest 24 suites / 207 passed, 3 skipped (baseline unchanged); eslint + `tsc --noEmit` clean.
+
+**User correction:** none
+
+**Coordination notes:** No UI changes; the mapping modal consumes the improved analysis as-is. Applies to both Demo (client parser) and Normal (Python parser + `/api/batch-import/preview`).
+
+**Blockers:** none
+
+**Next recommended:** manual browser re-test in Demo with compound labels (e.g. "Correo Trabajo", "Telefono Oficina") — should auto-pair in the modal; then `@session-control close commit`.
 
 ---
 

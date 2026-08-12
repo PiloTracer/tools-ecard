@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-08-12 (import-ux plan v2 drafted + review fixes applied)
+**Updated:** 2026-08-12 (demo KV-paste field-mapping fix; import-ux + fixes committed/pushed; next = redeploy prd/demo)
 
 ---
 
@@ -24,6 +24,8 @@
 | Feedback fixes F1–F3, F7–F8, F10–F11 | Export height parity; render-retry API; RecordEditModal focus; 1076×380 defaults; home nav; steppers; multi-delete guard |
 | Feedback F4–F6/F9/F12 (2026-07-16) | Profile + subscription UI; ingest-only person-name capitalize; image clip shapes; canvas units; api-server jest runner |
 | `.cursorrules` thin-client verify (2026-08-11) | Path-migration audit green (all pointers/skills/local refs resolve; `soc-deploy-basic verify` + `deploy-basic status` PASS); stale `nginx` compose row + SOC fallback inconsistency flagged |
+| Import-ux + templates (2026-08-12) | Passes 0–6 implemented + gate-verified (baseline hardening, template XLSX, transposed parsing, `.vcf` import, field-mapping + presets, template kinds, role-gated globals, e2e/docs) — `.work/plans/20260812-import-ux-templates-plan.md` §9 |
+| Demo KV-paste field-mapping fix (2026-08-12) | Unknown-label KV paste lines no longer dropped (mapping modal auto-opens); `telefono_trabajo`/`extension_trabajo` aliases; fuzzy exact-token-priority (correo/direccion heuristic); both parsers, parity kept; front 311 / api 207+3 / python 67 green |
 
 ---
 
@@ -31,7 +33,7 @@
 
 - 2026-07-16 · cross-cutting · "Prepare prod deploy from tar.gz backups + Demo mode with browser-only persistence" → completed (M4)
 - 2026-07-16 · feedback · F4–F6, F9, F12 → **completed in code** (commit this session); browser smoke still owner/eng
-- 2026-08-12 · feature · Import UX + templates (tasks 6–11 + .vcf import + role-gated global templates) → **IMPLEMENTED 2026-08-12** (Passes 0–6, all gates green; uncommitted): `.work/plans/20260812-import-ux-templates-plan.md` §9 implementation record. Residuals: Express batch-import stub deletion approval; full Playwright run in CI (`workflow_dispatch`); live `validate-token`/`app_roles` check against real tools-dashboard; browser walk-throughs
+- 2026-08-12 · feature · Import UX + templates (tasks 6–11 + .vcf import + role-gated global templates) → **IMPLEMENTED + COMMITTED/PUSHED 2026-08-12** (Passes 0–6, all gates green): `.work/plans/20260812-import-ux-templates-plan.md` §9 implementation record. Same-day follow-up: demo KV-paste mapping fix (unknown labels no longer dropped; modal auto-opens; fuzzy strong-token priority). Residuals: Express batch-import stub deletion approval; full Playwright run in CI (`workflow_dispatch`); live `validate-token`/`app_roles` check against real tools-dashboard; browser walk-throughs; **prd/demo redeploy to ship**
 
 ---
 
@@ -50,17 +52,18 @@
 | Priority | Item | Notes |
 |----------|------|-------|
 | **0** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
-| **1** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font+clip on PNG; import design, close tab, reopen; profile; units |
-| **2** | Production deploy cutover | `./bin/start.sh prd up`; DNS/TLS; Demo flags on clean host |
-| **3** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
-| **4** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
-| **5** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
+| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; `.env.prd` `OAUTH_SCOPES=profile email` check; recheck prd parse jobs / Cassandra; browser hard-refresh for client-side demo parser |
+| **2** | Manual browser click-through | Demo: paste with unknown labels → mapping modal opens; "Correo Trabajo"-style labels auto-pair; upload `.xlsx` → export PNG name+font; import design persistence; profile; units |
+| **3** | Production deploy cutover | DNS/TLS; Demo flags on clean host |
+| **4** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
+| **5** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
+| **6** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
 
 ---
 
 ## Current iteration
 
-*(none active — import-ux plan fully implemented 2026-08-12, all gates green, awaiting `@session-control close commit` + residuals in intake line above)*
+*(none active — import-ux plan implemented + demo paste-mapping fixes committed/pushed 2026-08-12, all gates green; next = prd/demo redeploy per Recommended next #1)*
 
 ### Completed — M5: x-director recommended improvements
 
