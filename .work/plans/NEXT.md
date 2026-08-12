@@ -52,7 +52,7 @@
 | Priority | Item | Notes |
 |----------|------|-------|
 | **0** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
-| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; `.env.prd` `OAUTH_SCOPES=profile email` check; recheck prd parse jobs / Cassandra; browser hard-refresh for client-side demo parser |
+| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; recheck prd parse jobs / Cassandra; browser hard-refresh for client-side demo parser |
 | **2** | Manual browser click-through | Demo: paste with unknown labels → mapping modal opens; "Correo Trabajo"-style labels auto-pair; upload `.xlsx` → export PNG name+font; import design persistence; profile; units |
 | **3** | Production deploy cutover | DNS/TLS; Demo flags on clean host |
 | **4** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
