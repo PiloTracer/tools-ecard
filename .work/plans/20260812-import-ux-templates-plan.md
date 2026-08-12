@@ -1,6 +1,6 @@
 # Plan — Import UX + Templates (tasks 6–11) — 2026-08-12
 
-**Status:** Draft v2 — all decision points resolved (§8); pending approval to start Pass 0
+**Status:** Approved 2026-08-12 — implemented Passes 0–6
 **Origin:** `.work/prompts/20261011-new-import-features/prompt.md` (x-director), session interrupted 2026-08-12 after completing verifications 1–5; plan never written. This document is that plan, rebuilt from the export `tmp/qwen-code-export-2026-08-12T01-33-04-726Z.md` plus fresh codebase verification. Reviewed against `.work/feedback/20260811-uncommitted-review-import-ux.md` (2026-08-12): findings 1.1/1.2/1.5/3.4–3.9 incorporated.
 **Standing constraints (owner):** no regressions · comprehensive tests per pass (incl. Python↔TS parity) · incremental passes, each independently shippable · both Demo and Production fully operational.
 
@@ -139,3 +139,29 @@ docker compose -f docker-compose.dev.yml exec front-cards sh -c "cd /app && npx 
 - **D4 — OAUTH_SCOPES:** ✅ no change (`profile email` suffices; roles ride the `app_roles` JWT claim). Pre-implementation check in Pass 5: confirm tools-dashboard issues `app_roles` for the ecards `client_id` in dev and prd.
 
 **No open questions remain. Plan ready for approval → implementation starts at Pass 0.**
+
+---
+
+## 9. Implementation record (2026-08-12)
+
+Gate counts = python unittest / api-server jest / front-cards jest (all in dev containers).
+
+| Pass | Delivered | Gate after pass |
+|------|-----------|-----------------|
+| P0 | Env-leak test fixed; `is_public` migration baselined+added; unmapped columns preserved into record `extra` + `unmapped_columns`; canonical 30-field list + snapshot JSONs + 3-way parity tests | py 40 / api 150 / front 218 |
+| P1 | Downloadable import templates (horizontal+vertical XLSX) + generator script + upload-UI links; transposed-XLSX parsing both parsers | suites green |
+| P2 | `.vcf` vCard import both parsers (2.1 QP/charset, 3.0, 4.0; multi-card; unknown props → `extra`) | suites green |
+| P3 | Field mapping: `POST /api/batch-import/preview`, `--mapping` parser override, upload threading (`Batch.fieldMapping`), `FieldMappingPreset` + CRUD, `FieldMappingModal` (upload+paste, EN/ES, presets), Demo parity | suites green |
+| P4 | `TemplateMetadata.kind` + migration; template-fork-on-Save; "Save as new template"; gallery kind pills + badges | suites green |
+| P5 | Roles (`AuthenticatedUser.roles`, `requireAppRole` → validate-token, fail-closed); global templates via `isPublic`; bundled channel `public/templates/globals/` + manifest script; frontend roles + gating UI | py 62 / api 207 / front 305 |
+| P6 | Playwright smoke extended (6 specs); ops runbook + README updates; RISK_REGISTRY (R2 closed, R11–R15 opened); this record | **Final: py 62 (61+1 in-container skip) · api 207 pass/0 fail/3 skip (24 suites) · front 305 pass (44 suites) · front tsc clean · prisma 5 migrations up to date · playwright 6/6 compile (`--list`)** |
+
+### Deviations from plan
+
+- **Prisma baseline resolve:** dev DB had drift predating the plan; `is_public` migration was applied via `migrate resolve` baselining before adding the new migration (no data touched).
+- **Fixture duplication:** `vcard-fields.snapshot.json` is duplicated per tree (`api-server/batch-parsing/fixtures/`, `front-cards/features/demo/fixtures/`) because containers mount only their own tree — parity tests keep the copies in sync.
+- **Preview route name:** implemented as `POST /api/batch-import/preview` (multipart body) instead of the stub shape `POST /:id/preview` — analysis runs on the uploaded file before a batch exists, so there is no `:id` yet.
+- **`loadTemplate` access-check fix:** a service-layer access check initially blocked opening global templates; fixed so load is open for `isPublic` while mutations stay gated.
+- **jest diagnostics exclusion:** 2 pre-existing tsc errors in `unifiedTemplateStorageService.ts` excluded from ts-jest diagnostics via a documented `jest.config.js` exception (not fixed — out of scope).
+- **Express stub deletion:** the dead `batch-import/routes.ts` + `controllers/` Express duplicate is still present — deletion requires owner approval and remains pending (A7).
+- **Pass 6 playwright:** full browser run not possible in the Alpine (musl) dev containers — Playwright's glibc chromium binaries don't exec there; specs verified via `--list` (6/6 compile) and the full suite runs in the CI ubuntu job (`front-cards-e2e`). Demo-mode upload and API-global flows need a live tools-dashboard login — covered by lighter checks + jest, gap documented.

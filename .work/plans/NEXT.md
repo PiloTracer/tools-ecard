@@ -31,7 +31,7 @@
 
 - 2026-07-16 · cross-cutting · "Prepare prod deploy from tar.gz backups + Demo mode with browser-only persistence" → completed (M4)
 - 2026-07-16 · feedback · F4–F6, F9, F12 → **completed in code** (commit this session); browser smoke still owner/eng
-- 2026-08-12 · feature · Import UX + templates (tasks 6–11 + .vcf import + role-gated global templates) → **plan v2 drafted, decisions D1–D4 resolved, awaiting approval**: `.work/plans/20260812-import-ux-templates-plan.md` (verifications 1–5 completed in interrupted session; 7 passes starting with baseline hardening)
+- 2026-08-12 · feature · Import UX + templates (tasks 6–11 + .vcf import + role-gated global templates) → **IMPLEMENTED 2026-08-12** (Passes 0–6, all gates green; uncommitted): `.work/plans/20260812-import-ux-templates-plan.md` §9 implementation record. Residuals: Express batch-import stub deletion approval; full Playwright run in CI (`workflow_dispatch`); live `validate-token`/`app_roles` check against real tools-dashboard; browser walk-throughs
 
 ---
 
@@ -60,7 +60,7 @@
 
 ## Current iteration
 
-*(none active — import-ux plan v3 `.work/plans/20260812-import-ux-templates-plan.md` awaiting owner approval; on approval start **Pass 0 — baseline hardening**)*
+*(none active — import-ux plan fully implemented 2026-08-12, all gates green, awaiting `@session-control close commit` + residuals in intake line above)*
 
 ### Completed — M5: x-director recommended improvements
 

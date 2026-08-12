@@ -1,6 +1,6 @@
 # Operations Runbook — tools-ecards
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-08-12
 
 ## Stack lifecycle
 
@@ -351,6 +351,81 @@ curl -b cookies.txt http://localhost:7400/api/diagnostics/queue-stats
 # Render status for a batch record
 curl -b cookies.txt http://localhost:7400/api/batches/BATCH_ID/records/RECORD_ID/render-status
 ```
+
+## Import & template operations
+
+### Regenerating the import-template XLSX downloads
+
+The two downloadable workbooks (`import-template-horizontal.xlsx` = headers on row 1, `import-template-vertical.xlsx` = headers down column A) are **generated static assets** served from `front-cards/public/templates/`. They are built from the canonical 30-field vCard list (`api-server/batch-parsing/fixtures/vcard-fields.snapshot.json`) — regenerate them whenever that list changes (the alias-parity tests will fail first if you forget).
+
+```bash
+# 1. Generate inside the api-server container (has openpyxl)
+docker compose -f docker-compose.dev.yml exec api-server \
+  sh -c "cd /app && python3 batch-parsing/generate_import_templates.py --outdir /tmp/templates"
+
+# 2. Copy the outputs back to the host repo (committed assets)
+docker cp $(docker compose -f docker-compose.dev.yml ps -q api-server):/tmp/templates/. \
+  front-cards/public/templates/
+
+# 3. Verify
+python3 -c "import zipfile; zipfile.ZipFile('front-cards/public/templates/import-template-horizontal.xlsx')"
+```
+
+`scripts/generate-import-templates.py` at the repo root is a thin wrapper that delegates to the same generator (useful on a host with openpyxl; inside containers prefer step 1 above — the api-server container only mounts `api-server/`).
+
+For prd/demo hosts the files ship with git — `git pull` + `./bin/refresh-prd.sh` / `./bin/refresh-demo.sh` is enough; no in-container generation needed.
+
+### Bundled global templates (`public/templates/globals/`)
+
+Operator-curated global templates that ship as static files — visible in the template gallery in **both** Demo and Production, with zero DB/API dependency. Entries are read-only; opening one forks a local copy on save.
+
+1. In the designer, **Export** the design (produces a `.zip` package) and save a preview image.
+2. Drop `<name>.zip` + the same-named `<name>.png` into `front-cards/public/templates/globals/`.
+3. Regenerate the manifest (preserves existing `description` fields by entry name):
+
+   ```bash
+   docker compose -f docker-compose.dev.yml exec front-cards \
+     sh -c "cd /app && node scripts/build-global-templates-manifest.mjs"
+   ```
+
+4. Commit `manifest.json` + the dropped files, deploy (`git pull` + refresh script), then restart/static-asset refresh picks them up — they are served from `public/`.
+
+Resilience: a missing preview falls back to a placeholder; a missing/corrupt ZIP hides that entry with a console warning; an empty or invalid `manifest.json` degrades to "no bundled globals" — none of these break the gallery. To remove a bundled global, delete its files and re-run the manifest script.
+
+### App roles: `appsuper` / `appglobal`
+
+Global-template management (create/update/delete templates with `isPublic=true`) is gated by tools-dashboard **client-app roles**, carried in the `app_roles` JWT claim:
+
+- **`appsuper`** — superuser for this app only.
+- **`appglobal`** — superuser across apps.
+- **Either** role grants access (plain membership check, no implication mapping, deny by default; unknown future roles ignored).
+
+Two enforcement paths:
+
+- **Rendering (UI hints):** front-cards decodes `app_roles` from the stored access-token JWT (`/api/auth/user`); the "Global" checkbox/badges are hidden when neither role is present. UI only — never trust it for authorization.
+- **Authoritative:** every global-template mutation goes through the api-server `requireAppRole` preHandler (`api-server/src/core/middleware/requireAppRole.ts`), which re-validates the token on each call against the dashboard: `POST {OAUTH_VALIDATE_TOKEN_ENDPOINT}` with body `{"token": "<access-token>"}` (endpoint default: `{origin of OAUTH_USER_INFO_ENDPOINT}/auth/internal/oauth/validate-token`). Responses: `401` invalid/expired token · `403` (`insufficient_role`) valid token without either role · `503` (`role_validation_unavailable`) dashboard unreachable or non-OK — **fail-closed by design**: global-template mutations are rejected whenever the role check cannot be performed.
+
+Env: `OAUTH_VALIDATE_TOKEN_ENDPOINT` (all three `.env.*.example` files). When unset it defaults to the origin of `OAUTH_USER_INFO_ENDPOINT` + `/auth/internal/oauth/validate-token`. Claim staleness after a role revoke is bounded by token lifetime (≤1h) for the *rendering* path; the authoritative path is always current.
+
+Smoke check (from the api-server container or any host that can reach the dashboard):
+
+```bash
+curl -sS -X POST "$OAUTH_VALIDATE_TOKEN_ENDPOINT" \
+  -H 'Content-Type: application/json' \
+  -d '{"token": "<user-access-token>"}'
+# Expected: {"valid": true, "app_roles": ["appsuper", ...]} (shape per tools-dashboard guide)
+# {"valid": false} for a revoked/expired token → api-server would answer 401.
+```
+
+### vCard (`.vcf`) import — support and limits
+
+Both parsers (Python `file_parser.py` Normal mode; `demoSpreadsheetParser.ts` Demo) accept `.vcf` uploads/pastes:
+
+- vCard **2.1** (incl. `QUOTED-PRINTABLE` + `CHARSET` decoding), **3.0**, **4.0**; line unfolding; `\,` `\;` `\n` escapes.
+- Multi-card files → one batch record per `BEGIN:VCARD` block.
+- Property mapping: `N`/`FN` → names, `ORG` → business_name (+department), `TITLE` → jobTitle, `TEL;TYPE=…` → phone numbers (+extension heuristics), `EMAIL`, `ADR` → address fields, `URL` → website/social, `NOTE` → notes.
+- **Limits:** media properties (`PHOTO`, `LOGO`, `SOUND`, …) are **not** imported; any unknown/unmapped property is preserved verbatim in the record's `extra` (consolidated under `vcf_unmapped`) — nothing is silently dropped.
+- Malformed cards are skipped without failing the rest of the file.
 
 ## Monitoring and alerting (recommended)
 
