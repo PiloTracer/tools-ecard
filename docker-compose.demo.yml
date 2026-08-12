@@ -275,6 +275,11 @@ services:
     image: ${ECARDS_FRONT_IMAGE:-ecards-front:demo}
     container_name: tools_dashboard${TD_STACK_SUFFIX:-_prd_tcrd}-frontend
     restart: unless-stopped
+    volumes:
+      # Bundled global templates publish live: drop <name>.zip/.png/.json into
+      # this host dir and they are listed (/api/bundled-templates) and served
+      # immediately — no rebuild, no restart. Read-only inside the container.
+      - ./front-cards/public/templates/globals:/app/public/templates/globals:ro
     env_file:
       - ${ECARDS_ENV_FILE:-.env.demo}
     environment:

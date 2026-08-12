@@ -35,26 +35,28 @@ test.describe('E-Cards smoke', () => {
     }
   });
 
-  test('bundled global templates manifest is served and valid (Pass 5)', async ({ page }) => {
-    const response = await page.request.get('/templates/globals/manifest.json');
+  test('bundled global templates listing is served and valid (Pass 5)', async ({ page }) => {
+    const response = await page.request.get('/api/bundled-templates');
     expect(response.status()).toBe(200);
-    const manifest = await response.json();
-    expect(Array.isArray(manifest)).toBe(true);
-    for (const entry of manifest) {
-      expect(typeof entry.name).toBe('string');
-      expect(typeof entry.file).toBe('string');
+    const listing = await response.json();
+    for (const group of ['shared', 'demo', 'prd'] as const) {
+      expect(Array.isArray(listing[group])).toBe(true);
+      for (const entry of listing[group]) {
+        expect(typeof entry.name).toBe('string');
+        expect(typeof entry.file).toBe('string');
+      }
     }
   });
 
-  test('template gallery survives a corrupt bundled-globals manifest', async ({ page }) => {
+  test('template gallery survives a failing bundled-templates listing', async ({ page }) => {
     // Demo mode flag (localStorage key from features/demo/demoConstants.ts) so the
     // gallery reads browser storage instead of the auth-gated API.
     await page.addInitScript(() => {
       window.localStorage.setItem('ecards:demo:enabled', '1');
     });
-    // Corrupt manifest: the bundled loader must skip it with a console warning,
+    // Corrupt listing: the bundled loader must skip it with a console warning,
     // never break the gallery.
-    await page.route('**/templates/globals/manifest.json', (route) =>
+    await page.route('**/api/bundled-templates', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: '{corrupt-json' })
     );
 

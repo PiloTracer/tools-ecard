@@ -901,7 +901,44 @@ export function CanvasControls() {
       link.click();
       URL.revokeObjectURL(url);
 
-      console.log('[Export] Package downloaded successfully');
+      // Publish-ready sidecars: a PNG preview and a small JSON descriptor.
+      // Dropping <name>.zip + <name>.png + <name>.json into
+      // public/templates/globals/ (or its demo/prd subdir) publishes the
+      // design as a bundled global template — no manifest step. Failures
+      // here never fail the export itself.
+      try {
+        if (fabricCanvas) {
+          // Thumbnail-sized preview (~640px wide, capped at 1x).
+          const multiplier = Math.min(1, 640 / (canvasWidth || 640));
+          const previewDataUrl = fabricCanvas.toDataURL({
+            format: 'png',
+            multiplier,
+            enableRetinaScaling: false,
+          });
+          const previewLink = document.createElement('a');
+          previewLink.download = `${safeFileStem}.png`;
+          previewLink.href = previewDataUrl;
+          previewLink.click();
+        }
+      } catch (previewError) {
+        console.warn('[Export] PNG preview sidecar failed (ZIP already downloaded):', previewError);
+      }
+
+      try {
+        const sidecarBlob = new Blob([JSON.stringify({ name: displayName }, null, 2) + '\n'], {
+          type: 'application/json',
+        });
+        const sidecarUrl = URL.createObjectURL(sidecarBlob);
+        const sidecarLink = document.createElement('a');
+        sidecarLink.download = `${safeFileStem}.json`;
+        sidecarLink.href = sidecarUrl;
+        sidecarLink.click();
+        URL.revokeObjectURL(sidecarUrl);
+      } catch (sidecarError) {
+        console.warn('[Export] JSON sidecar failed (ZIP already downloaded):', sidecarError);
+      }
+
+      console.log('[Export] Package downloaded successfully (zip + png preview + json sidecar)');
     } catch (error) {
       console.error('[Export] Failed to export package:', error);
       alert(`Failed to export template: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -26,7 +26,12 @@ function okResponse(overrides: Record<string, unknown> = {}) {
 }
 
 describe('bundledTemplatesService (Pass 5)', () => {
+  // The dev container exports NEXT_PUBLIC_DEMO_MODE=true; neutralize it so each
+  // test controls the site scope explicitly (localStorage flag = demo).
+  const savedDemoEnv = process.env.NEXT_PUBLIC_DEMO_MODE;
+
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_DEMO_MODE = '';
     jest.clearAllMocks();
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
@@ -35,26 +40,35 @@ describe('bundledTemplatesService (Pass 5)', () => {
     (console.warn as jest.Mock).mockRestore?.();
   });
 
+  afterAll(() => {
+    if (savedDemoEnv === undefined) delete process.env.NEXT_PUBLIC_DEMO_MODE;
+    else process.env.NEXT_PUBLIC_DEMO_MODE = savedDemoEnv;
+  });
+
   it('lists valid entries with preview URLs and skips corrupt or missing ZIPs', async () => {
     const goodZip = await makeTemplateZipBuffer();
-    const manifest = [
-      { name: 'Good Card', file: 'good.zip', preview: 'good.png', description: 'Starter' },
-      { name: 'No Preview', file: 'plain.zip' },
-      { name: 'Corrupt', file: 'corrupt.zip' },
-      { name: 'Missing', file: 'missing.zip' },
-    ];
+    const listing = {
+      shared: [
+        { name: 'Good Card', file: 'good.zip', preview: 'good.png', description: 'Starter' },
+        { name: 'No Preview', file: 'plain.zip' },
+        { name: 'Corrupt', file: 'corrupt.zip' },
+        { name: 'Missing', file: 'missing.zip' },
+      ],
+      demo: [],
+      prd: [],
+    };
 
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === '/templates/globals/manifest.json') {
-        return okResponse({ json: async () => manifest });
+      if (url === '/api/bundled-templates') {
+        return okResponse({ json: async () => listing });
       }
-      if (url === '/templates/globals/good.zip') {
+      if (url === '/api/bundled-templates/file/good.zip') {
         return okResponse({ arrayBuffer: async () => goodZip });
       }
-      if (url === '/templates/globals/plain.zip') {
+      if (url === '/api/bundled-templates/file/plain.zip') {
         return okResponse({ arrayBuffer: async () => goodZip });
       }
-      if (url === '/templates/globals/corrupt.zip') {
+      if (url === '/api/bundled-templates/file/corrupt.zip') {
         return okResponse({ arrayBuffer: async () => new TextEncoder().encode('not a zip').buffer });
       }
       return { ok: false, status: 404 };
@@ -67,7 +81,7 @@ describe('bundledTemplatesService (Pass 5)', () => {
       id: `${BUNDLED_TEMPLATE_PREFIX}good.zip`,
       kind: 'template',
       isBundled: true,
-      previewUrl: '/templates/globals/good.png',
+      previewUrl: '/api/bundled-templates/file/good.png',
       description: 'Starter',
     });
     expect(list[1].previewUrl).toBeUndefined();
@@ -79,14 +93,16 @@ describe('bundledTemplatesService (Pass 5)', () => {
     );
   });
 
-  it('returns [] when the manifest fetch fails (never breaks the gallery)', async () => {
+  it('returns [] when the listing fetch fails (never breaks the gallery)', async () => {
     mockFetch.mockRejectedValue(new Error('network down'));
 
     await expect(bundledTemplatesService.listBundledTemplates()).resolves.toEqual([]);
   });
 
-  it('returns [] when the manifest is not an array', async () => {
-    mockFetch.mockResolvedValue(okResponse({ json: async () => ({ not: 'an array' }) }));
+  it('returns [] when the listing payload is malformed', async () => {
+    mockFetch.mockResolvedValue(
+      okResponse({ json: async () => ({ shared: 'nope', demo: 42, prd: null }) })
+    );
 
     await expect(bundledTemplatesService.listBundledTemplates()).resolves.toEqual([]);
   });
@@ -94,7 +110,7 @@ describe('bundledTemplatesService (Pass 5)', () => {
   it('loads a bundled template through the real JSZip import path', async () => {
     const zipBuffer = await makeTemplateZipBuffer('Bundled Card');
     mockFetch.mockImplementation(async (url: string) => {
-      if (url === '/templates/globals/good.zip') {
+      if (url === '/api/bundled-templates/file/good.zip') {
         return okResponse({
           arrayBuffer: async () => zipBuffer,
           blob: async () => new Blob([zipBuffer]),
@@ -120,5 +136,87 @@ describe('bundledTemplatesService (Pass 5)', () => {
     await expect(
       bundledTemplatesService.loadBundledTemplate(`${BUNDLED_TEMPLATE_PREFIX}missing.zip`)
     ).rejects.toThrow('Bundled template not found');
+  });
+
+  it('merges the shared root set with the prd-scoped set (default site)', async () => {
+    const goodZip = await makeTemplateZipBuffer();
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/bundled-templates') {
+        return okResponse({
+          json: async () => ({
+            shared: [{ name: 'Shared Card', file: 'shared.zip' }],
+            demo: [{ name: 'Demo Card', file: 'demo/a.zip' }],
+            prd: [{ name: 'Prd Card', file: 'prd/c.zip', preview: 'prd/c.png' }],
+          }),
+        });
+      }
+      if (url === '/api/bundled-templates/file/shared.zip' || url === '/api/bundled-templates/file/prd/c.zip') {
+        return okResponse({ arrayBuffer: async () => goodZip });
+      }
+      return { ok: false, status: 404 };
+    });
+
+    const list = await bundledTemplatesService.listBundledTemplates();
+
+    // The demo group must NOT leak into the prd site listing.
+    expect(list.map((t) => t.name)).toEqual(['Shared Card', 'Prd Card']);
+    expect(list[0]).toMatchObject({
+      id: `${BUNDLED_TEMPLATE_PREFIX}shared.zip`,
+      storageUrl: '/api/bundled-templates/file/shared.zip',
+    });
+    expect(list[1]).toMatchObject({
+      id: `${BUNDLED_TEMPLATE_PREFIX}prd/c.zip`,
+      storageUrl: '/api/bundled-templates/file/prd/c.zip',
+      previewUrl: '/api/bundled-templates/file/prd/c.png',
+    });
+  });
+
+  it('lists the demo-scoped set (not the prd one) when demo mode is on', async () => {
+    window.localStorage.setItem('ecards:demo:enabled', '1');
+    try {
+      const goodZip = await makeTemplateZipBuffer();
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === '/api/bundled-templates') {
+          return okResponse({
+            json: async () => ({
+              shared: [],
+              demo: [{ name: 'Demo Card', file: 'demo/a.zip' }],
+              prd: [{ name: 'Prd Card', file: 'prd/c.zip' }],
+            }),
+          });
+        }
+        if (url === '/api/bundled-templates/file/demo/a.zip') {
+          return okResponse({ arrayBuffer: async () => goodZip });
+        }
+        return { ok: false, status: 404 };
+      });
+
+      const list = await bundledTemplatesService.listBundledTemplates();
+
+      // The prd group must NOT leak into the demo site listing.
+      expect(list.map((t) => t.name)).toEqual(['Demo Card']);
+      expect(list[0]).toMatchObject({
+        id: `${BUNDLED_TEMPLATE_PREFIX}demo/a.zip`,
+        storageUrl: '/api/bundled-templates/file/demo/a.zip',
+      });
+
+      // Loading resolves the scope-relative id back to the scoped URL.
+      const zipBuffer = await makeTemplateZipBuffer('Demo Card');
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === '/api/bundled-templates/file/demo/a.zip') {
+          return okResponse({
+            arrayBuffer: async () => zipBuffer,
+            blob: async () => new Blob([zipBuffer]),
+          });
+        }
+        return { ok: false, status: 404 };
+      });
+      const loaded = await bundledTemplatesService.loadBundledTemplate(
+        `${BUNDLED_TEMPLATE_PREFIX}demo/a.zip`
+      );
+      expect(loaded.name).toBe('Demo Card');
+    } finally {
+      window.localStorage.removeItem('ecards:demo:enabled');
+    }
   });
 });
