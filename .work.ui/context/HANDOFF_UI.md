@@ -4,11 +4,11 @@
 
 ## Session status
 
-**Open:** -
+**Open:** closed
 
-**Updated:** 2026-07-16
+**Updated:** 2026-08-12
 
-**Closed:** -
+**Closed:** 2026-08-12
 
 **UI layer state:** Bootstrap complete — ready for foundation. Thin-client: `AI_UI_SOURCE=/mnt/work/Projects/.ai.ui`.
 
