@@ -73,13 +73,12 @@ export async function POST(request: NextRequest) {
 
     // Generate state for CSRF protection
     const state = generateRandomString(64);
-    console.log('Generated state:', state.substring(0, 10) + '...');
 
     // Generate PKCE code verifier and challenge
     const codeVerifier = generateRandomString(64);
     const codeChallenge = generateCodeChallenge(codeVerifier);
-    console.log('Generated code_verifier:', codeVerifier.substring(0, 10) + '...');
-    console.log('Generated code_challenge:', codeChallenge);
+    // Never log state/verifier/challenge values — they are single-use auth secrets.
+    console.log('Generated state + PKCE code_verifier/code_challenge');
 
     // Build authorization URL
     const params = new URLSearchParams({

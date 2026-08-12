@@ -81,8 +81,9 @@ function AuthCallbackContent() {
       const isManualLogin = storedState && state && storedState === state;
 
       console.log('Client ID:', clientId);
-      console.log('Stored state:', storedState ? `${storedState.substring(0, 10)}...` : 'NOT FOUND');
-      console.log('Received state:', state ? `${state.substring(0, 10)}...` : 'NOT PROVIDED');
+      // Presence only — state/verifier are single-use auth secrets, never logged.
+      console.log('Stored state:', storedState ? 'PRESENT' : 'NOT FOUND');
+      console.log('Received state:', state ? 'PRESENT' : 'NOT PROVIDED');
       console.log('States match:', isManualLogin ? 'YES' : 'NO');
       console.log('Flow type:', isManualLogin ? 'Manual Login (Self-Initiated)' : 'Pre-Initiated OAuth (from App Library)');
 
@@ -94,7 +95,7 @@ function AuthCallbackContent() {
 
         // Get code verifier for PKCE
         codeVerifier = getCodeVerifier(clientId);
-        console.log('Code verifier from storage:', codeVerifier ? `${codeVerifier.substring(0, 10)}...` : 'NOT FOUND');
+        console.log('Code verifier from storage:', codeVerifier ? 'PRESENT' : 'NOT FOUND');
 
         if (!codeVerifier) {
           console.error('No code verifier found in sessionStorage');
@@ -114,8 +115,6 @@ function AuthCallbackContent() {
         // Clean up any stale OAuth data from previous sessions
         if (storedState && storedState !== state) {
           console.log('⚠️  Found stale OAuth data from previous session - clearing');
-          console.log('   Old stored state:', storedState.substring(0, 10) + '...');
-          console.log('   New received state:', state ? state.substring(0, 10) + '...' : 'none');
           clearOAuthData(clientId);
         }
 

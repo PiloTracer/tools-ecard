@@ -126,7 +126,8 @@ function failureRedirect(): NextResponse {
 export async function GET(request: NextRequest) {
   try {
     console.log('=== Server-Side OAuth Callback Started ===');
-    console.log('Request URL:', request.url);
+    // Log the path only — the full URL carries the single-use code + state.
+    console.log('Request path:', request.nextUrl.pathname);
 
     // Get URL parameters
     const searchParams = request.nextUrl.searchParams;
@@ -136,8 +137,8 @@ export async function GET(request: NextRequest) {
     const errorDescription = searchParams.get('error_description');
 
     console.log('URL Parameters:', {
-      code: code ? `${code.substring(0, 10)}...` : 'MISSING',
-      state: receivedState ? `${receivedState.substring(0, 10)}...` : 'MISSING',
+      code: code ? 'PRESENT' : 'MISSING',
+      state: receivedState ? 'PRESENT' : 'MISSING',
       error,
       errorDescription,
     });
@@ -165,10 +166,7 @@ export async function GET(request: NextRequest) {
 
     // Both must match for the PKCE flow; otherwise we would trade the code without code_verifier and the IdP would reject.
     if (storedState && receivedState && storedState !== receivedState) {
-      console.error('OAuth state mismatch', {
-        stored: storedState.substring(0, 10),
-        received: receivedState.substring(0, 10),
-      });
+      console.error('OAuth state mismatch — aborting login');
       return failureRedirect();
     }
 
@@ -176,8 +174,8 @@ export async function GET(request: NextRequest) {
     const isManualLogin = storedState && receivedState && storedState === receivedState;
 
     console.log('Flow Detection:', {
-      storedState: storedState ? `${storedState.substring(0, 10)}...` : 'NOT FOUND',
-      receivedState: receivedState ? `${receivedState.substring(0, 10)}...` : 'NOT PROVIDED',
+      storedState: storedState ? 'PRESENT' : 'NOT FOUND',
+      receivedState: receivedState ? 'PRESENT' : 'NOT PROVIDED',
       statesMatch: isManualLogin,
       flowType: isManualLogin ? 'Manual Login (PKCE)' : 'Pre-Initiated OAuth',
     });
@@ -194,7 +192,7 @@ export async function GET(request: NextRequest) {
       }
 
       codeVerifier = storedCodeVerifier;
-      console.log('✓ Code verifier found:', storedCodeVerifier.substring(0, 10) + '...');
+      console.log('✓ Code verifier found in cookies');
     } else {
       // Pre-initiated OAuth flow - no PKCE required
       console.log('✓ Pre-initiated OAuth flow - no PKCE validation needed');
@@ -258,11 +256,8 @@ export async function GET(request: NextRequest) {
     }
 
     const user: User = await userResponse.json();
-    console.log('✓ User info fetched:', {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-    });
+    // No PII in logs — internal id only (per repo data-privacy rules).
+    console.log('✓ User info fetched:', { id: user.id });
 
     const afterLoginUrl = getPostLoginRedirectUrl();
     const redirectTo = isSameOriginAsEcards(afterLoginUrl)

@@ -109,12 +109,11 @@ export async function generateAuthorizationUrl(
 
   // Generate state for CSRF protection
   const state = generateState();
-  console.log('Generated state:', state);
 
   // Generate PKCE code verifier and challenge
   const { codeVerifier, codeChallenge } = await generatePKCE();
-  console.log('Generated PKCE code verifier (first 10 chars):', codeVerifier.substring(0, 10) + '...');
-  console.log('Generated PKCE code challenge:', codeChallenge);
+  // Never log state/verifier/challenge values — they are single-use auth secrets.
+  console.log('Generated state + PKCE code_verifier/code_challenge');
 
   // Store in sessionStorage with client ID-specific key
   storeOAuthData(state, codeVerifier, OAUTH_CONFIG.clientId);

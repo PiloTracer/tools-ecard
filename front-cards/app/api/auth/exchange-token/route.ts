@@ -116,10 +116,11 @@ export async function POST(request: NextRequest) {
       console.log('Skipping code_verifier (pre-initiated OAuth flow)');
     }
 
-    console.log('Token request body (without secret):', {
+    console.log('Token request body (sensitive fields redacted):', {
       ...tokenRequestBody,
+      code: '***REDACTED***',
       client_secret: '***REDACTED***',
-      code_verifier: codeVerifier ? codeVerifier.substring(0, 10) + '...' : 'NOT INCLUDED',
+      code_verifier: codeVerifier ? '***REDACTED***' : 'NOT INCLUDED',
     });
 
     const tokenResponse = await oauthServerFetch(OAUTH_CONFIG.tokenEndpoint, {
@@ -150,8 +151,8 @@ export async function POST(request: NextRequest) {
     const tokens: OAuthTokenResponse = await tokenResponse.json();
     console.log('✓ Token exchange successful!');
     console.log('Received tokens:', {
-      access_token: tokens.access_token ? `${tokens.access_token.substring(0, 10)}...` : 'MISSING',
-      refresh_token: tokens.refresh_token ? 'present' : 'MISSING',
+      access_token: tokens.access_token ? 'PRESENT' : 'MISSING',
+      refresh_token: tokens.refresh_token ? 'PRESENT' : 'MISSING',
       expires_in: tokens.expires_in,
       scope: tokens.scope,
     });
@@ -180,10 +181,9 @@ export async function POST(request: NextRequest) {
 
     const user: User = await userResponse.json();
     console.log('✓ User info fetched successfully!');
+    // No PII in logs — internal id + account-status tier only.
     console.log('User:', {
       id: user.id,
-      username: user.username,
-      email: user.email,
       subscription: user.subscription?.tier,
     });
 
