@@ -377,20 +377,21 @@ For prd/demo hosts the files ship with git — `git pull` + `./bin/refresh-prd.s
 
 ### Bundled global templates (`public/templates/globals/`)
 
-Operator-curated global templates that ship as static files — visible in the template gallery in **both** Demo and Production, with zero DB/API dependency. Entries are read-only; opening one forks a local copy on save.
+Operator-curated global templates shipped as plain files — visible in the template gallery with zero DB/API dependency. Entries are read-only; opening one forks a local copy on save. Full operator guide (Spanish): `.work/docs/guides/20260812-agregar-plantillas-demo.md`.
 
-1. In the designer, **Export** the design (produces a `.zip` package) and save a preview image.
-2. Drop `<name>.zip` + the same-named `<name>.png` into `front-cards/public/templates/globals/`.
-3. Regenerate the manifest (preserves existing `description` fields by entry name):
+**Per-site sets:** `globals/demo/` is listed only on the demo site, `globals/prd/` only on production, and the root `globals/` on both.
 
-   ```bash
-   docker compose -f docker-compose.dev.yml exec front-cards \
-     sh -c "cd /app && node scripts/build-global-templates-manifest.mjs"
-   ```
+**Publishing is drop-and-go — no manifest, no rebuild, no restart.** The globals directory is bind-mounted from the host repo into the front-cards container (`docker-compose.prd.yml` / `docker-compose.demo.yml`), and both the listing (`GET /api/bundled-templates`, live `readdir`) and the file download (`GET /api/bundled-templates/file/<path>`, streamed from disk) read it live:
 
-4. Commit `manifest.json` + the dropped files, deploy (`git pull` + refresh script), then restart/static-asset refresh picks them up — they are served from `public/`.
+1. In the designer, **Export** the design — downloads 3 files: `<name>.zip` (package) + `<name>.png` (gallery preview) + `<name>.json` (display name; add `"description"` by hand if wanted).
+2. Copy the 3 files into `front-cards/public/templates/globals/` (or its `demo/` / `prd/` subdir) — on the VPS this can be a plain `scp`; they appear in the gallery immediately.
+3. Optional but recommended: commit + push the files so git stays the versioned backup of the published set.
 
-Resilience: a missing preview falls back to a placeholder; a missing/corrupt ZIP hides that entry with a console warning; an empty or invalid `manifest.json` degrades to "no bundled globals" — none of these break the gallery. To remove a bundled global, delete its files and re-run the manifest script.
+One-time requirement: this mechanism itself ships with a normal deploy (`git pull` + `./bin/refresh-prd.sh … ui`); the new volume mount takes effect on the recreate the refresh script already performs. Note: Next's standalone server only serves `public/` files that existed at process start — that is why the gallery reads through the live API routes instead of the static `/templates/globals/` paths.
+
+Resilience: a missing preview falls back to a placeholder; a missing/corrupt ZIP hides that entry with a console warning; a failing listing degrades to "no bundled globals" — none of these break the gallery. To remove a bundled global, delete its files (gone immediately).
+
+The old `manifest.json` + `scripts/build-global-templates-manifest.mjs` flow was removed 2026-08-12 (replaced by the live listing); the `globals/` dirs are tracked via `.gitkeep`.
 
 ### App roles: `appsuper` / `appglobal`
 

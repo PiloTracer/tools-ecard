@@ -26,6 +26,7 @@
 | `.cursorrules` thin-client verify (2026-08-11) | Path-migration audit green (all pointers/skills/local refs resolve; `soc-deploy-basic verify` + `deploy-basic status` PASS); stale `nginx` compose row + SOC fallback inconsistency flagged |
 | Import-ux + templates (2026-08-12) | Passes 0–6 implemented + gate-verified (baseline hardening, template XLSX, transposed parsing, `.vcf` import, field-mapping + presets, template kinds, role-gated globals, e2e/docs) — `.work/plans/20260812-import-ux-templates-plan.md` §9 |
 | Demo KV-paste field-mapping fix (2026-08-12) | Unknown-label KV paste lines no longer dropped (mapping modal auto-opens); `telefono_trabajo`/`extension_trabajo` aliases; fuzzy exact-token-priority (correo/direccion heuristic); both parsers, parity kept; front 311 / api 207+3 / python 67 green |
+| OAuth log-scrub + drop-and-go bundled templates (2026-08-12) | Auth secrets/PII redacted from frontend OAuth logs (5 files); manifest flow replaced by live listing (`/api/bundled-templates` + file route) + compose host-mount → publish templates by copying files (no rebuild/restart); Export emits zip+png+json sidecars; per-site sets (demo/prd/shared); Spanish guide + runbook updated |
 
 ---
 
@@ -52,7 +53,7 @@
 | Priority | Item | Notes |
 |----------|------|-------|
 | **0** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
-| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; recheck prd parse jobs / Cassandra; browser hard-refresh for client-side demo parser |
+| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes + drop-and-go templates) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; recreate applies the new globals volume mount (a plain restart would not); recheck prd parse jobs / Cassandra; browser hard-refresh once for the new bundle |
 | **2** | Manual browser click-through | Demo: paste with unknown labels → mapping modal opens; "Correo Trabajo"-style labels auto-pair; upload `.xlsx` → export PNG name+font; import design persistence; profile; units |
 | **3** | Production deploy cutover | DNS/TLS; Demo flags on clean host |
 | **4** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
