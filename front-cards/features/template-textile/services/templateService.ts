@@ -5,7 +5,8 @@
 
 import { browserStorageService, type CachedTemplate } from './browserStorageService';
 import { resourceManager } from './resourceManager';
-import type { Template, TemplateElement } from '../types';
+import { bundledTemplatesService, BUNDLED_TEMPLATE_PREFIX } from './bundledTemplatesService';
+import type { Template, TemplateElement, TemplateKind } from '../types';
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
 import { isDemoMode } from '@/features/demo/isDemoMode';
 import { demoTemplateRepository } from '@/features/demo/demoTemplateRepository';
@@ -38,6 +39,9 @@ export type StorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
 export interface SaveTemplateRequest {
   name: string;
   templateData: Template;
+  kind?: TemplateKind; // default 'design'; 'template' via explicit "Save as new template"
+  /** Publish as a global template (Pass 5) — server role-gates this. */
+  global?: boolean;
 }
 
 export interface TemplateMetadata {
@@ -48,6 +52,15 @@ export interface TemplateMetadata {
   storageMode: StorageMode;
   resourceUrls: string[];
   version: number;
+  kind: TemplateKind;
+  /** Global template from the API (isPublic) — read-only for non-owners. */
+  isPublic?: boolean;
+  /** Bundled global template shipped as a static asset (public/templates/globals/). */
+  isBundled?: boolean;
+  /** Optional preview image URL (bundled globals). */
+  previewUrl?: string;
+  /** Optional operator-provided description (bundled globals manifest). */
+  description?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -127,6 +140,7 @@ class TemplateService {
         storageMode: 'LOCAL_ONLY',
         resourceUrls: resources.map(r => r.url),
         version: 1,
+        kind: request.kind ?? 'design',
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -138,7 +152,8 @@ class TemplateService {
         data: processedTemplate,
         resources: resources.map(r => r.url),
         timestamp: Date.now(),
-        userId: 'local'
+        userId: 'local',
+        kind: metadata.kind
       });
 
       return metadata;
@@ -154,6 +169,9 @@ class TemplateService {
         body: JSON.stringify({
           name: request.name,
           templateData: processedTemplate,
+          kind: request.kind,
+          // Only sent when true — server role-gates global saves (403 for regular users)
+          ...(request.global === true ? { global: true } : {}),
           resources: resourceData
         })
       });
@@ -161,6 +179,7 @@ class TemplateService {
       if (response.ok) {
         const result = await response.json();
         const metadata = result.data as TemplateMetadata;
+        metadata.kind = metadata.kind ?? request.kind ?? 'design';
 
         // Also cache locally for offline access
         await browserStorageService.cacheTemplate({
@@ -169,7 +188,8 @@ class TemplateService {
           data: processedTemplate,
           resources: metadata.resourceUrls,
           timestamp: Date.now(),
-          userId: metadata.userId
+          userId: metadata.userId,
+          kind: metadata.kind
         });
 
         return metadata;
@@ -196,6 +216,7 @@ class TemplateService {
           storageMode: 'FALLBACK',
           resourceUrls: resources.map(r => r.url),
           version: 1,
+          kind: request.kind ?? 'design',
           createdAt: new Date(),
           updatedAt: new Date()
         };
@@ -206,7 +227,8 @@ class TemplateService {
           data: processedTemplate,
           resources: resources.map(r => r.url),
           timestamp: Date.now(),
-          userId: 'fallback'
+          userId: 'fallback',
+          kind: metadata.kind
         });
 
         return metadata;
@@ -220,8 +242,20 @@ class TemplateService {
    * Load a template by ID
    */
   async loadTemplate(templateId: string): Promise<LoadedTemplate> {
+    // Bundled global templates are static assets — load in any mode, no auth.
+    if (templateId.startsWith(BUNDLED_TEMPLATE_PREFIX)) {
+      return bundledTemplatesService.loadBundledTemplate(templateId);
+    }
     if (isDemoMode()) {
-      return demoTemplateRepository.loadTemplate(templateId) as Promise<LoadedTemplate>;
+      try {
+        return await demoTemplateRepository.loadTemplate(templateId) as LoadedTemplate;
+      } catch (demoError) {
+        // Not demo-local: may be an API-served global template (Pass 5).
+        // GETs pass the demo write guard, so try the server before failing.
+        const serverTemplate = await this.loadServerTemplate(templateId);
+        if (serverTemplate) return serverTemplate;
+        throw demoError;
+      }
     }
     const mode = await this.getStorageMode();
 
@@ -242,6 +276,7 @@ class TemplateService {
           storageMode: 'LOCAL_ONLY',
           resourceUrls: cached.resources,
           version: 1,
+          kind: cached.kind ?? 'design',
           createdAt: new Date(cached.timestamp),
           updatedAt: new Date(cached.timestamp)
         }
@@ -267,6 +302,7 @@ class TemplateService {
             template.metadata.storageMode = typeof template.metadata.storageMode === 'string'
               ? template.metadata.storageMode
               : (template.metadata.storageMode as any)?.mode || 'FALLBACK';
+            template.metadata.kind = template.metadata.kind ?? 'design';
           }
 
           // Cache locally for offline access
@@ -276,7 +312,8 @@ class TemplateService {
             data: template.data,
             resources: template.resources,
             timestamp: Date.now(),
-            userId: template.userId
+            userId: template.userId,
+            kind: template.metadata?.kind ?? 'design'
           });
 
           // Preload resources
@@ -305,6 +342,7 @@ class TemplateService {
           storageMode: mode || 'FALLBACK',
           resourceUrls: cached.resources,
           version: 1,
+          kind: cached.kind ?? 'design',
           createdAt: new Date(cached.timestamp),
           updatedAt: new Date(cached.timestamp)
         }
@@ -315,33 +353,92 @@ class TemplateService {
   }
 
   /**
-   * List all templates
+   * Load a template directly from the API, without touching local caches.
+   * Used in Demo mode for API-served global templates (Pass 5) — GETs pass
+   * the demo write guard. Returns null on any failure.
    */
-  async listTemplates(): Promise<TemplateMetadata[]> {
+  private async loadServerTemplate(templateId: string): Promise<LoadedTemplate | null> {
+    try {
+      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile/${templateId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) return null;
+      const result = await response.json();
+      const template = result.data as LoadedTemplate;
+      if (template.metadata) {
+        // Defend against a runtime object-shaped storageMode without `any`
+        const rawMode: unknown = template.metadata.storageMode;
+        template.metadata.storageMode = typeof rawMode === 'string'
+          ? (rawMode as StorageMode)
+          : ((rawMode as { mode?: StorageMode } | null)?.mode ?? 'FALLBACK');
+        template.metadata.kind = template.metadata.kind ?? 'design';
+      }
+      return template;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * List all templates, optionally filtered by kind ('template' | 'design').
+   * No filter = both kinds (previous behavior).
+   */
+  async listTemplates(kind?: TemplateKind): Promise<TemplateMetadata[]> {
     if (isDemoMode()) {
-      return demoTemplateRepository.listTemplates() as Promise<TemplateMetadata[]>;
+      const local = await demoTemplateRepository.listTemplates(kind) as TemplateMetadata[];
+      // Pass 5: API-served global templates are readable in Demo too —
+      // GETs pass the demo write guard. Best effort: if the API is
+      // unreachable, Demo keeps working with local templates only.
+      try {
+        const kindQuery = kind ? `?kind=${kind}` : '';
+        const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile${kindQuery}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          const localIds = new Set(local.map(t => t.id));
+          for (const t of (result.data || []) as TemplateMetadata[]) {
+            if (t.isPublic === true && !localIds.has(t.id)) {
+              local.push({ ...t, kind: t.kind ?? 'design' });
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Demo mode: API globals unavailable, listing local templates only:', error);
+      }
+      return local;
     }
     const mode = await this.getStorageMode();
 
     if (mode === 'LOCAL_ONLY') {
       // List from local storage only
       const cached = await browserStorageService.listTemplates();
-      return cached.map(t => ({
-        id: t.id,
-        userId: t.userId || 'local',
-        name: t.name,
-        storageUrl: `local://${t.id}`,
-        storageMode: 'LOCAL_ONLY',
-        resourceUrls: t.resources,
-        version: 1,
-        createdAt: new Date(t.timestamp),
-        updatedAt: new Date(t.timestamp)
-      }));
+      return cached
+        .map(t => ({
+          id: t.id,
+          userId: t.userId || 'local',
+          name: t.name,
+          storageUrl: `local://${t.id}`,
+          storageMode: 'LOCAL_ONLY' as const,
+          resourceUrls: t.resources,
+          version: 1,
+          kind: t.kind ?? 'design' as TemplateKind,
+          createdAt: new Date(t.timestamp),
+          updatedAt: new Date(t.timestamp)
+        }))
+        .filter(t => !kind || t.kind === kind);
     }
 
     try {
       // Try to list from server
-      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile`, {
+      const kindQuery = kind ? `?kind=${kind}` : '';
+      const response = await apiFetchWithRefresh(`${getApiBaseUrl()}/api/v1/template-textile${kindQuery}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -355,7 +452,8 @@ class TemplateService {
           // Normalize storageMode: if it's an object with a 'mode' property, extract it
           storageMode: typeof t.storageMode === 'string'
             ? t.storageMode
-            : (t.storageMode as any)?.mode || 'FALLBACK'
+            : (t.storageMode as any)?.mode || 'FALLBACK',
+          kind: t.kind ?? 'design' as TemplateKind
         }));
 
         // Merge with local templates
@@ -364,7 +462,8 @@ class TemplateService {
 
         // Add local-only templates
         for (const local of localTemplates) {
-          if (!serverIds.has(local.id)) {
+          const localKind = local.kind ?? 'design';
+          if (!serverIds.has(local.id) && (!kind || localKind === kind)) {
             templates.push({
               id: local.id,
               userId: local.userId || 'local',
@@ -373,6 +472,7 @@ class TemplateService {
               storageMode: 'LOCAL_ONLY',
               resourceUrls: local.resources,
               version: 1,
+              kind: localKind,
               createdAt: new Date(local.timestamp),
               updatedAt: new Date(local.timestamp)
             });
@@ -387,17 +487,20 @@ class TemplateService {
 
     // Fallback to local templates
     const cached = await browserStorageService.listTemplates();
-    return cached.map(t => ({
-      id: t.id,
-      userId: t.userId || 'fallback',
-      name: t.name,
-      storageUrl: `fallback://${t.id}`,
-      storageMode: mode || 'FALLBACK',
-      resourceUrls: t.resources,
-      version: 1,
-      createdAt: new Date(t.timestamp),
-      updatedAt: new Date(t.timestamp)
-    }));
+    return cached
+      .map(t => ({
+        id: t.id,
+        userId: t.userId || 'fallback',
+        name: t.name,
+        storageUrl: `fallback://${t.id}`,
+        storageMode: (mode || 'FALLBACK') as StorageMode,
+        resourceUrls: t.resources,
+        version: 1,
+        kind: t.kind ?? 'design' as TemplateKind,
+        createdAt: new Date(t.timestamp),
+        updatedAt: new Date(t.timestamp)
+      }))
+      .filter(t => !kind || t.kind === kind);
   }
 
   /**

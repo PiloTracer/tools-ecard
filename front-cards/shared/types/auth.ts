@@ -22,6 +22,11 @@ export type User = {
   email: string;
   display_name: string;
   avatar_url?: string;
+  /**
+   * tools-dashboard client-app roles (from the access-token JWT `app_roles`
+   * claim, decoded by /api/auth/user). UI hints only — the server enforces.
+   */
+  roles?: string[];
   subscription?: {
     tier: 'free' | 'basic' | 'professional' | 'enterprise';
     status: 'active' | 'suspended' | 'cancelled';
@@ -82,6 +87,10 @@ export type AuthContextState = {
   isLoading: boolean;
   user: User | null;
   error: string | null;
+  /** tools-dashboard client-app roles (UI hints only; server enforces). */
+  roles: string[];
+  /** True when roles include `appsuper` or `appglobal` (either grants it). */
+  canManageGlobalTemplates: boolean;
 };
 
 /**

@@ -8,12 +8,15 @@ import operatorSamples from './fixtures/operator_batch_samples.json';
 import {
   applyWorkPhonePrefix,
   findHeaderRowIndex,
+  isTransposedMatrix,
   isUsefulDemoContactRow,
   mapRowToContactFields,
   matrixToTable,
   parseCsvText,
   parseDemoSpreadsheetFile,
+  transposeMatrix,
 } from './demoSpreadsheetParser';
+import { buildXlsxFile } from './xlsxTestHelper';
 
 describe('demoSpreadsheetParser', () => {
   describe('parseCsvText', () => {
@@ -587,6 +590,22 @@ describe('demoSpreadsheetParser', () => {
       await expect(parseDemoSpreadsheetFile(file)).rejects.toThrow(/cannot parse legacy \.xls/i);
     });
 
+    it('parses .vcf vCard files', async () => {
+      const file = new File(
+        [
+          'BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;Jane;;\r\nFN:Jane Doe\r\n' +
+            'EMAIL:jane.doe@example.com\r\nEND:VCARD\r\n',
+        ],
+        'contacts.vcf',
+        { type: 'text/vcard' }
+      );
+      const table = await parseDemoSpreadsheetFile(file);
+      expect(table.rows).toHaveLength(1);
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('Jane Doe');
+      expect(fields.email).toBe('jane.doe@example.com');
+    });
+
     it('does not treat zip binary as CSV rows', async () => {
       const zip = new JSZip();
       zip.file('xl/worksheets/sheet1.xml', '<worksheet><sheetData/></worksheet>');
@@ -644,6 +663,77 @@ describe('demoSpreadsheetParser', () => {
       const fields = mapRowToContactFields(table.headers, table.rows[0]);
       expect(fields.fullName).toBe('Ada Lovelace');
       expect(fields.email).toBe('ada@example.com');
+    });
+  });
+
+  describe('transposed (vertical) xlsx', () => {
+    const HEADERS = ['full_name', 'email', 'work_phone', 'work_phone_ext'];
+    const CONTACTS = [
+      ['Example Person', 'example.person@example.com', '+506 2222 0000', '123'],
+      ['Another Person', 'another@example.com', '+506 2222 0001', ''],
+    ];
+    const horizontal = [HEADERS, ...CONTACTS];
+    // Transposed: headers down column A, one contact per column B/C.
+    const transposed = HEADERS.map((_, i) => [HEADERS[i], CONTACTS[0][i], CONTACTS[1][i]]);
+
+    it('detects a clear vertical layout as transposed', () => {
+      expect(isTransposedMatrix(transposed)).toBe(true);
+    });
+
+    it('keeps a clear horizontal layout', () => {
+      expect(isTransposedMatrix(horizontal)).toBe(false);
+    });
+
+    it('falls back to horizontal when scores are ambiguous', () => {
+      // First row AND first column both look like headers (4 hits each) — no
+      // clear margin, so the status-quo horizontal orientation must win.
+      const ambiguous = [
+        ['full_name', 'email', 'work_phone', 'mobile_phone'],
+        ['last_name', 'a', 'b', 'c'],
+        ['address_city', 'd', 'e', 'f'],
+        ['address_country', 'g', 'h', 'i'],
+      ];
+      expect(isTransposedMatrix(ambiguous)).toBe(false);
+    });
+
+    it('requires a minimum of header hits in column A', () => {
+      const weak = [
+        ['full_name', 'Example Person'],
+        ['email', 'example.person@example.com'],
+        ['random label', 'random value'],
+        ['another label', 'another value'],
+      ];
+      expect(isTransposedMatrix(weak)).toBe(false);
+    });
+
+    it('transposeMatrix flips a ragged matrix', () => {
+      expect(
+        transposeMatrix([
+          ['a', 'b', 'c'],
+          ['d', 'e'],
+        ])
+      ).toEqual([
+        ['a', 'd'],
+        ['b', 'e'],
+        ['c', ''],
+      ]);
+    });
+
+    it('parses a transposed .xlsx to the same table as its horizontal twin', async () => {
+      const hTable = await parseDemoSpreadsheetFile(await buildXlsxFile(horizontal, 'h.xlsx'));
+      const vTable = await parseDemoSpreadsheetFile(await buildXlsxFile(transposed, 'v.xlsx'));
+
+      expect(vTable.headers).toEqual(HEADERS);
+      expect(vTable.rows).toEqual(hTable.rows);
+
+      const fields = mapRowToContactFields(vTable.headers, vTable.rows[0]);
+      expect(fields.fullName).toBe('Example Person');
+      expect(fields.email).toBe('example.person@example.com');
+      expect(fields.workPhone).toBe('+506 2222 0000');
+      expect(fields.workPhoneExt).toBe('123');
+      // Blank ext (self-closing styled cell) of contact 2 stays empty.
+      const fields2 = mapRowToContactFields(vTable.headers, vTable.rows[1]);
+      expect(fields2.workPhoneExt).toBeUndefined();
     });
   });
 });

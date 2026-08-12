@@ -22,6 +22,9 @@ export function normalizeOAuthUser(data: unknown): User | null {
     username,
     email: email || id,
     display_name: displayName || username || email,
+    roles: Array.isArray(record.roles)
+      ? record.roles.filter((r): r is string => typeof r === 'string')
+      : undefined,
     avatar_url:
       typeof record.avatar_url === 'string'
         ? record.avatar_url

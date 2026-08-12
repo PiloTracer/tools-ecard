@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { oauthServerFetch } from '@/shared/server/oauth-fetch';
 import { normalizeOAuthUser } from '@/shared/lib/normalizeOAuthUser';
+import { decodeAppRolesFromToken } from '@/shared/lib/appRoles';
 
 // OAuth configuration from environment variables
 const OAUTH_CONFIG = {
@@ -58,6 +59,11 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ authenticated: false as const });
     }
+
+    // Roles live in the access-token JWT (app_roles claim), not userinfo.
+    // Exposed to the client as a UI hint only — the api-server enforces
+    // role-gated actions authoritatively via validate-token.
+    user.roles = decodeAppRolesFromToken(accessToken);
 
     return NextResponse.json(user);
   } catch (error) {

@@ -1,5 +1,6 @@
 // Batch upload feature types
 import { BatchStatus } from '@prisma/client';
+import type { FieldMapping } from '../batch-import/types';
 
 export interface BatchUploadRequest {
   file: Express.Multer.File;
@@ -9,6 +10,8 @@ export interface BatchUploadRequest {
   projectName: string;
   /** Max records to import; -1 = unlimited. Omitted → server env/fallback applies. */
   batchRecordLimit?: number;
+  /** Explicit user field mapping (Pass 3); threaded through the queue to the parser. */
+  mapping?: FieldMapping[];
 }
 
 export interface BatchUploadResponse {
@@ -66,6 +69,8 @@ export interface BatchCreateData {
   fileSize: number;
   filePath: string;
   status?: BatchStatus;
+  /** Explicit user field mapping persisted with the batch (consumed on retry). */
+  fieldMapping?: FieldMapping[];
 }
 
 export interface BatchUpdateData {
@@ -89,6 +94,8 @@ export interface BatchProcessingJob {
   // Phone formatting configuration from project settings
   workPhonePrefix?: string;      // e.g., "2222" for Costa Rica landlines
   defaultCountryCode?: string;   // e.g., "+(506)" for Costa Rica
+  /** Explicit user field mapping (Pass 3); passed to the Python parser as --mapping. */
+  mapping?: FieldMapping[];
 }
 
 export class BatchUploadError extends Error {

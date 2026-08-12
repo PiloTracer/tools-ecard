@@ -22,4 +22,52 @@ test.describe('E-Cards smoke', () => {
     expect(response?.status()).toBeLessThan(500);
     await expect(page.locator('body')).toBeVisible();
   });
+
+  test('downloadable import templates are served (Pass 1)', async ({ page }) => {
+    for (const name of ['import-template-horizontal.xlsx', 'import-template-vertical.xlsx']) {
+      const response = await page.request.get(`/templates/${name}`);
+      expect(response.status()).toBe(200);
+      // XLSX is a ZIP container — assert the PK magic bytes.
+      const body = await response.body();
+      expect(body.length).toBeGreaterThan(100);
+      expect(body[0]).toBe(0x50); // 'P'
+      expect(body[1]).toBe(0x4b); // 'K'
+    }
+  });
+
+  test('bundled global templates manifest is served and valid (Pass 5)', async ({ page }) => {
+    const response = await page.request.get('/templates/globals/manifest.json');
+    expect(response.status()).toBe(200);
+    const manifest = await response.json();
+    expect(Array.isArray(manifest)).toBe(true);
+    for (const entry of manifest) {
+      expect(typeof entry.name).toBe('string');
+      expect(typeof entry.file).toBe('string');
+    }
+  });
+
+  test('template gallery survives a corrupt bundled-globals manifest', async ({ page }) => {
+    // Demo mode flag (localStorage key from features/demo/demoConstants.ts) so the
+    // gallery reads browser storage instead of the auth-gated API.
+    await page.addInitScript(() => {
+      window.localStorage.setItem('ecards:demo:enabled', '1');
+    });
+    // Corrupt manifest: the bundled loader must skip it with a console warning,
+    // never break the gallery.
+    await page.route('**/templates/globals/manifest.json', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{corrupt-json' })
+    );
+
+    // /template-textile/test-colors renders the full designer without ProtectedRoute.
+    const response = await page.goto('/template-textile/test-colors');
+    expect(response?.status()).toBeLessThan(500);
+
+    await page.getByTitle('Open Template', { exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Open Template' })).toBeVisible();
+    // Loading finishes and the gallery renders content or the empty state —
+    // crucially, not the error banner caused by the corrupt manifest.
+    await expect(page.getByText('Loading templates...')).toBeHidden({ timeout: 15000 });
+    await expect(page.getByText(/Failed to load templates/)).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+  });
 });

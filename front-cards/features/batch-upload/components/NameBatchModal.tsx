@@ -8,6 +8,8 @@ interface NameBatchModalProps {
   sourceLabel?: string;
   onClose: () => void;
   onConfirm: (batchFileName: string) => Promise<void>;
+  /** Pass 3: opens the field-mapping modal instead of uploading right away. */
+  onAdjustMapping?: (batchFileName: string) => void;
 }
 
 /**
@@ -20,6 +22,7 @@ export function NameBatchModal({
   sourceLabel,
   onClose,
   onConfirm,
+  onAdjustMapping,
 }: NameBatchModalProps) {
   const [batchName, setBatchName] = useState(suggestedName);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -111,6 +114,16 @@ export function NameBatchModal({
             >
               Cancel
             </button>
+            {onAdjustMapping && (
+              <button
+                type="button"
+                onClick={() => onAdjustMapping(batchName)}
+                disabled={isSubmitting}
+                className="rounded-md border border-slate-600 bg-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Adjust mapping
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void handleConfirm()}

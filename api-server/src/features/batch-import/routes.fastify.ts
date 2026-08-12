@@ -1,5 +1,6 @@
-import { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { batchImportService } from './services/batchImportService';
+import { FieldMappingValidationError } from './services/fieldMapping';
 import { BatchImportError } from './types';
 import type { AuthenticatedUser } from '../../core/middleware/authMiddleware';
 
@@ -7,7 +8,124 @@ interface AuthenticatedRequest extends FastifyRequest {
   user?: AuthenticatedUser;
 }
 
+/** Map known domain errors onto HTTP responses (shared by all handlers below). */
+function handleRouteError(error: unknown, reply: FastifyReply) {
+  if (error instanceof BatchImportError) {
+    return reply.code(error.statusCode).send({
+      error: error.message,
+      code: error.code,
+    });
+  }
+  if (error instanceof FieldMappingValidationError) {
+    return reply.code(400).send({
+      error: error.message,
+      code: 'INVALID_MAPPING',
+    });
+  }
+  throw error;
+}
+
 const batchImportRoutes: FastifyPluginAsync = async (fastify) => {
+  // Preview an uploaded file's columns BEFORE a batch exists (Pass 3): runs the
+  // Python parser's --inspect mode and suggests a saved preset on signature match.
+  fastify.post('/preview', async (request, reply) => {
+    try {
+      if (!request.user) {
+        throw new BatchImportError(
+          'Authentication required',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      let fileName: string | null = null;
+      let buffer: Buffer | null = null;
+      for await (const part of request.parts()) {
+        if (part.type === 'file') {
+          buffer = await part.toBuffer();
+          fileName = part.filename;
+        }
+      }
+
+      if (!buffer || !fileName) {
+        throw new BatchImportError('No file provided', 'NO_FILE', 400);
+      }
+
+      const preview = await batchImportService.previewFile(
+        request.user.id,
+        fileName,
+        buffer
+      );
+
+      return reply.send({ success: true, data: preview });
+    } catch (error) {
+      return handleRouteError(error, reply);
+    }
+  });
+
+  // List the caller's saved mapping presets (strictly per-user)
+  fastify.get('/mappings/presets', async (request, reply) => {
+    try {
+      if (!request.user) {
+        throw new BatchImportError(
+          'Authentication required',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      const presets = await batchImportService.listPresets(request.user.id);
+      return reply.send({ success: true, data: presets });
+    } catch (error) {
+      return handleRouteError(error, reply);
+    }
+  });
+
+  // Save a mapping preset (signature computed server-side from source columns)
+  fastify.post<{
+    Body: { name?: string; mapping?: unknown };
+  }>('/mappings/presets', async (request, reply) => {
+    try {
+      if (!request.user) {
+        throw new BatchImportError(
+          'Authentication required',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      const { name, mapping } = request.body ?? {};
+      const preset = await batchImportService.createPreset(
+        request.user.id,
+        name ?? '',
+        mapping
+      );
+      return reply.code(201).send({ success: true, data: preset });
+    } catch (error) {
+      return handleRouteError(error, reply);
+    }
+  });
+
+  // Delete one of the caller's presets
+  fastify.delete<{
+    Params: { id: string };
+  }>('/mappings/presets/:id', async (request, reply) => {
+    try {
+      if (!request.user) {
+        throw new BatchImportError(
+          'Authentication required',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      await batchImportService.deletePreset(request.user.id, request.params.id);
+      return reply.code(204).send();
+    } catch (error) {
+      return handleRouteError(error, reply);
+    }
+  });
+
   // Import a batch file (initiate processing)
   fastify.post<{
     Params: { id: string };

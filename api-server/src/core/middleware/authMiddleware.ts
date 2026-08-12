@@ -39,6 +39,12 @@ export interface AuthenticatedUser {
   /** Resolved batch record cap for import/view/export; -1 = unlimited */
   batchRecordLimit: number;
   batchRecordLimitUnlimited: boolean;
+  /**
+   * tools-dashboard client-app roles from the access-token JWT `app_roles`
+   * claim ([] when absent). Fast path for UI/rendering decisions only —
+   * elevated actions must re-validate via `requireAppRole` (validate-token).
+   */
+  roles: string[];
 }
 
 declare module 'fastify' {
@@ -97,6 +103,34 @@ function getAccessToken(request: FastifyRequest): string | undefined {
   return fromCookie;
 }
 
+/**
+ * Exported for role-gating middleware (requireAppRole) — same extraction
+ * rules as the auth middlewares above.
+ */
+export function extractAccessToken(request: FastifyRequest): string | undefined {
+  return getAccessToken(request);
+}
+
+/**
+ * Decode the `app_roles` claim from a JWT access token payload.
+ * No signature verification: the userinfo call in fetchAndCacheUser has
+ * already established token validity — this is only the fast "rendering"
+ * path. Authoritative role checks (requireAppRole) use validate-token.
+ * Malformed tokens, missing claims, and non-array values all yield [].
+ */
+export function decodeAppRolesFromToken(accessToken: string): string[] {
+  const parts = accessToken.split('.');
+  if (parts.length < 2) return [];
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+    const roles = payload?.app_roles;
+    if (!Array.isArray(roles)) return [];
+    return roles.filter((r): r is string => typeof r === 'string');
+  } catch {
+    return [];
+  }
+}
+
 // ─── Core auth logic ────────────────────────────────────────────
 
 async function fetchAndCacheUser(accessToken: string): Promise<AuthenticatedUser | null> {
@@ -128,6 +162,7 @@ async function fetchAndCacheUser(accessToken: string): Promise<AuthenticatedUser
       oauthId: userData.id?.toString(),
       batchRecordLimit: resolvedLimit.limit,
       batchRecordLimitUnlimited: resolvedLimit.unlimited,
+      roles: decodeAppRolesFromToken(accessToken),
     };
 
     setCachedUser(accessToken, user);

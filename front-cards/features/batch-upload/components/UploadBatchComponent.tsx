@@ -9,13 +9,19 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { BatchStatusTracker } from './BatchStatusTracker';
 import { NameBatchModal } from './NameBatchModal';
+import { FieldMappingModal } from './FieldMappingModal';
 import { useProjects } from '@/features/simple-projects';
 import {
   batchFileExtension,
   fileWithDisplayName,
   suggestBatchFileName,
 } from '../utils/batchNaming';
-import type { BatchUploadResponse, FileValidationError } from '../types';
+import type {
+  BatchUploadResponse,
+  FieldMappingEntry,
+  FileValidationError,
+  MappingPreview,
+} from '../types';
 
 export interface UploadBatchComponentProps {
   className?: string;
@@ -29,6 +35,11 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [suggestedBatchName, setSuggestedBatchName] = useState('');
   const [showNameModal, setShowNameModal] = useState(false);
+  // Pass 3: column-mapping preview + modal state
+  const [mappingPreview, setMappingPreview] = useState<MappingPreview | null>(null);
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; name: string } | null>(null);
+  const previewRef = useRef<Promise<MappingPreview | null> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
@@ -106,12 +117,23 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       }
 
       setValidationError(null);
+      // Kick off the column-mapping preview (Pass 3) while the user names the
+      // batch; a preview failure never blocks the upload flow.
+      previewRef.current = (async () => {
+        try {
+          const { batchService } = await import('../services/batchService');
+          return await batchService.previewBatchFile(file);
+        } catch (previewError) {
+          console.warn('[UploadBatch] Preview failed; continuing without mapping:', previewError);
+          return null;
+        }
+      })();
       void promptBatchName(file);
     },
     [validateFile, promptBatchName]
   );
 
-  const uploadFile = async (file: File, displayFileName: string) => {
+  const uploadFile = async (file: File, displayFileName: string, mapping?: FieldMappingEntry[]) => {
     setIsUploading(true);
     setValidationError(null);
 
@@ -128,7 +150,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       }
 
       const namedFile = fileWithDisplayName(file, displayFileName);
-      const response = await batchService.uploadBatch(namedFile, projectId, project.name);
+      const response = await batchService.uploadBatch(namedFile, projectId, project.name, mapping);
 
       setUploadedBatch(response);
       if (fileInputRef.current) {
@@ -151,9 +173,69 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       throw new Error('No batch file selected');
     }
     const finalName = finalizeBatchFileName(batchFileName, pendingFile);
-    await uploadFile(pendingFile, finalName);
+    const file = pendingFile;
+    const preview = (await previewRef.current) ?? null;
+    setMappingPreview(preview);
     setPendingFile(null);
     setSuggestedBatchName('');
+    // Auto-open the mapping modal only when some column has no auto-match;
+    // fully auto-mapped files upload straight away (happy path unblocked).
+    if (preview && preview.columns.some((c) => c.confidence === 'none')) {
+      setPendingUpload({ file, name: finalName });
+      setShowMappingModal(true);
+      return;
+    }
+    await uploadFile(file, finalName);
+  };
+
+  // "Adjust mapping" in the name modal: always available, even when every
+  // column auto-mapped.
+  const handleAdjustMapping = async (batchFileName: string) => {
+    if (!pendingFile) return;
+    const finalName = finalizeBatchFileName(batchFileName, pendingFile);
+    const file = pendingFile;
+    const preview = (await previewRef.current) ?? null;
+    setPendingFile(null);
+    setSuggestedBatchName('');
+    if (!preview) {
+      // No analysis available — proceed without a mapping rather than blocking.
+      await uploadFile(file, finalName);
+      return;
+    }
+    setMappingPreview(preview);
+    setPendingUpload({ file, name: finalName });
+    setShowNameModal(false);
+    setShowMappingModal(true);
+  };
+
+  const handleConfirmMapping = async (mapping: FieldMappingEntry[], savePresetName?: string) => {
+    if (!pendingUpload) {
+      throw new Error('No pending upload');
+    }
+    if (savePresetName) {
+      try {
+        const { batchService } = await import('../services/batchService');
+        await batchService.saveMappingPreset(savePresetName, mapping);
+      } catch (error) {
+        // A preset-save failure must not lose the upload — the mapping itself
+        // is already applied to this batch.
+        console.warn('[UploadBatch] Could not save mapping preset:', error);
+      }
+    }
+    await uploadFile(pendingUpload.file, pendingUpload.name, mapping);
+    setPendingUpload(null);
+    setMappingPreview(null);
+  };
+
+  const handleCloseMappingModal = () => {
+    if (isUploading) return;
+    setShowMappingModal(false);
+    setPendingUpload(null);
+    setMappingPreview(null);
+    previewRef.current = null;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleCloseNameModal = () => {
@@ -161,6 +243,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     setShowNameModal(false);
     setPendingFile(null);
     setSuggestedBatchName('');
+    previewRef.current = null;
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -222,7 +305,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   );
 
   const handleClick = () => {
-    if (!isDisabled && !isUploading && !showNameModal) {
+    if (!isDisabled && !isUploading && !showNameModal && !showMappingModal) {
       fileInputRef.current?.click();
     }
   };
@@ -231,7 +314,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     async (e: React.ClipboardEvent) => {
       e.preventDefault();
 
-      if (isDisabled || isUploading || showNameModal) return;
+      if (isDisabled || isUploading || showNameModal || showMappingModal) return;
 
       const clipboardData = e.clipboardData;
       const files = clipboardData.files;
@@ -247,12 +330,12 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         handleFile(file);
       }
     },
-    [handleFile, isDisabled, isUploading, showNameModal]
+    [handleFile, isDisabled, isUploading, showNameModal, showMappingModal]
   );
 
   React.useEffect(() => {
     const container = containerRef.current;
-    if (!container || isDisabled || isUploading || showNameModal) return;
+    if (!container || isDisabled || isUploading || showNameModal || showMappingModal) return;
 
     let isHovering = false;
 
@@ -295,7 +378,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       container.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('paste', handleDocumentPaste);
     };
-  }, [handleFile, isDisabled, isUploading, showNameModal]);
+  }, [handleFile, isDisabled, isUploading, showNameModal, showMappingModal]);
 
   const getButtonClasses = () => {
     const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200';
@@ -335,7 +418,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         className="hidden"
         accept={ALLOWED_EXTENSIONS.join(',')}
         onChange={handleFileSelect}
-        disabled={isDisabled || isUploading || showNameModal}
+        disabled={isDisabled || isUploading || showNameModal || showMappingModal}
       />
 
       <NameBatchModal
@@ -344,7 +427,19 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         sourceLabel={pendingFile?.name}
         onClose={handleCloseNameModal}
         onConfirm={handleConfirmBatchName}
+        onAdjustMapping={(name) => void handleAdjustMapping(name)}
       />
+
+      {mappingPreview && (
+        <FieldMappingModal
+          isOpen={showMappingModal}
+          columns={mappingPreview.columns}
+          targetFields={mappingPreview.targetFields}
+          suggestedPreset={mappingPreview.suggestedPreset}
+          onClose={handleCloseMappingModal}
+          onConfirm={handleConfirmMapping}
+        />
+      )}
 
       <div
         className={getButtonClasses()}
@@ -394,6 +489,24 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
             style={{ pointerEvents: 'none' }}
           />
         )}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2 text-xs">
+        <a
+          href="/templates/import-template-horizontal.xlsx"
+          download
+          className="text-blue-600 hover:text-blue-800 hover:underline"
+        >
+          Download template (rows)
+        </a>
+        <span className="text-gray-300">|</span>
+        <a
+          href="/templates/import-template-vertical.xlsx"
+          download
+          className="text-blue-600 hover:text-blue-800 hover:underline"
+        >
+          Download template (columns)
+        </a>
       </div>
 
       {validationError && (

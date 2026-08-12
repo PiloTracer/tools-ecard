@@ -19,6 +19,10 @@ interface TemplateState {
   lastSavedAt: Date | null;
   hasUnsavedChanges: boolean;
 
+  // Pass 4: set when the open document was opened from a template — Save then
+  // forks a new design instead of overwriting the source template.
+  openedFromTemplate: { id: string; name: string } | null;
+
   // Elements (derived from currentTemplate but kept for convenience)
   elements: TemplateElement[];
 
@@ -45,6 +49,7 @@ interface TemplateState {
   setCanvasSizeUnit: (unit: LengthUnit) => void;
   updateTemplateId: (id: string) => void;
   setSaveMetadata: (projectName: string, templateName: string) => void;
+  setOpenedFromTemplate: (source: { id: string; name: string } | null) => void;
   markAsSaved: () => void;
   markAsChanged: () => void;
 
@@ -83,6 +88,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   currentTemplateName: null,
   lastSavedAt: null,
   hasUnsavedChanges: false,
+  openedFromTemplate: null,
   elements: [],
   canvasWidth: DEFAULT_CANVAS_WIDTH,
   canvasHeight: DEFAULT_CANVAS_HEIGHT,
@@ -114,6 +120,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       canvasHeight: height,
       exportWidth: width >= DEFAULT_EXPORT_WIDTH ? width : DEFAULT_EXPORT_WIDTH,
       canvasSizeUnit: 'px',
+      openedFromTemplate: null, // fresh document — no fork source
       history: [[]],
       historyIndex: 0,
     });
@@ -135,6 +142,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       canvasHeight: template.height,
       exportWidth: template.exportWidth ?? 1920,
       canvasSizeUnit: template.canvasSizeUnit ?? template.exportBaseWidthUnit ?? 'px',
+      // Reset fork lineage; callers that open a template re-set it via setOpenedFromTemplate.
+      openedFromTemplate: null,
       history: [JSON.parse(JSON.stringify(template.elements))],
       historyIndex: 0,
     });
@@ -225,6 +234,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       ? { ...state.currentTemplate, name: templateName }
       : state.currentTemplate,
   })),
+
+  setOpenedFromTemplate: (source) => set({ openedFromTemplate: source }),
 
   markAsSaved: () => set({
     lastSavedAt: new Date(),

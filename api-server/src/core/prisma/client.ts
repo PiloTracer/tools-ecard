@@ -46,6 +46,7 @@ export const templateOperations = {
     elementCount?: number;
     thumbnailUrl?: string;
     isPublic?: boolean;
+    kind?: string; // 'template' | 'design' — undefined keeps DB default / existing value
     syncStatus?: string;
     version?: number;
   }) {
@@ -78,17 +79,38 @@ export const templateOperations = {
   },
 
   /**
-   * List templates for a user
+   * Get template by ID without owner scoping.
+   * Callers MUST enforce access (owner or isPublic) themselves.
+   */
+  async getTemplateById(id: string) {
+    return prisma.templateMetadata.findFirst({
+      where: { id },
+      include: {
+        resources: true,
+        project: true
+      }
+    });
+  },
+
+  /**
+   * List templates for a user.
+   * includeGlobals=true merges global templates (isPublic) owned by anyone —
+   * used for the gallery so every authenticated user sees globals.
    */
   async listTemplates(
     userId: string,
     projectId?: string,
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
+    kind?: string,
+    includeGlobals: boolean = false
   ) {
     const where = {
-      userId,
-      ...(projectId && { projectId })
+      ...(includeGlobals
+        ? { OR: [{ userId }, { isPublic: true }] }
+        : { userId }),
+      ...(projectId && { projectId }),
+      ...(kind && { kind })
     };
 
     const [templates, total] = await Promise.all([

@@ -24,4 +24,14 @@ describe('normalizeOAuthUser', () => {
   it('returns null for signed-out payload', () => {
     expect(normalizeOAuthUser({ authenticated: false })).toBeNull();
   });
+
+  it('passes through string roles, drops non-array roles (Pass 5)', () => {
+    expect(
+      normalizeOAuthUser({ id: 'u1', email: 'a@b.c', roles: ['appsuper', 'appglobal'] })?.roles
+    ).toEqual(['appsuper', 'appglobal']);
+    expect(normalizeOAuthUser({ id: 'u1', email: 'a@b.c', roles: 'appsuper' })?.roles).toBeUndefined();
+    expect(normalizeOAuthUser({ id: 'u1', email: 'a@b.c', roles: ['appsuper', 7] })?.roles).toEqual([
+      'appsuper',
+    ]);
+  });
 });

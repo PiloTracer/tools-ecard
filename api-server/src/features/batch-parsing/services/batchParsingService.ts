@@ -6,6 +6,7 @@
 
 import { spawn } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { appConfig } from '../../../core/config';
 import { createLogger } from '../../../core/utils/logger';
@@ -27,6 +28,15 @@ function resolveBatchParsingPath(filename: string): string {
   return path.join(process.cwd(), 'batch-parsing', filename);
 }
 
+// Exported for the batch-import mapping helpers (canonical snapshot lookup).
+export { resolveBatchParsingPath };
+
+/** Minimal structural shape of an explicit field-mapping entry (Pass 3). */
+export interface ExplicitFieldMapping {
+  sourceColumn: string;
+  targetField: string;
+}
+
 export interface BatchParsingOptions {
   batchId: string;
   filePath: string;
@@ -35,12 +45,16 @@ export interface BatchParsingOptions {
   defaultCountryCode?: string;   // e.g., "+(506)" for Costa Rica
   /** Max records to import; -1 = unlimited */
   maxRecords?: number;
+  /** Explicit user field mapping (Pass 3); consulted by the parser before auto-mapping */
+  mapping?: ExplicitFieldMapping[];
 }
 
 export interface BatchParsingResult {
   success: boolean;
   records_total?: number;
   records_processed?: number;
+  /** Headers no mapping pass claimed; values are kept in each record's `extra` map. */
+  unmapped_columns?: string[];
   error?: string;
 }
 
@@ -69,7 +83,7 @@ export class BatchParsingService {
    * Spawns a child process and waits for completion
    */
   async parseBatch(options: BatchParsingOptions): Promise<BatchParsingResult> {
-    const { batchId, filePath, verbose = false, workPhonePrefix, defaultCountryCode, maxRecords } = options;
+    const { batchId, filePath, verbose = false, workPhonePrefix, defaultCountryCode, maxRecords, mapping } = options;
 
     return new Promise((resolve, reject) => {
       // Determine storage mode from environment
@@ -84,6 +98,26 @@ export class BatchParsingService {
         '--cassandra-keyspace', this.cassandraKeyspace,
         '--storage-mode', storageMode
       ];
+
+      // Explicit user mapping (Pass 3): written to a temp JSON file the Python
+      // parser validates and consults before its auto-mapping passes.
+      let mappingTempPath: string | null = null;
+      if (mapping && mapping.length > 0) {
+        mappingTempPath = path.join(
+          os.tmpdir(),
+          `batch-mapping-${batchId}-${Date.now()}.json`
+        );
+        fs.writeFileSync(
+          mappingTempPath,
+          JSON.stringify({
+            mappings: mapping.map((m) => ({
+              source_column: m.sourceColumn,
+              target_field: m.targetField,
+            })),
+          })
+        );
+        args.push('--mapping', mappingTempPath);
+      }
 
       // Add phone formatting configuration if provided
       if (workPhonePrefix) {
@@ -137,6 +171,9 @@ export class BatchParsingService {
 
       // Handle process completion
       pythonProcess.on('close', (code) => {
+        if (mappingTempPath) {
+          fs.promises.unlink(mappingTempPath).catch(() => undefined);
+        }
         if (code === 0) {
           // Success - parse JSON result from stdout
           try {
@@ -181,6 +218,49 @@ export class BatchParsingService {
       pythonProcess.on('error', (error) => {
         log.error({ error, batchId }, 'Failed to start Python process');
         reject(new Error(`Failed to start Python parser: ${error.message}`));
+      });
+    });
+  }
+
+  /**
+   * Inspect a LOCAL file's columns via the Python parser's --inspect mode
+   * (Pass 3 preview): per-column auto-mapping + sample values, no DB access.
+   * Single source of truth for header scoring — the TS side never reimplements it.
+   */
+  async inspectFile(localFilePath: string): Promise<Record<string, unknown>> {
+    return new Promise((resolve, reject) => {
+      const args = [this.parserScriptPath, '--inspect', '--file-path', localFilePath];
+
+      const pythonProcess = spawn(this.pythonPath, args, {
+        cwd: path.dirname(this.parserScriptPath),
+        env: { ...process.env },
+      });
+
+      let stdoutData = '';
+      let stderrData = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+      });
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+      });
+
+      pythonProcess.on('close', (code) => {
+        try {
+          const lines = stdoutData.trim().split('\n');
+          const result = JSON.parse(lines[lines.length - 1]) as Record<string, unknown>;
+          resolve(result);
+        } catch {
+          resolve({
+            success: false,
+            error: stderrData || `Python inspect exited with code ${code}`,
+          });
+        }
+      });
+
+      pythonProcess.on('error', (error) => {
+        reject(new Error(`Failed to start Python inspect: ${error.message}`));
       });
     });
   }

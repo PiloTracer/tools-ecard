@@ -1,5 +1,8 @@
 import { prisma } from '../../../core/prisma/client';
-import { BatchStatus } from '@prisma/client';
+import { BatchStatus, Prisma } from '@prisma/client';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
   BatchImportRequest,
   BatchImportResponse,
@@ -7,7 +10,16 @@ import {
   ParsedRecord,
   ImportError,
   FieldMapping,
+  ColumnAnalysis,
+  FieldMappingPresetDto,
+  InspectColumnsResult,
 } from '../types';
+import { batchParsingService } from '../../batch-parsing/services/batchParsingService';
+import {
+  computeMappingSignature,
+  getCanonicalTargetFields,
+  validateFieldMappings,
+} from './fieldMapping';
 
 // Common field name patterns for auto-detection
 const FIELD_PATTERNS: Record<string, string[]> = {
@@ -181,6 +193,135 @@ export class BatchImportService {
       { sourceColumn: 'Mobile Phone', targetField: 'mobilePhone', confidence: 0.90 },
       { sourceColumn: 'Business', targetField: 'businessName', confidence: 0.85 },
     ];
+  }
+
+  // --- Pass 3: preview (column inspection) + saved mapping presets ---
+
+  /**
+   * Inspect an uploaded file's columns via the Python parser's --inspect mode:
+   * per-column auto-mapping (alias/canonical/fuzzy/none) + sample values, plus
+   * the canonical target-field list and a suggested preset when the file's
+   * header signature matches one the user saved before.
+   */
+  async previewFile(
+    userId: string,
+    fileName: string,
+    buffer: Buffer
+  ): Promise<{
+    fileName: string;
+    rowsTotal: number;
+    columns: ColumnAnalysis[];
+    targetFields: ReturnType<typeof getCanonicalTargetFields>;
+    suggestedPreset: FieldMappingPresetDto | null;
+  }> {
+    const ext = path.extname(fileName || '').toLowerCase() || '.csv';
+    const tempPath = path.join(
+      os.tmpdir(),
+      `inspect-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`
+    );
+
+    let inspect: InspectColumnsResult;
+    try {
+      await fs.promises.writeFile(tempPath, buffer);
+      inspect = (await batchParsingService.inspectFile(tempPath)) as unknown as InspectColumnsResult;
+    } finally {
+      await fs.promises.unlink(tempPath).catch(() => undefined);
+    }
+
+    if (!inspect.success || !inspect.columns) {
+      throw new BatchImportError(
+        inspect.error || 'Could not analyze the file',
+        'INSPECT_FAILED',
+        400
+      );
+    }
+
+    const columns: ColumnAnalysis[] = inspect.columns.map((c) => ({
+      sourceColumn: c.source_column,
+      autoField: c.auto_field,
+      confidence: c.confidence,
+      sampleValues: c.sample_values,
+    }));
+
+    const signature = computeMappingSignature(columns.map((c) => c.sourceColumn));
+    const preset = await prisma.fieldMappingPreset.findFirst({
+      where: { userId, signature },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return {
+      fileName: inspect.file || fileName,
+      rowsTotal: inspect.rows_total ?? 0,
+      columns,
+      targetFields: getCanonicalTargetFields(),
+      suggestedPreset: preset ? this.toPresetDto(preset) : null,
+    };
+  }
+
+  /** List the caller's saved mapping presets (strictly per-user). */
+  async listPresets(userId: string): Promise<FieldMappingPresetDto[]> {
+    const presets = await prisma.fieldMappingPreset.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return presets.map((p) => this.toPresetDto(p));
+  }
+
+  /**
+   * Save a mapping preset. The signature is computed server-side from the
+   * mapping's source columns so it always matches the preview/upload lookup.
+   */
+  async createPreset(
+    userId: string,
+    name: string,
+    mappingInput: unknown
+  ): Promise<FieldMappingPresetDto> {
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName) {
+      throw new BatchImportError('Preset name is required', 'VALIDATION_ERROR', 400);
+    }
+    const mappings = validateFieldMappings(mappingInput);
+    if (mappings.length === 0) {
+      throw new BatchImportError('Preset mapping must not be empty', 'VALIDATION_ERROR', 400);
+    }
+    const signature = computeMappingSignature(mappings.map((m) => m.sourceColumn));
+    const preset = await prisma.fieldMappingPreset.create({
+      data: {
+        userId,
+        name: trimmedName.slice(0, 120),
+        signature,
+        mapping: mappings as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return this.toPresetDto(preset);
+  }
+
+  /** Delete one of the caller's presets (404 when owned by someone else). */
+  async deletePreset(userId: string, presetId: string): Promise<void> {
+    const result = await prisma.fieldMappingPreset.deleteMany({
+      where: { id: presetId, userId },
+    });
+    if (result.count === 0) {
+      throw new BatchImportError('Preset not found', 'NOT_FOUND', 404);
+    }
+  }
+
+  private toPresetDto(preset: {
+    id: string;
+    name: string;
+    signature: string;
+    mapping: unknown;
+    createdAt: Date;
+    updatedAt: Date;
+  }): FieldMappingPresetDto {
+    return {
+      id: preset.id,
+      name: preset.name,
+      signature: preset.signature,
+      mapping: (preset.mapping as FieldMapping[]) ?? [],
+      createdAt: preset.createdAt,
+      updatedAt: preset.updatedAt,
+    };
   }
 
   // --- Private helpers ---

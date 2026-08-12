@@ -6,7 +6,15 @@ module.exports = {
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
+    // diagnostics.exclude: unifiedTemplateStorageService.ts carries 2 PRE-EXISTING
+    // tsc errors at HEAD (TS2367/TS2322 — known, deliberately unfixed). ts-jest
+    // reports them as suite failures, which would make any suite importing that
+    // module unrunnable. Excluded here so its behavior can be tested; `tsc
+    // --noEmit` still reports the errors as before.
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.test.json',
+      diagnostics: { exclude: ['**/unifiedTemplateStorageService.ts'] },
+    }],
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
   moduleNameMapper: {

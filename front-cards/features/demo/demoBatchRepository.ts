@@ -9,6 +9,7 @@ import {
   type BatchUploadResponse,
   type BatchStatusResponse,
   type ListBatchesResponse,
+  type FieldMappingEntry,
 } from '@/features/batch-upload/types';
 import { demoStore, newDemoId } from './demoStore';
 import type { Project } from '@/features/simple-projects/types';
@@ -47,7 +48,12 @@ function toBatch(b: DemoBatchRecord): Batch {
 }
 
 export const demoBatchRepository = {
-  async uploadBatch(file: File, projectId: string, projectName: string): Promise<BatchUploadResponse> {
+  async uploadBatch(
+    file: File,
+    projectId: string,
+    projectName: string,
+    mapping?: FieldMappingEntry[]
+  ): Promise<BatchUploadResponse> {
     const id = newDemoId('batch');
     const now = new Date().toISOString();
     const projects = demoStore.getProjects<Project>();
@@ -62,7 +68,10 @@ export const demoBatchRepository = {
     const totalRecords = dataRows.length;
 
     const records = dataRows.map((cols, i) => {
-      const fields = mapRowToContactFields(table.headers, cols, { workPhonePrefix });
+      const fields = mapRowToContactFields(table.headers, cols, {
+        workPhonePrefix,
+        explicitMapping: mapping,
+      });
       return {
         id: newDemoId('rec'),
         batchId: id,

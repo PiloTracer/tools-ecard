@@ -9,6 +9,7 @@ import {
   BatchUploadError,
   BatchProcessingJob,
 } from '../types';
+import type { FieldMapping } from '../../batch-import/types';
 import { batchRepository } from '../repositories/batchRepository';
 import { storageService } from './storageService';
 import { queueService } from './queueService';
@@ -18,7 +19,7 @@ import { resolveServerBatchRecordLimit } from '../../../core/limits/batchRecordL
 
 export class BatchUploadService {
   async uploadBatch(request: BatchUploadRequest): Promise<BatchUploadResponse> {
-    const { file, userId, userEmail, projectId, projectName } = request;
+    const { file, userId, userEmail, projectId, projectName, mapping } = request;
     // Caller (authenticated Fastify route) passes the per-user resolved limit;
     // legacy/anonymous paths omit it. Always fall back to server env/fallback so
     // the limit is never silently undefined (= unlimited) downstream.
@@ -38,7 +39,8 @@ export class BatchUploadService {
       // 2. Upload file to storage (SeaweedFS or local) - use projectId for consistent paths
       const uploadResult = await storageService.uploadBatchFile(file, userEmail, projectId);
 
-      // 3. Create batch record in database
+      // 3. Create batch record in database (persisting the explicit mapping, if
+      // any, so a later retry re-applies it)
       const batch = await batchRepository.create({
         userId,
         userEmail,
@@ -48,6 +50,7 @@ export class BatchUploadService {
         fileSize: file.size,
         filePath: uploadResult.filePath,
         status: BatchStatus.UPLOADED,
+        fieldMapping: mapping,
       });
 
       // 4. Enqueue async job for batch parsing with phone config
@@ -58,6 +61,7 @@ export class BatchUploadService {
         batchRecordLimit,
         workPhonePrefix: project?.workPhonePrefix ?? undefined,
         defaultCountryCode: project?.defaultCountryCode ?? undefined,
+        mapping,
       };
 
       await queueService.enqueueBatchParsing(job);
@@ -244,7 +248,8 @@ export class BatchUploadService {
     // Update status to UPLOADED
     await batchRepository.updateStatus(batch.id, BatchStatus.UPLOADED);
 
-    // Re-enqueue for processing with phone config
+    // Re-enqueue for processing with phone config. The explicit field mapping
+    // saved at upload time (Pass 3) is re-applied on retry.
     const job: BatchProcessingJob = {
       batchId: batch.id,
       filePath: batch.filePath,
@@ -252,6 +257,7 @@ export class BatchUploadService {
       batchRecordLimit: resolvedLimit,
       workPhonePrefix: project?.workPhonePrefix ?? undefined,
       defaultCountryCode: project?.defaultCountryCode ?? undefined,
+      mapping: (batch.fieldMapping as unknown as FieldMapping[] | null) ?? undefined,
     };
 
     await queueService.enqueueBatchParsing(job);

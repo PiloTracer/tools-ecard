@@ -80,6 +80,12 @@ export interface ShapeElement extends BaseElement {
 
 export type TemplateElement = TextElement | ImageElement | QRElement | ShapeElement;
 
+/**
+ * Saved-item kind (Pass 4): 'template' = reusable starting point (opening it and
+ * saving forks a new design), 'design' = a card design (saves in place).
+ */
+export type TemplateKind = 'template' | 'design';
+
 export interface Template {
   id: string;
   name: string;

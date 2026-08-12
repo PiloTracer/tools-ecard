@@ -78,6 +78,49 @@ export interface FileValidationError {
   message: string;
 }
 
+// --- Pass 3: user-defined field mapping ---
+
+export type MappingConfidence = 'alias' | 'canonical' | 'fuzzy' | 'none';
+
+/** Explicit mapping target sending the column to the record's extra data verbatim. */
+export const MAPPING_IGNORE_TARGET = 'ignore';
+
+export interface FieldMappingEntry {
+  sourceColumn: string;
+  /** Canonical snake_case field id, or MAPPING_IGNORE_TARGET */
+  targetField: string;
+}
+
+export interface ColumnMappingAnalysis {
+  sourceColumn: string;
+  /** Canonical snake_case field id when auto-mapped, else null */
+  autoField: string | null;
+  confidence: MappingConfidence;
+  sampleValues: string[];
+}
+
+export interface CanonicalTargetField {
+  id: string;
+  labelEn: string;
+  labelEs: string;
+  category: string;
+}
+
+export interface FieldMappingPreset {
+  id: string;
+  name: string;
+  signature: string;
+  mapping: FieldMappingEntry[];
+}
+
+export interface MappingPreview {
+  fileName: string;
+  rowsTotal: number;
+  columns: ColumnMappingAnalysis[];
+  targetFields: CanonicalTargetField[];
+  suggestedPreset: FieldMappingPreset | null;
+}
+
 export const ALLOWED_FILE_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
 export const MAX_FILE_SIZE_MB = 10;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;

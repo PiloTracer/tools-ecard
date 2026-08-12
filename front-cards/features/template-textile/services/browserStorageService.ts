@@ -3,6 +3,8 @@
  * IndexedDB wrapper for resource caching and offline template storage
  */
 
+import type { TemplateKind } from '../types';
+
 const DB_NAME = 'template-textile-storage';
 const DB_VERSION = 1;
 const RESOURCE_STORE = 'resources';
@@ -23,6 +25,8 @@ export interface CachedTemplate {
   resources: string[];
   timestamp: number;
   userId?: string;
+  // Pass 4: absent in entries cached before kind existed ⇒ treated as 'design'.
+  kind?: TemplateKind;
 }
 
 class BrowserStorageService {

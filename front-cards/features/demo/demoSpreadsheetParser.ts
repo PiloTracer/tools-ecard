@@ -6,6 +6,7 @@
 import JSZip from 'jszip';
 import { decodeXmlEntities } from '../../shared/lib/decodeXmlEntities';
 import { capitalizeName, DEMO_PERSON_NAME_KEYS } from './nameCapitalize';
+import { snakeToCamel, camelToSnake } from '../batch-upload/utils/mappingSignature';
 
 export type DemoParsedTable = {
   headers: string[];
@@ -46,7 +47,7 @@ export type DemoContactFields = {
   personalBirthday?: string | null;
 };
 
-const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
+export const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
   first_name: 'firstName',
   firstname: 'firstName',
   first: 'firstName',
@@ -310,6 +311,63 @@ export function findHeaderRowIndex(matrix: string[][]): number {
   return bestScore > 0 ? bestIdx : 0;
 }
 
+/**
+ * Count cells that look like known field headers (mirrors api-server
+ * FileParser._header_match_count): exact alias hit or substring containment
+ * against any known header keyword.
+ */
+function headerMatchCount(cells: string[]): number {
+  let count = 0;
+  for (const cell of cells) {
+    const key = normalizeHeaderKey(cell);
+    if (!key) continue;
+    if (
+      HEADER_ALIASES[key] ||
+      HEADER_KEYWORDS.some((kw) => key.includes(kw) || kw.includes(key))
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/** Minimum column-A header hits before a sheet is treated as transposed. */
+const TRANSPOSED_MIN_MATCHES = 3;
+
+/**
+ * Detect a transposed layout: headers down column A, one contact per column
+ * B+ (mirrors api-server FileParser._is_transposed_matrix). Chosen only on a
+ * clear margin — column A must score at least TRANSPOSED_MIN_MATCHES header
+ * hits AND strictly more than the best horizontal row; ambiguous sheets keep
+ * the status-quo horizontal parsing.
+ */
+export function isTransposedMatrix(matrix: string[][]): boolean {
+  if (matrix.length === 0) return false;
+  const width = Math.max(...matrix.map((r) => r.length));
+  if (width < 2) return false;
+  const limit = Math.min(20, matrix.length);
+  let horizontal = 0;
+  const columnA: string[] = [];
+  for (let r = 0; r < limit; r++) {
+    horizontal = Math.max(horizontal, headerMatchCount(matrix[r] || []));
+    columnA.push(matrix[r]?.[0] ?? '');
+  }
+  const vertical = headerMatchCount(columnA);
+  return vertical >= TRANSPOSED_MIN_MATCHES && vertical > horizontal;
+}
+
+/** Transpose a cell matrix (headers-in-column-A → headers-in-row-1). */
+export function transposeMatrix(matrix: string[][]): string[][] {
+  const width = Math.max(...matrix.map((r) => r.length));
+  const out: string[][] = [];
+  for (let c = 0; c < width; c++) {
+    const row: string[] = [];
+    for (let r = 0; r < matrix.length; r++) row.push(matrix[r]?.[c] ?? '');
+    out.push(row);
+  }
+  return out;
+}
+
 /** Convert a raw cell matrix into headers + data rows (skips title/preamble rows). */
 export function matrixToTable(matrix: string[][]): DemoParsedTable {
   if (matrix.length === 0) {
@@ -332,8 +390,48 @@ export function matrixToTable(matrix: string[][]): DemoParsedTable {
   return { headers: normalizedHeaders, rows };
 }
 
-/** Drop title/section/header-echo rows that are not real contacts. */
-export function isUsefulDemoContactRow(
+/** Per-column auto-mapping analysis for the field-mapping modal (Pass 3). Same
+ *  shape as the Normal-mode /api/batch-import/preview response columns. */
+export type DemoHeaderAnalysis = {
+  sourceColumn: string;
+  /** Canonical snake_case field id when auto-mapped, else null */
+  autoField: string | null;
+  /** The demo alias table is keyed on canonical-normalized headers, so the
+   *  alias and canonical passes of the Python parser collapse into 'alias'. */
+  confidence: 'alias' | 'canonical' | 'fuzzy' | 'none';
+  sampleValues: string[];
+};
+
+/**
+ * Analyze a parsed table's headers: per column, which field the auto-mapping
+ * would claim (exact alias first, fuzzy fallback second) plus sample values.
+ * Powers the demo-mode field-mapping modal without any server call.
+ */
+export function analyzeHeaders(table: DemoParsedTable, maxSamples = 5): DemoHeaderAnalysis[] {
+  return table.headers.map((header, i) => {
+    const key = normalizeHeaderKey(header);
+    let autoField: keyof DemoContactFields | null = HEADER_ALIASES[key] ?? null;
+    let confidence: DemoHeaderAnalysis['confidence'] = autoField ? 'alias' : 'none';
+    if (!autoField && key) {
+      autoField = findFuzzyFieldMatch(key);
+      if (autoField) confidence = 'fuzzy';
+    }
+    const sampleValues: string[] = [];
+    for (const row of table.rows) {
+      const value = row[i]?.trim();
+      if (value) sampleValues.push(value);
+      if (sampleValues.length >= maxSamples) break;
+    }
+    return {
+      sourceColumn: header,
+      autoField: autoField ? camelToSnake(autoField) : null,
+      confidence,
+      sampleValues,
+    };
+  });
+}
+
+/** Drop title/section/header-echo rows that are not real contacts. */export function isUsefulDemoContactRow(
   headers: string[],
   cols: string[]
 ): boolean {
@@ -717,6 +815,356 @@ function looksLikeEmail(value: string): boolean {
   return v.includes('@') && !/\s/.test(v);
 }
 
+/* ------------------------------------------------------------------------ */
+/* vCard (.vcf) parsing — mirrors api-server file_parser.py _parse_vcf.      */
+/* ------------------------------------------------------------------------ */
+
+/** Column holding one "NAME;PARAMS: value" line per vCard property that has no
+ *  canonical field. The label has no header-alias overlap, so the fuzzy matcher
+ *  never claims it; demo records retain it raw in headers/cols (Normal mode
+ *  lands it in the record `extra` map). */
+const VCF_UNMAPPED_COLUMN = 'vcf_unmapped';
+
+/** Housekeeping properties that carry no contact data and are dropped on purpose. */
+const VCF_IGNORED_PROPERTIES = new Set(['VERSION', 'PRODID', 'REV']);
+
+/** Binary media payloads are never imported; a placeholder line is kept instead. */
+const VCF_MEDIA_PROPERTIES = new Set(['PHOTO', 'LOGO', 'KEY', 'SOUND']);
+
+/** Trailing extension hint inside a phone value, e.g. "+506 2200 0000 ext. 555". */
+const VCF_EXT_SUFFIX_RE = /\s*(?:,|;|\s)\s*(?:ext\.?|extension|x)\s*[:.]?\s*(\d{1,6})\s*$/i;
+
+/** Canonical field order (mirrors api-server data_normalizer.FIELD_MAPPING) so
+ *  both parsers emit identically ordered vcf tables. */
+const VCF_CANONICAL_ORDER = [
+  'first_name',
+  'last_name',
+  'full_name',
+  'email',
+  'work_phone',
+  'work_phone_ext',
+  'mobile_phone',
+  'address_street',
+  'address_city',
+  'address_state',
+  'address_postal',
+  'address_country',
+  'social_instagram',
+  'social_twitter',
+  'social_facebook',
+  'business_name',
+  'business_title',
+  'business_department',
+  'business_url',
+  'business_hours',
+  'business_address_street',
+  'business_address_city',
+  'business_address_state',
+  'business_address_postal',
+  'business_address_country',
+  'business_linkedin',
+  'business_twitter',
+  'personal_url',
+  'personal_bio',
+  'personal_birthday',
+];
+
+type VcfProperty = {
+  name: string;
+  /** Original pre-colon portion (params as written) — used for unmapped lines. */
+  left: string;
+  types: string[];
+  params: Record<string, string>;
+  /** QP-decoded but still text-escaped value. */
+  value: string;
+};
+
+/** Split raw vCard text into logical lines: whitespace-folded continuations
+ *  (3.0/4.0) and quoted-printable soft breaks (2.1, trailing '=') are rejoined. */
+function vcfLogicalLines(text: string): string[] {
+  const lines: string[] = [];
+  for (const raw of text.split(/\r\n|\r|\n/)) {
+    if (raw === '') continue;
+    const last = lines[lines.length - 1];
+    if (lines.length > 0 && (raw[0] === ' ' || raw[0] === '\t')) {
+      lines[lines.length - 1] = last + raw.slice(1);
+    } else if (
+      lines.length > 0 &&
+      last.endsWith('=') &&
+      last.split(':')[0].toUpperCase().includes('QUOTED-PRINTABLE')
+    ) {
+      // 2.1 quoted-printable soft break: the trailing '=' marks the fold and
+      // is not part of the value.
+      lines[lines.length - 1] =
+        last.slice(0, -1) + (raw[0] === ' ' || raw[0] === '\t' ? raw.slice(1) : raw);
+    } else {
+      lines.push(raw);
+    }
+  }
+  return lines;
+}
+
+/** Split on `sep` occurrences not escaped with a backslash (escapes kept). */
+function vcfSplitUnescaped(value: string, sep: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let escaped = false;
+  for (const ch of value) {
+    if (escaped) {
+      current += '\\' + ch;
+      escaped = false;
+    } else if (ch === '\\') {
+      escaped = true;
+    } else if (ch === sep) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (escaped) current += '\\';
+  parts.push(current);
+  return parts;
+}
+
+/** vCard text escapes: \n / \N -> newline; \, \; \\ -> literal char. */
+function vcfUnescape(value: string): string {
+  return value.replace(/\\(.)/g, (_m, ch: string) =>
+    ch === 'n' || ch === 'N' ? '\n' : ch
+  );
+}
+
+/** Decode a QUOTED-PRINTABLE value (vCard 2.1) honouring CHARSET=. */
+function vcfDecodeQuotedPrintable(value: string, charset?: string | null): string {
+  const bytes: number[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (
+      code === 0x3d && // '='
+      i + 2 < value.length &&
+      /^[0-9A-Fa-f]{2}$/.test(value.slice(i + 1, i + 3))
+    ) {
+      bytes.push(parseInt(value.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(code & 0xff);
+    }
+  }
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder((charset || 'utf-8').toLowerCase());
+  } catch {
+    decoder = new TextDecoder('utf-8');
+  }
+  return decoder.decode(new Uint8Array(bytes));
+}
+
+/** Parse one logical vCard line. Supports both 3.0/4.0 params
+ *  (`TEL;TYPE=WORK,CELL:...`) and 2.1 bare tokens (`TEL;WORK;CELL:...`). */
+function vcfParseProperty(line: string): VcfProperty | null {
+  const colon = line.indexOf(':');
+  if (colon < 0) return null;
+  const left = line.slice(0, colon);
+  const rawValue = line.slice(colon + 1);
+  const segments = left.split(';');
+  const name = (segments[0] || '').trim().toUpperCase();
+  if (!name) return null;
+  const types: string[] = [];
+  const params: Record<string, string> = {};
+  let encoding: string | null = null;
+  let charset: string | null = null;
+  for (const segRaw of segments.slice(1)) {
+    const seg = segRaw.trim();
+    if (!seg) continue;
+    const eq = seg.indexOf('=');
+    if (eq >= 0) {
+      const key = seg.slice(0, eq).trim().toUpperCase();
+      const val = seg.slice(eq + 1).trim();
+      if (key === 'TYPE') {
+        for (const t of val.split(',')) {
+          const tt = t.trim().toUpperCase();
+          if (tt) types.push(tt);
+        }
+      } else if (key === 'ENCODING') {
+        encoding = val.toUpperCase();
+      } else if (key === 'CHARSET') {
+        charset = val;
+      } else {
+        params[key] = val;
+      }
+    } else {
+      const token = seg.toUpperCase();
+      if (token === 'QUOTED-PRINTABLE') encoding = 'QUOTED-PRINTABLE';
+      else if (token === 'BASE64' || token === 'B') encoding = 'BASE64';
+      else types.push(token);
+    }
+  }
+  const value =
+    encoding === 'QUOTED-PRINTABLE' ? vcfDecodeQuotedPrintable(rawValue, charset) : rawValue;
+  return { name, left, types, params, value };
+}
+
+function vcfAssignTel(
+  record: Record<string, string>,
+  unmapped: string[],
+  prop: VcfProperty
+): void {
+  let number = vcfUnescape(prop.value).trim();
+  let ext = prop.params['EXT'] || prop.params['X-EXTENSION'] || '';
+  const match = number.match(VCF_EXT_SUFFIX_RE);
+  if (match) {
+    ext = ext || match[1];
+    number = number.slice(0, match.index).replace(/[ ,;]+$/, '');
+  }
+  const types = new Set(prop.types);
+  let target: string | null;
+  if (types.has('CELL')) {
+    target = 'mobile_phone';
+  } else if (types.has('HOME') || types.has('FAX') || types.has('PAGER')) {
+    target = null; // no canonical home/fax field -> unmapped
+  } else {
+    target = 'work_phone'; // WORK, VOICE, or untyped
+  }
+  if (target && number && !(target in record)) {
+    record[target] = number;
+    if (ext && !('work_phone_ext' in record)) record['work_phone_ext'] = ext;
+  } else {
+    unmapped.push(`${prop.left}: ${number}${ext ? ` ext. ${ext}` : ''}`);
+  }
+}
+
+function vcfAssignAdr(
+  record: Record<string, string>,
+  unmapped: string[],
+  prop: VcfProperty
+): void {
+  const parts = vcfSplitUnescaped(prop.value, ';').map((p) => vcfUnescape(p).trim());
+  while (parts.length < 7) parts.push('');
+  const prefix = prop.types.includes('WORK') ? 'business_address' : 'address';
+  const mapping: Record<string, string> = {
+    [`${prefix}_street`]: parts.slice(0, 3).filter(Boolean).join(', '),
+    [`${prefix}_city`]: parts[3],
+    [`${prefix}_state`]: parts[4],
+    [`${prefix}_postal`]: parts[5],
+    [`${prefix}_country`]: parts[6],
+  };
+  let placed = false;
+  for (const [field, val] of Object.entries(mapping)) {
+    if (val && !(field in record)) {
+      record[field] = val;
+      placed = true;
+    }
+  }
+  if (!placed) unmapped.push(`${prop.left}: ${vcfUnescape(prop.value).trim()}`);
+}
+
+/** Map one VCARD's properties onto canonical snake_case field ids. Anything
+ *  without a canonical home is kept as a 'NAME;PARAMS: value' line in the
+ *  vcf_unmapped column (never silently dropped). */
+function vcfCardToRecord(properties: VcfProperty[]): Record<string, string> {
+  const record: Record<string, string> = {};
+  const unmapped: string[] = [];
+
+  const assign = (field: string, value: string): boolean => {
+    const v = (value || '').trim();
+    if (v && !(field in record)) {
+      record[field] = v;
+      return true;
+    }
+    return false;
+  };
+
+  for (const prop of properties) {
+    const { name, left, value } = prop;
+    if (VCF_IGNORED_PROPERTIES.has(name)) continue;
+    if (VCF_MEDIA_PROPERTIES.has(name)) {
+      unmapped.push(`${left}: <media omitted>`);
+      continue;
+    }
+    if (name === 'N') {
+      const parts = vcfSplitUnescaped(value, ';').map((p) => vcfUnescape(p).trim());
+      assign('last_name', parts[0] || '');
+      assign('first_name', [parts[1], parts[2]].filter(Boolean).join(' '));
+    } else if (name === 'FN') {
+      assign('full_name', vcfUnescape(value));
+    } else if (name === 'ORG') {
+      const units = vcfSplitUnescaped(value, ';').map((p) => vcfUnescape(p).trim());
+      assign('business_name', units[0] || '');
+      assign('business_department', units.slice(1).filter(Boolean).join('; '));
+    } else if (name === 'TITLE') {
+      assign('business_title', vcfUnescape(value));
+    } else if (name === 'TEL') {
+      vcfAssignTel(record, unmapped, prop);
+    } else if (name === 'EMAIL') {
+      if (!assign('email', vcfUnescape(value))) {
+        unmapped.push(`${left}: ${vcfUnescape(value).trim()}`);
+      }
+    } else if (name === 'ADR') {
+      vcfAssignAdr(record, unmapped, prop);
+    } else if (name === 'URL') {
+      const target =
+        prop.types.includes('HOME') || prop.types.includes('PERSONAL')
+          ? 'personal_url'
+          : 'business_url';
+      if (!assign(target, vcfUnescape(value))) {
+        unmapped.push(`${left}: ${vcfUnescape(value).trim()}`);
+      }
+    } else if (name === 'NOTE') {
+      if (!assign('personal_bio', vcfUnescape(value))) {
+        unmapped.push(`${left}: ${vcfUnescape(value).trim()}`);
+      }
+    } else if (name === 'BDAY') {
+      if (!assign('personal_birthday', vcfUnescape(value))) {
+        unmapped.push(`${left}: ${vcfUnescape(value).trim()}`);
+      }
+    } else if (name === 'X-EXTENSION') {
+      if (!assign('work_phone_ext', vcfUnescape(value))) {
+        unmapped.push(`${left}: ${vcfUnescape(value).trim()}`);
+      }
+    } else {
+      unmapped.push(`${left}: ${vcfUnescape(value).trim()}`);
+    }
+  }
+
+  if (!('full_name' in record)) {
+    const assembled = [record['first_name'], record['last_name']].filter(Boolean).join(' ');
+    if (assembled) record['full_name'] = assembled;
+  }
+  if (unmapped.length > 0) record[VCF_UNMAPPED_COLUMN] = unmapped.join('\n');
+  return record;
+}
+
+/**
+ * Parse a .vcf file (vCard 2.1/3.0/4.0) into a table with one row per VCARD and
+ * canonical snake_case field ids as headers, so the standard
+ * mapRowToContactFields pipeline applies unchanged. A truncated final card
+ * without END:VCARD is still emitted best-effort.
+ */
+export function parseVcf(text: string): DemoParsedTable {
+  const cards: VcfProperty[][] = [];
+  let current: VcfProperty[] | null = null;
+  for (const line of vcfLogicalLines(text)) {
+    const tag = line.trim().toUpperCase();
+    if (tag === 'BEGIN:VCARD') {
+      current = [];
+    } else if (tag === 'END:VCARD') {
+      if (current) cards.push(current);
+      current = null;
+    } else if (current) {
+      const prop = vcfParseProperty(line);
+      if (prop) current.push(prop);
+    }
+  }
+  if (current && current.length > 0) cards.push(current);
+
+  const records = cards
+    .map(vcfCardToRecord)
+    .filter((r) => Object.keys(r).length > 0);
+  const headers = VCF_CANONICAL_ORDER.filter((k) => records.some((r) => k in r));
+  if (records.some((r) => VCF_UNMAPPED_COLUMN in r)) headers.push(VCF_UNMAPPED_COLUMN);
+  return { headers, rows: records.map((r) => headers.map((h) => r[h] ?? '')) };
+}
+
 function looksLikeWebsite(value: string): boolean {
   const v = value.trim().toLowerCase();
   if (!v || v.includes('@')) return false;
@@ -957,20 +1405,51 @@ async function parseXlsxBuffer(buffer: ArrayBuffer): Promise<DemoParsedTable> {
   }
 
   const matrix = parseSheetRows(await sheetFile.async('string'), sharedStrings);
-  return matrixToTable(matrix);
+  // Transposed sheets (headers down column A, one contact per column B+) are
+  // flipped into the standard row layout before header detection.
+  return matrixToTable(isTransposedMatrix(matrix) ? transposeMatrix(matrix) : matrix);
 }
 
 export function mapRowToContactFields(
   headers: string[],
   cols: string[],
-  options: { allowPositionalFallback?: boolean; workPhonePrefix?: string | null } = {}
+  options: {
+    allowPositionalFallback?: boolean;
+    workPhonePrefix?: string | null;
+    /** Explicit user mapping (Pass 3): snake_case canonical targets or 'ignore';
+     *  consulted before alias/fuzzy auto-mapping. */
+    explicitMapping?: Array<{ sourceColumn: string; targetField: string }>;
+  } = {}
 ): DemoContactFields {
-  const allowPositionalFallback = options.allowPositionalFallback !== false;
+  // An explicit mapping expresses the user's full intent — positional guessing
+  // would contradict it (e.g. an ignored name column must stay unmapped).
+  const allowPositionalFallback =
+    options.allowPositionalFallback !== false && !options.explicitMapping?.length;
+  const explicitByKey = new Map<string, string>();
+  for (const entry of options.explicitMapping ?? []) {
+    const key = normalizeHeaderKey(entry.sourceColumn);
+    if (key) explicitByKey.set(key, entry.targetField);
+  }
   const fields: DemoContactFields = {};
   let mappedFromHeaders = 0;
   const unmatchedHeaderIdx: number[] = [];
   headers.forEach((header, i) => {
-    const key = HEADER_ALIASES[normalizeHeaderKey(header)];
+    const normalizedKey = normalizeHeaderKey(header);
+    const explicitTarget = explicitByKey.get(normalizedKey);
+    if (explicitTarget !== undefined) {
+      // Explicit user mapping wins over every auto pass; 'ignore' claims the
+      // column without mapping it (raw headers/cols stay on the record anyway).
+      if (explicitTarget !== 'ignore') {
+        const key = snakeToCamel(explicitTarget) as keyof DemoContactFields;
+        const value = cols[i]?.trim();
+        if (value) {
+          fields[key] = value;
+          mappedFromHeaders += 1;
+        }
+      }
+      return;
+    }
+    const key = HEADER_ALIASES[normalizedKey];
     if (!key) {
       unmatchedHeaderIdx.push(i);
       return;
@@ -1010,7 +1489,10 @@ export function mapRowToContactFields(
   // for real uploads, the isUsefulDemoContactRow filter — never the header
   // row or pre-header title rows.
   const nameMappedFromHeader = Boolean(fields.fullName || fields.firstName || fields.lastName);
-  if (allowPositionalFallback && !nameMappedFromHeader && cols[0]) {
+  // Never promote an email-shaped first cell to a name — that happens with
+  // vcf-derived tables whose card has no N/FN (headers are canonical ids, so
+  // positional meaning does not apply).
+  if (allowPositionalFallback && !nameMappedFromHeader && cols[0] && !looksLikeEmail(cols[0])) {
     fields.fullName = cols[0];
   }
 
@@ -1083,14 +1565,12 @@ export async function parseDemoSpreadsheetFile(file: File): Promise<DemoParsedTa
     );
   }
 
-  if (ext === '.vcf') {
-    throw new Error(
-      'Demo mode does not parse .vcf yet. Use .csv or .xlsx, or disable Demo mode for full server parsing.'
-    );
-  }
-
   const buffer = await readFileBuffer(file);
   const bytes = new Uint8Array(buffer);
+
+  if (ext === '.vcf') {
+    return parseVcf(new TextDecoder('utf-8').decode(bytes));
+  }
 
   if (ext === '.xlsx' || looksLikeZip(bytes)) {
     try {

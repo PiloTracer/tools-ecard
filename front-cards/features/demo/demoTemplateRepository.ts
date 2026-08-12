@@ -2,7 +2,7 @@
  * Demo template repository — localStorage + IndexedDB via demoStore
  */
 
-import type { Template } from '@/features/template-textile/types';
+import type { Template, TemplateKind } from '@/features/template-textile/types';
 import { demoStore, newDemoId } from './demoStore';
 
 export type DemoStorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
@@ -15,6 +15,7 @@ export interface DemoTemplateMetadata {
   storageMode: DemoStorageMode;
   resourceUrls: string[];
   version: number;
+  kind: TemplateKind;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +23,7 @@ export interface DemoTemplateMetadata {
 export interface DemoSaveTemplateRequest {
   name: string;
   templateData: Template;
+  kind?: TemplateKind;
 }
 
 export interface DemoLoadedTemplate {
@@ -38,6 +40,8 @@ interface DemoTemplateRecord {
   name: string;
   data: Template;
   resources: string[];
+  // Pass 4: absent in records saved before kind existed ⇒ treated as 'design'.
+  kind?: TemplateKind;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,6 +55,7 @@ function toMeta(t: DemoTemplateRecord): DemoTemplateMetadata {
     storageMode: 'LOCAL_ONLY',
     resourceUrls: t.resources,
     version: 1,
+    kind: t.kind === 'template' ? 'template' : 'design',
     createdAt: new Date(t.createdAt),
     updatedAt: new Date(t.updatedAt),
   };
@@ -72,6 +77,7 @@ export const demoTemplateRepository = {
         ...templates[existingIdx],
         name: request.name,
         data: { ...request.templateData, name: request.name },
+        kind: request.kind ?? templates[existingIdx].kind ?? 'design',
         updatedAt: now,
       };
       templates[existingIdx] = updated;
@@ -90,6 +96,7 @@ export const demoTemplateRepository = {
       name: request.name,
       data: { ...request.templateData, id, name: request.name },
       resources: [],
+      kind: request.kind ?? 'design',
       createdAt: now,
       updatedAt: now,
     };
@@ -113,8 +120,9 @@ export const demoTemplateRepository = {
     };
   },
 
-  async listTemplates(): Promise<DemoTemplateMetadata[]> {
-    return demoStore.getTemplates<DemoTemplateRecord>().map(toMeta);
+  async listTemplates(kind?: TemplateKind): Promise<DemoTemplateMetadata[]> {
+    const all = demoStore.getTemplates<DemoTemplateRecord>().map(toMeta);
+    return kind ? all.filter((t) => t.kind === kind) : all;
   },
 
   async deleteTemplate(templateId: string): Promise<void> {

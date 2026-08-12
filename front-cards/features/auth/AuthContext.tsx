@@ -15,6 +15,7 @@ import { OAUTH_CONFIG } from '@/shared/lib/oauth-config';
 import { isDemoMode, exitDemoMode } from '@/features/demo/isDemoMode';
 import { bindDemoStoreToOAuthUser } from '@/features/demo/demoStore';
 import { normalizeOAuthUser } from '@/shared/lib/normalizeOAuthUser';
+import { canManageGlobalTemplates as rolesAllowGlobalTemplates } from '@/shared/lib/appRoles';
 
 function userFromAuthUserBody(data: unknown): User | null {
   return normalizeOAuthUser(data);
@@ -164,11 +165,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [pathname, checkAuth]);
 
+  const roles = user?.roles ?? [];
+
   const value: AuthContextType = {
     isAuthenticated,
     isLoading,
     user,
     error,
+    roles,
+    canManageGlobalTemplates: rolesAllowGlobalTemplates(roles),
     login,
     logout,
     refreshToken,

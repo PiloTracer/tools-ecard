@@ -66,7 +66,7 @@ describe('Batch Upload Validators', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should accept .vcf files', () => {
+    it('should accept .vcf files (vCard import is supported; no route-level rejection)', () => {
       const result = uploadFileSchema.safeParse({
         file: {
           fieldname: 'file',
@@ -74,7 +74,7 @@ describe('Batch Upload Validators', () => {
           encoding: '7bit',
           mimetype: 'text/vcard',
           size: 1024,
-          buffer: Buffer.from('test'),
+          buffer: Buffer.from('BEGIN:VCARD\r\nFN:Jane Doe\r\nEND:VCARD\r\n'),
         },
       });
       expect(result.success).toBe(true);

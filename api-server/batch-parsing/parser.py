@@ -41,6 +41,98 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Explicit-mapping target that sends a column to the record's `extra` map verbatim
+# (user-confirmed "do not import this column as a field").
+IGNORE_TARGET = 'ignore'
+
+
+def load_explicit_mapping(mapping_path: str) -> Dict[str, str]:
+    """Load and validate an explicit user field-mapping JSON file.
+
+    Shape: {"mappings": [{"source_column": "<header>", "target_field": "<id>"}]}
+    where target_field is a canonical field id (FIELD_MAPPING key) or 'ignore'.
+    Returns {canonical_header_key(source_column): target_field}. Unknown target
+    fields are a hard error listing the valid ids — never guess.
+    """
+    with open(mapping_path, 'r', encoding='utf-8') as f:
+        payload = json.load(f)
+    entries = payload.get('mappings') if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("Mapping file must contain a 'mappings' list")
+    valid_targets = sorted(FIELD_MAPPING.keys()) + [IGNORE_TARGET]
+    mapping: Dict[str, str] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("Each mapping entry must be an object")
+        source = str(entry.get('source_column', '')).strip()
+        target = str(entry.get('target_field', '')).strip()
+        if not source or not target:
+            raise ValueError("Each mapping entry needs source_column and target_field")
+        if target not in FIELD_MAPPING and target != IGNORE_TARGET:
+            raise ValueError(
+                f"Unknown target_field '{target}'. Valid targets: {', '.join(valid_targets)}"
+            )
+        mapping[_canonical_header_key(source)] = target
+    return mapping
+
+
+def inspect_file_columns(file_path: str, max_samples: int = 5) -> Dict[str, Any]:
+    """Analyze a LOCAL file's columns without writing anywhere: per column, report
+    which auto-mapping pass (alias/canonical/fuzzy) would claim it and a few sample
+    values. Powers the /api/batch-import/preview endpoint so the TS side never has
+    to reimplement header scoring."""
+    file_parser = FileParser()
+    df = file_parser.parse_file(file_path)
+
+    # Exact-alias lookup (lowercase, as in BatchParser.map_row pass 1)
+    alias_lookup: Dict[str, str] = {}
+    for target_field, aliases in FIELD_MAPPING.items():
+        for alias in aliases:
+            alias_lookup.setdefault(alias.lower(), target_field)
+
+    def classify(header_key: str):
+        if header_key in alias_lookup:
+            return alias_lookup[header_key], 'alias'
+        canonical = _canonical_header_key(header_key)
+        if canonical and canonical in CANONICAL_FIELD_MAP:
+            return CANONICAL_FIELD_MAP[canonical], 'canonical'
+        fuzzy = find_fuzzy_field_match(header_key)
+        if fuzzy:
+            return fuzzy, 'fuzzy'
+        return None, 'none'
+
+    columns = []
+    for original in df.columns:
+        header = str(original)
+        header_key = header.lower().strip()
+        auto_field, confidence = classify(header_key)
+        samples = []
+        for val in df[original].tolist():
+            if pd.isna(val):
+                continue
+            val_str = str(val).strip()
+            if val_str.endswith('.0'):
+                val_str = val_str[:-2]
+            if val_str:
+                samples.append(val_str)
+            if len(samples) >= max_samples:
+                break
+        columns.append({
+            'source_column': header,
+            'auto_field': auto_field,
+            'confidence': confidence,
+            'sample_values': samples,
+        })
+
+    return {
+        'success': True,
+        'file': os.path.basename(file_path),
+        'rows_total': int(len(df)),
+        'columns': columns,
+        'target_fields': sorted(FIELD_MAPPING.keys()),
+    }
+
+
 class BatchParser:
     """
     Main batch parsing service that coordinates:
@@ -59,7 +151,8 @@ class BatchParser:
         storage_mode: str = 'seaweedfs',
         work_phone_prefix: Optional[str] = None,
         default_country_code: Optional[str] = None,
-        max_records: Optional[int] = None
+        max_records: Optional[int] = None,
+        explicit_mapping: Optional[Dict[str, str]] = None
     ):
         self.batch_id = batch_id
         self.file_path = file_path
@@ -69,6 +162,9 @@ class BatchParser:
         self.work_phone_prefix = work_phone_prefix
         self.default_country_code = default_country_code
         self.max_records = max_records
+        # Explicit user field mapping (canonical header key -> target field or
+        # 'ignore'); consulted before every auto pass in map_row.
+        self.explicit_mapping = explicit_mapping or {}
 
         # Initialize components
         self.normalizer = DataNormalizer()
@@ -78,6 +174,10 @@ class BatchParser:
         # Database connections (initialized later)
         self.pg_conn = None
         self.cassandra_session = None
+
+        # Headers that no alias/canonical/fuzzy pass claimed, accumulated across rows
+        # (headers are file-level, so this converges after the first row).
+        self.unmapped_columns = set()
 
     def connect_databases(self):
         """Establish connections to PostgreSQL and Cassandra"""
@@ -274,18 +374,36 @@ class BatchParser:
                 mapped[target_field] = self.normalizer.format_field(target_field, val_str)
             return True
 
+        # Pass 0: explicit user mapping — highest priority, consulted before the
+        # alias/canonical/fuzzy passes. 'ignore' columns stay claimed (no auto pass
+        # may take them) and land in `extra` verbatim via the unmapped-column pass.
+        explicit_ignored = set()
+        if self.explicit_mapping:
+            for header_key, original_key in row_keys.items():
+                target = self.explicit_mapping.get(_canonical_header_key(header_key))
+                if target is None:
+                    continue
+                matched_keys.add(header_key)
+                if target == IGNORE_TARGET:
+                    explicit_ignored.add(str(original_key))
+                else:
+                    _assign(target, row[original_key])
+
         # Pass 1: map fields based on FIELD_MAPPING's exact aliases
         for target_field, aliases in FIELD_MAPPING.items():
             found = False
             for alias in aliases:
                 alias_lower = alias.lower()
-                if alias_lower in row_keys:
+                # Skip headers an earlier pass (explicit user mapping, or an
+                # earlier field in this loop) already claimed.
+                if alias_lower in row_keys and alias_lower not in matched_keys:
                     if _assign(target_field, row[row_keys[alias_lower]]):
                         matched_keys.add(alias_lower)
                         found = True
                         break
                     matched_keys.add(alias_lower)
-            if not found:
+            if not found and target_field not in mapped:
+                # Don't wipe a value the explicit user mapping (Pass 0) assigned.
                 mapped[target_field] = None
 
         # Pass 1b: canonical separator-insensitive matching — treats `_` and spaces as
@@ -312,7 +430,33 @@ class BatchParser:
                 continue
             fuzzy_field = find_fuzzy_field_match(header_key)
             if fuzzy_field and not mapped.get(fuzzy_field):
-                _assign(fuzzy_field, row[original_key])
+                if _assign(fuzzy_field, row[original_key]):
+                    matched_keys.add(header_key)
+
+        # Preserve unmapped columns (no alias/canonical/fuzzy match) in the record's
+        # `extra` map as raw header -> cell value, instead of silently dropping them.
+        # Demo mode keeps raw headers; Normal mode now does too. User-ignored columns
+        # (explicit 'ignore' mapping) are claimed but land here verbatim.
+        extra = {}
+        for header_key, original_key in row_keys.items():
+            if not header_key:
+                continue
+            if header_key in matched_keys and str(original_key) not in explicit_ignored:
+                continue
+            val = row[original_key]
+            if pd.isna(val):
+                continue
+            val_str = str(val).strip()
+            # Remove trailing .0 from Excel float conversion
+            if val_str.endswith('.0'):
+                val_str = val_str[:-2]
+            if val_str == "":
+                continue
+            extra[str(original_key)] = val_str
+        mapped["extra"] = extra
+        # User-ignored columns are a deliberate choice, not a mapping gap — keep
+        # them out of the unmapped-columns report.
+        self.unmapped_columns.update(k for k in extra.keys() if k not in explicit_ignored)
 
         # Special handling: Name splitting
         if mapped.get("first_name") and not mapped.get("last_name"):
@@ -432,7 +576,7 @@ class BatchParser:
                 record.get('personal_url'),
                 record.get('personal_bio'),
                 record.get('personal_birthday'),
-                {}  # empty map for extra field
+                record.get('extra') or {}  # unmapped columns, raw header -> value
             )
 
             logger.info("=" * 80)
@@ -547,6 +691,7 @@ class BatchParser:
                 'records_processed': records_processed,
                 'records_imported': records_processed,
                 'limit_reached': limit_reached,
+                'unmapped_columns': sorted(self.unmapped_columns),
             }
 
         except Exception as e:
@@ -573,13 +718,16 @@ class BatchParser:
 
 def main():
     parser = argparse.ArgumentParser(description='Parse batch file and store to hybrid database')
-    parser.add_argument('--batch-id', required=True, help='Batch UUID')
-    parser.add_argument('--file-path', required=True, help='Storage path to file (e.g., batches/email/project/file.csv)')
-    parser.add_argument('--postgres-url', required=True, help='PostgreSQL connection URL')
-    parser.add_argument('--cassandra-hosts', required=True, help='Cassandra hosts (comma-separated)')
+    parser.add_argument('--batch-id', help='Batch UUID')
+    parser.add_argument('--file-path', required=True, help='Storage path to file (e.g., batches/email/project/file.csv); with --inspect, a local file path')
+    parser.add_argument('--postgres-url', help='PostgreSQL connection URL')
+    parser.add_argument('--cassandra-hosts', help='Cassandra hosts (comma-separated)')
     parser.add_argument('--cassandra-keyspace', default='ecards', help='Cassandra keyspace')
     parser.add_argument('--storage-mode', default='seaweedfs', choices=['seaweedfs', 'local'], help='Storage mode')
     parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
+    parser.add_argument('--inspect', action='store_true',
+                        help='Analyze the file\'s columns and print the analysis JSON; no database access')
+    parser.add_argument('--mapping', help='Path to explicit field-mapping JSON ({"mappings": [...]}); consulted before auto-mapping')
     # Phone formatting configuration
     parser.add_argument('--work-phone-prefix', help='Prefix for 4-digit work phone numbers (e.g., "2222")')
     parser.add_argument('--default-country-code', help='Default country code for 8-digit numbers (e.g., "+(506)")')
@@ -589,6 +737,29 @@ def main():
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+
+    # Inspect mode: local file, no databases, no persistence.
+    if args.inspect:
+        try:
+            print(json.dumps(inspect_file_columns(args.file_path)))
+            sys.exit(0)
+        except Exception as e:
+            print(json.dumps({'success': False, 'error': str(e)}))
+            sys.exit(1)
+
+    for required in ('batch_id', 'postgres_url', 'cassandra_hosts'):
+        if not getattr(args, required):
+            parser.error(f'--{required.replace("_", "-")} is required unless --inspect is given')
+
+    # Explicit user mapping: fail fast on a malformed/unknown target before any work.
+    explicit_mapping = None
+    if args.mapping:
+        try:
+            explicit_mapping = load_explicit_mapping(args.mapping)
+        except Exception as e:
+            logger.error(f"❌ Invalid mapping file: {e}")
+            print(json.dumps({'success': False, 'error': f'Invalid mapping: {e}'}))
+            sys.exit(1)
 
     # Parse comma-separated Cassandra hosts
     cassandra_hosts = [h.strip() for h in args.cassandra_hosts.split(',')]
@@ -604,6 +775,7 @@ def main():
         work_phone_prefix=args.work_phone_prefix,
         default_country_code=args.default_country_code,
         max_records=args.max_records,
+        explicit_mapping=explicit_mapping,
     )
 
     try:

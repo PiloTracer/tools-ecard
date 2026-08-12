@@ -132,10 +132,15 @@ Visual editor for creating card layouts with:
 - Dynamic image elements (icons, logos)
 - QR code generation
 - Background image uploads
+- Template kinds: reusable **templates** fork into a new **design** on save; gallery filters (All / Templates / My designs)
+- **Global templates** shared with all users — API-served (managed by `appsuper`/`appglobal` role holders) or **bundled** as static files under `front-cards/public/templates/globals/` (see ops runbook)
 
 ### 2. Batch Import
-Import staff data from Excel or text with:
-- Intelligent field mapping
+Import staff data from Excel, vCard or text with:
+- Accepted formats: `.csv` / `.txt` / `.md` / `.vcf` / `.xls` / `.xlsx` (incl. transposed XLSX — headers down column A)
+- **Downloadable blank templates** (rows or columns layout) from the upload dialog
+- Intelligent field mapping (EN/ES aliases + fuzzy) with an interactive **mapping modal** for unmapped columns and savable per-user mapping presets
+- vCard 2.1/3.0/4.0 support (multi-card files); unknown fields preserved in record `extra`
 - LLM-assisted name parsing (with credit management)
 - Fallback to "as-is" when credits unavailable
 - Phone vs extension detection
@@ -380,4 +385,4 @@ MIT - See LICENSE file for details
 ---
 
 **Version:** 0.5.1
-**Last Updated:** 2026-07-16
+**Last Updated:** 2026-08-12

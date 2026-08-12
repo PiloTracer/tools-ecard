@@ -8,6 +8,8 @@ import {
   deleteBatchSchema,
 } from './validators/batchValidators';
 import { BatchUploadError } from './types';
+import { validateFieldMappings, FieldMappingValidationError } from '../batch-import/services/fieldMapping';
+import type { FieldMapping } from '../batch-import/types';
 import type { AuthenticatedUser } from '../../core/middleware/authMiddleware';
 
 interface AuthenticatedRequest extends FastifyRequest {
@@ -32,6 +34,7 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
       let file: Express.Multer.File | null = null;
       let projectId: string | null = null;
       let projectName: string | null = null;
+      let mapping: FieldMapping[] | undefined;
 
       for await (const part of parts) {
         if (part.type === 'file') {
@@ -48,6 +51,17 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
           projectId = part.value as string;
         } else if (part.fieldname === 'projectName') {
           projectName = part.value as string;
+        } else if (part.fieldname === 'mapping') {
+          // Explicit user field mapping (Pass 3), JSON-encoded FieldMapping[].
+          // Unknown target fields are rejected with a 400 — never guessed.
+          try {
+            mapping = validateFieldMappings(JSON.parse(part.value as string));
+          } catch (error) {
+            if (error instanceof FieldMappingValidationError) {
+              throw new BatchUploadError(error.message, 'INVALID_MAPPING', 400);
+            }
+            throw new BatchUploadError('Invalid mapping JSON', 'INVALID_MAPPING', 400);
+          }
         }
       }
 
@@ -91,6 +105,7 @@ const batchUploadRoutes: FastifyPluginAsync = async (fastify) => {
         projectId,
         projectName,
         batchRecordLimit: request.user.batchRecordLimit,
+        mapping,
       });
 
       return reply.code(201).send(result);

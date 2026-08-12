@@ -4,6 +4,7 @@ describe('App library storage integration startup policy', () => {
   const envKeys = [
     'NODE_ENV',
     'DEMO_MODE',
+    'NEXT_PUBLIC_DEMO_MODE',
     'TOOLS_DASHBOARD_ORIGIN',
     'APP_LIBRARY_STORAGE_INTEGRATION_KEY',
     'APP_LIBRARY_STORAGE_INTEGRATION_OPTIONAL',
@@ -80,6 +81,7 @@ describe('App library storage integration startup policy', () => {
   it('requires integration in strict production', () => {
     process.env.NODE_ENV = 'production';
     process.env.DEMO_MODE = 'false';
+    delete process.env.NEXT_PUBLIC_DEMO_MODE;
     process.env.APP_LIBRARY_STORAGE_INTEGRATION_OPTIONAL = 'false';
     process.env.TOOLS_DASHBOARD_ORIGIN = 'https://tools.example.com';
     process.env.APP_LIBRARY_STORAGE_INTEGRATION_KEY = 'secret';

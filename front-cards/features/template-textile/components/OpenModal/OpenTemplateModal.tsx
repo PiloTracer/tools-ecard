@@ -2,20 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import { templateService, type TemplateMetadata } from '../../services/templateService';
+import { bundledTemplatesService } from '../../services/bundledTemplatesService';
 
 interface OpenTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpen: (templateId: string) => Promise<void>;
+  /**
+   * Show edit affordances for API-served global templates (Pass 5).
+   * Deny by default: pass AuthContext.canManageGlobalTemplates.
+   */
+  canManageGlobalTemplates?: boolean;
 }
 
 export function OpenTemplateModal({
   isOpen,
   onClose,
-  onOpen
+  onOpen,
+  canManageGlobalTemplates = false
 }: OpenTemplateModalProps) {
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<'all' | 'template' | 'design'>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +39,40 @@ export function OpenTemplateModal({
     setError(null);
 
     try {
-      const templateList = await templateService.listTemplates();
-      setTemplates(templateList);
+      // Bundled globals ship as static assets and never throw — corrupt or
+      // missing entries are skipped by the service with a console warning.
+      const [templateList, bundledList] = await Promise.all([
+        templateService.listTemplates(),
+        bundledTemplatesService.listBundledTemplates()
+      ]);
+      setTemplates([...bundledList, ...templateList]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load templates');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const isGlobal = (t: TemplateMetadata) => t.isPublic === true || t.isBundled === true;
+
+  // Super-only affordance: delete an API-served global template for everyone.
+  // Bundled globals are static files — remove them from public/templates/globals/ instead.
+  const handleDeleteGlobal = async (e: React.MouseEvent, template: TemplateMetadata) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete global template "${template.name}" for all users?`)) return;
+    setError(null);
+    try {
+      await templateService.deleteTemplate(template.id);
+      if (selectedTemplateId === template.id) setSelectedTemplateId(null);
+      await loadTemplates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete global template');
+    }
+  };
+
+  const visibleTemplates = kindFilter === 'all'
+    ? templates
+    : templates.filter((t) => (t.kind ?? 'design') === kindFilter);
 
   const handleOpen = async () => {
     if (!selectedTemplateId) {
@@ -91,6 +125,27 @@ export function OpenTemplateModal({
           <p className="text-sm text-gray-600 mt-1">
             Select a template to open
           </p>
+          {/* Kind filter: Templates | My designs (All = previous behavior) */}
+          <div className="flex gap-2 mt-3" role="group" aria-label="Filter by kind">
+            {([
+              { value: 'all', label: 'All' },
+              { value: 'template', label: 'Templates' },
+              { value: 'design', label: 'My designs' },
+            ] as const).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setKindFilter(option.value)}
+                className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                  kindFilter === option.value
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Content */}
@@ -109,7 +164,7 @@ export function OpenTemplateModal({
                 <p className="ml-3 text-sm text-red-800">{error}</p>
               </div>
             </div>
-          ) : templates.length === 0 ? (
+          ) : visibleTemplates.length === 0 ? (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -119,7 +174,7 @@ export function OpenTemplateModal({
             </div>
           ) : (
             <div className="space-y-2">
-              {templates.map((template) => (
+              {visibleTemplates.map((template) => (
                 <div key={template.id} className="relative">
                   <div
                     onClick={() => setSelectedTemplateId(template.id)}
@@ -130,10 +185,38 @@ export function OpenTemplateModal({
                     }`}
                   >
                     <div className="flex items-start justify-between">
+                      {template.previewUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={template.previewUrl}
+                          alt=""
+                          className="w-12 h-12 mr-3 rounded border border-gray-200 object-cover shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">
-                          {template.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-gray-900 truncate">
+                            {template.name}
+                          </p>
+                          <span
+                            className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              template.kind === 'template'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {template.kind === 'template' ? 'Template' : 'Design'}
+                          </span>
+                          {isGlobal(template) && (
+                            <span className="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 text-emerald-700">
+                              Global
+                            </span>
+                          )}
+                        </div>
+                        {template.description && (
+                          <p className="text-xs text-gray-500 mt-1 truncate">{template.description}</p>
+                        )}
                         <p className="text-xs text-gray-500 mt-1">
                           Updated: {new Date(template.updatedAt).toLocaleDateString()}
                         </p>
@@ -149,6 +232,19 @@ export function OpenTemplateModal({
                           </span>
                         </div>
                       </div>
+                      {canManageGlobalTemplates && template.isPublic === true && !template.isBundled && (
+                        <button
+                          type="button"
+                          title={`Delete global template "${template.name}" for all users`}
+                          aria-label={`Delete global template ${template.name}`}
+                          onClick={(e) => handleDeleteGlobal(e, template)}
+                          className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-9 0h10" />
+                          </svg>
+                        </button>
+                      )}
                       {selectedTemplateId === template.id && (
                         <svg className="w-5 h-5 text-blue-600 ml-2" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

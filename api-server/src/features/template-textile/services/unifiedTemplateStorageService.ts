@@ -9,8 +9,17 @@ import { getS3Service } from '../../s3-bucket/services/s3Service';
 import type { Request } from 'express';
 import { decodeBase64Data } from '../utils/base64Helper';
 import { createLogger } from '../../../core/utils/logger';
+import { GLOBAL_TEMPLATES_AUTHORIZED } from '../../../core/middleware/requireAppRole';
 
 const log = createLogger('TemplateStorage');
+
+/** 403 error for global-template mutations without a role-verified request. */
+function forbiddenGlobalTemplateError(): Error {
+  return Object.assign(
+    new Error('Forbidden: global template management requires an elevated app role'),
+    { statusCode: 403, code: 'insufficient_role' }
+  );
+}
 
 // Namespace UUID for generating user UUIDs from email addresses
 // This is a well-known UUID that we use as a namespace for email-based UUIDs
@@ -24,6 +33,8 @@ function emailToUuid(email: string): string {
   return uuidv5(email.toLowerCase(), EMAIL_NAMESPACE);
 }
 
+export type TemplateKind = 'template' | 'design';
+
 export interface TemplateMetadata {
   id: string;
   userId: string;
@@ -32,6 +43,9 @@ export interface TemplateMetadata {
   storageMode: StorageMode;
   resourceUrls: string[];
   version: number;
+  kind: TemplateKind;
+  /** Global template: visible read-only to every authenticated user (Pass 5). */
+  isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,11 +53,19 @@ export interface TemplateMetadata {
 export interface SaveTemplateInput {
   name: string;
   templateData: any;
+  kind?: TemplateKind; // default 'design' (DB default); 'template' via explicit "Save as template"
+  /** Create/update a GLOBAL template — requires the role-verified request flag. */
+  global?: boolean;
   resources?: Array<{
     type: string;
     data: string;
     hash?: string;
   }>;
+}
+
+/** Normalize a raw DB value into a TemplateKind (missing/unknown ⇒ 'design'). */
+function toTemplateKind(value: unknown): TemplateKind {
+  return value === 'template' ? 'template' : 'design';
 }
 
 export interface Template {
@@ -86,6 +108,14 @@ class UnifiedTemplateStorageService {
       throw new Error('User not authenticated');
     }
 
+    // Global templates (Pass 5): only requests that passed the authoritative
+    // requireAppRole preHandler carry this flag. This service-level check is
+    // defense in depth so a future route can't bypass the role gate.
+    const globalTemplatesAuthorized = (request as any)[GLOBAL_TEMPLATES_AUTHORIZED] === true;
+    if (input.global === true && !globalTemplatesAuthorized) {
+      throw forbiddenGlobalTemplateError();
+    }
+
     // Sanitize email for use in path (consistent with batch-upload)
     const sanitizedEmail = this.sanitizeEmailForPath(userEmail);
 
@@ -114,6 +144,12 @@ class UnifiedTemplateStorageService {
       // If can't check, generate new ID
       templateId = uuidv4();
       log.debug({ templateId }, 'Using fallback template ID');
+    }
+
+    // Never overwrite/demote an existing global template without the
+    // role-verified flag — even if the caller owns the row.
+    if (existingTemplate?.isPublic && !globalTemplatesAuthorized) {
+      throw forbiddenGlobalTemplateError();
     }
 
     const timestamp = new Date();
@@ -238,6 +274,10 @@ class UnifiedTemplateStorageService {
           storageUrl,
           storageMode,
           elementCount: templateData.elements?.length || 0,
+          // undefined keeps the existing value on update (Prisma ignores undefined);
+          // `global: true` promotes/creates a global template.
+          isPublic: input.global === true ? true : undefined,
+          kind: input.kind,
           version
         });
 
@@ -249,6 +289,8 @@ class UnifiedTemplateStorageService {
           storageMode,
           resourceUrls,
           version,
+          kind: input.kind ?? toTemplateKind(existingTemplate?.kind),
+          isPublic: input.global === true || existingTemplate?.isPublic === true,
           createdAt: existingTemplate?.createdAt || timestamp,
           updatedAt: timestamp
         };
@@ -292,6 +334,8 @@ class UnifiedTemplateStorageService {
         storageMode,
         resourceUrls,
         version: 1,
+        kind: input.kind ?? 'design',
+        isPublic: input.global === true,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -346,9 +390,16 @@ class UnifiedTemplateStorageService {
 
     if (storageMode === 'full' || storageMode === 'fallback') {
       try {
-        const dbTemplate = await templateOperations.getTemplate(templateId, userId);
+        const dbTemplate = await templateOperations.getTemplateById(templateId);
         if (!dbTemplate) {
           throw new Error('Template not found');
+        }
+
+        // Access: owner, or anyone authenticated for global templates (Pass 5).
+        // Checked BEFORE metadata assignment so the catch below can't fall
+        // through to a storage load for a template the user may not read.
+        if (dbTemplate.userId !== userId && dbTemplate.isPublic !== true) {
+          throw new Error('Unauthorized');
         }
 
         metadata = {
@@ -359,17 +410,14 @@ class UnifiedTemplateStorageService {
           storageMode: dbTemplate.storageMode as StorageMode,
           resourceUrls: dbTemplate.resources?.map((r: any) => r.storageUrl).filter(Boolean) || [],
           version: dbTemplate.version || 1,
+          kind: toTemplateKind(dbTemplate.kind),
+          isPublic: dbTemplate.isPublic === true,
           createdAt: dbTemplate.createdAt,
           updatedAt: dbTemplate.updatedAt
         };
-
-        // Verify ownership
-        if (metadata && metadata.userId !== userId) {
-          throw new Error('Unauthorized');
-        }
       } catch (error) {
         log.error({ error, templateId }, 'Failed to load metadata from PostgreSQL');
-        if (storageMode === 'full') {
+        if (storageMode === 'full' || (error instanceof Error && error.message === 'Unauthorized')) {
           throw error;
         }
       }
@@ -515,12 +563,19 @@ class UnifiedTemplateStorageService {
       throw new Error('User not authenticated');
     }
 
+    // Optional ?kind=template|design filter (additive; absent = both kinds)
+    const rawKind = (request as any).query?.kind;
+    const kind: TemplateKind | undefined =
+      rawKind === 'template' || rawKind === 'design' ? rawKind : undefined;
+
     const modeResult = await modeDetectionService.detectMode();
     const storageMode = modeResult.mode;
 
     if (storageMode === 'full' || storageMode === 'fallback') {
       try {
-        const result = await templateOperations.listTemplates(userId);
+        // includeGlobals: every authenticated user sees global (isPublic)
+        // templates alongside their own — read-only unless they own them.
+        const result = await templateOperations.listTemplates(userId, undefined, 1, 20, kind, true);
         return result.templates.map(t => ({
           id: t.id,
           userId: t.userId,
@@ -529,6 +584,8 @@ class UnifiedTemplateStorageService {
           storageMode: t.storageMode as StorageMode,
           resourceUrls: t.resources?.map((r: any) => r.storageUrl).filter(Boolean) || [],
           version: t.version || 1,
+          kind: toTemplateKind(t.kind),
+          isPublic: t.isPublic === true,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt
         }));
@@ -577,6 +634,8 @@ class UnifiedTemplateStorageService {
         storageMode: dbTemplate.storageMode as StorageMode,
         resourceUrls: dbTemplate.resources?.map((r: any) => r.storageUrl).filter(Boolean) || [],
         version: dbTemplate.version || 1,
+        kind: toTemplateKind(dbTemplate.kind),
+        isPublic: dbTemplate.isPublic === true,
         createdAt: dbTemplate.createdAt,
         updatedAt: dbTemplate.updatedAt
       };
@@ -586,6 +645,12 @@ class UnifiedTemplateStorageService {
       if (metadata.userId !== userId) {
         console.error(`[DELETE SERVICE] Ownership mismatch: metadata.userId="${metadata.userId}" !== requestUserId="${userId}"`);
         throw new Error('Unauthorized');
+      }
+
+      // Global templates are immutable to anyone without the role-verified
+      // flag (Pass 5) — defense in depth behind the route-level preHandler.
+      if (metadata.isPublic && (request as any)[GLOBAL_TEMPLATES_AUTHORIZED] !== true) {
+        throw forbiddenGlobalTemplateError();
       }
     } catch (error) {
       log.error({ error, templateId }, 'Failed to load metadata for deletion');

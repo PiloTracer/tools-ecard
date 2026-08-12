@@ -41,6 +41,19 @@ export class TemplateController {
         });
       }
 
+      // Optional kind: 'template' | 'design' (default 'design' server-side)
+      if (saveRequest.kind !== undefined && saveRequest.kind !== 'template' && saveRequest.kind !== 'design') {
+        return reply.status(400).send({
+          success: false,
+          error: "Invalid kind: must be 'template' or 'design'"
+        });
+      }
+
+      // Optional global flag (Pass 5): publish as a global template visible to
+      // all users. Gated by the route-level requireAppRole preHandler + the
+      // service-layer role flag; globals default to kind 'template'.
+      const global = saveRequest.global === true;
+
       console.log('[TemplateController] Calling unifiedTemplateStorageService.saveTemplate');
 
       // Save template using unified service
@@ -48,6 +61,8 @@ export class TemplateController {
         {
           name: saveRequest.name,
           templateData: saveRequest.templateData,
+          kind: saveRequest.kind ?? (global ? 'template' : undefined),
+          global,
           resources: saveRequest.resources
         },
         request as any
@@ -62,9 +77,11 @@ export class TemplateController {
       });
     } catch (error) {
       console.error('[TemplateController] Error saving template:', error);
-      return reply.status(500).send({
+      const statusCode = typeof (error as any)?.statusCode === 'number' ? (error as any).statusCode : 500;
+      return reply.status(statusCode).send({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to save template'
+        error: error instanceof Error ? error.message : 'Failed to save template',
+        ...((error as any)?.code ? { code: (error as any).code } : {})
       });
     }
   }
@@ -120,6 +137,15 @@ export class TemplateController {
         });
       }
 
+      // Optional ?kind=template|design filter (additive; absent = both kinds)
+      const kindParam = (request.query as any)?.kind;
+      if (kindParam !== undefined && kindParam !== 'template' && kindParam !== 'design') {
+        return reply.status(400).send({
+          success: false,
+          error: "Invalid kind: must be 'template' or 'design'"
+        });
+      }
+
       const templates = await unifiedTemplateStorageService.listTemplates(request as any);
 
       return reply.status(200).send({
@@ -168,13 +194,15 @@ export class TemplateController {
       console.error('Error deleting template:', error);
       let statusCode = 500;
       if (error instanceof Error) {
-        if (error.message === 'Unauthorized') statusCode = 403;
+        if ((error as any).statusCode === 403) statusCode = 403;
+        else if (error.message === 'Unauthorized') statusCode = 403;
         else if (error.message === 'Template not found') statusCode = 404;
         else if (error.message === 'User not authenticated') statusCode = 401;
       }
       return reply.status(statusCode).send({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete template'
+        error: error instanceof Error ? error.message : 'Failed to delete template',
+        ...((error as any)?.code ? { code: (error as any).code } : {})
       });
     }
   }

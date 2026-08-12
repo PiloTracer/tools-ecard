@@ -20,10 +20,11 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  projects          Project[]
-  projectSelection  UserProjectSelection?
-  templates         TemplateMetadata[]
-  batches           Batch[]
+  projects            Project[]
+  projectSelection    UserProjectSelection?
+  templates           TemplateMetadata[]
+  batches             Batch[]
+  fieldMappingPresets FieldMappingPreset[]
 
   @@map("users")
 }
@@ -82,6 +83,7 @@ model TemplateMetadata {
   elementCount Int      @default(0) @map("element_count")
   thumbnailUrl String?  @map("thumbnail_url")
   isPublic     Boolean  @default(false) @map("is_public")
+  kind         String   @default("design") // 'template' | 'design' (Pass 4: user templates vs card designs)
   syncStatus   String   @default("synced") @map("sync_status") // 'synced' | 'pending' | 'failed'
   version      Int      @default(1)
   createdAt    DateTime @default(now()) @map("created_at")
@@ -184,6 +186,9 @@ model Batch {
   user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   records BatchRecord[]
 
+  // Explicit user field mapping applied at parse time (Pass 3); consumed on retry.
+  fieldMapping  Json?     @map("field_mapping")
+
   @@index([userId])
   @@index([userEmail])
   @@index([projectId])
@@ -221,6 +226,26 @@ model BatchRecord {
   @@index([mobilePhone])
   @@index([createdAt])
   @@map("batch_records")
+}
+
+// FieldMappingPreset - saved per-user column→field mappings (Pass 3).
+// `signature` is a stable hash of the sorted normalized source-header list; a
+// signature match on upload/preview auto-suggests the preset.
+model FieldMappingPreset {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  signature String
+  mapping   Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, signature])
+  @@map("field_mapping_presets")
 }
 
 // Batch status enumeration

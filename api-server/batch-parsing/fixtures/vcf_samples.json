@@ -1,0 +1,166 @@
+{
+  "description": "Shared vCard (.vcf) contract between the Normal parser (api-server/batch-parsing/file_parser.py) and the Demo parser (front-cards/features/demo/demoSpreadsheetParser.ts). Duplicated into both fixture dirs per repo convention (containers mount only their own subtree). Synthetic data only. Expected fields use canonical snake_case ids and are asserted AFTER the full mapping pipeline on each side (demo test converts snake->camel). unmappedContains are substrings of the consolidated 'vcf_unmapped' extra value.",
+  "cases": [
+    {
+      "id": "vcard30_simple",
+      "vcf": "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Gomez;Ana;Maria;Dr.;Jr.\r\nFN:Dr. Ana Maria Gomez Jr.\r\nORG:Acme Corp;Sales Dept\r\nTITLE:Sales Manager\r\nTEL;TYPE=WORK:+506 2222 1234\r\nTEL;TYPE=CELL:+506 8888 9999\r\nEMAIL:ana.gomez@example.com\r\nADR;TYPE=HOME:;;123 Main Street;San Jose;Cartago;10101;Costa Rica\r\nURL:https://acme.example.com\r\nNOTE:Vip Client\r\nBDAY:1985-03-17\r\nEND:VCARD\r\n",
+      "expected": [
+        {
+          "fields": {
+            "first_name": "Ana Maria",
+            "last_name": "Gomez",
+            "full_name": "Dr. Ana Maria Gomez Jr.",
+            "business_name": "Acme Corp",
+            "business_department": "Sales Dept",
+            "business_title": "Sales Manager",
+            "work_phone": "+506 2222 1234",
+            "mobile_phone": "+506 8888 9999",
+            "email": "ana.gomez@example.com",
+            "address_street": "123 Main Street",
+            "address_city": "San Jose",
+            "address_state": "Cartago",
+            "address_postal": "10101",
+            "address_country": "Costa Rica",
+            "business_url": "https://acme.example.com",
+            "personal_bio": "Vip Client",
+            "personal_birthday": "1985-03-17"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vcard21_quoted_printable",
+      "vcf": "BEGIN:VCARD\r\nVERSION:2.1\r\nN;CHARSET=ISO-8859-1;ENCODING=QUOTED-PRINTABLE:Rodr=EDguez;Mar=EDa;;\r\nFN;CHARSET=ISO-8859-1;ENCODING=QUOTED-PRINTABLE:Mar=EDa Rodr=EDguez\r\nTEL;WORK;VOICE:+506 2233 4455\r\nEMAIL;INTERNET:maria.rodriguez@example.com\r\nEND:VCARD\r\nBEGIN:VCARD\r\nVERSION:2.1\r\nN;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:G=C3=B3mez;Jos=C3=A9;;\r\nFN;ENCODING=QUOTED-PRINTABLE;CHARSET=UTF-8:Jos=C3=A9 G=C3=B3=\r\nmez\r\nTEL;CELL:+506 8877 6655\r\nEND:VCARD\r\n",
+      "expected": [
+        {
+          "fields": {
+            "first_name": "María",
+            "last_name": "Rodríguez",
+            "full_name": "María Rodríguez",
+            "work_phone": "+506 2233 4455",
+            "email": "maria.rodriguez@example.com"
+          }
+        },
+        {
+          "fields": {
+            "first_name": "José",
+            "last_name": "Gómez",
+            "full_name": "José Gómez",
+            "mobile_phone": "+506 8877 6655"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vcard40_folding_and_escapes",
+      "vcf": "BEGIN:VCARD\r\nVERSION:4.0\r\nN:Perez;Juan;;\r\nFN:Juan Perez\r\nTITLE:Chief Executive Officer\r\nTEL;TYPE=WORK:+506 2200 0000 ext. 555\r\nEMAIL;TYPE=WORK:juan.perez@example.com\r\nURL;TYPE=HOME:https://juanperez.example.com\r\nNOTE:First Line\\, With Comm\r\n a And More\r\nEND:VCARD\r\n",
+      "expected": [
+        {
+          "fields": {
+            "first_name": "Juan",
+            "last_name": "Perez",
+            "full_name": "Juan Perez",
+            "business_title": "Chief Executive Officer",
+            "work_phone": "+506 2200 0000",
+            "work_phone_ext": "555",
+            "email": "juan.perez@example.com",
+            "personal_url": "https://juanperez.example.com",
+            "personal_bio": "First Line, With Comma And More"
+          }
+        }
+      ]
+    },
+    {
+      "id": "multi_contact",
+      "vcf": "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Alvarado;Luis;;\r\nFN:Luis Alvarado\r\nEMAIL:luis.alvarado@example.com\r\nTEL;TYPE=WORK:+506 2100 0001\r\nEND:VCARD\r\nBEGIN:VCARD\r\nVERSION:3.0\r\nN:Chaves;Karla;;\r\nFN:Karla Chaves\r\nEMAIL:karla.chaves@example.com\r\nTEL;TYPE=CELL:+506 8300 0002\r\nEND:VCARD\r\nBEGIN:VCARD\r\nVERSION:3.0\r\nN:Ortiz;Mario;;\r\nFN:Mario Ortiz\r\nEMAIL:mario.ortiz@example.com\r\nEND:VCARD\r\n",
+      "expected": [
+        {
+          "fields": {
+            "first_name": "Luis",
+            "last_name": "Alvarado",
+            "full_name": "Luis Alvarado",
+            "email": "luis.alvarado@example.com",
+            "work_phone": "+506 2100 0001"
+          }
+        },
+        {
+          "fields": {
+            "first_name": "Karla",
+            "last_name": "Chaves",
+            "full_name": "Karla Chaves",
+            "email": "karla.chaves@example.com",
+            "mobile_phone": "+506 8300 0002"
+          }
+        },
+        {
+          "fields": {
+            "first_name": "Mario",
+            "last_name": "Ortiz",
+            "full_name": "Mario Ortiz",
+            "email": "mario.ortiz@example.com"
+          }
+        }
+      ]
+    },
+    {
+      "id": "phone_type_distribution",
+      "vcf": "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Vargas;Elena;;\r\nFN:Elena Vargas\r\nTEL;TYPE=WORK:+506 2255 1000\r\nTEL;TYPE=CELL:+506 2255 1001\r\nTEL;TYPE=HOME:+506 2255 1002\r\nTEL;TYPE=FAX:+506 2255 1003\r\nX-EXTENSION:123\r\nEND:VCARD\r\n",
+      "expected": [
+        {
+          "fields": {
+            "first_name": "Elena",
+            "last_name": "Vargas",
+            "full_name": "Elena Vargas",
+            "work_phone": "+506 2255 1000",
+            "mobile_phone": "+506 2255 1001",
+            "work_phone_ext": "123"
+          },
+          "unmappedContains": [
+            "TEL;TYPE=HOME: +506 2255 1002",
+            "TEL;TYPE=FAX: +506 2255 1003"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "malformed_cards_best_effort",
+      "vcf": "BEGIN:VCARD\r\nVERSION:3.0\r\nEMAIL:only.email@example.com\r\nTEL;TYPE=CELL:+506 8000 1111\r\nEND:VCARD\r\nBEGIN:VCARD\r\nVERSION:3.0\r\nN:Solano;Diego;;\r\nTEL;TYPE=WORK:+506 2200 2222\r\n",
+      "expected": [
+        {
+          "fields": {
+            "email": "only.email@example.com",
+            "mobile_phone": "+506 8000 1111"
+          },
+          "absentFields": ["first_name", "last_name", "full_name"]
+        },
+        {
+          "fields": {
+            "first_name": "Diego",
+            "last_name": "Solano",
+            "full_name": "Diego Solano",
+            "work_phone": "+506 2200 2222"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unknown_properties_to_extra",
+      "vcf": "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Quesada;Sofia;;\r\nFN:Sofia Quesada\r\nEMAIL:sofia.quesada@example.com\r\nNICKNAME:Sofi\r\nX-SOCIALPROFILE;TYPE=linkedin:https://www.linkedin.com/in/squesada\r\nX-MULTILINE:Line1\\nLine2\r\nEND:VCARD\r\n",
+      "expected": [
+        {
+          "fields": {
+            "first_name": "Sofia",
+            "last_name": "Quesada",
+            "full_name": "Sofia Quesada",
+            "email": "sofia.quesada@example.com"
+          },
+          "unmappedContains": [
+            "NICKNAME: Sofi",
+            "X-SOCIALPROFILE;TYPE=linkedin: https://www.linkedin.com/in/squesada",
+            "X-MULTILINE: Line1\nLine2"
+          ]
+        }
+      ]
+    }
+  ]
+}

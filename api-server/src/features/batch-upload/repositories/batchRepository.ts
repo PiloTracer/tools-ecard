@@ -14,6 +14,9 @@ export class BatchRepository {
         fileSize: data.fileSize,
         filePath: data.filePath,
         status: data.status || BatchStatus.UPLOADED,
+        ...(data.fieldMapping && {
+          fieldMapping: data.fieldMapping as unknown as Prisma.InputJsonValue,
+        }),
       },
     });
   }

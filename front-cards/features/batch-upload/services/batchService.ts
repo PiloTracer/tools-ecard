@@ -5,6 +5,9 @@ import {
   BatchStats,
   Batch,
   BatchStatus,
+  FieldMappingEntry,
+  FieldMappingPreset,
+  MappingPreview,
 } from '../types';
 
 import { getApiBaseUrl } from '@/shared/lib/api-base-url';
@@ -31,12 +34,20 @@ class BatchService {
     return '';
   }
 
-  async uploadBatch(file: File, projectId: string, projectName: string): Promise<BatchUploadResponse> {
-    if (isDemoMode()) return demoBatchRepository.uploadBatch(file, projectId, projectName);
+  async uploadBatch(
+    file: File,
+    projectId: string,
+    projectName: string,
+    mapping?: FieldMappingEntry[]
+  ): Promise<BatchUploadResponse> {
+    if (isDemoMode()) return demoBatchRepository.uploadBatch(file, projectId, projectName, mapping);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('projectId', projectId);
     formData.append('projectName', projectName);
+    if (mapping && mapping.length > 0) {
+      formData.append('mapping', JSON.stringify(mapping));
+    }
 
     const response = await fetch(`${getApiBaseUrl()}/api/batches/upload`, {
       method: 'POST',
@@ -51,6 +62,68 @@ class BatchService {
     }
 
     return await response.json();
+  }
+
+  /**
+   * Column-mapping preview (Pass 3): per-column auto-mapping + sample values +
+   * suggested preset. Normal mode calls the API (Python parser --inspect);
+   * Demo mode analyzes headers client-side with the demo parser.
+   */
+  async previewBatchFile(file: File): Promise<MappingPreview> {
+    if (isDemoMode()) {
+      const { parseDemoSpreadsheetFile, analyzeHeaders } = await import(
+        '@/features/demo/demoSpreadsheetParser'
+      );
+      const { suggestDemoMappingPreset } = await import('@/features/demo/demoMappingPresets');
+      const { getCanonicalTargetFields } = await import('../utils/canonicalTargetFields');
+      const table = await parseDemoSpreadsheetFile(file);
+      return {
+        fileName: file.name,
+        rowsTotal: table.rows.length,
+        columns: analyzeHeaders(table),
+        targetFields: getCanonicalTargetFields(),
+        suggestedPreset: suggestDemoMappingPreset(table.headers),
+      };
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${getApiBaseUrl()}/api/batch-import/preview`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || error.message || 'Failed to preview batch file');
+    }
+
+    const body = await response.json();
+    return body.data as MappingPreview;
+  }
+
+  /** Save a mapping preset (Pass 3): API in Normal mode, localStorage in Demo. */
+  async saveMappingPreset(name: string, mapping: FieldMappingEntry[]): Promise<FieldMappingPreset> {
+    if (isDemoMode()) {
+      const { saveDemoMappingPreset } = await import('@/features/demo/demoMappingPresets');
+      return saveDemoMappingPreset(name, mapping);
+    }
+
+    const response = await fetch(`${getApiBaseUrl()}/api/batch-import/mappings/presets`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mapping }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || error.message || 'Failed to save mapping preset');
+    }
+
+    const body = await response.json();
+    return body.data as FieldMappingPreset;
   }
 
   async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {

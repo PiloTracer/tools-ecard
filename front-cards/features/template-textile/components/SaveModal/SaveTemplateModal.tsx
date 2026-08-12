@@ -6,9 +6,16 @@ import { useTemplateStore } from '../../stores/templateStore';
 interface SaveTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (templateName: string, projectName: string) => Promise<void>;
+  onSave: (templateName: string, projectName: string, options?: { saveAsTemplate?: boolean; saveAsGlobal?: boolean }) => Promise<void>;
   currentTemplateName?: string;
   currentProjectName?: string;
+  /** Set when the open document was opened from a template (Pass 4 fork semantics). */
+  openedFromTemplateName?: string | null;
+  /**
+   * Pass 5: show the "Global (all users)" option for elevated roles only.
+   * Deny by default — pass AuthContext.canManageGlobalTemplates (hidden in Demo).
+   */
+  canManageGlobalTemplates?: boolean;
 }
 
 export function SaveTemplateModal({
@@ -16,20 +23,29 @@ export function SaveTemplateModal({
   onClose,
   onSave,
   currentTemplateName = '',
-  currentProjectName = 'default'
+  currentProjectName = 'default',
+  openedFromTemplateName = null,
+  canManageGlobalTemplates = false
 }: SaveTemplateModalProps) {
   const [templateName, setTemplateName] = useState(currentTemplateName);
   const [projectName, setProjectName] = useState(currentProjectName);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [saveAsGlobal, setSaveAsGlobal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Re-sync fields every time the modal opens so Save always shows the current name.
+  // Opened from a template: suggest "<name> copy" (the save forks a new design).
   useEffect(() => {
     if (!isOpen) return;
-    setTemplateName(currentTemplateName || '');
+    setTemplateName(
+      openedFromTemplateName ? `${openedFromTemplateName} copy` : currentTemplateName || ''
+    );
     setProjectName(currentProjectName || 'default');
+    setSaveAsTemplate(false);
+    setSaveAsGlobal(false);
     setError(null);
-  }, [isOpen, currentTemplateName, currentProjectName]);
+  }, [isOpen, currentTemplateName, currentProjectName, openedFromTemplateName]);
 
   if (!isOpen) return null;
 
@@ -53,7 +69,12 @@ export function SaveTemplateModal({
     setError(null);
 
     try {
-      await onSave(sanitizedTemplate, sanitizedProject);
+      await onSave(sanitizedTemplate, sanitizedProject, {
+        saveAsTemplate,
+        // Global only applies to "Save as new template" and is only offered
+        // to elevated roles — never send it otherwise (deny by default).
+        ...(saveAsTemplate && canManageGlobalTemplates && saveAsGlobal ? { saveAsGlobal: true } : {})
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save template');
@@ -121,6 +142,55 @@ export function SaveTemplateModal({
               autoFocus
             />
           </div>
+
+          {/* Fork hint when the document was opened from a template */}
+          {openedFromTemplateName && !saveAsTemplate && (
+            <p className="mb-4 text-xs text-slate-400">
+              Opened from template &ldquo;{openedFromTemplateName}&rdquo; — saving creates a new
+              design and leaves the template unchanged.
+            </p>
+          )}
+
+          {/* Save as new template */}
+          <div className="mb-4">
+            <label htmlFor="saveAsTemplate" className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+              <input
+                id="saveAsTemplate"
+                type="checkbox"
+                checked={saveAsTemplate}
+                onChange={(e) => {
+                  setSaveAsTemplate(e.target.checked);
+                  if (!e.target.checked) setSaveAsGlobal(false);
+                }}
+                disabled={isSaving}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-2 focus:ring-blue-500"
+              />
+              Save as new template
+            </label>
+            <p className="mt-1 text-xs text-slate-400">
+              Templates are reusable starting points: opening one and saving forks a new design.
+            </p>
+          </div>
+
+          {/* Global (all users) — elevated roles only (Pass 5; hidden otherwise) */}
+          {saveAsTemplate && canManageGlobalTemplates && (
+            <div className="mb-4 ml-6">
+              <label htmlFor="saveAsGlobal" className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input
+                  id="saveAsGlobal"
+                  type="checkbox"
+                  checked={saveAsGlobal}
+                  onChange={(e) => setSaveAsGlobal(e.target.checked)}
+                  disabled={isSaving}
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+                />
+                Global (all users)
+              </label>
+              <p className="mt-1 text-xs text-slate-400">
+                Global templates appear read-only in every user&rsquo;s gallery.
+              </p>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (

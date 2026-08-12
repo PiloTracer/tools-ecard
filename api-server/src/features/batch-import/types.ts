@@ -58,6 +58,40 @@ export interface BatchParseJobData {
   options?: ImportOptions;
 }
 
+// --- Pass 3: column inspection (preview) + presets ---
+
+export type MappingConfidence = 'alias' | 'canonical' | 'fuzzy' | 'none';
+
+export interface ColumnAnalysis {
+  sourceColumn: string;
+  autoField: string | null;
+  confidence: MappingConfidence;
+  sampleValues: string[];
+}
+
+export interface InspectColumnsResult {
+  success: boolean;
+  file?: string;
+  rows_total?: number;
+  columns?: Array<{
+    source_column: string;
+    auto_field: string | null;
+    confidence: MappingConfidence;
+    sample_values: string[];
+  }>;
+  target_fields?: string[];
+  error?: string;
+}
+
+export interface FieldMappingPresetDto {
+  id: string;
+  name: string;
+  signature: string;
+  mapping: FieldMapping[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Placeholder error class
 export class BatchImportError extends Error {
   constructor(

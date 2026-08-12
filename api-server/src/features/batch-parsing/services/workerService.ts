@@ -46,7 +46,7 @@ export class BatchParsingWorkerService {
     const queue = this.initializeQueue();
 
     queue.process('parse-batch', 1, async (job) => {
-      const { batchId, filePath, userEmail, workPhonePrefix, defaultCountryCode, batchRecordLimit } = job.data;
+      const { batchId, filePath, userEmail, workPhonePrefix, defaultCountryCode, batchRecordLimit, mapping } = job.data;
       log.info({ jobId: job.id, batchId }, 'Processing batch parse job');
 
       try {
@@ -61,13 +61,19 @@ export class BatchParsingWorkerService {
           workPhonePrefix,
           defaultCountryCode,
           maxRecords: batchRecordLimit,
+          mapping,
         });
 
         await job.progress(90);
 
         if (result.success) {
           log.info(
-            { batchId, recordsProcessed: result.records_processed, recordsTotal: result.records_total },
+            {
+              batchId,
+              recordsProcessed: result.records_processed,
+              recordsTotal: result.records_total,
+              unmappedColumns: result.unmapped_columns?.length ?? 0,
+            },
             'Batch parse completed'
           );
 
@@ -79,7 +85,8 @@ export class BatchParsingWorkerService {
             success: true,
             batchId,
             recordsProcessed: result.records_processed,
-            recordsTotal: result.records_total
+            recordsTotal: result.records_total,
+            unmappedColumns: result.unmapped_columns ?? []
           };
         } else {
           throw new Error(result.error || 'Unknown parsing error');

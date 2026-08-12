@@ -14,8 +14,11 @@ import {
   resolveUniqueTemplateName,
   stemFromImportFileName,
 } from '../../utils/importTemplateNaming';
+import { resolveSaveIntent } from '../../utils/templateSaveIntent';
 import { templateService } from '../../services/templateService';
 import { templatePackageService } from '../../services/templatePackageService';
+import { useAuth } from '@/features/auth/AuthContext';
+import { isDemoMode } from '@/features/demo/isDemoMode';
 import type { Template, ImageElement } from '../../types';
 import type { LengthUnit } from '../../utils/lengthUnits';
 import { readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
@@ -210,6 +213,7 @@ export function CanvasControls() {
     currentProjectName,
     currentTemplateName,
     hasUnsavedChanges,
+    openedFromTemplate,
     canvasWidth,
     canvasHeight,
     exportWidth,
@@ -228,6 +232,12 @@ export function CanvasControls() {
   } = useTemplateStore();
 
   const projectNameForSave = currentProjectName || selectedProject?.name || 'default';
+
+  // Pass 5: global-template management is gated by app roles (UI hint only —
+  // the server enforces authoritatively). Hidden in Demo: the demo write
+  // guard rejects mutations with 403, so offering the controls would be dead UI.
+  const { canManageGlobalTemplates: roleCanManageGlobals } = useAuth();
+  const canManageGlobalTemplates = roleCanManageGlobals && !isDemoMode();
 
   // Sync background color from template to canvas store on template load
   useEffect(() => {
@@ -259,7 +269,11 @@ export function CanvasControls() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentTemplate, currentTemplateName, hasUnsavedChanges, projectNameForSave]);
 
-  const handleSaveTemplate = async (templateName: string, projectName: string) => {
+  const handleSaveTemplate = async (
+    templateName: string,
+    projectName: string,
+    options?: { saveAsTemplate?: boolean; saveAsGlobal?: boolean }
+  ) => {
     if (!currentTemplate) {
       throw new Error('No template to save');
     }
@@ -267,13 +281,24 @@ export function CanvasControls() {
     setIsSaving(true);
 
     try {
+      // Pass 4: resolve fork semantics before persisting —
+      // opening a template then saving creates a NEW design (never overwrites
+      // the template); "Save as new template" always creates a new template.
+      const existingNames = (await templateService.listTemplates()).map((t) => t.name);
+      const intent = resolveSaveIntent({
+        requestedName: templateName,
+        saveAsTemplate: options?.saveAsTemplate === true,
+        openedFromTemplate,
+        existingNames,
+      });
+
       let toPersist = templateSnapshotForPersistence(
         currentTemplate,
         canvasWidth,
         canvasHeight,
         exportWidth,
         canvasSizeUnit,
-        templateName
+        intent.name
       );
       toPersist = mergeLiveCanvasGeometryIntoTemplate(toPersist, fabricCanvas);
       // Rasterize all images before saving to avoid SVG corruption
@@ -281,8 +306,12 @@ export function CanvasControls() {
 
       // Save the template (resource extraction happens inside saveTemplate)
       const metadata = await templateService.saveTemplate({
-        name: templateName,
+        name: intent.name,
         templateData: processedTemplate,
+        kind: intent.kind,
+        // Global publish (Pass 5): only for "Save as new template" from an
+        // elevated role; the server role-gates this regardless.
+        global: canManageGlobalTemplates && options?.saveAsGlobal === true && intent.kind === 'template',
       });
 
       // Store may still hold stale x/y/rotation; align so same-session edit matches what was saved
@@ -311,8 +340,17 @@ export function CanvasControls() {
       useTemplateStore.getState().updateTemplateId(metadata.id);
 
       // Update store with saved metadata
-      setSaveMetadata(projectName, templateName);
+      setSaveMetadata(projectName, intent.name);
       markAsSaved();
+
+      // Fork bookkeeping: after "Save as new template" the open document IS a
+      // template (future saves fork again); after forking a design it is a
+      // design saved in place (no fork source anymore).
+      if (intent.kind === 'template') {
+        useTemplateStore.getState().setOpenedFromTemplate({ id: metadata.id, name: intent.name });
+      } else if (intent.fork) {
+        useTemplateStore.getState().setOpenedFromTemplate(null);
+      }
 
       // Close the modal
       setShowSaveModal(false);
@@ -356,6 +394,14 @@ export function CanvasControls() {
         loadedTemplate.name
       );
       markAsSaved();
+
+      // Pass 4: opening a template arms fork-on-save (Save creates a new design);
+      // opening a design keeps in-place saves.
+      useTemplateStore.getState().setOpenedFromTemplate(
+        loadedTemplate.metadata?.kind === 'template'
+          ? { id: loadedTemplate.id, name: loadedTemplate.name }
+          : null
+      );
 
       console.log('Template opened successfully:', loadedTemplate.name);
     } catch (error) {
@@ -1019,6 +1065,8 @@ export function CanvasControls() {
         onSave={handleSaveTemplate}
         currentTemplateName={currentTemplateName || ''}
         currentProjectName={projectNameForSave}
+        openedFromTemplateName={openedFromTemplate?.name ?? null}
+        canManageGlobalTemplates={canManageGlobalTemplates}
       />
 
       {/* Open Modal */}
@@ -1026,6 +1074,7 @@ export function CanvasControls() {
         isOpen={showOpenModal}
         onClose={() => setShowOpenModal(false)}
         onOpen={handleOpenTemplate}
+        canManageGlobalTemplates={canManageGlobalTemplates}
       />
 
       {/* Close Confirmation Modal */}

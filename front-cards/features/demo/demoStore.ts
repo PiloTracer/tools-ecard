@@ -12,6 +12,7 @@ const KEY_SUFFIX = {
   templates: 'templates',
   batches: 'batches',
   fonts: 'fonts',
+  mappingPresets: 'mappingPresets',
 } as const;
 
 let activeUserId: string | null = null;
@@ -133,6 +134,14 @@ export const demoStore = {
 
   setFontsMeta<T>(fonts: T[]): void {
     lsSet(scopedKey(KEY_SUFFIX.fonts), fonts);
+  },
+
+  getMappingPresets<T>(): T[] {
+    return lsGet<T[]>(scopedKey(KEY_SUFFIX.mappingPresets), []);
+  },
+
+  setMappingPresets<T>(presets: T[]): void {
+    lsSet(scopedKey(KEY_SUFFIX.mappingPresets), presets);
   },
 
   async putBlob(id: string, data: string, mimeType: string): Promise<void> {
