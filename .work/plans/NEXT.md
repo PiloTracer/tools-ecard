@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-08-11 (post `.cursorrules` verify + close)
+**Updated:** 2026-08-12 (import-ux plan v2 drafted + review fixes applied)
 
 ---
 
@@ -31,6 +31,7 @@
 
 - 2026-07-16 · cross-cutting · "Prepare prod deploy from tar.gz backups + Demo mode with browser-only persistence" → completed (M4)
 - 2026-07-16 · feedback · F4–F6, F9, F12 → **completed in code** (commit this session); browser smoke still owner/eng
+- 2026-08-12 · feature · Import UX + templates (tasks 6–11 + .vcf import + role-gated global templates) → **plan v2 drafted, decisions D1–D4 resolved, awaiting approval**: `.work/plans/20260812-import-ux-templates-plan.md` (verifications 1–5 completed in interrupted session; 7 passes starting with baseline hardening)
 
 ---
 
@@ -48,7 +49,7 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | Commit framework path migration | `.cursorrules` + `.work.soc/plans/NEXT_SOC.md` (left out of the `.work/`-scoped session commit); decide the stale `nginx` compose-table row first |
+| **0** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
 | **1** | Manual browser click-through | Demo: upload `.xlsx`, batch export, confirm name+font+clip on PNG; import design, close tab, reopen; profile; units |
 | **2** | Production deploy cutover | `./bin/start.sh prd up`; DNS/TLS; Demo flags on clean host |
 | **3** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
@@ -59,7 +60,7 @@
 
 ## Current iteration
 
-*(none active — feedback UX slice complete 2026-07-16. Start M6 or residual M1/M2 with `@code-implementation plan`)*
+*(none active — import-ux plan v3 `.work/plans/20260812-import-ux-templates-plan.md` awaiting owner approval; on approval start **Pass 0 — baseline hardening**)*
 
 ### Completed — M5: x-director recommended improvements
 

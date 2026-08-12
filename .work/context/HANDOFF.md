@@ -2,6 +2,14 @@
 
 ## Session status
 
+**No open session.** Next session starts with `@session-control start`.
+
+**Closed:** 2026-08-12 — goal: import-ux + templates planning (`@x-director`; prompt `.work/prompts/20261011-new-import-features/prompt.md`). Done: (1) recovered the interrupted 2026-08-11/12 session from its export — verifications 1–5 were complete but no plan/code had been written; (2) wrote the full multi-pass plan `.work/plans/20260812-import-ux-templates-plan.md` — Passes 0–6: baseline hardening → template XLSX downloads + transposed parsing → `.vcf` import → field-mapping (upload+paste, saved presets) → user templates vs designs → role-gated global templates (tools-dashboard `app_roles`: `appsuper`|`appglobal`; API channel + bundled `front-cards/public/templates/globals/` channel) → e2e/docs; (3) owner resolved decision points D1–D4 (plan §8); (4) independent review `.work/feedback/20260811-uncommitted-review-import-ux.md` verified claim-by-claim — all critical findings confirmed against the repo (`isPublic` never migrated; Fastify+Express duplicate batch-import routers; wrong Pass 0 path; Bull≠BullMQ; three per-env example files; parity-test snake↔camel trap) and every fix folded into plan v3; (5) 418KB chat export moved repo-root → `tmp/` per exports policy; (6) NEXT.md intake line + Priority-0 bookkeeping. No application code changed.
+
+**Residual / next:** plan v3 **awaits owner approval → then start Pass 0**; deletion of the dead Express `batch-import/routes.ts`+`controllers/` needs owner approval; before Pass 5 confirm externally that tools-dashboard issues `app_roles` for the ecards `client_id` (dev+prd) and the `validate-token` contract; stale `nginx` compose-row decision still open; `.qwen/` gitignore decision open (owner committed `.qwen/settings.json` in `247357a`); untracked `reasonix.toml` at root left untouched (outside session scope).
+
+Treat prior closed sessions as historical only; see "What this cycle produced" below.
+
 **Closed:** 2026-08-11 — goal: verify `.cursorrules` consistency & reliability after the framework path migration. Read-only audit: all 4 source pointers (`/mnt/work/Projects/.ai*`) resolve; all 16 Agent OS + 6 SOC skill handles exist; every local `.work/`, `.work.soc/`, `.work.ui/` reference resolves; `soc-deploy-basic.sh verify` → all checks passed; `deploy-basic.sh status` → cursorrules-verify PASS; zero stale `/data/Projects` refs. Findings (not fixed, pending decision): stale `nginx` row in §Docker compose table (TLS is host-level nginx, explicitly not part of the stack); SOC unreachable-source fallback contradicts the Agent OS/UI stop-policy (SOC block is generator-owned — fix upstream). No code changes this session.
 
 **Closed:** 2026-08-01 (PM) — goal: make batch import + login work across dev / prd / demo. Done: (1) dev Normal-mode upload fixed end-to-end — dev `.env` flipped to `USE_LOCAL_STORAGE=true` (host SeaweedFS down with the tools-dashboard stack), `batchService` now sends `credentials: 'include'` on all reads (httpOnly cookie made the Bearer fallback empty → silent 401 → "nothing happens" on file select), name modal no longer blocks on list failure, Python-stderr log noise downgraded to warn; all 6 operator samples verified through the full pipeline (storage→queue→worker→parser→Postgres+Cassandra), 7/7 LOADED (`6d34bf4`). (2) Login: `subscription` scope dropped everywhere (provider registrations only allow `profile email`; requesting more rejected every login) — code defaults + `.env`/`.env.prd`/`.env.demo`; OAuth failures now redirect to the Tools Dashboard app library instead of an e-cards error screen; "Go to Tools Dashboard" link added on the login page (`65af773`). Verified: jest 191, api jest 46, python 28, tsc both apps, live `scope=profile email` from `/api/auth/login`. Committed + pushed.
@@ -16,11 +24,11 @@
 
 **Prior:** Closed 2026-07-16 — Operator feedback F4–F6/F9/F12 (profile, ingest-only capitalize, image clip shapes, canvas units) + api-server jest OOM runner; verified, committed, pushed
 
-**Updated:** 2026-08-11
+**Updated:** 2026-08-12
 
 **Note (2026-07-24):** Nine commits landed on `main` on 2026-07-24 (prd env-file policy, health-gated startup, Prisma auto-recover, Redis auth at runtime, image force-recreate, redisConnection import path) that are **not** recorded in §What this cycle produced below — HANDOFF is stale for that work.
 
-**Repository state:** `main` synced with `origin/main`; working tree holds uncommitted framework-migration leftovers: `.cursorrules` (path migration `/data/Projects` → `/mnt/work/Projects` + expanded SOC block — outside `.work/`, not staged by session commits) and `.work.soc/plans/NEXT_SOC.md` (stale `@session-soc` → `@soc-session` handle fix); untracked `.qwen/` (agent tool state — keep untracked). 2026-08-11 session committed `.work/` bookkeeping only. **Residual:** commit the `.cursorrules` migration + decide the stale `nginx` row; manual browser click-through; owner DNS/TLS/Demo deploy; prd redeploy + Cassandra check; M1/M2 placeholders; monitoring.
+**Repository state:** `main` synced with `origin/main` post-close. Framework-migration leftovers resolved by owner commit `247357a` (`.cursorrules` + `.work.soc/plans/NEXT_SOC.md` + `.qwen/settings.json`). Untracked at root: `reasonix.toml` (outside session scope, untouched). Chat export lives in `tmp/` (gitignored). **Residual:** import-ux plan v3 approval → Pass 0; Express batch-import routes deletion approval; stale `nginx` row decision; `.qwen/` gitignore decision; manual browser click-through; owner DNS/TLS/Demo deploy; prd redeploy + Cassandra check; M1/M2 placeholders; monitoring.
 
 **Recommended pick-up file:** `.work/plans/NEXT.md`
 
@@ -75,7 +83,8 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 4 | Manual browser click-through of Demo fixes (upload real `.xlsx`, run batch export, visually confirm name + font on output PNG) | Confidence in Demo fix | eng/owner |
 | 5 | Pre-existing `traceability-verify.sh` gap: FR1-FR4, FR7-FR10 not mapped to `M{N}-T{N}` tasks in master plan (unrelated to this session's work; found while running the close pre-check) | Plan hygiene | eng |
 | 6 | Manual browser click-through of import-persistence fix (import a `.zip`/`.json` design in Demo + Normal, close tab without Save, reopen, confirm it's listed in Open Template and loads correctly) — could not be unit-tested because `demoStore`/`browserStorageService` need `indexedDB`, unavailable in this repo's jsdom jest setup with no polyfill installed | Confidence in import-persistence fix | eng/owner |
-| 7 | Commit `.cursorrules` framework path migration + expanded SOC block and `.work.soc/plans/NEXT_SOC.md` handle fix (both outside `.work/` session-commit scope); decide fix for stale `nginx` compose-table row first | `.cursorrules` reliability | eng/owner |
+| 7 | ~~Commit `.cursorrules` framework path migration + NEXT_SOC fix~~ — **Done** in owner commit `247357a`. Residual: decide the stale `nginx` compose-table row (TLS is host-level, not a compose service) | `.cursorrules` reliability | eng/owner |
+| 8 | Approve import-ux plan v3 (`.work/plans/20260812-import-ux-templates-plan.md`) → start Pass 0; approve deletion of dead Express `batch-import/routes.ts`+`controllers/`; decide `.qwen/` gitignore; decide untracked `reasonix.toml` | Import-ux implementation | owner |
 
 ---
 
@@ -125,6 +134,7 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | 2026-08-01 | Operator batch-sample verify + close | 6 samples (`.work/feedback/test-data.md`) verified via `.txt`/`.md` upload + paste, Demo + Normal; fixture regression tests; python 28, jest 191 + 46 green |
 | 2026-08-01 PM | Normal-mode upload + login fixes | Dev storage flip (local), batchService credentials + modal silent-failure fix, python stderr log level; prd parse-failure diagnosis (needs redeploy + Cassandra check); OAuth scopes `profile email` + failure→Dashboard redirect + login-page Dashboard link; full-pipeline e2e 7/7 LOADED |
 | 2026-08-11 | `.cursorrules` verify + close | Read-only consistency/reliability audit of the path migration: source pointers, skill handles, local refs, built-in verifier audits — all green; stale `nginx` row + SOC fallback inconsistency flagged (unfixed); HANDOFF/NEXT refreshed |
+| 2026-08-12 | Import-ux plan v3 + review fixes + close | Recovered interrupted session (verifications 1–5 done, no plan/code); wrote `.work/plans/20260812-import-ux-templates-plan.md` Passes 0–6; owner resolved D1–D4; independent review (`.work/feedback/20260811-uncommitted-review-import-ux.md`) claim-verified — all critical findings true, fixes applied (isPublic migration precondition, Fastify-only endpoint strategy, Pass 0 path, Bull wording, 3 env examples, parity casing); chat export → `tmp/`; no app code changed |
 
 ---
 
@@ -278,10 +288,10 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ## Latest action (@session-control close)
 
-**Date:** 2026-08-11
+**Date:** 2026-08-12
 **Request:** `@session-control close commit push`
-**Session result:** Closed. Verified `.cursorrules` consistency & reliability after the `/data/Projects` → `/mnt/work/Projects` framework path migration: all source pointers, skill handles (16 Agent OS + 6 SOC), and local `.work*` references resolve; built-in audits green (`soc-deploy-basic.sh verify` → all checks passed; `deploy-basic.sh status` → cursorrules-verify PASS); zero stale old-prefix refs. Traceability pre-check re-confirmed the known FR-mapping gap (owner action #5). Findings flagged, not fixed: stale `nginx` row in §Docker table; SOC unreachable-source fallback contradicts Agent OS/UI stop-policy (generator-owned block — fix upstream). No code changes; `.work/` bookkeeping committed + pushed.
-**Blockers remaining:** `.cursorrules` migration itself uncommitted (outside `.work/` session scope — separate commit); stale `nginx` row decision; manual browser click-through; prd redeploy + Cassandra check (carried from 2026-08-01)
+**Session result:** Closed. Recovered the interrupted import-ux session (verifications 1–5 complete; no plan/code had been written) and produced the full multi-pass plan `.work/plans/20260812-import-ux-templates-plan.md` (Passes 0–6, tasks 6–11 + `.vcf` import + role-gated global templates via tools-dashboard `app_roles`, dual API+bundled channel). Owner resolved decision points D1–D4 (plan §8). Independent review `.work/feedback/20260811-uncommitted-review-import-ux.md` claim-verified against the repo — all critical findings true (`isPublic` never migrated; Fastify+Express duplicate routers; wrong Pass 0 path; Bull≠BullMQ; three per-env examples; parity casing trap) and every fix applied to plan v3. Chat export moved to `tmp/` per exports policy. NEXT.md intake + Priority-0 bookkeeping; HANDOFF refreshed. No application code changed. `.work/` committed + pushed.
+**Blockers remaining:** plan v3 approval → Pass 0; Express batch-import routes deletion approval; external pre-check before Pass 5 (`validate-token` contract + `app_roles` issuance for ecards client_id); stale `nginx` row decision; `.qwen/` gitignore decision; manual browser click-through; prd redeploy + Cassandra check (carried from 2026-08-01)
 
 ---
 
