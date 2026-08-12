@@ -29,6 +29,40 @@ describe('analyzeHeaders', () => {
     const analysis = analyzeHeaders(table);
     expect(analysis[0]).toMatchObject({ autoField: 'work_phone', confidence: 'fuzzy' });
   });
+
+  it('strong alias tokens win over filler-token substring noise', () => {
+    // "correo"/"telefono" state the column's meaning; filler tokens like
+    // "trabajo"/"oficina" only substring-match business-address aliases and must
+    // not turn the header into an ambiguous (unmapped) one.
+    const table = parseCsvText(
+      'Correo Trabajo\tTelefono del Trabajo\nana@example.com\t+506 2222 0000'
+    );
+    const analysis = analyzeHeaders(table);
+    const byHeader = Object.fromEntries(analysis.map((c) => [c.sourceColumn, c]));
+    expect(byHeader['Correo Trabajo']).toMatchObject({ autoField: 'email', confidence: 'fuzzy' });
+    expect(byHeader['Telefono del Trabajo']).toMatchObject({
+      autoField: 'work_phone',
+      confidence: 'fuzzy',
+    });
+  });
+
+  it('flags unknown key-value paste labels as unmapped (modal trigger)', () => {
+    // An unknown label in a whitespace-separated KV paste must surface as a
+    // confidence-'none' column so UploadBatchComponent auto-opens the mapping
+    // modal instead of silently dropping the value.
+    const table = parseCsvText(
+      [
+        'nombre\tExample',
+        'correo\texample.person@example.com',
+        'Employee ID\tEMP-0042',
+      ].join('\n')
+    );
+    const analysis = analyzeHeaders(table);
+    const byHeader = Object.fromEntries(analysis.map((c) => [c.sourceColumn, c]));
+    expect(byHeader['Employee ID']).toMatchObject({ autoField: null, confidence: 'none' });
+    expect(byHeader['Employee ID'].sampleValues).toEqual(['EMP-0042']);
+    expect(byHeader['nombre']).toMatchObject({ autoField: 'first_name', confidence: 'alias' });
+  });
 });
 
 describe('mapRowToContactFields with explicitMapping', () => {

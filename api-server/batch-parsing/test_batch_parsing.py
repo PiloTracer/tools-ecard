@@ -53,6 +53,15 @@ class FuzzyFieldMatchTests(unittest.TestCase):
         # headers the exact pass didn't already claim.
         self.assertEqual(find_fuzzy_field_match("celular"), "mobile_phone")
 
+    def test_strong_alias_token_wins_over_filler_noise(self):
+        # "correo"/"telefono"/"extension" state the column's meaning; filler tokens
+        # like "trabajo"/"oficina" only substring-match business-address aliases and
+        # must not turn the header into an ambiguous (unmapped) one.
+        self.assertEqual(find_fuzzy_field_match("correo trabajo"), "email")
+        self.assertEqual(find_fuzzy_field_match("telefono del trabajo"), "work_phone")
+        self.assertEqual(find_fuzzy_field_match("extension de trabajo"), "work_phone_ext")
+        self.assertEqual(find_fuzzy_field_match("direccion casa"), "address_street")
+
 
 class CanonicalFieldMatchTests(unittest.TestCase):
     """Semantics: vCard field names are matched regardless of case and of `_` vs spaces."""
@@ -353,6 +362,49 @@ class FileParserFlexibilityTests(unittest.TestCase):
         self.assertEqual(len(df), 1)
         self.assertEqual(df.iloc[0]["full_name"], "John Doe")
         self.assertEqual(df.iloc[0]["work_phone"], "+506 2222-1234")
+
+    def test_key_value_paste_spanish_work_labels(self):
+        # Regression: "telefono trabajo"/"extension trabajo" were silently dropped —
+        # no exact alias, and the fuzzy matcher saw the "trabajo" token inside five
+        # business-address aliases plus "telefono"/"extension" -> ambiguous -> None,
+        # so the line never became a column.
+        content = (
+            "nombre completo\tExample Person\n"
+            "nombre\tExample\n"
+            "apellido\tPerson\n"
+            "telefono trabajo\t+506 2222 0000\n"
+            "extension trabajo\t123\n"
+            "movil\t+506 8888 0000\n"
+            "correo\texample.person@example.com\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["telefono trabajo"], "+506 2222 0000")
+        self.assertEqual(df.iloc[0]["extension trabajo"], "123")
+        self.assertEqual(
+            CANONICAL_FIELD_MAP.get(_canonical_header_key("telefono trabajo")),
+            "work_phone",
+        )
+        self.assertEqual(
+            CANONICAL_FIELD_MAP.get(_canonical_header_key("extension trabajo")),
+            "work_phone_ext",
+        )
+
+    def test_key_value_paste_unknown_label_is_kept_as_column(self):
+        # Unknown KV labels must survive as (unmapped) columns so the preview
+        # endpoint lists them for manual mapping instead of dropping the values.
+        content = (
+            "nombre\tExample\n"
+            "apellido\tPerson\n"
+            "correo\texample.person@example.com\n"
+            "Employee ID\tEMP-0042\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 1)
+        self.assertIn("Employee ID", df.columns)
+        self.assertEqual(df.iloc[0]["Employee ID"], "EMP-0042")
 
     def test_tsv_with_alias_only_header_row_stays_tabular(self):
         # Both cells of the header line are known aliases — must NOT be read as a

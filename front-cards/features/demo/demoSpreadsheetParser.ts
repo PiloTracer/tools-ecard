@@ -80,9 +80,11 @@ export const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
   tel: 'workPhone',
   telefono: 'workPhone',
   telefono_ofi: 'workPhone',
+  telefono_trabajo: 'workPhone',
   work_phone_ext: 'workPhoneExt',
   ext: 'workPhoneExt',
   extension: 'workPhoneExt',
+  extension_trabajo: 'workPhoneExt',
   mobile_phone: 'mobilePhone',
   mobilephone: 'mobilePhone',
   mobile: 'mobilePhone',
@@ -183,22 +185,28 @@ const FUZZY_MIN_ALIAS_LEN = 4;
 /**
  * Fuzzy fallback for headers that don't exactly match a known alias — e.g. "Teléfono
  * Oficina 2", "Cel./WhatsApp", "Correo Electrónico Personal". Splits the normalized key
- * into tokens and looks for a known field via exact-token lookup first, then substring
- * containment for longer alias keywords. If tokens point to more than one distinct
- * field (a genuinely compound header like "Nombre y Apellido"), returns null so the
- * existing positional-name fallback handles it instead of guessing wrong.
+ * into tokens. A token that IS a known alias (correo, email, telefono, direccion…)
+ * states the column's meaning outright — it wins over substring noise from filler
+ * tokens (trabajo, oficina, personal), so "Correo Trabajo" resolves to email. Two or
+ * more distinct strong hits mean a genuinely compound header ("Nombre y Apellido") →
+ * null, so the caller's positional/name fallback handles it instead of guessing.
+ * Without any strong hit, longer tokens try substring containment against known alias
+ * keywords; ambiguity likewise returns null.
  */
 function findFuzzyFieldMatch(normalizedKey: string): keyof DemoContactFields | null {
   const tokens = normalizedKey.split('_').filter(Boolean);
   const matchedFields = new Set<keyof DemoContactFields>();
 
+  // Strong-signal pass: exact-token alias hits only.
   for (const token of tokens) {
     const direct = HEADER_ALIASES[token];
-    if (direct) {
-      matchedFields.add(direct);
-      continue;
-    }
-    // Below the length floor, only an exact-token hit (above) counts — a short
+    if (direct) matchedFields.add(direct);
+  }
+  if (matchedFields.size === 1) return [...matchedFields][0];
+  if (matchedFields.size > 1) return null;
+
+  for (const token of tokens) {
+    // Below the length floor, only the exact-token pass (above) counts — a short
     // token like "de" would otherwise substring-match into unrelated long
     // aliases (e.g. "de" is contained in "department"/"departamento").
     if (token.length < FUZZY_MIN_ALIAS_LEN) continue;
@@ -516,7 +524,15 @@ function parseKeyValueSection(lines: string[]): DemoParsedTable {
   const headers: string[] = [];
   const values: string[] = [];
   for (const line of lines) {
-    const kv = matchKeyValueLine(line.trim());
+    let kv = matchKeyValueLine(line.trim());
+    if (!kv) {
+      // Whitespace-form line whose label is not a known alias: inside an
+      // already-classified KV section it is still a genuine label/value line.
+      // Keep it as a column so analyzeHeaders reports it as unmapped and the
+      // mapping modal can offer it — dropping it here silently lost the value.
+      const raw = line.trim().match(KEY_VALUE_WS_LINE_RE);
+      if (raw) kv = [raw[1].trim(), raw[2].trim()];
+    }
     if (!kv) continue;
     headers.push(kv[0]);
     values.push(kv[1]);

@@ -116,6 +116,51 @@ describe('demoSpreadsheetParser', () => {
       expect(fields.mobilePhone).toBe('+506 8888-9999');
     });
 
+    it('parses Spanish work-phone/extension labels in key-value paste', () => {
+      // Regression: "telefono trabajo" / "extension trabajo" used to be dropped
+      // silently — no exact alias, and the fuzzy matcher saw the "trabajo" token
+      // inside five business-address aliases plus "telefono"/"extension", so it
+      // returned ambiguous-null and the line never became a column (which also
+      // meant the mapping modal never opened: every surviving column was mapped).
+      const table = parseCsvText(
+        [
+          'nombre completo\tExample Person',
+          'nombre\tExample',
+          'apellido\tPerson',
+          'telefono trabajo\t+506 2222 0000',
+          'extension trabajo\t123',
+          'movil\t+506 8888 0000',
+          'correo\texample.person@example.com',
+        ].join('\n')
+      );
+      expect(table.rows).toHaveLength(1);
+      expect(table.headers).toContain('telefono trabajo');
+      expect(table.headers).toContain('extension trabajo');
+      const fields = mapRowToContactFields(table.headers, table.rows[0]);
+      expect(fields.fullName).toBe('Example Person');
+      expect(fields.workPhone).toBe('+506 2222 0000');
+      expect(fields.workPhoneExt).toBe('123');
+      expect(fields.mobilePhone).toBe('+506 8888 0000');
+      expect(fields.email).toBe('example.person@example.com');
+    });
+
+    it('keeps unknown-label key-value lines as unmapped columns', () => {
+      // Unknown KV labels inside a key-value section must survive as columns so
+      // analyzeHeaders flags them (confidence 'none') and the mapping modal
+      // offers them for manual mapping instead of losing the values.
+      const table = parseCsvText(
+        [
+          'nombre\tExample',
+          'apellido\tPerson',
+          'correo\texample.person@example.com',
+          'Employee ID\tEMP-0042',
+        ].join('\n')
+      );
+      expect(table.rows).toHaveLength(1);
+      expect(table.headers).toContain('Employee ID');
+      expect(table.rows[0][table.headers.indexOf('Employee ID')]).toBe('EMP-0042');
+    });
+
     it('keeps genuine TSV tables with alias-only header rows on the tabular path', () => {
       const table = parseCsvText('full_name\temail\nJohn Doe\tjohn@example.com\n');
       expect(table.headers).toEqual(['full_name', 'email']);

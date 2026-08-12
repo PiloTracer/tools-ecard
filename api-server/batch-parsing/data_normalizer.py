@@ -17,11 +17,11 @@ from nameparser import HumanName
 FIELD_MAPPING = {
     # Core
     "first_name": ["first_name", "firstName", "first name", "firstname", "fname", "given name", "nombre"],
-    "last_name": ["last_name", "lastName", "last name", "lastname", "lname", "surname", "family name", "apellidos"],
+    "last_name": ["last_name", "lastName", "last name", "lastname", "lname", "surname", "family name", "apellido", "apellidos"],
     "full_name": ["full_name", "fullName", "full name", "nombre completo", "usuario"],
     "email": ["email", "e-mail", "mail", "email address", "correo", "correo electrónico", "correo electronico"],
-    "work_phone": ["work_phone", "workPhone", "work phone", "office phone", "business phone", "tel", "phone", "telefono", "teléfono", "telefono ofi", "teléfono ofi"],
-    "work_phone_ext": ["work_phone_ext", "ext", "extension", "extensión"],
+    "work_phone": ["work_phone", "workPhone", "work phone", "office phone", "business phone", "tel", "phone", "telefono", "teléfono", "telefono ofi", "teléfono ofi", "telefono trabajo", "teléfono trabajo"],
+    "work_phone_ext": ["work_phone_ext", "ext", "extension", "extensión", "extension trabajo", "extensión trabajo"],
     "mobile_phone": ["mobile_phone", "mobilePhone", "mobile", "cell", "cellular", "mobile phone", "cell phone", "celular", "móvil", "whatsapp", "whats app"],
 
     # Address (Core)
@@ -111,14 +111,28 @@ def find_fuzzy_field_match(header: str) -> Optional[str]:
     """
     Fallback for headers that don't exactly match a `FIELD_MAPPING` alias — e.g. "Teléfono
     Oficina 2", "Cel./WhatsApp", "Correo Electrónico Personal". Splits the normalized
-    header into tokens; each token is checked first for an exact hit against any field's
-    alias tokens, then (for tokens >= FUZZY_MIN_ALIAS_LEN) for substring containment
-    against the full alias strings. If tokens end up pointing at more than one distinct
-    target field — a genuinely compound header like "Nombre y Apellido" — returns None so
-    the caller's own positional/name-splitting fallback handles it instead of guessing.
+    header into tokens. A token that is itself a full alias (correo, email, telefono,
+    direccion…) states the column's meaning outright — it wins over substring noise from
+    filler tokens (trabajo, oficina, personal), so "Correo Trabajo" resolves to email.
+    Two or more distinct strong hits mean a genuinely compound header ("Nombre y
+    Apellido") → None, so the caller's positional/name fallback handles it instead of
+    guessing. Without any strong hit, each token is checked against alias tokens and
+    (for tokens >= FUZZY_MIN_ALIAS_LEN) for substring containment against the full alias
+    strings; ambiguity likewise returns None.
     """
     tokens = [t for t in _normalize_header_token(header).split(' ') if t]
     if not tokens:
+        return None
+
+    # Strong-signal pass: tokens that are themselves full aliases.
+    strong_fields = {
+        CANONICAL_FIELD_MAP[key]
+        for key in (_canonical_header_key(token) for token in tokens)
+        if key in CANONICAL_FIELD_MAP
+    }
+    if len(strong_fields) == 1:
+        return next(iter(strong_fields))
+    if len(strong_fields) > 1:
         return None
 
     matched_fields = set()

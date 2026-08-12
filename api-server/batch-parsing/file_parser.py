@@ -240,6 +240,14 @@ class FileParser:
         for line in lines:
             match = _match_key_value_line(line.strip())
             if not match:
+                # Whitespace-form line whose label is not a known alias: inside an
+                # already-classified KV section it is still a genuine label/value
+                # line. Keep it as a column so the preview endpoint lists it as
+                # unmapped and the user can map it — dropping it lost the value.
+                ws = KEY_VALUE_WS_LINE_RE.match(line.strip())
+                if ws:
+                    match = (ws.group('key').strip(), ws.group('value').strip())
+            if not match:
                 continue
             key, value = match
             headers.append(key)
