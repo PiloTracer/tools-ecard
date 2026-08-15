@@ -10,10 +10,13 @@ import { ShapeProperties } from './ShapeProperties';
 import { isTextElement, isImageElement, isQRElement, isShapeElement } from '../../types';
 import { generateVCardFromElements } from '../../services/vcardGenerator';
 import { NumericStringInput } from '../common/NumericStringInput';
+import { IconButton } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 import { fromPixels, toPixels, unitLabel } from '../../utils/lengthUnits';
 import type { LengthUnit } from '../../utils/lengthUnits';
 
-export function PropertyPanel() {
+export function PropertyPanel({ onCloseDrawer }: { onCloseDrawer?: () => void }) {
+  const { t } = useTranslation();
   const { selectedElementIds, fabricCanvas, setSelectedElements } = useCanvasStore();
   const { elements, removeElements, updateElement, duplicateElement, bringToFront, sendToBack, bringForward, sendBackward, canvasWidth, canvasHeight, canvasSizeUnit } = useTemplateStore();
   const selectedElementId = selectedElementIds[0] ?? null;
@@ -277,9 +280,18 @@ export function PropertyPanel() {
 
   return (
     <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-gray-200 bg-gradient-to-r from-white to-slate-50 p-4">
-        <h2 className="text-lg font-bold text-slate-800">Properties</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Element settings</p>
+      <div className="flex items-start justify-between border-b border-border-subtle bg-gradient-to-r from-surface-base to-surface-elevated p-4">
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">{t('designer.properties')}</h2>
+          <p className="text-xs text-text-muted mt-0.5">Element settings</p>
+        </div>
+        {onCloseDrawer && (
+          <IconButton aria-label={t('common.close')} size="sm" onClick={onCloseDrawer} className="lg:hidden">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </IconButton>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

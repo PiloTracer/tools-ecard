@@ -1,12 +1,14 @@
 /**
  * BatchFilters Component
- * Filter controls for batch list
+ * Filter controls for batch list — SearchBar + status Select + Clear (S2 SPEC §4/§6).
  */
 
 'use client';
 
 import React from 'react';
 import type { BatchStatus, BatchListFilters } from '../types';
+import { SearchBar, Select, Button } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 
 interface BatchFiltersProps {
   filters: BatchListFilters;
@@ -14,6 +16,7 @@ interface BatchFiltersProps {
 }
 
 export const BatchFilters: React.FC<BatchFiltersProps> = ({ filters, onFiltersChange }) => {
+  const { t } = useTranslation();
   const statuses: (BatchStatus | '')[] = ['', 'UPLOADED', 'PARSING', 'PARSED', 'LOADED', 'ERROR'];
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -24,10 +27,10 @@ export const BatchFilters: React.FC<BatchFiltersProps> = ({ filters, onFiltersCh
     });
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (value: string) => {
     onFiltersChange({
       ...filters,
-      search: e.target.value || undefined,
+      search: value || undefined,
     });
   };
 
@@ -35,84 +38,49 @@ export const BatchFilters: React.FC<BatchFiltersProps> = ({ filters, onFiltersCh
     onFiltersChange({});
   };
 
-  const hasActiveFilters = filters.status || filters.search;
+  const hasActiveFilters = Boolean(filters.status || filters.search);
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-      <div className="flex flex-col sm:flex-row gap-4">
+    <div className="rounded-lg border border-border-subtle bg-surface-elevated p-4 shadow-elevation-2">
+      <div className="flex flex-col gap-4 sm:flex-row">
         {/* Search */}
         <div className="flex-1">
-          <label htmlFor="search" className="sr-only">
-            Search batches
+          <label htmlFor="search" className="mb-1 block text-sm font-medium text-text-primary">
+            {t('batches.searchPlaceholder')}
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-            <input
-              type="text"
-              id="search"
-              placeholder="Search by file name..."
-              value={filters.search || ''}
-              onChange={handleSearchChange}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
-          </div>
+          <SearchBar
+            id="search"
+            value={filters.search || ''}
+            onValueChange={handleSearchChange}
+            placeholder={t('batches.searchPlaceholder')}
+          />
         </div>
 
         {/* Status Filter */}
         <div className="w-full sm:w-48">
-          <label htmlFor="status" className="sr-only">
-            Filter by status
+          <label htmlFor="status" className="mb-1 block text-sm font-medium text-text-primary">
+            {t('batches.filterStatusLabel')}
           </label>
-          <select
-            id="status"
-            value={filters.status || ''}
-            onChange={handleStatusChange}
-            className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-          >
-            <option value="">All Statuses</option>
+          <Select id="status" value={filters.status || ''} onChange={handleStatusChange}>
+            <option value="">{t('batches.allStatuses')}</option>
             {statuses.slice(1).map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Clear Filters */}
         {hasActiveFilters && (
-          <button
-            onClick={handleClearFilters}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <svg
-              className="h-4 w-4 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-            Clear
-          </button>
+          <div className="flex items-end">
+            <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              {t('batches.clearFilters')}
+            </Button>
+          </div>
         )}
       </div>
     </div>

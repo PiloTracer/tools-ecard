@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { RenderStatusBadge } from './RenderStatusBadge';
+import { LocaleProvider } from '@/features/i18n';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -18,7 +19,7 @@ describe('RenderStatusBadge', () => {
 
   it('returns null when idle', () => {
     (fetch as jest.Mock).mockRejectedValue(new Error('Not found'));
-    const { container } = render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    const { container } = render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
     expect(container.firstChild).toBeNull();
   });
 
@@ -34,7 +35,7 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
 
     await waitFor(() => {
       expect(screen.getByText(/Rendering 45%/)).toBeInTheDocument();
@@ -53,7 +54,7 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
 
     await waitFor(() => {
       expect(screen.getByText('Rendered')).toBeInTheDocument();
@@ -73,7 +74,7 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
 
     await waitFor(() => {
       expect(screen.getByText('Failed')).toBeInTheDocument();
@@ -92,7 +93,7 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" apiBaseUrl="https://api.example.com" />);
+    render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" apiBaseUrl="https://api.example.com" /></LocaleProvider>);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -113,7 +114,7 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
 
     await waitFor(() => {
       expect(screen.getByText(/Rendering/)).toBeInTheDocument();
@@ -132,7 +133,7 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
 
     await waitFor(() => {
       expect(screen.getByText(/Rendering 10%/)).toBeInTheDocument();
@@ -151,13 +152,13 @@ describe('RenderStatusBadge', () => {
       }),
     });
 
-    const { container } = render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    const { container } = render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
     expect(container.firstChild).toBeNull();
   });
 
   it('handles network errors gracefully', async () => {
     (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
-    const { container } = render(<RenderStatusBadge recordId="rec-1" batchId="batch-1" />);
+    const { container } = render(<LocaleProvider><RenderStatusBadge recordId="rec-1" batchId="batch-1" /></LocaleProvider>);
     expect(container.firstChild).toBeNull();
   });
 });

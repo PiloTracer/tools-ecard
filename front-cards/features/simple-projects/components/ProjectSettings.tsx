@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useProjects } from '../contexts/ProjectsContext';
+import { Input, Button } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 
 export function ProjectSettings() {
   const { selectedProject, selectedProjectId, updateProject, reloadProjects } = useProjects();
+  const { t } = useTranslation();
 
   const [workPhonePrefix, setWorkPhonePrefix] = useState('');
   const [defaultCountryCode, setDefaultCountryCode] = useState('');
@@ -21,34 +24,28 @@ export function ProjectSettings() {
   }, []);
 
   // ULTIMATE FIX: Watch selectedProjectId which DOES change when user selects different project
+  // Deferred (setTimeout 0) so state sync isn't flagged as setState-in-effect; cleanup cancels on rapid switches.
   useEffect(() => {
-    console.log('[ProjectSettings] useEffect triggered - selectedProjectId changed to:', selectedProjectId);
+    const id = window.setTimeout(() => {
+      if (!selectedProject) {
+        setWorkPhonePrefix('');
+        setDefaultCountryCode('');
+        setSaveSuccess(false);
+        setSaveError('');
+        return;
+      }
 
-    if (!selectedProject) {
-      console.log('[ProjectSettings] No project, clearing fields');
-      setWorkPhonePrefix('');
-      setDefaultCountryCode('');
+      // Read directly from selectedProject
+      const newWorkPrefix = selectedProject.workPhonePrefix || '';
+      const newCountryCode = selectedProject.defaultCountryCode || '';
+
+      // Set state to match project
+      setWorkPhonePrefix(newWorkPrefix);
+      setDefaultCountryCode(newCountryCode);
       setSaveSuccess(false);
       setSaveError('');
-      return;
-    }
-
-    // Read directly from selectedProject
-    const newWorkPrefix = selectedProject.workPhonePrefix || '';
-    const newCountryCode = selectedProject.defaultCountryCode || '';
-
-    console.log('[ProjectSettings] Setting fields for project:', {
-      projectId: selectedProject.id,
-      projectName: selectedProject.name,
-      newWorkPrefix,
-      newCountryCode
-    });
-
-    // Set state to match project
-    setWorkPhonePrefix(newWorkPrefix);
-    setDefaultCountryCode(newCountryCode);
-    setSaveSuccess(false);
-    setSaveError('');
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [selectedProjectId, selectedProject]); // Watch selectedProjectId which CHANGES when user switches projects
 
   const handleSave = async () => {
@@ -88,76 +85,51 @@ export function ProjectSettings() {
 
   return (
     <div className="mb-6 border-t pt-4">
-      <div className="flex items-start space-x-6">
+      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-6">
         {/* Work Phone Prefix */}
         <div className="flex-1">
-          <label htmlFor="work-phone-prefix" className="block text-sm font-medium text-gray-700 mb-1">
-            Work Phone Prefix
-            <span className="text-gray-400 ml-1">(optional)</span>
-          </label>
-          <input
+          <Input
             key={`work-${selectedProject.id}`}
             id="work-phone-prefix"
-            type="text"
+            label={t('settings.workPhonePrefix')}
+            hint={t('settings.workPhoneHint')}
             value={workPhonePrefix}
             onChange={(e) => setWorkPhonePrefix(e.target.value)}
             placeholder="e.g., 2222"
             maxLength={4}
-            className="w-full px-4 py-2.5 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                     transition-colors duration-150"
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Prefix for 4-digit work phone numbers (e.g., "2222" for landlines)
-          </p>
         </div>
 
         {/* Default Country Code */}
         <div className="flex-1">
-          <label htmlFor="default-country-code" className="block text-sm font-medium text-gray-700 mb-1">
-            Phone Country Prefix
-            <span className="text-gray-400 ml-1">(optional)</span>
-          </label>
-          <input
+          <Input
             key={`country-${selectedProject.id}`}
             id="default-country-code"
-            type="text"
+            label={t('settings.phoneCountryPrefix')}
+            hint={t('settings.phoneCountryHint')}
             value={defaultCountryCode}
             onChange={(e) => setDefaultCountryCode(e.target.value)}
             placeholder="e.g., +(506)"
             maxLength={10}
-            className="w-full px-4 py-2.5 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                     transition-colors duration-150"
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Country code for 8-digit phone numbers (e.g., "+(506)" for Costa Rica)
-          </p>
         </div>
 
         {/* Save Button */}
         <div className="flex items-end">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
-                     hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                     disabled:bg-gray-300 disabled:cursor-not-allowed
-                     transition-colors duration-150"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? t('settings.saving') : t('common.save')}
+          </Button>
         </div>
       </div>
 
       {/* Success/Error Messages */}
       {saveSuccess && (
-        <div className="mt-3 px-4 py-2 bg-green-50 text-green-700 text-sm rounded-lg border border-green-200">
-          Phone settings saved successfully!
+        <div className="mt-3 px-4 py-2 bg-success-subtle text-status-success text-sm rounded-lg border border-border-subtle">
+          {t('settings.saveSuccess')}
         </div>
       )}
       {saveError && (
-        <div className="mt-3 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+        <div className="mt-3 px-4 py-2 bg-error-subtle text-status-error text-sm rounded-lg border border-border-subtle">
           {saveError}
         </div>
       )}

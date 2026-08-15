@@ -3,9 +3,12 @@
 import { useTemplateStore } from '../../stores/templateStore';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { VCardFieldsSection } from './VCardFieldsSection';
+import { IconButton } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 import type { TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 
-export function ElementToolbox() {
+export function ElementToolbox({ onCloseDrawer }: { onCloseDrawer?: () => void }) {
+  const { t } = useTranslation();
   const { addElement } = useTemplateStore();
   const { width, height } = useCanvasStore();
 
@@ -21,7 +24,7 @@ export function ElementToolbox() {
       text: 'Text',
       fontSize: 24,
       fontFamily: 'Arial',
-      color: '#000000',
+      color: '#000000', // token-lint-ignore: persisted design data (text default color)
       textAlign: 'left',
       rotation: 0,
       opacity: 1,
@@ -72,8 +75,8 @@ export function ElementToolbox() {
       size: 100,
       data: 'https://example.com',
       qrType: 'url',
-      colorDark: '#000000',
-      colorLight: '#ffffff',
+      colorDark: '#000000', // token-lint-ignore: persisted design data (element default)
+      colorLight: '#ffffff', // token-lint-ignore: persisted design data (element default)
       rotation: 0,
       opacity: 1,
       locked: false,
@@ -98,8 +101,8 @@ export function ElementToolbox() {
       y,
       width: w,
       height: h,
-      fill: shapeType === 'line' ? '' : '#3b82f6',
-      stroke: '#1e40af',
+      fill: shapeType === 'line' ? '' : '#3b82f6', // token-lint-ignore: persisted design data (shape default fill)
+      stroke: '#1e40af', // token-lint-ignore: persisted design data (shape default stroke)
       strokeWidth: shapeType === 'line' ? 2 : 1,
       rotation: 0,
       opacity: 1,
@@ -113,29 +116,38 @@ export function ElementToolbox() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 to-white p-4">
-        <h2 className="text-lg font-bold text-slate-800">Elements</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Drag to canvas</p>
+    <div className="flex h-full flex-col bg-surface-base">
+      <div className="flex items-start justify-between border-b border-border-subtle bg-gradient-to-r from-surface-elevated to-surface-base p-4">
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">{t('designer.elements')}</h2>
+          <p className="text-xs text-text-muted mt-0.5">Drag to canvas</p>
+        </div>
+        {onCloseDrawer && (
+          <IconButton aria-label={t('common.close')} size="sm" onClick={onCloseDrawer} className="lg:hidden">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </IconButton>
+        )}
       </div>
 
-      <div className="flex flex-col gap-3 p-4">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         <button
           onClick={handleAddText}
-          className="flex items-center gap-3 rounded-lg border-2 border-slate-200 p-3 text-left hover:border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all"
+          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
         >
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 shadow-sm">
             <span className="text-2xl font-bold text-purple-700">T</span>
           </div>
           <div>
-            <div className="font-semibold text-slate-800">Text</div>
+            <div className="text-sm font-semibold text-slate-500">Text</div>
             <div className="text-xs text-slate-500">Add text element</div>
           </div>
         </button>
 
         <button
           onClick={handleAddImage}
-          className="flex items-center gap-3 rounded-lg border-2 border-slate-200 p-3 text-left hover:border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all"
+          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
         >
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-green-100 to-green-200 shadow-sm">
             <svg className="h-6 w-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,14 +155,14 @@ export function ElementToolbox() {
             </svg>
           </div>
           <div>
-            <div className="font-semibold text-slate-800">Image</div>
+            <div className="text-sm font-semibold text-slate-500">Image</div>
             <div className="text-xs text-slate-500">Add image element</div>
           </div>
         </button>
 
         <button
           onClick={handleAddQR}
-          className="flex items-center gap-3 rounded-lg border-2 border-slate-200 p-3 text-left hover:border-blue-500 hover:bg-blue-50 hover:shadow-md transition-all"
+          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
         >
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 shadow-sm">
             <svg className="h-6 w-6 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,52 +170,52 @@ export function ElementToolbox() {
             </svg>
           </div>
           <div>
-            <div className="font-semibold text-slate-800">QR Code</div>
+            <div className="text-sm font-semibold text-slate-500">QR Code</div>
             <div className="text-xs text-slate-500">Add QR code element</div>
           </div>
         </button>
 
-        <div className="border-t border-slate-200 pt-3 mt-3">
-          <div className="text-xs font-semibold text-slate-600 mb-2 px-1">SHAPES</div>
+        <div className="border-t border-border-subtle pt-3 mt-3">
+          <div className="text-xs font-semibold text-slate-500 mb-2 px-1">SHAPES</div>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleAddShape('rectangle')}
-              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-indigo-100 to-indigo-200">
                 <div className="w-5 h-4 border-2 border-indigo-700"></div>
               </div>
-              <div className="text-xs font-medium text-slate-800">Rectangle</div>
+              <div className="text-xs font-semibold text-slate-500">Rectangle</div>
             </button>
 
             <button
               onClick={() => handleAddShape('circle')}
-              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-pink-100 to-pink-200">
                 <div className="w-5 h-5 rounded-full border-2 border-pink-700"></div>
               </div>
-              <div className="text-xs font-medium text-slate-800">Circle</div>
+              <div className="text-xs font-semibold text-slate-500">Circle</div>
             </button>
 
             <button
               onClick={() => handleAddShape('ellipse')}
-              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-violet-100 to-violet-200">
                 <div className="w-6 h-4 rounded-full border-2 border-violet-700"></div>
               </div>
-              <div className="text-xs font-medium text-slate-800">Ellipse</div>
+              <div className="text-xs font-semibold text-slate-500">Ellipse</div>
             </button>
 
             <button
               onClick={() => handleAddShape('line')}
-              className="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-200 p-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-slate-100 to-slate-200">
                 <div className="w-6 h-0 border-t-2 border-slate-700"></div>
               </div>
-              <div className="text-xs font-medium text-slate-800">Line</div>
+              <div className="text-xs font-semibold text-slate-500">Line</div>
             </button>
           </div>
         </div>

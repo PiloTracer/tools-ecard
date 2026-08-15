@@ -130,7 +130,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
                         const newColors = element.colors!.filter((_, i) => i !== index);
                         handleChange({
                           colors: newColors.length > 0 ? newColors : undefined,
-                          color: newColors.length === 0 ? '#000000' : undefined
+                          color: newColors.length === 0 ? '#000000' : undefined // token-lint-ignore: persisted design data (element property value)
                         });
                       }}
                       className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-300"
@@ -148,7 +148,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
               <span className="text-xs text-gray-500 w-20">All words</span>
               <input
                 type="color"
-                value={element.color || '#000000'}
+                value={element.color || '#000000'} // token-lint-ignore: persisted design data (element property value)
                 onChange={(e) => handleChange({ color: e.target.value })}
                 className="h-8 w-20 rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
               />
@@ -158,7 +158,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
           {/* Add Color button */}
           <button
             onClick={() => {
-              const currentColors = element.colors || (element.color ? [element.color] : ['#000000']);
+              const currentColors = element.colors || (element.color ? [element.color] : ['#000000']); // token-lint-ignore: persisted design data (element property value)
               const lastColor = currentColors[currentColors.length - 1];
               handleChange({
                 colors: [...currentColors, lastColor],
@@ -185,7 +185,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
                       element.colors?.length || 0,
                       element.wordColorMode
                     );
-                    const color = element.colors?.[colorIndex] || element.color || '#000000';
+                    const color = element.colors?.[colorIndex] || element.color || '#000000'; // token-lint-ignore: persisted design data (element property value)
                     return (
                       <span key={index} style={{ color }}>
                         {word}
@@ -249,7 +249,7 @@ export function TextProperties({ element }: TextPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Color</label>
         <input
           type="color"
-          value={element.stroke || '#000000'}
+          value={element.stroke || '#000000'} // token-lint-ignore: persisted design data (element property value)
           onChange={(e) => handleChange({ stroke: e.target.value })}
           className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
         />

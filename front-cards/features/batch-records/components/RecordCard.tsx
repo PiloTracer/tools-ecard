@@ -28,9 +28,9 @@ export const RecordCard: React.FC<RecordCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const hasField = (value: any) => value !== null && value !== undefined && value !== '';
+  const hasField = (value: unknown) => value !== null && value !== undefined && value !== '';
 
-  const renderField = (label: string, value: any) => {
+  const renderField = (label: string, value: React.ReactNode) => {
     if (!hasField(value)) return null;
     return (
       <div>
@@ -53,7 +53,6 @@ export const RecordCard: React.FC<RecordCardProps> = ({
               <RenderStatusBadge
                 recordId={record.batchRecordId}
                 batchId={record.batchId}
-                templateId={renderTemplateId}
               />
             </div>
           )}

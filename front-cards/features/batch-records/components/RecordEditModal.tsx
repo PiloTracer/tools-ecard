@@ -8,6 +8,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRecordEdit } from '../hooks/useRecordEdit';
 import type { ContactRecord, RecordUpdateInput } from '../types';
+import { Modal, Button } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 
 interface RecordEditModalProps {
   record: ContactRecord;
@@ -28,7 +30,7 @@ const InputField: React.FC<{
   placeholder?: string;
 }> = ({ label, field, value, onChange, error, type = 'text', placeholder = '' }) => (
   <div>
-    <label htmlFor={field} className="block text-sm font-medium text-gray-700 mb-1">
+    <label htmlFor={field} className="block text-sm font-medium text-text-primary mb-1">
       {label}
     </label>
     <input
@@ -38,10 +40,10 @@ const InputField: React.FC<{
       onChange={(e) => onChange(field, e.target.value)}
       placeholder={placeholder}
       className={`block w-full px-3 py-2 border ${
-        error ? 'border-red-300' : 'border-gray-300'
-      } rounded-md shadow-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+        error ? 'border-status-error' : 'border-border-default'
+      } rounded-md shadow-sm text-text-primary placeholder:text-text-muted bg-surface-inset focus:outline-none focus:ring-accent focus:border-accent sm:text-sm`}
     />
-    {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+    {error && <p className="mt-1 text-xs text-status-error">{error}</p>}
   </div>
 );
 
@@ -77,6 +79,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const { updateRecordAsync, isUpdating, isSuccess, reset } = useRecordEdit({ batchId });
 
   const [formData, setFormData] = useState<RecordUpdateInput>({});
@@ -200,34 +203,26 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Edit Contact - {record.fullName || 'Unnamed'}
-          </h2>
-          <button
-            onClick={onClose}
-            disabled={isUpdating}
-            className="text-gray-400 hover:text-gray-600 focus:outline-none"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title={t('records.editTitle', { name: record.fullName || 'Unnamed' })}
+      size="wide"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isUpdating}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" onClick={handleSubmit} disabled={isUpdating}>
+            {isUpdating ? t('settings.saving') : t('common.save')}
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
           {/* Personal Information */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <VCardField
         formData={formData}
@@ -246,7 +241,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Contact Methods */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Contact Methods</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Contact Methods</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <VCardField
         formData={formData}
@@ -269,7 +264,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Personal Address */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Address</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Personal Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <VCardField
@@ -298,7 +293,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Business Information */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Business Information</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Business Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <VCardField
         formData={formData}
@@ -327,7 +322,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Business Address */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Business Address</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Business Address</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <VCardField
@@ -356,7 +351,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Social Profiles */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Social Profiles</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Social Profiles</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <VCardField
         formData={formData}
@@ -375,7 +370,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Professional Profiles */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Professional Profiles</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Professional Profiles</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <VCardField
         formData={formData}
@@ -390,7 +385,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
 
           {/* Personal Details */}
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Details</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Personal Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <VCardField
         formData={formData}
@@ -401,7 +396,7 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
         errors={errors}
         onChange={handleChange} label="Birthday" field="personalBirthday" type="date" />
               <div className="md:col-span-2">
-                <label htmlFor="personalBio" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="personalBio" className="block text-sm font-medium text-text-primary mb-1">
                   Bio
                 </label>
                 <textarea
@@ -409,32 +404,12 @@ export const RecordEditModal: React.FC<RecordEditModalProps> = ({
                   value={formData.personalBio || ''}
                   onChange={(e) => handleChange('personalBio', e.target.value)}
                   rows={3}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-border-default rounded-md shadow-sm text-text-primary placeholder:text-text-muted bg-surface-inset focus:outline-none focus:ring-accent focus:border-accent sm:text-sm"
                 />
               </div>
             </div>
           </div>
-        </form>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isUpdating}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isUpdating}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUpdating ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 };

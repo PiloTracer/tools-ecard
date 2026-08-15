@@ -8,6 +8,7 @@ import { useTemplateStore } from '../../stores/templateStore';
 import { SaveTemplateModal } from '../SaveModal/SaveTemplateModal';
 import { OpenTemplateModal } from '../OpenModal/OpenTemplateModal';
 import { TemplateStatus } from '../TemplateStatus/TemplateStatus';
+import { useTranslation } from '@/features/i18n';
 import { OffscreenExportButton } from '../OffscreenExport/OffscreenExportButton';
 import { ElementsLayerManagerModal } from './ElementsLayerManagerModal';
 import {
@@ -187,12 +188,14 @@ export function CanvasControls() {
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null); // S4 decision 3: no alert()
   const [showElementsLayerModal, setShowElementsLayerModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // File input ref for importing templates
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { selectedProject } = useProjects();
+  const { t } = useTranslation();
 
   const {
     zoom,
@@ -381,7 +384,7 @@ export function CanvasControls() {
       // Clear current canvas
       if (fabricCanvas) {
         fabricCanvas.clear();
-        fabricCanvas.backgroundColor = '#ffffff';
+        fabricCanvas.backgroundColor = '#ffffff'; // token-lint-ignore: canvas background is design data, not chrome
       }
 
       // Load template into store (this will trigger canvas re-render)
@@ -424,7 +427,7 @@ export function CanvasControls() {
     // Clear the canvas
     if (fabricCanvas) {
       fabricCanvas.clear();
-      fabricCanvas.backgroundColor = '#ffffff';
+      fabricCanvas.backgroundColor = '#ffffff'; // token-lint-ignore: canvas background is design data, not chrome
     }
 
     // Create a new empty template
@@ -465,7 +468,7 @@ export function CanvasControls() {
       // Close the current template (same as executeCloseTemplate)
       if (fabricCanvas) {
         fabricCanvas.clear();
-        fabricCanvas.backgroundColor = '#ffffff';
+        fabricCanvas.backgroundColor = '#ffffff'; // token-lint-ignore: canvas background is design data, not chrome
       }
 
       const { setDimensions } = useCanvasStore.getState();
@@ -625,7 +628,7 @@ export function CanvasControls() {
         console.log('  -', obj.type, 'elementId:', obj.elementId, '_originalImageUrl:', obj._originalImageUrl?.substring(0, 50));
       });
 
-      alert('Cannot export: Canvas contains cross-origin images. This is a bug - data URL images should not cause CORS issues. Check console for details.');
+      setActionError("Cannot export: Canvas contains cross-origin images. This is a bug - data URL images should not cause CORS issues. Check console for details.");
 
       // Restore everything before returning
       imageReplacements.forEach(({ original, highRes }) => {
@@ -785,7 +788,7 @@ export function CanvasControls() {
       });
     } catch (error) {
       console.error('[EXPORT JPG] Canvas is tainted, trying without CORS-sensitive images:', error);
-      alert('Cannot export: Canvas contains cross-origin images. Please re-import your images or save and reload the template to rasterize them.');
+      setActionError('Cannot export: Canvas contains cross-origin images. Please re-import your images or save and reload the template to rasterize them.');
 
       // Restore everything before returning
       imageReplacements.forEach(({ original, highRes }) => {
@@ -941,7 +944,7 @@ export function CanvasControls() {
       console.log('[Export] Package downloaded successfully (zip + png preview + json sidecar)');
     } catch (error) {
       console.error('[Export] Failed to export package:', error);
-      alert(`Failed to export template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setActionError(`Failed to export template: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -1020,7 +1023,7 @@ export function CanvasControls() {
       // Clear current canvas
       if (fabricCanvas) {
         fabricCanvas.clear();
-        fabricCanvas.backgroundColor = newTemplate.backgroundColor || '#ffffff';
+        fabricCanvas.backgroundColor = newTemplate.backgroundColor || '#ffffff'; // token-lint-ignore: canvas background default is design data, not chrome
         console.log('[Import] Cleared canvas and set background color:', newTemplate.backgroundColor);
       }
 
@@ -1056,7 +1059,7 @@ export function CanvasControls() {
         setShowSaveModal(true);
       } catch (persistError) {
         console.error('[Import] Imported template could not be auto-saved:', persistError);
-        alert(
+        setActionError(
           `Template "${newTemplate.name}" was imported but could not be saved automatically ` +
             `(${persistError instanceof Error ? persistError.message : 'unknown error'}). ` +
             `It is only in this editor session — use Save before closing this tab.`
@@ -1073,12 +1076,31 @@ export function CanvasControls() {
         errorMessage = error.message;
       }
 
-      alert(`Failed to import template: ${errorMessage}`);
+      setActionError(`Failed to import template: ${errorMessage}`);
     }
   };
 
   return (
     <Fragment>
+      {/* Inline action error banner (S4 decision 3 — replaces alert()) */}
+      {actionError && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 border-b border-status-error/40 bg-error-subtle px-4 py-2 text-sm text-status-error"
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label={t('common.close')}
+            className="rounded p-0.5 hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
       {/* Hidden File Input for Template Import */}
       <input
         ref={fileInputRef}

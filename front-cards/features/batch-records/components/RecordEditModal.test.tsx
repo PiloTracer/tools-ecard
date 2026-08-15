@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { RecordEditModal } from './RecordEditModal';
+import { LocaleProvider } from '@/features/i18n';
 import type { ContactRecord } from '../types';
 
 jest.mock('../hooks/useRecordEdit', () => ({
@@ -59,12 +60,14 @@ describe('RecordEditModal (F8 focus regression)', () => {
     const record = makeRecord();
 
     const { rerender } = render(
-      <RecordEditModal
-        record={record}
-        batchId="batch-1"
-        isOpen
-        onClose={jest.fn()}
-      />
+      <LocaleProvider>
+        <RecordEditModal
+          record={record}
+          batchId="batch-1"
+          isOpen
+          onClose={jest.fn()}
+        />
+      </LocaleProvider>
     );
 
     const input = screen.getByLabelText('Full Name') as HTMLInputElement;
@@ -75,12 +78,14 @@ describe('RecordEditModal (F8 focus regression)', () => {
     expect(input).toHaveValue('Ada Lovelace Updated');
 
     rerender(
-      <RecordEditModal
-        record={{ ...record, updatedAt: '2026-01-02T00:00:00Z' }}
-        batchId="batch-1"
-        isOpen
-        onClose={jest.fn()}
-      />
+      <LocaleProvider>
+        <RecordEditModal
+          record={{ ...record, updatedAt: '2026-01-02T00:00:00Z' }}
+          batchId="batch-1"
+          isOpen
+          onClose={jest.fn()}
+        />
+      </LocaleProvider>
     );
 
     const inputAfter = screen.getByLabelText('Full Name') as HTMLInputElement;

@@ -49,7 +49,7 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
           <label className="mb-1 block text-sm font-medium text-gray-700">Fill Color</label>
           <input
             type="color"
-            value={element.fill || '#3b82f6'}
+            value={element.fill || '#3b82f6'} // token-lint-ignore: persisted design data (element property value)
             onChange={(e) => handleChange({ fill: e.target.value })}
             className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
           />
@@ -60,7 +60,7 @@ export function ShapeProperties({ element }: ShapePropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Stroke Color</label>
         <input
           type="color"
-          value={element.stroke || '#1e40af'}
+          value={element.stroke || '#1e40af'} // token-lint-ignore: persisted design data (element property value)
           onChange={(e) => handleChange({ stroke: e.target.value })}
           className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
         />

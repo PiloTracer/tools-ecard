@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useProjects } from '../contexts/ProjectsContext';
 import { ProjectsIssueAlert } from './ProjectsIssueAlert';
+import { useTranslation } from '@/features/i18n';
 
 export function ProjectSelector() {
   const {
@@ -13,6 +14,7 @@ export function ProjectSelector() {
     createProject,
     selectProject
   } = useProjects();
+  const { t } = useTranslation();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -59,12 +61,12 @@ export function ProjectSelector() {
   if (loading) {
     return (
       <div className="flex items-center space-x-3 mb-6">
-        <label className="text-sm font-medium text-gray-700 min-w-fit">
-          Project:
+        <label className="text-sm font-medium text-text-primary min-w-fit">
+          {t('settings.project')}:
         </label>
         <div className="flex items-center space-x-2 flex-1">
-          <div className="h-10 w-48 bg-gray-100 animate-pulse rounded-lg"></div>
-          <span className="text-sm text-gray-500">Loading projects...</span>
+          <div className="h-10 w-48 bg-surface-inset animate-pulse rounded-lg"></div>
+          <span className="text-sm text-text-secondary">Loading projects...</span>
         </div>
       </div>
     );
@@ -73,9 +75,9 @@ export function ProjectSelector() {
   if (error) {
     return (
       <div className="mb-6 space-y-2">
-        <p className="text-sm font-medium text-gray-900">Workspace (project)</p>
+        <p className="text-sm font-medium text-text-primary">Workspace (project)</p>
         <ProjectsIssueAlert alert={error} variant="inline" />
-        <p className="text-xs text-gray-500">The same summary appears in the amber bar at the top of the page.</p>
+        <p className="text-xs text-text-muted">The same summary appears in the amber bar at the top of the page.</p>
       </div>
     );
   }
@@ -83,8 +85,8 @@ export function ProjectSelector() {
   return (
     <div className="mb-6">
       <div className="flex items-center space-x-3">
-        <label htmlFor="project-selector" className="text-sm font-medium text-gray-700 min-w-fit">
-          Project:
+        <label htmlFor="project-selector" className="text-sm font-medium text-text-primary min-w-fit">
+          {t('settings.project')}:
         </label>
 
         {!isCreating ? (
@@ -93,21 +95,21 @@ export function ProjectSelector() {
             value={selectedProjectId || ''}
             onChange={handleSelectProject}
             disabled={projects.length === 0}
-            className="flex-1 max-w-xs px-4 py-2.5 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm
-                     hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                     disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed
+            className="flex-1 max-w-xs px-4 py-2.5 text-sm text-text-primary bg-surface-inset border border-border-default rounded-lg shadow-sm
+                     hover:border-border-strong focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent
+                     disabled:bg-surface-inset disabled:text-text-muted disabled:cursor-not-allowed
                      transition-colors duration-150
-                     [&>option]:text-gray-900 [&>option]:bg-white"
+                     [&>option]:text-text-primary [&>option]:bg-surface-overlay"
           >
             {projects.length === 0 && (
-              <option value="" className="text-gray-900 bg-white">No projects available</option>
+              <option value="" className="text-text-primary bg-surface-overlay">No projects available</option>
             )}
             {projects.map(project => (
-              <option key={project.id} value={project.id} className="text-gray-900 bg-white">
+              <option key={project.id} value={project.id} className="text-text-primary bg-surface-overlay">
                 {project.name}{project.isDefault ? ' (default)' : ''}
               </option>
             ))}
-            <option value="create-new" className="font-medium text-gray-900 bg-white">
+            <option value="create-new" className="font-medium text-text-primary bg-surface-overlay">
               + Create New Project
             </option>
           </select>
@@ -122,23 +124,23 @@ export function ProjectSelector() {
                 if (e.key === 'Escape') handleCancelCreate();
               }}
               placeholder="Enter project name"
-              className="flex-1 px-4 py-2.5 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+              className="flex-1 px-4 py-2.5 text-sm text-text-primary bg-surface-inset border border-border-default rounded-lg shadow-sm
+                       focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent
                        transition-colors duration-150"
               autoFocus
             />
             <button
               onClick={handleCreateProject}
-              className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
-                       hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+              className="px-5 py-2.5 bg-accent text-white text-sm font-medium rounded-lg
+                       hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2
                        transition-colors duration-150"
             >
               Create
             </button>
             <button
               onClick={handleCancelCreate}
-              className="px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg
-                       hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2
+              className="px-5 py-2.5 bg-surface-inset text-text-secondary text-sm font-medium rounded-lg
+                       hover:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-border-strong focus:ring-offset-2
                        transition-colors duration-150"
             >
               Cancel
@@ -148,7 +150,7 @@ export function ProjectSelector() {
       </div>
 
       {createError && (
-        <div className="mt-2 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+        <div className="mt-2 px-4 py-2 bg-error-subtle text-status-error text-sm rounded-lg border border-border-subtle">
           {createError}
         </div>
       )}

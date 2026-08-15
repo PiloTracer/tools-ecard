@@ -66,7 +66,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Dark Color</label>
         <input
           type="color"
-          value={element.colorDark || '#000000'}
+          value={element.colorDark || '#000000'} // token-lint-ignore: persisted design data (element property value)
           onChange={(e) => handleChange({ colorDark: e.target.value })}
           className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
         />
@@ -76,7 +76,7 @@ export function QRProperties({ element }: QRPropertiesProps) {
         <label className="mb-1 block text-sm font-medium text-gray-700">Light Color</label>
         <input
           type="color"
-          value={element.colorLight || '#ffffff'}
+          value={element.colorLight || '#ffffff'} // token-lint-ignore: persisted design data (element property value)
           onChange={(e) => handleChange({ colorLight: e.target.value })}
           className="h-10 w-full rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
         />

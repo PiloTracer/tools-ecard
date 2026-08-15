@@ -384,30 +384,30 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200';
 
     if (isDisabled) {
-      return `${baseClasses} border-gray-200 bg-gray-50 cursor-not-allowed opacity-50`;
+      return `${baseClasses} border-border-default bg-surface-inset cursor-not-allowed opacity-50`;
     }
 
     if (isDragging) {
-      return `${baseClasses} border-blue-500 bg-blue-50`;
+      return `${baseClasses} border-accent bg-accent-subtle`;
     }
 
     if (isUploading) {
-      return `${baseClasses} border-blue-400 bg-blue-50`;
+      return `${baseClasses} border-accent bg-accent-subtle`;
     }
 
-    return `${baseClasses} border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer`;
+    return `${baseClasses} border-border-default hover:border-accent hover:bg-accent-subtle cursor-pointer`;
   };
 
   const getIconClasses = () => {
-    return isDisabled ? 'w-6 h-6 text-gray-300 mr-3' : 'w-6 h-6 text-gray-400 mr-3';
+    return isDisabled ? 'w-6 h-6 text-text-muted mr-3' : 'w-6 h-6 text-text-muted mr-3';
   };
 
   const getTitleClasses = () => {
-    return isDisabled ? 'font-medium text-gray-400' : 'font-medium text-gray-900';
+    return isDisabled ? 'font-medium text-text-muted' : 'font-medium text-text-primary';
   };
 
   const getDescriptionClasses = () => {
-    return isDisabled ? 'text-sm text-gray-300' : 'text-sm text-gray-500';
+    return isDisabled ? 'text-sm text-text-muted' : 'text-sm text-text-secondary';
   };
 
   return (
@@ -478,14 +478,14 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
             .csv, .txt, .md, .vcf, .xls, .xlsx up to {MAX_SIZE_MB}MB
           </p>
           {!isDisabled && !isUploading && !isDragging && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Click, drag & drop, or hover and paste (Ctrl+V)
             </p>
           )}
         </div>
         {isUploading && (
           <div
-            className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"
+            className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent"
             style={{ pointerEvents: 'none' }}
           />
         )}
@@ -495,23 +495,23 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         <a
           href="/templates/import-template-horizontal.xlsx"
           download
-          className="text-blue-600 hover:text-blue-800 hover:underline"
+          className="text-accent hover:underline"
         >
           Download template (rows)
         </a>
-        <span className="text-gray-300">|</span>
+        <span className="text-border-strong">|</span>
         <a
           href="/templates/import-template-vertical.xlsx"
           download
-          className="text-blue-600 hover:text-blue-800 hover:underline"
+          className="text-accent hover:underline"
         >
           Download template (columns)
         </a>
       </div>
 
       {validationError && (
-        <div className="mt-2 p-3 bg-red-50 rounded-md border border-red-200">
-          <p className="text-sm text-red-600">{validationError.message}</p>
+        <div className="mt-2 p-3 bg-error-subtle rounded-md border border-border-subtle">
+          <p className="text-sm text-status-error">{validationError.message}</p>
         </div>
       )}
 

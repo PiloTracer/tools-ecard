@@ -172,8 +172,8 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
           relative border-2 border-dashed rounded-lg p-8
           transition-colors duration-200 ease-in-out
           ${isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 bg-white hover:border-gray-400'
+            ? 'border-accent bg-accent-subtle'
+            : 'border-border-default bg-surface-inset hover:border-border-strong'
           }
           ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
@@ -195,7 +195,7 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
         <div className="text-center" style={{ pointerEvents: 'none' }}>
           {/* Upload Icon */}
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-text-muted"
             stroke="currentColor"
             fill="none"
             viewBox="0 0 48 48"
@@ -210,7 +210,7 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
           </svg>
 
           {/* Instructions */}
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-text-secondary">
             {isDragging ? (
               'Drop the file here'
             ) : (
@@ -219,17 +219,17 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
               </>
             )}
           </p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-text-muted">
             {acceptedFileTypes.join(', ')} up to {MAX_FILE_SIZE_MB}MB
           </p>
 
           {/* Selected File */}
           {selectedFile && !isUploading && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-md">
-              <p className="text-sm text-gray-700">
+            <div className="mt-4 p-3 bg-surface-inset rounded-md">
+              <p className="text-sm text-text-primary">
                 <span className="font-medium">Selected:</span> {selectedFile.name}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 Size: {formatFileSize(selectedFile.size)}
               </p>
             </div>
@@ -239,16 +239,16 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
           {isUploading && (
             <div className="mt-4">
               <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span className="ml-2 text-sm text-gray-600">Uploading...</span>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
+                <span className="ml-2 text-sm text-text-secondary">Uploading...</span>
               </div>
             </div>
           )}
 
           {/* Validation Error */}
           {validationError && (
-            <div className="mt-4 p-3 bg-red-50 rounded-md">
-              <p className="text-sm text-red-600">{validationError.message}</p>
+            <div className="mt-4 p-3 bg-error-subtle rounded-md">
+              <p className="text-sm text-status-error">{validationError.message}</p>
             </div>
           )}
         </div>
@@ -261,7 +261,7 @@ export const FileUploadComponent: React.FC<FileUploadProps> = ({
             e.stopPropagation();
             handleUpload();
           }}
-          className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200"
+          className="mt-4 w-full bg-accent text-white py-2 px-4 rounded-md hover:bg-accent-hover transition-colors duration-200"
         >
           Upload File
         </button>

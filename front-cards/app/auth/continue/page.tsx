@@ -11,6 +11,12 @@ import { POST_LOGIN_REDIRECT_URL } from '@/shared/lib/oauth-config';
 
 export default function AuthContinuePage() {
   useEffect(() => {
+    // Mark this login as fresh so the dashboard can show the success banner once.
+    try {
+      window.sessionStorage.setItem('ecards_fresh_login', '1');
+    } catch {
+      // storage unavailable — banner simply won't show
+    }
     const raw = POST_LOGIN_REDIRECT_URL.trim();
     const target =
       raw.startsWith('http://') || raw.startsWith('https://')

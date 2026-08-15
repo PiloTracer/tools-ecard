@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — semantic, source of truth: .work.ui/design-system/tokens.json (DTCG).
+ * Sync from tokens.json; do not fork. Values authored in oklch() per UI foundation doc 02.
+ * Utilities generated from these via `@theme inline` (Tailwind v4, CSS-first).
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* text */
+  --text-primary: oklch(0.2046 0.0 89.9);
+  --text-secondary: oklch(0.4386 0.0 89.9);
+  --text-muted: oklch(0.5555 0.0 89.9);
+  --text-on-accent: oklch(1.0 0.0 89.9);
+
+  /* surfaces */
+  --surface-base: oklch(1.0 0.0 89.9);
+  --surface-elevated: oklch(0.9851 0.0 89.9);
+  --surface-inset: oklch(0.9702 0.0 89.9);
+  --surface-overlay: oklch(1.0 0.0 89.9);
+
+  /* borders */
+  --border-subtle: oklch(0.9219 0.0 89.9);
+  --border-default: oklch(0.8699 0.0 89.9);
+  --border-strong: oklch(0.7155 0.0 89.9);
+
+  /* accent (brand orange — owner-approved 2026-08-14) */
+  --accent-default: oklch(0.5946 0.1483 44.9);
+  --accent-hover: oklch(0.5305 0.1322 45.0);
+  --accent-active: oklch(0.4725 0.1165 45.1);
+  --accent-subtle: oklch(0.9632 0.0177 54.0);
+
+  /* status */
+  --status-success: oklch(0.5273 0.1371 150.1);
+  --status-success-subtle: oklch(0.9819 0.0181 155.8);
+  --status-warning: oklch(0.5553 0.1455 49.0);
+  --status-warning-subtle: oklch(0.9869 0.0214 95.3);
+  --status-error: oklch(0.5054 0.1905 27.5);
+  --status-error-subtle: oklch(0.9705 0.0129 17.4);
+  --status-info: oklch(0.4882 0.2172 264.4);
+  --status-info-subtle: oklch(0.9705 0.0142 254.6);
+
+  /* elevation + scrim */
+  --elevation-shadow-1: 0 1px 2px 0 oklch(0.3 0 0 / 0.05);
+  --elevation-shadow-2: 0 4px 6px -1px oklch(0.3 0 0 / 0.08);
+  --elevation-shadow-3: 0 10px 15px -3px oklch(0.3 0 0 / 0.12);
+  --scrim: oklch(0 0 0 / 0.5);
+
+  /* radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* focus ring */
+  --focus-ring: var(--accent-default);
+
+  /* legacy aliases (existing usages keep working) */
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-on-accent: var(--text-on-accent);
+
+  --color-surface-base: var(--surface-base);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-overlay: var(--surface-overlay);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent-default);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-subtle: var(--accent-subtle);
+
+  --color-success: var(--status-success);
+  --color-success-subtle: var(--status-success-subtle);
+  --color-warning: var(--status-warning);
+  --color-warning-subtle: var(--status-warning-subtle);
+  --color-error: var(--status-error);
+  --color-error-subtle: var(--status-error-subtle);
+  --color-info: var(--status-info);
+  --color-info-subtle: var(--status-info-subtle);
+
+  --shadow-elevation-1: var(--elevation-shadow-1);
+  --shadow-elevation-2: var(--elevation-shadow-2);
+  --shadow-elevation-3: var(--elevation-shadow-3);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --text-primary: oklch(0.9702 0.0 89.9);
+    --text-secondary: oklch(0.7155 0.0 89.9);
+    --text-muted: oklch(0.5555 0.0 89.9);
+    --text-on-accent: oklch(1.0 0.0 89.9);
+
+    --surface-base: oklch(0.2046 0.0 89.9);
+    --surface-elevated: oklch(0.2393 0.0 89.9);
+    --surface-inset: oklch(0.2686 0.0 89.9);
+    --surface-overlay: oklch(0.2393 0.0 89.9);
+
+    --border-subtle: oklch(0.2686 0.0 89.9);
+    --border-default: oklch(0.3677 0.0 89.9);
+    --border-strong: oklch(0.4386 0.0 89.9);
+
+    --accent-default: oklch(0.6749 0.1363 48.2);
+    --accent-hover: oklch(0.5946 0.1483 44.9);
+    --accent-active: oklch(0.5305 0.1322 45.0);
+    --accent-subtle: oklch(0.2356 0.0313 52.7);
+
+    --status-success: oklch(0.7227 0.1920 149.6);
+    --status-success-subtle: oklch(0.2190 0.0333 156.8);
+    --status-warning: oklch(0.7686 0.1647 70.1);
+    --status-warning-subtle: oklch(0.2253 0.0339 80.5);
+    --status-error: oklch(0.6368 0.2078 25.3);
+    --status-error-subtle: oklch(0.2109 0.0451 21.7);
+    --status-info: oklch(0.7137 0.1434 254.6);
+    --status-info-subtle: oklch(0.2182 0.0431 260.1);
+
+    --elevation-shadow-1: 0 1px 2px 0 oklch(0 0 0 / 0.5);
+    --elevation-shadow-2: 0 4px 6px -1px oklch(0 0 0 / 0.5);
+    --elevation-shadow-3: 0 10px 15px -3px oklch(0 0 0 / 0.55);
+
+    --background: var(--surface-base);
+    --foreground: var(--text-primary);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Geist via next/font vars (declared in layout.tsx); Arial was overriding it before */
+  font-family: var(--font-geist-sans, ui-sans-serif, system-ui, Arial, sans-serif);
 }

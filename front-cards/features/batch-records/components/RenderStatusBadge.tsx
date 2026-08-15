@@ -2,18 +2,20 @@
 
 /**
  * Render Job Status Badge
- * Displays the render progress for a batch record's card
- * Polls the render-status endpoint when active
+ * Displays the render progress for a batch record's card via the Badge primitive.
+ * Polls the render-status endpoint while active; reports state changes upward so
+ * the list can show a retry action on failure (retry itself lives in the row).
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Badge, type BadgeTone } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 
 interface RenderStatusProps {
   recordId: string;
   batchId: string;
   apiBaseUrl?: string;
-  /** Required for server-side render retry (normal mode). */
-  templateId?: string;
+  onStateChange?: (state: 'idle' | 'active' | 'completed' | 'failed') => void;
 }
 
 interface RenderStatusData {
@@ -25,18 +27,26 @@ interface RenderStatusData {
   failedReason?: string;
 }
 
-type RenderState = 'idle' | 'loading' | 'active' | 'completed' | 'failed';
+export type RenderState = 'idle' | 'active' | 'completed' | 'failed';
 
 export function RenderStatusBadge({
   recordId,
   batchId,
   apiBaseUrl = '',
-  templateId,
+  onStateChange,
 }: RenderStatusProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<RenderState>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [retrying, setRetrying] = useState(false);
+
+  const applyState = useCallback(
+    (next: RenderState) => {
+      setState(next);
+      onStateChange?.(next);
+    },
+    [onStateChange],
+  );
 
   const checkStatus = useCallback(async () => {
     try {
@@ -53,24 +63,24 @@ export function RenderStatusBadge({
           case 'active':
           case 'waiting':
           case 'delayed':
-            setState('active');
+            applyState('active');
             break;
           case 'completed':
-            setState('completed');
+            applyState('completed');
             break;
           case 'failed':
-            setState('failed');
-            setError(data.failedReason || 'Render failed');
+            setError(data.failedReason || t('records.renderStatus.failedReason'));
+            applyState('failed');
             break;
           default:
-            setState('idle');
+            applyState('idle');
         }
       }
     } catch {
       // Silently handle — record may not have a render job yet
-      setState('idle');
+      applyState('idle');
     }
-  }, [recordId, batchId, apiBaseUrl]);
+  }, [recordId, batchId, apiBaseUrl, applyState, t]);
 
   // Poll while rendering is active
   useEffect(() => {
@@ -85,86 +95,51 @@ export function RenderStatusBadge({
     }
   }, [state, checkStatus]);
 
-  const handleRetry = useCallback(async () => {
-    if (!templateId?.trim()) {
-      setError('Template ID required to retry render');
-      return;
-    }
-    setRetrying(true);
-    try {
-      const res = await fetch(
-        `${apiBaseUrl}/api/batches/${batchId}/records/${recordId}/render-retry`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId: templateId.trim() }),
-        }
-      );
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || json.message || 'Retry failed');
-      }
-      setError(null);
-      setState('active');
-      setProgress(0);
-      void checkStatus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Retry failed');
-    } finally {
-      setRetrying(false);
-    }
-  }, [apiBaseUrl, batchId, recordId, templateId, checkStatus]);
-
   if (state === 'idle') return null;
 
-  if (state === 'active') {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-        <svg className="animate-spin -ml-1 mr-1.5 h-3 w-3 text-blue-500" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        Rendering {progress}%
-      </span>
-    );
-  }
+  const tones: Record<RenderState, BadgeTone> = {
+    idle: 'neutral',
+    active: 'warning',
+    completed: 'success',
+    failed: 'error',
+  };
 
-  if (state === 'completed') {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        <svg className="-ml-1 mr-1.5 h-3 w-3 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+  const icon = () => {
+    if (state === 'active') {
+      return (
+        <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      );
+    }
+    if (state === 'completed') {
+      return (
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
-        Rendered
-      </span>
-    );
-  }
+      );
+    }
+    if (state === 'failed') {
+      return (
+        <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+            clipRule="evenodd"
+          />
+        </svg>
+      );
+    }
+    return null;
+  };
 
-  if (state === 'failed') {
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        <span
-          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 cursor-help"
-          title={error || 'Render failed'}
-        >
-          <svg className="-ml-1 mr-1.5 h-3 w-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Failed
-        </span>
-        {templateId && (
-          <button
-            type="button"
-            onClick={() => void handleRetry()}
-            disabled={retrying}
-            className="rounded border border-red-300 bg-white px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-          >
-            {retrying ? 'Retrying…' : 'Retry'}
-          </button>
-        )}
-      </span>
-    );
-  }
+  const label = () => {
+    if (state === 'active') return t('records.renderStatus.rendering', { progress });
+    if (state === 'completed') return t('records.renderStatus.rendered');
+    return t('records.renderStatus.failed');
+  };
 
-  return null;
+  return (
+    <Badge tone={tones[state]} icon={icon()} title={error ?? undefined}>
+      {label()}
+    </Badge>
+  );
 }

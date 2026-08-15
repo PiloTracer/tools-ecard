@@ -1,15 +1,17 @@
 /**
  * RecordsList Component
- * Main list container for batch records with search
+ * Batch records in a sortable DataTable with search, render-status badges,
+ * inline edit/delete actions, and failed-render retry with confirm (S3 SPEC).
  */
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRecords } from '../hooks/useRecords';
 import { useRecordDelete } from '../hooks/useRecordDelete';
-import { RecordCard } from './RecordCard';
-import { RecordSearch } from './RecordSearch';
+import { RenderStatusBadge, type RenderState } from './RenderStatusBadge';
+import { DataTable, SearchBar, Button, StatePanel, Modal } from '@/components/ui';
+import { useTranslation } from '@/features/i18n';
 import type { ContactRecord } from '../types';
 
 interface RecordsListProps {
@@ -18,105 +20,144 @@ interface RecordsListProps {
   renderTemplateId?: string;
 }
 
+const recordName = (r: ContactRecord): string =>
+  r.fullName || [r.firstName, r.lastName].filter(Boolean).join(' ') || '—';
+
 export const RecordsList: React.FC<RecordsListProps> = ({
   batchId,
   onEditRecord,
   renderTemplateId,
 }) => {
+  const { t } = useTranslation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<ContactRecord | null>(null);
+  const [retryRecord, setRetryRecord] = useState<ContactRecord | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
+  const [badgeNonce, setBadgeNonce] = useState<Record<string, number>>({});
 
-  const {
-    records,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    searchQuery,
-    setSearchQuery,
-  } = useRecords({ batchId });
+  const { records, isLoading, isError, error, refetch, searchQuery, setSearchQuery } = useRecords({
+    batchId,
+  });
 
   const { deleteRecordAsync, isDeleting } = useRecordDelete({ batchId });
 
-  const handleDeleteClick = (recordId: string) => {
-    setRecordToDelete(recordId);
+  const handleDeleteClick = (record: ContactRecord) => {
+    setRecordToDelete(record);
     setShowDeleteDialog(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!recordToDelete) return;
-
     try {
-      await deleteRecordAsync(recordToDelete);
+      await deleteRecordAsync(recordToDelete.batchRecordId);
       setShowDeleteDialog(false);
       setRecordToDelete(null);
-    } catch (error) {
-      console.error('Failed to delete record:', error);
+    } catch (e) {
+      console.error('Failed to delete record:', e);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-pulse"
-          >
-            <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
-            <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
-            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+  const handleStateChange = useCallback(
+    (recordId: string) => (state: RenderState) => {
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        if (state === 'failed') next.add(recordId);
+        else next.delete(recordId);
+        return next;
+      });
+    },
+    [],
+  );
 
-  if (isError) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <div className="flex items-center">
-          <svg
-            className="h-6 w-6 text-red-600 mr-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+  const handleRetryConfirm = async () => {
+    if (!retryRecord || !renderTemplateId?.trim()) return;
+    setRetrying(true);
+    try {
+      const res = await fetch(
+        `/api/batches/${batchId}/records/${retryRecord.batchRecordId}/render-retry`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId: renderTemplateId.trim() }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || json.message || 'Retry failed');
+      // Remount the badge so it re-polls from a fresh state
+      setBadgeNonce((prev) => ({
+        ...prev,
+        [retryRecord.batchRecordId]: (prev[retryRecord.batchRecordId] ?? 0) + 1,
+      }));
+      setRetryRecord(null);
+    } catch (e) {
+      console.error('Render retry failed:', e);
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const actionsColumn = {
+    id: 'actions',
+    label: '',
+    render: (record: ContactRecord) => (
+      <div className="flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={() => onEditRecord(record)}
+          aria-label={`${t('records.editTitle', { name: recordName(record) })}`}
+          className="rounded-md p-1.5 text-text-muted hover:bg-surface-inset hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
             />
           </svg>
-          <div>
-            <h3 className="text-lg font-medium text-red-800">Failed to load records</h3>
-            <p className="text-sm text-red-700 mt-1">
-              {error instanceof Error ? error.message : 'An error occurred'}
-            </p>
-          </div>
-        </div>
+        </button>
         <button
-          onClick={() => refetch()}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          type="button"
+          onClick={() => handleDeleteClick(record)}
+          aria-label={t('records.deleteConfirmTitle')}
+          className="rounded-md p-1.5 text-text-muted hover:bg-error-subtle hover:text-status-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          Retry
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
         </button>
       </div>
-    );
-  }
+    ),
+  };
 
-  return (
-    <>
-      <div className="space-y-6">
-        {/* Search */}
-        <div className="flex items-center justify-between gap-4">
-          <RecordSearch onSearchChange={setSearchQuery} className="flex-1" />
+  const statusColumn = {
+    id: 'status',
+    label: t('records.renderStatus.failed'),
+    sortable: true,
+    sortValue: (record: ContactRecord) => recordName(record),
+    render: (record: ContactRecord) => (
+      <div className="flex items-center gap-2">
+        <RenderStatusBadge
+          key={`${record.batchRecordId}-${badgeNonce[record.batchRecordId] ?? 0}`}
+          recordId={record.batchRecordId}
+          batchId={batchId}
+          onStateChange={handleStateChange(record.batchRecordId)}
+        />
+        {failedIds.has(record.batchRecordId) && (
           <button
-            onClick={() => refetch()}
-            className="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            type="button"
+            onClick={() => setRetryRecord(record)}
+            aria-label={t('records.retry')}
+            title={t('records.retryConfirmTitle')}
+            className="rounded-md p-1.5 text-text-muted hover:bg-surface-inset hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -124,116 +165,128 @@ export const RecordsList: React.FC<RecordsListProps> = ({
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            Refresh
           </button>
-        </div>
+        )}
+      </div>
+    ),
+  };
 
-        {/* Results Count */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600">
-            {searchQuery ? (
-              <>
-                Found <span className="font-medium">{records.length}</span> matching record
-                {records.length !== 1 ? 's' : ''}
-              </>
-            ) : (
-              <>
-                Showing <span className="font-medium">{records.length}</span> record
-                {records.length !== 1 ? 's' : ''}
-              </>
-            )}
-          </p>
-        </div>
+  const columns = [
+    { id: 'name', label: t('records.name'), sortable: true, sortValue: recordName },
+    { id: 'email', label: t('records.email'), sortable: true, sortValue: (r: ContactRecord) => r.email ?? '' },
+    {
+      id: 'phone',
+      label: t('records.phone'),
+      sortable: true,
+      sortValue: (r: ContactRecord) => r.workPhone ?? r.mobilePhone ?? '',
+    },
+    statusColumn,
+    actionsColumn,
+  ];
 
-        {/* Records Grid */}
-        {records.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+  return (
+    <>
+      <div className="space-y-6">
+        {/* Toolbar */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <SearchBar
+              value={searchQuery}
+              onDebouncedChange={setSearchQuery}
+              placeholder={t('records.searchPlaceholder')}
+            />
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => refetch()}>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <h3 className="mt-2 text-lg font-medium text-gray-900">No records found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchQuery
-                ? 'Try adjusting your search query.'
-                : 'This batch does not contain any records yet.'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {records.map((record) => (
-              <RecordCard
-                key={record.batchRecordId}
-                record={record}
-                onEdit={onEditRecord}
-                onDelete={handleDeleteClick}
-                isDeleting={isDeleting && recordToDelete === record.batchRecordId}
-                renderTemplateId={renderTemplateId}
-              />
-            ))}
-          </div>
+            {t('records.refresh')}
+          </Button>
+        </div>
+
+        {/* Results Count */}
+        {!isLoading && !isError && (
+          <p className="text-sm text-text-secondary">
+            {searchQuery
+              ? t('records.foundCount', { count: records.length })
+              : t('records.showingCount', { count: records.length })}
+          </p>
+        )}
+
+        {/* Loading / Error */}
+        {isLoading && <StatePanel kind="loading" title={t('batches.loading')} />}
+        {isError && (
+          <StatePanel
+            kind="error"
+            title={t('batches.noBatches')}
+            description={error instanceof Error ? error.message : undefined}
+            action={
+              <Button variant="secondary" onClick={() => refetch()}>
+                {t('batches.refresh')}
+              </Button>
+            }
+          />
+        )}
+
+        {/* DataTable */}
+        {!isLoading && !isError && (
+          <DataTable<ContactRecord>
+            caption={t('records.title')}
+            columns={columns}
+            data={records}
+            rowKey={(r) => r.batchRecordId}
+            emptyState={
+              <span>
+                {t('records.noRecords')} —{' '}
+                {searchQuery ? t('records.noSearchResultsHint') : t('records.noRecordsHint')}
+              </span>
+            }
+          />
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      {showDeleteDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-start mb-4">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-6 w-6 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-              </div>
-              <div className="ml-3 flex-1">
-                <h3 className="text-lg font-medium text-gray-900">Delete Record</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  Are you sure you want to delete this record? This action cannot be undone.
-                </p>
-              </div>
-            </div>
+      {/* Delete confirm */}
+      <Modal
+        open={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        title={t('records.deleteConfirmTitle')}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="danger" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? t('batches.processing') : t('common.delete')}
+            </Button>
+          </>
+        }
+      >
+        <p>{t('records.deleteConfirmBody')}</p>
+      </Modal>
 
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowDeleteDialog(false);
-                  setRecordToDelete(null);
-                }}
-                disabled={isDeleting}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                disabled={isDeleting}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Failed-render retry confirm */}
+      <Modal
+        open={Boolean(retryRecord)}
+        onClose={() => !retrying && setRetryRecord(null)}
+        title={t('records.retryConfirmTitle')}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRetryRecord(null)} disabled={retrying}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" onClick={handleRetryConfirm} disabled={retrying}>
+              {retrying ? t('records.retrying') : t('records.retry')}
+            </Button>
+          </>
+        }
+      >
+        <p>{t('records.retryConfirmBody', { name: retryRecord ? recordName(retryRecord) : '' })}</p>
+      </Modal>
     </>
   );
 };
