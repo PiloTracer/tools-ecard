@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-08-12 (demo KV-paste field-mapping fix; import-ux + fixes committed/pushed; next = redeploy prd/demo)
+**Updated:** 2026-08-14 (UI cycle S0–S4 committed/pushed + both sessions closed; next = prd/demo redeploy + browser click-through)
 
 ---
 
@@ -53,12 +53,13 @@
 | Priority | Item | Notes |
 |----------|------|-------|
 | **0** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
-| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes + drop-and-go templates) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; recreate applies the new globals volume mount (a plain restart would not); recheck prd parse jobs / Cassandra; browser hard-refresh once for the new bundle |
-| **2** | Manual browser click-through | Demo: paste with unknown labels → mapping modal opens; "Correo Trabajo"-style labels auto-pair; upload `.xlsx` → export PNG name+font; import design persistence; profile; units |
+| **0b** | ~~UI Design OS cycle S0–S4~~ **DONE 2026-08-14** (foundation + 16 primitives + 4 screen rebuilds; token system live; audits pass) | committed + pushed with this close; UI bookend closed |
+| **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes + drop-and-go templates + UI S0–S4 rebuild) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; recreate applies the new globals volume mount (a plain restart would not); recheck prd parse jobs / Cassandra; browser hard-refresh once for the new bundle |
+| **2** | Manual browser click-through | Demo: paste with unknown labels → mapping modal opens; "Correo Trabajo"-style labels auto-pair; upload `.xlsx` → export PNG name+font; import design persistence; profile; units; **hostile first click (large paste / malformed CSV / mobile viewport)** — session goal, UI side shipped, live verification pending |
 | **3** | Production deploy cutover | DNS/TLS; Demo flags on clean host |
 | **4** | Start M6 or residual M1/M2 | Fabric parse TODO; batch-import placeholders — `@code-implementation plan` |
 | **5** | Monitoring + automated backups | Prometheus/Grafana/Sentry; wire `bin/start_cron.sh` |
-| **6** | UI foundation (optional) | `@ui-design-foundation greenfield` when UI design work starts |
+| **6** | UI follow-ups | pre-existing lint debt in CanvasControls/PropertyPanel (≈40); designer data-hex exception docs; `RecordSearch.tsx`/`RecordCard.tsx` deletion approval; i18n deep-pass on designer internals; dark-chrome re-theme |
 
 ---
 
