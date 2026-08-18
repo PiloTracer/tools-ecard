@@ -116,7 +116,7 @@ export const bundledTemplatesService = {
       const previewUrl = entry.preview
         ? fileUrl(entry.preview)
         : entry.previewInZip
-          ? `${zipUrl}?extract=preview.png`
+          ? `${zipUrl}?extract=${encodeURIComponent(entry.previewInZipFile ?? 'preview.png')}`
           : undefined;
 
       templates.push({

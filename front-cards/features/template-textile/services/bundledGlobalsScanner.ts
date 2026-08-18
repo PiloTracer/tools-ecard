@@ -6,17 +6,22 @@
  * `<name>.zip` (+ optional `<name>.png` preview + `<name>.json` sidecar) into
  * a directory is the whole publishing step — nothing to regenerate.
  *
+ * A single `<name>.zip` may also embed its own `<name>.png` + `<name>.json`
+ * sidecars; the legacy `preview.png` / `sidecar.json` names are still accepted
+ * for backward compatibility.
+ *
  * Layout:
  *   globals/        → shared set (listed on every site)
  *   globals/demo/   → demo site only
  *   globals/prd/    → production site only
  *
- * Entry shape per ZIP found: { name, file, preview?, previewInZip?, description? }
- *   - name: sidecar `name` if the optional `<name>.json` (or embedded sidecar.json)
+ * Entry shape per ZIP found: { name, file, preview?, previewInZip?, previewInZipFile?, description? }
+ *   - name: sidecar `name` if the optional `<name>.json` (or embedded sidecar)
  *     provides one, otherwise the filename stem
  *   - file: path relative to the globals root (e.g. "demo/A.zip")
  *   - preview: same-named .png when present as a separate file
- *   - previewInZip: true when preview.png is embedded inside the ZIP
+ *   - previewInZip: true when a preview is embedded inside the ZIP
+ *   - previewInZipFile: filename of the embedded preview (e.g. "A.png")
  *   - description: sidecar `description` when present
  *
  * Anything unreadable (bad sidecar JSON, missing dirs, corrupt ZIP) degrades
@@ -31,8 +36,10 @@ export interface BundledGlobalEntry {
   name: string;
   file: string;
   preview?: string;
-  /** True when `preview.png` must be served from inside the ZIP. */
+  /** True when a preview image is embedded inside the ZIP. */
   previewInZip?: boolean;
+  /** Filename of the embedded preview (e.g. "A.png"), if known. */
+  previewInZipFile?: string;
   description?: string;
 }
 
@@ -73,15 +80,21 @@ function parseSidecar(raw: string): { name?: string; description?: string } {
 }
 
 async function peekZipSidecars(
-  zipPath: string
-): Promise<{ name?: string; description?: string; hasPreview: boolean } | null> {
+  zipPath: string,
+  stem: string
+): Promise<{ name?: string; description?: string; hasPreview: boolean; previewFileName?: string } | null> {
   try {
     const buffer = readFileSync(zipPath);
     const zip = await JSZip.loadAsync(buffer);
-    const sidecarFile = zip.file('sidecar.json');
-    const previewFile = zip.file('preview.png');
+    // Prefer sidecars named after the ZIP stem; fall back to legacy names.
+    const sidecarFile = zip.file(`${stem}.json`) ?? zip.file('sidecar.json');
+    const previewFile = zip.file(`${stem}.png`) ?? zip.file('preview.png');
     const sidecar = sidecarFile ? parseSidecar(await sidecarFile.async('string')) : {};
-    return { ...sidecar, hasPreview: previewFile !== null };
+    return {
+      ...sidecar,
+      hasPreview: previewFile !== null,
+      previewFileName: previewFile ? previewFile.name : undefined,
+    };
   } catch {
     return null;
   }
@@ -115,9 +128,12 @@ async function scanDir(dir: string, relPrefix: string): Promise<BundledGlobalEnt
 
     // If external sidecar/preview are missing, peek inside the ZIP for embedded ones.
     if (!entry.preview || !entry.name || !entry.description) {
-      const embedded = await peekZipSidecars(join(dir, file));
+      const embedded = await peekZipSidecars(join(dir, file), stem);
       if (embedded) {
-        if (!entry.preview && embedded.hasPreview) entry.previewInZip = true;
+        if (!entry.preview && embedded.hasPreview) {
+          entry.previewInZip = true;
+          entry.previewInZipFile = embedded.previewFileName;
+        }
         if (!sidecar.name && embedded.name) entry.name = embedded.name;
         if (!entry.description && embedded.description) entry.description = embedded.description;
       }

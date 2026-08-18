@@ -10,7 +10,7 @@ Object.defineProperty(globalThis, 'fetch', { value: mockFetch, writable: true, c
 
 async function makeTemplateZipBuffer(
   name = 'Bundled Card',
-  opts: { embeddedPreview?: boolean; description?: string } = {}
+  opts: { embeddedPreview?: boolean; description?: string; stem?: string } = {}
 ): Promise<ArrayBuffer> {
   const zip = new JSZip();
   zip.file(
@@ -22,8 +22,9 @@ async function makeTemplateZipBuffer(
     JSON.stringify({ version: '1.0', exportDate: '2026-08-12T00:00:00Z', customFonts: [], images: [] })
   );
   if (opts.embeddedPreview) {
-    zip.file('preview.png', Buffer.from('fake-png'));
-    zip.file('sidecar.json', JSON.stringify({ name, description: opts.description }, null, 2));
+    const stem = opts.stem ?? 'preview';
+    zip.file(`${stem}.png`, Buffer.from('fake-png'));
+    zip.file(`${stem}.json`, JSON.stringify({ name, description: opts.description }, null, 2));
   }
   return zip.generateAsync({ type: 'arraybuffer' });
 }
@@ -182,6 +183,7 @@ describe('bundledTemplatesService (Pass 5)', () => {
     const embeddedZip = await makeTemplateZipBuffer('Embedded Preview Card', {
       embeddedPreview: true,
       description: 'Embedded description',
+      stem: 'embedded',
     });
     mockFetch.mockImplementation(async (url: string) => {
       if (url === '/api/bundled-templates') {
@@ -192,6 +194,7 @@ describe('bundledTemplatesService (Pass 5)', () => {
                 name: 'Embedded Preview Card',
                 file: 'embedded.zip',
                 previewInZip: true,
+                previewInZipFile: 'embedded.png',
                 description: 'Embedded description',
               },
             ],
@@ -211,7 +214,7 @@ describe('bundledTemplatesService (Pass 5)', () => {
     expect(list.map((t) => t.name)).toEqual(['Embedded Preview Card']);
     expect(list[0]).toMatchObject({
       id: `${BUNDLED_TEMPLATE_PREFIX}embedded.zip`,
-      previewUrl: '/api/bundled-templates/file/embedded.zip?extract=preview.png',
+      previewUrl: '/api/bundled-templates/file/embedded.zip?extract=embedded.png',
       description: 'Embedded description',
     });
   });

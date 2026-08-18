@@ -10,7 +10,8 @@
  *
  * Query param `?extract=<filename>` reads `<filename>` from inside a ZIP
  * package. This lets operators publish a single `<name>.zip` that embeds its
- * own `preview.png` and `sidecar.json`.
+ * own `<name>.png` + `<name>.json` sidecars (legacy `preview.png` /
+ * `sidecar.json` names are also accepted).
  *
  * Security: the path is confined to public/templates/globals; traversal
  * outside it is rejected. Only .zip/.png/.json are served.

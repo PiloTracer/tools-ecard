@@ -917,10 +917,13 @@ export function CanvasControls() {
 
       const sidecar = { name: displayName };
 
-      // Export as complete ZIP package with all resources + embedded sidecars
+      // Export as complete ZIP package with all resources + embedded sidecars.
+      // The embedded preview/sidecar share the ZIP filename stem so the operator
+      // gets a matching trio (e.g. MyTemplate.zip / MyTemplate.png / MyTemplate.json).
       const zipBlob = await templatePackageService.exportPackage(toPackage, {
         previewDataUrl,
         sidecar,
+        fileStem: safeFileStem,
       });
 
       // Download single ZIP file (always works — contains zip + png + json).

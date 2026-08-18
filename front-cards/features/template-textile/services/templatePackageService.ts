@@ -34,6 +34,12 @@ export interface TemplatePackageSidecars {
   previewDataUrl?: string;
   /** Optional sidecar metadata (name, description) for bundled-global publishing. */
   sidecar?: { name?: string; description?: string };
+  /**
+   * Filename stem for embedded preview/sidecar files so they match the outer
+   * ZIP name (e.g. "MyTemplate" → "MyTemplate.png" + "MyTemplate.json").
+   * When omitted the legacy names "preview.png" / "sidecar.json" are used.
+   */
+  fileStem?: string;
 }
 
 export class TemplatePackageService {
@@ -116,18 +122,23 @@ export class TemplatePackageService {
     // 4. Add metadata file
     zip.file('package.json', JSON.stringify(metadata, null, 2));
 
-    // 5. Embed optional sidecars for bundled-global publishing
+    // 5. Embed optional sidecars for bundled-global publishing.
+    // Name them after the outer ZIP stem when provided so the operator gets a
+    // clean trio of files with matching names.
+    const previewFileName = sidecars?.fileStem ? `${sidecars.fileStem}.png` : 'preview.png';
+    const sidecarFileName = sidecars?.fileStem ? `${sidecars.fileStem}.json` : 'sidecar.json';
+
     if (sidecars?.previewDataUrl) {
       const base64Data = sidecars.previewDataUrl.split(',')[1];
       if (base64Data) {
-        zip.file('preview.png', base64Data, { base64: true });
-        console.log('[PackageExport] Embedded preview.png sidecar');
+        zip.file(previewFileName, base64Data, { base64: true });
+        console.log(`[PackageExport] Embedded ${previewFileName} sidecar`);
       }
     }
 
     if (sidecars?.sidecar) {
-      zip.file('sidecar.json', JSON.stringify(sidecars.sidecar, null, 2) + '\n');
-      console.log('[PackageExport] Embedded sidecar.json:', sidecars.sidecar);
+      zip.file(sidecarFileName, JSON.stringify(sidecars.sidecar, null, 2) + '\n');
+      console.log(`[PackageExport] Embedded ${sidecarFileName}:`, sidecars.sidecar);
     }
 
     // 6. Generate ZIP blob

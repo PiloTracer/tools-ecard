@@ -9,12 +9,19 @@ import { join } from 'node:path';
 import JSZip from 'jszip';
 import { scanBundledGlobals } from './bundledGlobalsScanner';
 
-async function makeEmbeddedZip(name: string, description?: string): Promise<Buffer> {
+async function makeEmbeddedZip(
+  stem: string,
+  name: string,
+  description?: string,
+  legacyNames = false
+): Promise<Buffer> {
   const zip = new JSZip();
   zip.file('template.json', JSON.stringify({ name: 'Embedded', width: 100, height: 100, elements: [] }));
   zip.file('package.json', JSON.stringify({ version: '1.0', exportDate: new Date().toISOString() }));
-  zip.file('preview.png', Buffer.from('fake-png'));
-  zip.file('sidecar.json', JSON.stringify({ name, description }, null, 2));
+  const previewName = legacyNames ? 'preview.png' : `${stem}.png`;
+  const sidecarName = legacyNames ? 'sidecar.json' : `${stem}.json`;
+  zip.file(previewName, Buffer.from('fake-png'));
+  zip.file(sidecarName, JSON.stringify({ name, description }, null, 2));
   return Buffer.from(await zip.generateAsync({ type: 'arraybuffer' }));
 }
 
@@ -30,8 +37,16 @@ async function makeFixture(): Promise<string> {
   writeFileSync(join(base, 'plain.zip'), 'PK');
   writeFileSync(join(base, 'orphan.png'), 'png');
   writeFileSync(join(base, 'notes.txt'), 'not a template');
-  // Shared root: one ZIP with embedded sidecars only (no external files).
-  writeFileSync(join(base, 'embedded-only.zip'), await makeEmbeddedZip('Embedded Only', 'From inside ZIP'));
+  // Shared root: one ZIP with stem-named embedded sidecars only (no external files).
+  writeFileSync(
+    join(base, 'embedded-only.zip'),
+    await makeEmbeddedZip('embedded-only', 'Embedded Only', 'From inside ZIP')
+  );
+  // Shared root: one ZIP with legacy embedded sidecar names (backward compat).
+  writeFileSync(
+    join(base, 'legacy.zip'),
+    await makeEmbeddedZip('legacy', 'Legacy', 'Legacy names', true)
+  );
   // Per-site dirs.
   mkdirSync(join(base, 'demo'));
   writeFileSync(join(base, 'demo', 'a.zip'), 'PK');
@@ -56,7 +71,15 @@ describe('scanBundledGlobals', () => {
         name: 'Embedded Only',
         file: 'embedded-only.zip',
         previewInZip: true,
+        previewInZipFile: 'embedded-only.png',
         description: 'From inside ZIP',
+      },
+      {
+        name: 'Legacy',
+        file: 'legacy.zip',
+        previewInZip: true,
+        previewInZipFile: 'preview.png',
+        description: 'Legacy names',
       },
       { name: 'plain', file: 'plain.zip' },
     ]);
