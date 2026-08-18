@@ -27,6 +27,8 @@ export interface UploadBatchComponentProps {
   className?: string;
 }
 
+const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
+
 export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ className = '' }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -47,7 +49,6 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
   const isDisabled = !selectedProjectId || loading;
 
-  const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
   const MAX_SIZE_MB = 10;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
@@ -310,75 +311,68 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     }
   };
 
-  const handlePaste = useCallback(
-    async (e: React.ClipboardEvent) => {
-      e.preventDefault();
+  const isPasteAllowed = !isDisabled && !isUploading && !showNameModal && !showMappingModal;
 
-      if (isDisabled || isUploading || showNameModal || showMappingModal) return;
-
-      const clipboardData = e.clipboardData;
+  const createFileFromPaste = useCallback(
+    (clipboardData: DataTransfer): File | null => {
       const files = clipboardData.files;
       if (files && files.length > 0) {
-        handleFile(files[0]);
-        return;
+        return files[0];
       }
 
       const text = clipboardData.getData('text/plain');
       if (text && text.trim()) {
         const blob = new Blob([text], { type: 'text/plain' });
-        const file = new File([blob], 'pasted-content.txt', { type: 'text/plain' });
+        return new File([blob], 'pasted-content.txt', { type: 'text/plain' });
+      }
+
+      return null;
+    },
+    []
+  );
+
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      if (!isPasteAllowed) return;
+
+      const file = createFileFromPaste(e.clipboardData);
+      if (file) {
+        e.preventDefault();
         handleFile(file);
       }
     },
-    [handleFile, isDisabled, isUploading, showNameModal, showMappingModal]
+    [createFileFromPaste, handleFile, isPasteAllowed]
   );
 
   React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container || isDisabled || isUploading || showNameModal || showMappingModal) return;
-
-    let isHovering = false;
-
-    const handleMouseEnter = () => {
-      isHovering = true;
-    };
-
-    const handleMouseLeave = () => {
-      isHovering = false;
-    };
+    if (!isPasteAllowed) return;
 
     const handleDocumentPaste = (e: ClipboardEvent) => {
-      if (!isHovering) return;
+      // Never hijack paste when the user is typing in an input.
+      const active = document.activeElement;
+      const tag = active?.tagName?.toLowerCase();
+      const isEditable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        active?.getAttribute('contenteditable') === 'true';
+      if (isEditable) return;
 
       const clipboardData = e.clipboardData;
       if (!clipboardData) return;
 
-      const files = clipboardData.files;
-      if (files && files.length > 0) {
+      const file = createFileFromPaste(clipboardData);
+      if (file) {
         e.preventDefault();
-        handleFile(files[0]);
-        return;
-      }
-
-      const text = clipboardData.getData('text/plain');
-      if (text && text.trim()) {
-        e.preventDefault();
-        const blob = new Blob([text], { type: 'text/plain' });
-        const file = new File([blob], 'pasted-content.txt', { type: 'text/plain' });
         handleFile(file);
       }
     };
 
-    container.addEventListener('mouseenter', handleMouseEnter);
-    container.addEventListener('mouseleave', handleMouseLeave);
     document.addEventListener('paste', handleDocumentPaste);
 
     return () => {
-      container.removeEventListener('mouseenter', handleMouseEnter);
-      container.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('paste', handleDocumentPaste);
     };
-  }, [handleFile, isDisabled, isUploading, showNameModal, showMappingModal]);
+  }, [createFileFromPaste, handleFile, isPasteAllowed]);
 
   const getButtonClasses = () => {
     const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200';
