@@ -31,6 +31,7 @@ const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
 
 export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ className = '' }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [validationError, setValidationError] = useState<FileValidationError | null>(null);
   const [uploadedBatch, setUploadedBatch] = useState<BatchUploadResponse | null>(null);
@@ -44,6 +45,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const previewRef = useRef<Promise<MappingPreview | null> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropzoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
   const { selectedProjectId, loading } = useProjects();
 
@@ -338,6 +340,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       const file = createFileFromPaste(e.clipboardData);
       if (file) {
         e.preventDefault();
+        e.stopPropagation();
         handleFile(file);
       }
     },
@@ -374,8 +377,21 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     };
   }, [createFileFromPaste, handleFile, isPasteAllowed]);
 
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    // Focus the dropzone on hover so keyboard/paste events are routed directly
+    // to the area the user is pointing at.
+    if (isPasteAllowed && dropzoneRef.current) {
+      dropzoneRef.current.focus({ preventScroll: true });
+    }
+  }, [isPasteAllowed]);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
   const getButtonClasses = () => {
-    const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200';
+    const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200 outline-none';
 
     if (isDisabled) {
       return `${baseClasses} border-border-default bg-surface-inset cursor-not-allowed opacity-50`;
@@ -387,6 +403,10 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
     if (isUploading) {
       return `${baseClasses} border-accent bg-accent-subtle`;
+    }
+
+    if (isHovered) {
+      return `${baseClasses} border-accent bg-accent-subtle cursor-pointer`;
     }
 
     return `${baseClasses} border-border-default hover:border-accent hover:bg-accent-subtle cursor-pointer`;
@@ -436,8 +456,11 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       )}
 
       <div
+        ref={dropzoneRef}
         className={getButtonClasses()}
         onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -447,7 +470,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         tabIndex={isDisabled ? -1 : 0}
         aria-label="Import Batch"
         aria-disabled={isDisabled}
-        title={isDisabled ? 'Select a project to import batches' : 'Click, drag and drop, or paste content'}
+        title={isDisabled ? 'Select a project to import batches' : 'Click, drag and drop, or hover and paste (Ctrl+V)'}
       >
         <svg
           className={getIconClasses()}

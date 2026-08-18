@@ -1,9 +1,5 @@
 /**
- * UploadBatchComponent — template download links (plan tasks 6+7).
- *
- * The dropzone offers the two committed import-template workbooks
- * (front-cards/public/templates/) as static downloads in both Demo and Normal
- * mode; these tests guard the hrefs against typos/drift.
+ * UploadBatchComponent — template download links and clipboard paste.
  */
 
 import React from 'react';
@@ -91,5 +87,33 @@ describe('UploadBatchComponent template downloads', () => {
     expect(batchService.previewBatchFile).not.toHaveBeenCalled();
 
     document.body.removeChild(input);
+  });
+
+  it('focuses the dropzone on hover and accepts paste directly on it', async () => {
+    render(<UploadBatchComponent />);
+
+    const dropzone = screen.getByRole('button', { name: 'Import Batch' });
+    fireEvent.mouseEnter(dropzone);
+
+    // Hovering should move focus to the dropzone so onPaste fires directly.
+    await waitFor(() => {
+      expect(document.activeElement).toBe(dropzone);
+    });
+
+    const text = 'work_phone:\t+506 2222-1234\nemail:\tjohn.doe@eco.com';
+    fireEvent.paste(dropzone, {
+      clipboardData: {
+        getData: (format: string) => (format === 'text/plain' ? text : ''),
+        files: [],
+      } as unknown as DataTransfer,
+    });
+
+    await waitFor(() => {
+      expect(batchService.previewBatchFile).toHaveBeenCalled();
+    });
+
+    const fileArg = (batchService.previewBatchFile as jest.Mock).mock.calls[0][0] as File;
+    expect(fileArg.name).toBe('pasted-content.txt');
+    expect(fileArg.type).toBe('text/plain');
   });
 });
