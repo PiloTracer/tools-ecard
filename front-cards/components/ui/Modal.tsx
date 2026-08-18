@@ -102,13 +102,13 @@ export function Modal({ open, onClose, title, ariaLabel, closeLabel = 'Close', c
         tabIndex={-1}
         data-testid="ui-modal"
         className={cn(
-          'w-full rounded-xl bg-surface-overlay shadow-elevation-3 focus:outline-none',
+          'flex w-full max-h-[calc(100vh-2rem)] flex-col rounded-xl bg-surface-overlay shadow-elevation-3 focus:outline-none',
           size === 'md' ? 'max-w-lg' : 'max-w-3xl',
           className,
         )}
       >
         {title ? (
-          <div className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-6 py-4">
             <h2 id={titleId} className="text-lg font-semibold text-text-primary">
               {title}
             </h2>
@@ -124,9 +124,12 @@ export function Modal({ open, onClose, title, ariaLabel, closeLabel = 'Close', c
             </button>
           </div>
         ) : null}
-        <div className="px-6 py-4 text-text-secondary">{children}</div>
+        {/* Scrollable body: min-h-0 lets this flex child shrink below content size,
+            so tall content (e.g. the 30+ field record edit form) scrolls inside the
+            modal instead of running past the viewport while body scroll is locked. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 text-text-secondary">{children}</div>
         {footer ? (
-          <div className="flex items-center justify-end gap-3 border-t border-border-subtle px-6 py-4">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border-subtle px-6 py-4">
             {footer}
           </div>
         ) : null}

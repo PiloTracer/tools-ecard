@@ -125,7 +125,9 @@ services:
     depends_on:
       - api-server
     command: npm run dev
-    mem_limit: 512m
+    # Next 16 dev (Turbopack) plus the render-status polling burst OOMs at 512m
+    # (observed: container OOM-killed shortly after a batch upload); 1g gives headroom.
+    mem_limit: 1g
 
   # API Server - Internal backend service (NOT the external auth API)
   # This is the E-Cards application's own API server for internal operations

@@ -62,6 +62,7 @@ function emptyContact(batchId: string, id: string): ContactRecord {
 }
 
 function mapDemoRecord(raw: Record<string, unknown>, batchId: string): ContactRecord {
+  const recordId = String(raw.id ?? '');
   const data =
     (raw.data as {
       cols?: string[];
@@ -69,7 +70,7 @@ function mapDemoRecord(raw: Record<string, unknown>, batchId: string): ContactRe
     }) || {};
   const fields = data.fields || {};
   const cols = data.cols || [];
-  const base = emptyContact(batchId, String(raw.id ?? ''));
+  const base = emptyContact(batchId, recordId);
 
   // Legacy rows (uploaded before the header-aware demo parser existed)
   // stored bare `cols` in a fixed [fullName, firstName, lastName, email]
@@ -116,6 +117,9 @@ function mapDemoRecord(raw: Record<string, unknown>, batchId: string): ContactRe
     personalUrl: fields.personalUrl ?? null,
     personalBio: fields.personalBio ?? null,
     personalBirthday: fields.personalBirthday ?? null,
+    // Demo renderer mocks these at ingest (completed/100); server records leave them undefined
+    renderStatus: (raw.renderStatus as ContactRecord['renderStatus']) ?? undefined,
+    renderProgress: typeof raw.renderProgress === 'number' ? raw.renderProgress : undefined,
   };
 }
 

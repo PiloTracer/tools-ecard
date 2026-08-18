@@ -62,6 +62,10 @@ export interface ContactRecord {
 
   // Extra
   extra: Record<string, string> | null;
+
+  // Render status (populated by Demo's mocked renderer; absent on server records)
+  renderStatus?: 'idle' | 'active' | 'completed' | 'failed' | string;
+  renderProgress?: number;
 }
 
 export interface RecordsListResponse {

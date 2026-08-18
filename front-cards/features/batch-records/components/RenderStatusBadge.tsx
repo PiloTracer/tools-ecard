@@ -7,7 +7,7 @@
  * the list can show a retry action on failure (retry itself lives in the row).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Badge, type BadgeTone } from '@/components/ui';
 import { useTranslation } from '@/features/i18n';
 
@@ -16,7 +16,16 @@ interface RenderStatusProps {
   batchId: string;
   apiBaseUrl?: string;
   onStateChange?: (state: 'idle' | 'active' | 'completed' | 'failed') => void;
+  /** Known status from the record payload (Demo renderer mocks these at ingest). When
+   *  terminal ('completed'/'failed') the badge renders it directly and never polls. */
+  initialStatus?: RenderState | string;
+  initialProgress?: number;
 }
+
+/** Maximum polls when no job is ever found (idle/not_found) before giving up.
+ *  Bounds log/network noise for records that will never render (e.g. Demo mode
+ *  records whose mocked status was already consumed, or jobs never queued). */
+const MAX_IDLE_POLLS = 10;
 
 interface RenderStatusData {
   recordId: string;
@@ -34,10 +43,25 @@ export function RenderStatusBadge({
   batchId,
   apiBaseUrl = '',
   onStateChange,
+  initialStatus,
+  initialProgress,
 }: RenderStatusProps) {
   const { t } = useTranslation();
-  const [state, setState] = useState<RenderState>('idle');
-  const [progress, setProgress] = useState(0);
+
+  // Seed from the record's known render status (Demo mocks these at ingest).
+  // Terminal statuses render immediately; 'active' starts polling from the
+  // known progress instead of the default idle → first-fetch race.
+  const seed: RenderState =
+    initialStatus === 'completed'
+      ? 'completed'
+      : initialStatus === 'failed'
+        ? 'failed'
+        : initialStatus === 'active' || initialStatus === 'waiting' || initialStatus === 'delayed'
+          ? 'active'
+          : 'idle';
+
+  const [state, setState] = useState<RenderState>(seed);
+  const [progress, setProgress] = useState(initialProgress && initialProgress > 0 ? initialProgress : 0);
   const [error, setError] = useState<string | null>(null);
 
   const applyState = useCallback(
@@ -82,18 +106,41 @@ export function RenderStatusBadge({
     }
   }, [recordId, batchId, apiBaseUrl, applyState, t]);
 
+  // Keep the latest checkStatus callable from a stable effect.
+  // Without this ref, every state update recreates `checkStatus`
+  // (it closes over `applyState`), which re-runs the effect below,
+  // which fires the deferred initial fetch again — a tight fetch loop
+  // (observed: ~6 req/s per badge) instead of a 2s poll.
+  const checkStatusRef = useRef(checkStatus);
+  useEffect(() => {
+    checkStatusRef.current = checkStatus;
+  }, [checkStatus]);
+
   // Poll while rendering is active
   useEffect(() => {
     if (state === 'idle' || state === 'active') {
-      const interval = setInterval(checkStatus, 2000);
+      let idlePolls = 0;
+      const interval = setInterval(() => {
+        // A record that never gets a job (not_found → idle) must not poll forever:
+        // stop after MAX_IDLE_POLLS so the endpoint stays quiet for records that
+        // will never render (Demo mocked statuses already consumed, etc.).
+        if (state === 'idle') {
+          idlePolls += 1;
+          if (idlePolls > MAX_IDLE_POLLS) {
+            clearInterval(interval);
+            return;
+          }
+        }
+        checkStatusRef.current();
+      }, 2000);
       // Defer initial fetch to avoid synchronous setState in effect
-      const timeout = setTimeout(checkStatus, 0);
+      const timeout = setTimeout(() => checkStatusRef.current(), 0);
       return () => {
         clearInterval(interval);
         clearTimeout(timeout);
       };
     }
-  }, [state, checkStatus]);
+  }, [state, recordId, batchId]);
 
   if (state === 'idle') return null;
 

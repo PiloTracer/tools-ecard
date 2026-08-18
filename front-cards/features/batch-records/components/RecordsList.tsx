@@ -147,6 +147,8 @@ export const RecordsList: React.FC<RecordsListProps> = ({
           key={`${record.batchRecordId}-${badgeNonce[record.batchRecordId] ?? 0}`}
           recordId={record.batchRecordId}
           batchId={batchId}
+          initialStatus={record.renderStatus}
+          initialProgress={record.renderProgress}
           onStateChange={handleStateChange(record.batchRecordId)}
         />
         {failedIds.has(record.batchRecordId) && (
