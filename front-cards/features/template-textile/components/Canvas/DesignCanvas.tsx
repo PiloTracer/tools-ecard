@@ -326,6 +326,19 @@ export function DesignCanvas() {
       if (systemUpdating.current.has(elementId)) {
         console.log(`[SYSTEM-UPDATE] Skipping object:modified for ${elementId} - system update, not user action`);
         systemUpdating.current.delete(elementId);
+        // A user interaction may have started BEFORE this system update landed
+        // (mousedown added `activelyInteracting`). The normal path below is the
+        // only place those flags get cleared — early-returning here leaks them,
+        // and a stuck `activelyInteracting` silently blocks BOTH the Delete key
+        // guard and the sync's canvas removal, making the element undeletable
+        // (repro: two overlapping drops of the same vCard field). Release the
+        // locks exactly like the normal path would. If a real drag is still in
+        // progress, its own object:modified on mouseup re-arms the lock.
+        setTimeout(() => {
+          processingModification.current.delete(elementId);
+          activelyInteracting.current.delete(elementId);
+          globalSyncLockRef.current = false;
+        }, 300);
         return;
       }
 
@@ -1678,11 +1691,17 @@ export function DesignCanvas() {
       // Delete/Backspace — use Fabric’s active objects (correct for multi-select; see isFabricActiveSelection)
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const ids = getElementIdsFromActiveObjects(canvas);
-        if (
-          ids.length > 0 &&
-          !ids.some((id) => activelyInteracting.current.has(id) || globalSyncLockRef.current)
-        ) {
+        if (ids.length > 0) {
           e.preventDefault();
+          // Release any stale interaction locks for the elements being deleted.
+          // A leaked `activelyInteracting` (see the object:modified
+          // systemUpdating early-return) would otherwise silently block the
+          // delete guard AND the sync removal — element appears undeletable.
+          ids.forEach((id) => {
+            activelyInteracting.current.delete(id);
+            processingModification.current.delete(id);
+          });
+          globalSyncLockRef.current = false;
           removeElements(ids);
           setSelectedElements([]);
           canvas.discardActiveObject();

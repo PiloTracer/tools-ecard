@@ -17,6 +17,4 @@ module.exports = {
   transform: {
     '^.+\\.ts$': '<rootDir>/jest-transformer.js',
   },
-  // Exclude native-dependency modules from coverage (require canvas deps)
-  modulePathIgnorePatterns: ['<rootDir>/src/services/renderer'],
 };

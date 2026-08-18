@@ -57,9 +57,31 @@ export interface RecordFieldValues {
   mobilePhone?: string | null;
   businessName?: string | null;
   businessTitle?: string | null;
+  addressStreet?: string | null;
+  addressCity?: string | null;
+  addressState?: string | null;
+  addressPostal?: string | null;
+  addressCountry?: string | null;
+  socialInstagram?: string | null;
+  socialTwitter?: string | null;
+  socialFacebook?: string | null;
+  businessDepartment?: string | null;
+  businessUrl?: string | null;
+  businessHours?: string | null;
+  businessAddressStreet?: string | null;
+  businessAddressCity?: string | null;
+  businessAddressState?: string | null;
+  businessAddressPostal?: string | null;
+  businessAddressCountry?: string | null;
+  businessLinkedin?: string | null;
+  businessTwitter?: string | null;
+  personalUrl?: string | null;
+  personalBio?: string | null;
+  personalBirthday?: string | null;
   [key: string]: string | null | undefined;
 }
 
+/** Every vCard fieldId the designer can drop must resolve to a record property. */
 const FIELD_ID_TO_PROPERTY: Record<string, keyof RecordFieldValues> = {
   full_name: 'fullName',
   first_name: 'firstName',
@@ -70,9 +92,30 @@ const FIELD_ID_TO_PROPERTY: Record<string, keyof RecordFieldValues> = {
   mobile_phone: 'mobilePhone',
   business_name: 'businessName',
   business_title: 'businessTitle',
+  address_street: 'addressStreet',
+  address_city: 'addressCity',
+  address_state: 'addressState',
+  address_postal: 'addressPostal',
+  address_country: 'addressCountry',
+  social_instagram: 'socialInstagram',
+  social_twitter: 'socialTwitter',
+  social_facebook: 'socialFacebook',
+  business_department: 'businessDepartment',
+  business_url: 'businessUrl',
+  business_hours: 'businessHours',
+  business_address_street: 'businessAddressStreet',
+  business_address_city: 'businessAddressCity',
+  business_address_state: 'businessAddressState',
+  business_address_postal: 'businessAddressPostal',
+  business_address_country: 'businessAddressCountry',
+  business_linkedin: 'businessLinkedin',
+  business_twitter: 'businessTwitter',
+  personal_url: 'personalUrl',
+  personal_bio: 'personalBio',
+  personal_birthday: 'personalBirthday',
 };
 
-function resolveText(element: TemplateElementJson, record?: RecordFieldValues): string {
+export function resolveText(element: TemplateElementJson, record?: RecordFieldValues): string {
   if (element.fieldId && record) {
     const key = FIELD_ID_TO_PROPERTY[element.fieldId] ?? (element.fieldId as keyof RecordFieldValues);
     const value = record[key];
