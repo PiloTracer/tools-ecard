@@ -29,11 +29,20 @@ interface PackageMetadata {
   }>;
 }
 
+export interface TemplatePackageSidecars {
+  /** PNG data URL for the template preview thumbnail. */
+  previewDataUrl?: string;
+  /** Optional sidecar metadata (name, description) for bundled-global publishing. */
+  sidecar?: { name?: string; description?: string };
+}
+
 export class TemplatePackageService {
   /**
-   * Export template as ZIP package with all resources
+   * Export template as ZIP package with all resources.
+   * Optional sidecars are embedded so a single download contains the full
+   * publishable set (template + preview PNG + JSON descriptor).
    */
-  async exportPackage(template: Template): Promise<Blob> {
+  async exportPackage(template: Template, sidecars?: TemplatePackageSidecars): Promise<Blob> {
     console.log('[PackageExport] Starting export for template:', template.name);
 
     const zip = new JSZip();
@@ -107,13 +116,28 @@ export class TemplatePackageService {
     // 4. Add metadata file
     zip.file('package.json', JSON.stringify(metadata, null, 2));
 
-    // 5. Generate ZIP blob
+    // 5. Embed optional sidecars for bundled-global publishing
+    if (sidecars?.previewDataUrl) {
+      const base64Data = sidecars.previewDataUrl.split(',')[1];
+      if (base64Data) {
+        zip.file('preview.png', base64Data, { base64: true });
+        console.log('[PackageExport] Embedded preview.png sidecar');
+      }
+    }
+
+    if (sidecars?.sidecar) {
+      zip.file('sidecar.json', JSON.stringify(sidecars.sidecar, null, 2) + '\n');
+      console.log('[PackageExport] Embedded sidecar.json:', sidecars.sidecar);
+    }
+
+    // 6. Generate ZIP blob
     console.log('[PackageExport] Generating ZIP file...');
     const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 
     console.log('[PackageExport] Export complete!', {
       images: metadata.images.length,
       fonts: metadata.customFonts.length,
+      sidecars: { preview: !!sidecars?.previewDataUrl, sidecar: !!sidecars?.sidecar },
       size: `${(zipBlob.size / 1024).toFixed(2)} KB`
     });
 

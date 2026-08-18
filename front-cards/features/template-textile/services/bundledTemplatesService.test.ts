@@ -8,7 +8,10 @@ import { bundledTemplatesService, BUNDLED_TEMPLATE_PREFIX } from './bundledTempl
 const mockFetch = jest.fn();
 Object.defineProperty(globalThis, 'fetch', { value: mockFetch, writable: true, configurable: true });
 
-async function makeTemplateZipBuffer(name = 'Bundled Card'): Promise<ArrayBuffer> {
+async function makeTemplateZipBuffer(
+  name = 'Bundled Card',
+  opts: { embeddedPreview?: boolean; description?: string } = {}
+): Promise<ArrayBuffer> {
   const zip = new JSZip();
   zip.file(
     'template.json',
@@ -18,6 +21,10 @@ async function makeTemplateZipBuffer(name = 'Bundled Card'): Promise<ArrayBuffer
     'package.json',
     JSON.stringify({ version: '1.0', exportDate: '2026-08-12T00:00:00Z', customFonts: [], images: [] })
   );
+  if (opts.embeddedPreview) {
+    zip.file('preview.png', Buffer.from('fake-png'));
+    zip.file('sidecar.json', JSON.stringify({ name, description: opts.description }, null, 2));
+  }
   return zip.generateAsync({ type: 'arraybuffer' });
 }
 
@@ -168,6 +175,44 @@ describe('bundledTemplatesService (Pass 5)', () => {
       id: `${BUNDLED_TEMPLATE_PREFIX}prd/c.zip`,
       storageUrl: '/api/bundled-templates/file/prd/c.zip',
       previewUrl: '/api/bundled-templates/file/prd/c.png',
+    });
+  });
+
+  it('uses the ZIP-extract URL when the preview is embedded in the ZIP', async () => {
+    const embeddedZip = await makeTemplateZipBuffer('Embedded Preview Card', {
+      embeddedPreview: true,
+      description: 'Embedded description',
+    });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/bundled-templates') {
+        return okResponse({
+          json: async () => ({
+            shared: [
+              {
+                name: 'Embedded Preview Card',
+                file: 'embedded.zip',
+                previewInZip: true,
+                description: 'Embedded description',
+              },
+            ],
+            demo: [],
+            prd: [],
+          }),
+        });
+      }
+      if (url === '/api/bundled-templates/file/embedded.zip') {
+        return okResponse({ arrayBuffer: async () => embeddedZip });
+      }
+      return { ok: false, status: 404 };
+    });
+
+    const list = await bundledTemplatesService.listBundledTemplates();
+
+    expect(list.map((t) => t.name)).toEqual(['Embedded Preview Card']);
+    expect(list[0]).toMatchObject({
+      id: `${BUNDLED_TEMPLATE_PREFIX}embedded.zip`,
+      previewUrl: '/api/bundled-templates/file/embedded.zip?extract=preview.png',
+      description: 'Embedded description',
     });
   });
 

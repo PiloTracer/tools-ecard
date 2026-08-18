@@ -113,6 +113,12 @@ export const bundledTemplatesService = {
         continue;
       }
 
+      const previewUrl = entry.preview
+        ? fileUrl(entry.preview)
+        : entry.previewInZip
+          ? `${zipUrl}?extract=preview.png`
+          : undefined;
+
       templates.push({
         id: `${BUNDLED_TEMPLATE_PREFIX}${entry.file}`,
         userId: 'global',
@@ -123,7 +129,7 @@ export const bundledTemplatesService = {
         version: 1,
         kind: 'template' as TemplateKind,
         isBundled: true,
-        previewUrl: entry.preview ? fileUrl(entry.preview) : undefined,
+        previewUrl,
         description: entry.description,
         createdAt: new Date(0),
         updatedAt: new Date(0)

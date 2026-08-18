@@ -14,7 +14,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    return NextResponse.json(scanBundledGlobals(), {
+    const listing = await scanBundledGlobals();
+    return NextResponse.json(listing, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {

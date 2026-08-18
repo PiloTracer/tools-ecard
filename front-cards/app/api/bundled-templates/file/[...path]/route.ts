@@ -8,15 +8,20 @@
  * globals directory on every request instead — drop files on the host and
  * they are immediately downloadable, no rebuild, no restart.
  *
+ * Query param `?extract=<filename>` reads `<filename>` from inside a ZIP
+ * package. This lets operators publish a single `<name>.zip` that embeds its
+ * own `preview.png` and `sidecar.json`.
+ *
  * Security: the path is confined to public/templates/globals; traversal
  * outside it is rejected. Only .zip/.png/.json are served.
  */
 
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join, normalize } from 'node:path';
 import { NextResponse } from 'next/server';
 import { Readable } from 'node:stream';
+import JSZip from 'jszip';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,8 +42,28 @@ function resolveConfinedPath(segments: string[]): string | null {
   return abs;
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
+function contentTypeFor(name: string): string {
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+  return CONTENT_TYPES[ext] ?? 'application/octet-stream';
+}
+
+async function extractFromZip(zipPath: string, entryName: string): Promise<Blob | null> {
+  try {
+    const buffer = readFileSync(zipPath);
+    const zip = await JSZip.loadAsync(buffer);
+    const entry = zip.file(entryName);
+    if (!entry) return null;
+    return await entry.async('blob');
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
+  const { searchParams } = new URL(request.url);
+  const extract = searchParams.get('extract');
+
   const abs = resolveConfinedPath(path ?? []);
   if (!abs) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
@@ -47,6 +72,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
   try {
     const info = await stat(abs);
     if (!info.isFile()) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+    // Extract a file from inside a ZIP package.
+    if (extract) {
+      const ext = extract.slice(extract.lastIndexOf('.')).toLowerCase();
+      if (!CONTENT_TYPES[ext]) {
+        return NextResponse.json({ error: 'not found' }, { status: 404 });
+      }
+      const data = await extractFromZip(abs, extract);
+      if (!data) {
+        return NextResponse.json({ error: 'not found' }, { status: 404 });
+      }
+      return new NextResponse(data, {
+        headers: {
+          'Content-Type': contentTypeFor(extract),
+          'Content-Length': String(data.size),
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
     const ext = abs.slice(abs.lastIndexOf('.')).toLowerCase();
     const stream = Readable.toWeb(createReadStream(abs)) as ReadableStream;
     return new NextResponse(stream, {

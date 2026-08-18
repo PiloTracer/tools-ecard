@@ -892,43 +892,59 @@ export function CanvasControls() {
       );
       toPackage = mergeLiveCanvasGeometryIntoTemplate(toPackage, fabricCanvas);
 
-      // Export as complete ZIP package with all resources
-      const zipBlob = await templatePackageService.exportPackage(toPackage);
+      const safeFileStem = displayName.replace(/[<>:"/\\|?*]/g, '_').trim() || 'template';
 
-      // Download ZIP file
+      // Publish-ready sidecars: a PNG preview and a small JSON descriptor.
+      // They are embedded in the main ZIP so a single download is enough, and
+      // we also try to download them as separate files for operators who prefer
+      // the legacy 3-file drop workflow. Browsers often block the 2nd/3rd
+      // download from one gesture, so the embedded copies are the reliable
+      // fallback.
+      let previewDataUrl: string | undefined;
+      try {
+        if (fabricCanvas) {
+          // Thumbnail-sized preview (~640px wide, capped at 1x).
+          const multiplier = Math.min(1, 640 / (canvasWidth || 640));
+          previewDataUrl = fabricCanvas.toDataURL({
+            format: 'png',
+            multiplier,
+            enableRetinaScaling: false,
+          });
+        }
+      } catch (previewError) {
+        console.warn('[Export] PNG preview generation failed:', previewError);
+      }
+
+      const sidecar = { name: displayName };
+
+      // Export as complete ZIP package with all resources + embedded sidecars
+      const zipBlob = await templatePackageService.exportPackage(toPackage, {
+        previewDataUrl,
+        sidecar,
+      });
+
+      // Download single ZIP file (always works — contains zip + png + json).
       const url = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
-      const safeFileStem = displayName.replace(/[<>:"/\\|?*]/g, '_').trim() || 'template';
       link.download = `${safeFileStem}.zip`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
 
-      // Publish-ready sidecars: a PNG preview and a small JSON descriptor.
-      // Dropping <name>.zip + <name>.png + <name>.json into
-      // public/templates/globals/ (or its demo/prd subdir) publishes the
-      // design as a bundled global template — no manifest step. Failures
-      // here never fail the export itself.
+      // Best-effort separate sidecar downloads for the legacy 3-file workflow.
       try {
-        if (fabricCanvas) {
-          // Thumbnail-sized preview (~640px wide, capped at 1x).
-          const multiplier = Math.min(1, 640 / (canvasWidth || 640));
-          const previewDataUrl = fabricCanvas.toDataURL({
-            format: 'png',
-            multiplier,
-            enableRetinaScaling: false,
-          });
+        if (previewDataUrl) {
           const previewLink = document.createElement('a');
           previewLink.download = `${safeFileStem}.png`;
           previewLink.href = previewDataUrl;
           previewLink.click();
         }
       } catch (previewError) {
-        console.warn('[Export] PNG preview sidecar failed (ZIP already downloaded):', previewError);
+        console.warn('[Export] PNG preview sidecar download failed (embedded in ZIP):', previewError);
       }
 
       try {
-        const sidecarBlob = new Blob([JSON.stringify({ name: displayName }, null, 2) + '\n'], {
+        const sidecarBlob = new Blob([JSON.stringify(sidecar, null, 2) + '\n'], {
           type: 'application/json',
         });
         const sidecarUrl = URL.createObjectURL(sidecarBlob);
@@ -938,10 +954,10 @@ export function CanvasControls() {
         sidecarLink.click();
         URL.revokeObjectURL(sidecarUrl);
       } catch (sidecarError) {
-        console.warn('[Export] JSON sidecar failed (ZIP already downloaded):', sidecarError);
+        console.warn('[Export] JSON sidecar download failed (embedded in ZIP):', sidecarError);
       }
 
-      console.log('[Export] Package downloaded successfully (zip + png preview + json sidecar)');
+      console.log('[Export] Package downloaded successfully (single ZIP contains template + preview + sidecar)');
     } catch (error) {
       console.error('[Export] Failed to export package:', error);
       setActionError(`Failed to export template: ${error instanceof Error ? error.message : 'Unknown error'}`);
