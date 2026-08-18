@@ -118,6 +118,8 @@ function templateWithAllFields(): Template {
     width: 1200,
     height: 800,
     elements,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 }
 
@@ -158,7 +160,6 @@ function recordFromFields(fields: Record<string, string | null>): BatchRecord {
     personalUrl: fields.personalUrl ?? null,
     personalBio: fields.personalBio ?? null,
     personalBirthday: fields.personalBirthday ?? null,
-    extra: null,
   };
 }
 
@@ -228,6 +229,8 @@ describe('batch export field mapping (all palette fields)', () => {
       name: 'duplicate-fields',
       width: 1200,
       height: 800,
+      createdAt: new Date(),
+      updatedAt: new Date(),
       elements: [
         {
           id: 'el-wp-1',

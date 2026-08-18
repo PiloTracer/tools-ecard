@@ -16,8 +16,6 @@ function makeTemplate(name = 'Test Template'): Template {
     canvasHeight: 600,
     backgroundColor: '#ffffff',
     elements: [],
-    version: 1,
-    kind: 'template',
     createdAt: new Date('2026-08-18T00:00:00Z'),
     updatedAt: new Date('2026-08-18T00:00:00Z'),
   };

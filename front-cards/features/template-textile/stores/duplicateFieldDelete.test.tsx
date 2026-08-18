@@ -73,7 +73,7 @@ describe('duplicate-field elements: selection + deletion', () => {
     store.addElement(makeFieldElement('el-a', 'work_phone', 10));
     store.addElement(makeFieldElement('el-b', 'work_phone', 200));
 
-    const els = useTemplateStore.getState().elements;
+    const els = useTemplateStore.getState().elements as TextElement[];
     expect(els).toHaveLength(2);
     expect(els[0].fieldId).toBe(els[1].fieldId); // same field, distinct ids
 
