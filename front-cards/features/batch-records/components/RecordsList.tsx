@@ -23,6 +23,79 @@ interface RecordsListProps {
 const recordName = (r: ContactRecord): string =>
   r.fullName || [r.firstName, r.lastName].filter(Boolean).join(' ') || '—';
 
+/** Field groups for the record details view. Labels mirror RecordEditModal
+ * (hardcoded English there too — i18n deep-pass on records is a known follow-up). */
+const DETAIL_GROUPS: ReadonlyArray<{
+  title: string;
+  fields: ReadonlyArray<readonly [label: string, key: keyof ContactRecord]>;
+}> = [
+  {
+    title: 'Contact',
+    fields: [
+      ['Full Name', 'fullName'],
+      ['First Name', 'firstName'],
+      ['Last Name', 'lastName'],
+      ['Email', 'email'],
+      ['Work Phone', 'workPhone'],
+      ['Extension', 'workPhoneExt'],
+      ['Mobile Phone', 'mobilePhone'],
+    ],
+  },
+  {
+    title: 'Address',
+    fields: [
+      ['Street', 'addressStreet'],
+      ['City', 'addressCity'],
+      ['State', 'addressState'],
+      ['Postal Code', 'addressPostal'],
+      ['Country', 'addressCountry'],
+    ],
+  },
+  {
+    title: 'Social',
+    fields: [
+      ['Instagram', 'socialInstagram'],
+      ['Twitter', 'socialTwitter'],
+      ['Facebook', 'socialFacebook'],
+    ],
+  },
+  {
+    title: 'Business',
+    fields: [
+      ['Company', 'businessName'],
+      ['Title', 'businessTitle'],
+      ['Department', 'businessDepartment'],
+      ['Website', 'businessUrl'],
+      ['Hours', 'businessHours'],
+    ],
+  },
+  {
+    title: 'Business Address',
+    fields: [
+      ['Street', 'businessAddressStreet'],
+      ['City', 'businessAddressCity'],
+      ['State', 'businessAddressState'],
+      ['Postal Code', 'businessAddressPostal'],
+      ['Country', 'businessAddressCountry'],
+    ],
+  },
+  {
+    title: 'Professional Profiles',
+    fields: [
+      ['LinkedIn', 'businessLinkedin'],
+      ['Twitter', 'businessTwitter'],
+    ],
+  },
+  {
+    title: 'Personal',
+    fields: [
+      ['Website', 'personalUrl'],
+      ['Bio', 'personalBio'],
+      ['Birthday', 'personalBirthday'],
+    ],
+  },
+];
+
 export const RecordsList: React.FC<RecordsListProps> = ({
   batchId,
   onEditRecord,
@@ -32,6 +105,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<ContactRecord | null>(null);
   const [retryRecord, setRetryRecord] = useState<ContactRecord | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<ContactRecord | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [badgeNonce, setBadgeNonce] = useState<Record<string, number>>({});
@@ -104,6 +178,28 @@ export const RecordsList: React.FC<RecordsListProps> = ({
       <div className="flex items-center justify-end gap-1">
         <button
           type="button"
+          onClick={() => setViewingRecord(record)}
+          aria-label={t('records.viewFields')}
+          title={t('records.viewFields')}
+          className="rounded-md p-1.5 text-text-muted hover:bg-surface-inset hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
           onClick={() => onEditRecord(record)}
           aria-label={`${t('records.editTitle', { name: recordName(record) })}`}
           className="rounded-md p-1.5 text-text-muted hover:bg-surface-inset hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -174,13 +270,20 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   };
 
   const columns = [
-    { id: 'name', label: t('records.name'), sortable: true, sortValue: recordName },
+    {
+      id: 'name',
+      label: t('records.name'),
+      sortable: true,
+      sortValue: recordName,
+      render: (r: ContactRecord) => recordName(r),
+    },
     { id: 'email', label: t('records.email'), sortable: true, sortValue: (r: ContactRecord) => r.email ?? '' },
     {
       id: 'phone',
       label: t('records.phone'),
       sortable: true,
       sortValue: (r: ContactRecord) => r.workPhone ?? r.mobilePhone ?? '',
+      render: (r: ContactRecord) => r.workPhone ?? r.mobilePhone ?? '—',
     },
     statusColumn,
     actionsColumn,
@@ -251,6 +354,58 @@ export const RecordsList: React.FC<RecordsListProps> = ({
           />
         )}
       </div>
+
+      {/* Record details (read-only, all populated fields) */}
+      <Modal
+        open={Boolean(viewingRecord)}
+        onClose={() => setViewingRecord(null)}
+        title={t('records.recordDetailsTitle', { name: viewingRecord ? recordName(viewingRecord) : '' })}
+        size="wide"
+      >
+        {viewingRecord && (
+          <div className="space-y-5">
+            {DETAIL_GROUPS.map((group) => {
+              const rows = group.fields
+                .map(([label, key]) => ({ label, value: viewingRecord[key] }))
+                .filter(
+                  (r): r is { label: string; value: string } =>
+                    typeof r.value === 'string' && r.value.trim().length > 0,
+                );
+              if (rows.length === 0) return null;
+              return (
+                <section key={group.title}>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                    {group.title}
+                  </h3>
+                  <dl className="mt-1 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                    {rows.map((r) => (
+                      <div key={r.label} className="flex gap-2 text-sm">
+                        <dt className="w-28 shrink-0 text-text-muted">{r.label}</dt>
+                        <dd className="break-words text-text-primary">{r.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              );
+            })}
+            {viewingRecord.extra && Object.keys(viewingRecord.extra).length > 0 && (
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                  Extra
+                </h3>
+                <dl className="mt-1 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                  {Object.entries(viewingRecord.extra).map(([key, value]) => (
+                    <div key={key} className="flex gap-2 text-sm">
+                      <dt className="w-28 shrink-0 text-text-muted">{key}</dt>
+                      <dd className="break-words text-text-primary">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Delete confirm */}
       <Modal

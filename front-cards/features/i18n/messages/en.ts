@@ -169,6 +169,8 @@ export const enMessages: MessageTree = {
     deleteConfirmBody: 'Are you sure you want to delete this record? This cannot be undone.',
     retryConfirmTitle: 'Retry Render',
     retryConfirmBody: 'Re-trigger the render for "{name}"?',
+    viewFields: 'View all fields',
+    recordDetailsTitle: 'Record details - {name}',
     renderStatus: {
       rendering: 'Rendering {progress}%',
       rendered: 'Rendered',
@@ -190,6 +192,12 @@ export const enMessages: MessageTree = {
     selectProjectTitle: 'Select a project to create templates',
     selectProjectViewTitle: 'Select a project to view batches',
     loadingProjects: 'Loading projects…',
+    importBatch: {
+      paste: 'Paste',
+      pasteTitle: 'Import the clipboard contents as a batch',
+      pasteEmpty: 'Clipboard has no text to import — copy some rows first.',
+      pasteUnavailable: 'Clipboard access unavailable — click the Import Batch area and press Ctrl+V instead.',
+    },
   },
   settings: {
     title: 'Settings',

@@ -11,6 +11,7 @@ import { BatchStatusTracker } from './BatchStatusTracker';
 import { NameBatchModal } from './NameBatchModal';
 import { FieldMappingModal } from './FieldMappingModal';
 import { useProjects } from '@/features/simple-projects';
+import { useTranslation } from '@/features/i18n';
 import {
   batchFileExtension,
   fileWithDisplayName,
@@ -29,11 +30,23 @@ export interface UploadBatchComponentProps {
 
 const ALLOWED_EXTENSIONS = ['.csv', '.txt', '.md', '.vcf', '.xls', '.xlsx'];
 
+// True when the element receives typed input — paste/focus must never be
+// hijacked from it (inputs, textareas, contenteditable).
+const isEditableElement = (el: Element | null): boolean => {
+  if (!el) return false;
+  const tag = el.tagName.toLowerCase();
+  return (
+    tag === 'input' ||
+    tag === 'textarea' ||
+    el.getAttribute('contenteditable') === 'true'
+  );
+};
+
 export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ className = '' }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [validationError, setValidationError] = useState<FileValidationError | null>(null);
+  const [pasteHint, setPasteHint] = useState<string | null>(null);
   const [uploadedBatch, setUploadedBatch] = useState<BatchUploadResponse | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [suggestedBatchName, setSuggestedBatchName] = useState('');
@@ -45,9 +58,9 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
   const previewRef = useRef<Promise<MappingPreview | null> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dropzoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
   const { selectedProjectId, loading } = useProjects();
+  const { t } = useTranslation();
 
   const isDisabled = !selectedProjectId || loading;
 
@@ -352,13 +365,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
     const handleDocumentPaste = (e: ClipboardEvent) => {
       // Never hijack paste when the user is typing in an input.
-      const active = document.activeElement;
-      const tag = active?.tagName?.toLowerCase();
-      const isEditable =
-        tag === 'input' ||
-        tag === 'textarea' ||
-        active?.getAttribute('contenteditable') === 'true';
-      if (isEditable) return;
+      if (isEditableElement(document.activeElement)) return;
 
       const clipboardData = e.clipboardData;
       if (!clipboardData) return;
@@ -377,18 +384,29 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
     };
   }, [createFileFromPaste, handleFile, isPasteAllowed]);
 
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-    // Focus the dropzone on hover so keyboard/paste events are routed directly
-    // to the area the user is pointing at.
-    if (isPasteAllowed && dropzoneRef.current) {
-      dropzoneRef.current.focus({ preventScroll: true });
+  // Explicit Paste button: reads the clipboard via the async Clipboard API on a
+  // real click (a user gesture, so no paste-event focus quirks apply).
+  const handlePasteButton = useCallback(async () => {
+    if (!isPasteAllowed) return;
+    setPasteHint(null);
+    if (!navigator.clipboard?.readText) {
+      setPasteHint(t('quickActions.importBatch.pasteUnavailable'));
+      return;
     }
-  }, [isPasteAllowed]);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false);
-  }, []);
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        setPasteHint(t('quickActions.importBatch.pasteEmpty'));
+        return;
+      }
+      const blob = new Blob([text], { type: 'text/plain' });
+      handleFile(new File([blob], 'pasted-content.txt', { type: 'text/plain' }));
+    } catch {
+      // Permission denied or read failed — Ctrl+V still works via the
+      // document-level paste listener.
+      setPasteHint(t('quickActions.importBatch.pasteUnavailable'));
+    }
+  }, [handleFile, isPasteAllowed, t]);
 
   const getButtonClasses = () => {
     const baseClasses = 'flex items-center p-4 border-2 border-dashed rounded-lg transition-all duration-200 outline-none';
@@ -403,10 +421,6 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
 
     if (isUploading) {
       return `${baseClasses} border-accent bg-accent-subtle`;
-    }
-
-    if (isHovered) {
-      return `${baseClasses} border-accent bg-accent-subtle cursor-pointer`;
     }
 
     return `${baseClasses} border-border-default hover:border-accent hover:bg-accent-subtle cursor-pointer`;
@@ -456,11 +470,8 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       )}
 
       <div
-        ref={dropzoneRef}
         className={getButtonClasses()}
         onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -470,7 +481,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
         tabIndex={isDisabled ? -1 : 0}
         aria-label="Import Batch"
         aria-disabled={isDisabled}
-        title={isDisabled ? 'Select a project to import batches' : 'Click, drag and drop, or hover and paste (Ctrl+V)'}
+        title={isDisabled ? 'Select a project to import batches' : 'Click, drag and drop, paste (Ctrl+V), or use the Paste button'}
       >
         <svg
           className={getIconClasses()}
@@ -496,7 +507,7 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
           </p>
           {!isDisabled && !isUploading && !isDragging && (
             <p className="text-xs text-text-muted mt-1">
-              Click, drag & drop, or hover and paste (Ctrl+V)
+              Click, drag & drop, paste (Ctrl+V), or use the Paste button
             </p>
           )}
         </div>
@@ -509,6 +520,16 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
       </div>
 
       <div className="mt-2 flex items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => void handlePasteButton()}
+          disabled={!isPasteAllowed}
+          className="font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          title={t('quickActions.importBatch.pasteTitle')}
+        >
+          {t('quickActions.importBatch.paste')}
+        </button>
+        <span className="text-border-strong">|</span>
         <a
           href="/templates/import-template-horizontal.xlsx"
           download
@@ -525,6 +546,10 @@ export const UploadBatchComponent: React.FC<UploadBatchComponentProps> = ({ clas
           Download template (columns)
         </a>
       </div>
+
+      {pasteHint && (
+        <p className="mt-2 text-xs text-text-secondary">{pasteHint}</p>
+      )}
 
       {validationError && (
         <div className="mt-2 p-3 bg-error-subtle rounded-md border border-border-subtle">

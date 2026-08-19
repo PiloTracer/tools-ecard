@@ -3,8 +3,9 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { renderWithLocale } from '@/features/i18n/testUtils';
 import { UploadBatchComponent } from './UploadBatchComponent';
 
 jest.mock('@/features/simple-projects', () => ({
@@ -22,7 +23,7 @@ jest.mock('../services/batchService', () => ({
 
 import { batchService } from '../services/batchService';
 
-describe('UploadBatchComponent template downloads', () => {
+describe('UploadBatchComponent', () => {
   beforeEach(() => {
     (batchService.uploadBatch as jest.Mock).mockReset();
     (batchService.previewBatchFile as jest.Mock).mockReset();
@@ -37,7 +38,7 @@ describe('UploadBatchComponent template downloads', () => {
   });
 
   it('links both import-template workbooks for download', () => {
-    render(<UploadBatchComponent />);
+    renderWithLocale(<UploadBatchComponent />);
 
     const rows = screen.getByRole('link', { name: 'Download template (rows)' });
     expect(rows).toHaveAttribute('href', '/templates/import-template-horizontal.xlsx');
@@ -48,8 +49,8 @@ describe('UploadBatchComponent template downloads', () => {
     expect(columns).toHaveAttribute('download');
   });
 
-  it('creates a batch from pasted plain text', async () => {
-    render(<UploadBatchComponent />);
+  it('supports clipboard paste of plain text to start a batch import', async () => {
+    renderWithLocale(<UploadBatchComponent />);
 
     const text = 'work_phone:\t+506 2222-1234\nemail:\tjohn.doe@eco.com';
     fireEvent.paste(document, {
@@ -62,14 +63,40 @@ describe('UploadBatchComponent template downloads', () => {
     await waitFor(() => {
       expect(batchService.previewBatchFile).toHaveBeenCalled();
     });
+    // Exactly once — the document listener must not double-handle the event.
+    expect(batchService.previewBatchFile).toHaveBeenCalledTimes(1);
 
     const fileArg = (batchService.previewBatchFile as jest.Mock).mock.calls[0][0] as File;
     expect(fileArg.name).toBe('pasted-content.txt');
     expect(fileArg.type).toBe('text/plain');
   });
 
-  it('does not hijack paste when an input is focused', async () => {
-    render(<UploadBatchComponent />);
+  it('supports clipboard paste of a file to start a batch import', async () => {
+    renderWithLocale(<UploadBatchComponent />);
+
+    const pastedFile = new File(['work_phone:\t+506 2222-1234'], 'clipboard-data.txt', {
+      type: 'text/plain',
+    });
+    const fileList = { item: (i: number) => (i === 0 ? pastedFile : null), length: 1, 0: pastedFile };
+
+    fireEvent.paste(document, {
+      clipboardData: {
+        getData: () => '',
+        files: fileList as unknown as FileList,
+      } as unknown as DataTransfer,
+    });
+
+    await waitFor(() => {
+      expect(batchService.previewBatchFile).toHaveBeenCalled();
+    });
+    expect(batchService.previewBatchFile).toHaveBeenCalledTimes(1);
+
+    const fileArg = (batchService.previewBatchFile as jest.Mock).mock.calls[0][0] as File;
+    expect(fileArg.name).toBe('clipboard-data.txt');
+  });
+
+  it('does not hijack clipboard paste when an input is focused', async () => {
+    renderWithLocale(<UploadBatchComponent />);
 
     const input = document.createElement('input');
     document.body.appendChild(input);
@@ -89,31 +116,55 @@ describe('UploadBatchComponent template downloads', () => {
     document.body.removeChild(input);
   });
 
-  it('focuses the dropzone on hover and accepts paste directly on it', async () => {
-    render(<UploadBatchComponent />);
-
-    const dropzone = screen.getByRole('button', { name: 'Import Batch' });
-    fireEvent.mouseEnter(dropzone);
-
-    // Hovering should move focus to the dropzone so onPaste fires directly.
-    await waitFor(() => {
-      expect(document.activeElement).toBe(dropzone);
+  it('imports the clipboard contents when the Paste button is clicked', async () => {
+    const readText = jest.fn().mockResolvedValue('work_phone:\t+506 2222-1234\nemail:\tjane@example.com');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText },
+      configurable: true,
     });
+    renderWithLocale(<UploadBatchComponent />);
 
-    const text = 'work_phone:\t+506 2222-1234\nemail:\tjohn.doe@eco.com';
-    fireEvent.paste(dropzone, {
-      clipboardData: {
-        getData: (format: string) => (format === 'text/plain' ? text : ''),
-        files: [],
-      } as unknown as DataTransfer,
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Paste' }));
 
     await waitFor(() => {
       expect(batchService.previewBatchFile).toHaveBeenCalled();
     });
+    expect(batchService.previewBatchFile).toHaveBeenCalledTimes(1);
 
     const fileArg = (batchService.previewBatchFile as jest.Mock).mock.calls[0][0] as File;
     expect(fileArg.name).toBe('pasted-content.txt');
     expect(fileArg.type).toBe('text/plain');
+  });
+
+  it('shows a hint instead of importing when the clipboard has no text', async () => {
+    const readText = jest.fn().mockResolvedValue('');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText },
+      configurable: true,
+    });
+    renderWithLocale(<UploadBatchComponent />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Paste' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/clipboard has no text to import/i)).toBeInTheDocument();
+    });
+    expect(batchService.previewBatchFile).not.toHaveBeenCalled();
+  });
+
+  it('shows a hint instead of crashing when clipboard access is denied', async () => {
+    const readText = jest.fn().mockRejectedValue(new Error('NotAllowedError'));
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText },
+      configurable: true,
+    });
+    renderWithLocale(<UploadBatchComponent />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Paste' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/clipboard access unavailable/i)).toBeInTheDocument();
+    });
+    expect(batchService.previewBatchFile).not.toHaveBeenCalled();
   });
 });

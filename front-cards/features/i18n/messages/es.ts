@@ -169,6 +169,8 @@ export const esMessages: MessageTree = {
     deleteConfirmBody: '¿Seguro que quieres eliminar este registro? No se puede deshacer.',
     retryConfirmTitle: 'Reintentar renderizado',
     retryConfirmBody: '¿Volver a generar el renderizado de "{name}"?',
+    viewFields: 'Ver todos los campos',
+    recordDetailsTitle: 'Detalles del registro - {name}',
     renderStatus: {
       rendering: 'Renderizando {progress}%',
       rendered: 'Renderizado',
@@ -190,6 +192,12 @@ export const esMessages: MessageTree = {
     selectProjectTitle: 'Selecciona un proyecto para crear plantillas',
     selectProjectViewTitle: 'Selecciona un proyecto para ver lotes',
     loadingProjects: 'Cargando proyectos…',
+    importBatch: {
+      paste: 'Pegar',
+      pasteTitle: 'Importar el contenido del portapapeles como un lote',
+      pasteEmpty: 'El portapapeles no tiene texto para importar — copia algunas filas primero.',
+      pasteUnavailable: 'Acceso al portapapeles no disponible — haz clic en el área Import Batch y pulsa Ctrl+V.',
+    },
   },
   settings: {
     title: 'Configuración',
