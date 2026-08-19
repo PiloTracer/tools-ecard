@@ -1,6 +1,6 @@
 # NEXT - planning backlog
 
-**Updated:** 2026-08-18 (paste → Paste button + records-page view fixes committed/pushed; next = owner fresh-tab retest + prd/demo redeploy)
+**Updated:** 2026-08-18 late (alias-table unification + French + render-resolution fixes committed/pushed; **render-worker tofu finding** — Dockerfile font fix pending owner approval)
 
 ---
 
@@ -28,6 +28,7 @@
 | Demo KV-paste field-mapping fix (2026-08-12) | Unknown-label KV paste lines no longer dropped (mapping modal auto-opens); `telefono_trabajo`/`extension_trabajo` aliases; fuzzy exact-token-priority (correo/direccion heuristic); both parsers, parity kept; front 311 / api 207+3 / python 67 green |
 | OAuth log-scrub + drop-and-go bundled templates (2026-08-12) | Auth secrets/PII redacted from frontend OAuth logs (5 files); manifest flow replaced by live listing (`/api/bundled-templates` + file route) + compose host-mount → publish templates by copying files (no rebuild/restart); Export emits zip+png+json sidecars; per-site sets (demo/prd/shared); Spanish guide + runbook updated |
 | Paste button + records view fixes (2026-08-18) | Hover-focus paste machinery removed → explicit Paste/Pegar button (`clipboard.readText`, empty/denied hints, EN/ES); Ctrl+V kept page-wide; records DataTable name/phone cells no longer empty (render fns); "View all fields" details modal (all populated fields, grouped); CDP real-browser probes proved 28-field paste→LOADED→details journey live; front jest 373 |
+| Unified alias table + French + render fixes (2026-08-18) | `field-aliases.json` single source (en/es/fr, 222 aliases) → both parsers build from it; French for all non-brand fields; TS KV-parity fix (colon-space pastes no longer hijacked by vertical parser); first-wins duplicate-column guard; suffix-tolerant duplicate fieldId resolution (both render paths); 30/30 render-map coverage machine-verified; mangled-label proof 28/28 both parsers; parity+variation tests both sides |
 
 ---
 
@@ -53,7 +54,8 @@
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| **0** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
+| **0** | **FIX render-worker tofu text (critical)** | Worker ships zero fonts + no `registerFont` → every server-rendered card is tofu (proved 2026-08-18 with all-field PNG render). Minimal: add `fontconfig` + `fonts-liberation`/`fonts-dejavu` to `render-worker/Dockerfile.{dev,prd}` (**protected files — needs owner approval**). Full fidelity: download template fonts from SeaweedFS + `registerFont` in worker (new feature; mirror browser fontService preload). Add a legibility assertion to worker tests after. |
+| **0b** | ~~Commit framework path migration~~ **DONE** (owner commit `247357a`) | Residual: stale `nginx` compose-table row decision in `.cursorrules` §Docker still open (TLS is host-level nginx, not a compose service) |
 | **0b** | ~~UI Design OS cycle S0–S4~~ **DONE 2026-08-14** (foundation + 16 primitives + 4 screen rebuilds; token system live; audits pass) | committed + pushed with this close; UI bookend closed |
 | **1** | Redeploy prd + demo (ship import-ux + paste-mapping fixes + drop-and-go templates + UI S0–S4 rebuild + **Paste button & records-view fixes**) | `git pull --ff-only` → `./bin/refresh-prd.sh --app` + `./bin/refresh-prd.sh demo`; recreate applies the new globals volume mount (a plain restart would not); recheck prd parse jobs / Cassandra; browser hard-refresh once for the new bundle |
 | **2** | Manual browser click-through | **Fresh tab first** (2026-08-18 hang was a wedged HMR tab): Paste button (allow clipboard permission once) with `tmp/testdata.txt` → 28 fields visible via "View all fields"; Demo: paste with unknown labels → mapping modal opens; upload `.xlsx` → export PNG name+font; import design persistence; profile; units; hostile first click (large paste / malformed CSV / mobile viewport) |
