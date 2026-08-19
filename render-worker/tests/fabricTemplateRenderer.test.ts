@@ -187,4 +187,24 @@ describe('fabricTemplateRenderer', () => {
     );
     expect(resolved).toBe('+1 (555) 000-0000 ');
   });
+
+  it('fills every element sharing a fieldId, including numeric duplicate suffixes', () => {
+    // Dropping the same field twice (or hand-edited/imported JSON carrying
+    // "work_phone_1") must resolve each element from the same record value.
+    const dup = { id: 'a', type: 'text' as const, fieldId: 'work_phone', fontSize: 12 };
+    const dupSuffixed = { id: 'b', type: 'text' as const, fieldId: 'work_phone_1', fontSize: 12 };
+    const dupSuffixed2 = { id: 'c', type: 'text' as const, fieldId: 'work_phone_2', fontSize: 12 };
+    expect(resolveText(dup, ALL_FIELD_VALUES)).toBe(FIELD_ID_TO_VALUE.work_phone);
+    expect(resolveText(dupSuffixed, ALL_FIELD_VALUES)).toBe(FIELD_ID_TO_VALUE.work_phone);
+    expect(resolveText(dupSuffixed2, ALL_FIELD_VALUES)).toBe(FIELD_ID_TO_VALUE.work_phone);
+  });
+
+  it('does not mistake a canonical field for a suffixed duplicate', () => {
+    // "work_phone_ext" must keep resolving to the extension, not work_phone.
+    const resolved = resolveText(
+      { id: 't2', type: 'text', fieldId: 'work_phone_ext', fontSize: 12 },
+      ALL_FIELD_VALUES
+    );
+    expect(resolved).toBe(FIELD_ID_TO_VALUE.work_phone_ext);
+  });
 });

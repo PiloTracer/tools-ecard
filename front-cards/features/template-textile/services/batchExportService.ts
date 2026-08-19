@@ -251,6 +251,22 @@ const FIELD_ID_TO_PROPERTY_MAP: Record<string, string> = {
 };
 
 /**
+ * Resolve a template element's fieldId to a BatchRecord property name.
+ * Direct map first; tolerate an auto-generated/legacy duplicate suffix
+ * ("work_phone_1") by resolving the base field id — the designer never
+ * suffixes, but hand-edited or imported template JSON can carry them.
+ */
+function resolveRecordProperty(fieldId: string): string {
+  const direct = FIELD_ID_TO_PROPERTY_MAP[fieldId];
+  if (direct) return direct;
+  const base = fieldId.replace(/_\d+$/, '');
+  if (base !== fieldId && FIELD_ID_TO_PROPERTY_MAP[base]) {
+    return FIELD_ID_TO_PROPERTY_MAP[base];
+  }
+  return fieldId;
+}
+
+/**
  * Apply batch record data to template
  * Maps fieldId attributes to record values
  */
@@ -272,7 +288,7 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
 
       if (textElement.fieldId) {
         // Convert snake_case fieldId to camelCase property name
-        const propertyName = FIELD_ID_TO_PROPERTY_MAP[textElement.fieldId] || textElement.fieldId;
+        const propertyName = resolveRecordProperty(textElement.fieldId);
 
         // Get value from record using the mapped property name
         const fieldValue = (record as any)[propertyName];

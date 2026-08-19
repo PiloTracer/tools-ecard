@@ -299,4 +299,78 @@ describe('batch export field mapping (all palette fields)', () => {
       expect(renderedByField.get(fieldId)).toBe(SAMPLE_VALUES[fieldId]);
     }
   });
+
+  it('fills numeric-suffixed duplicate fieldIds (work_phone_1) from the base field', () => {
+    // The designer never suffixes, but hand-edited or imported template JSON
+    // can carry "work_phone_1"-style duplicates — each must resolve to the
+    // base field's record value.
+    const record = recordFromFields(
+      Object.fromEntries(CANONICAL_HEADERS.map((h) => [snakeToCamel(h), SAMPLE_VALUES[h]]))
+    );
+    const mkText = (id: string, fieldId: string): TextElement => ({
+      id,
+      type: 'text',
+      x: 10, y: 10,
+      text: 'placeholder ',
+      fontSize: 12,
+      fontFamily: 'Arial',
+      color: '#000000',
+      textAlign: 'left',
+      rotation: 0,
+      opacity: 1,
+      locked: false,
+      fieldId,
+    });
+    const template: Template = {
+      id: 'tpl-dup-suffix',
+      name: 'duplicate-fields-suffixed',
+      width: 1200,
+      height: 800,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      elements: [
+        mkText('el-wp', 'work_phone'),
+        mkText('el-wp-1', 'work_phone_1'),
+        mkText('el-email-2', 'email_2'),
+      ],
+    };
+
+    const populated = applyRecordData(template, record);
+    const texts = (populated.elements.filter((el) => el.type === 'text') as TextElement[]).map((el) => el.text);
+    expect(texts).toEqual([SAMPLE_VALUES.work_phone, SAMPLE_VALUES.work_phone, SAMPLE_VALUES.email]);
+  });
+
+  it('does not mistake a canonical field for a suffixed duplicate', () => {
+    // "work_phone_ext" ends in a letter suffix and must keep resolving to the
+    // extension value, never to work_phone.
+    const record = recordFromFields(
+      Object.fromEntries(CANONICAL_HEADERS.map((h) => [snakeToCamel(h), SAMPLE_VALUES[h]]))
+    );
+    const template: Template = {
+      id: 'tpl-ext',
+      name: 'ext-field',
+      width: 1200,
+      height: 800,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      elements: [
+        {
+          id: 'el-ext',
+          type: 'text',
+          x: 10, y: 10,
+          text: 'placeholder ',
+          fontSize: 12,
+          fontFamily: 'Arial',
+          color: '#000000',
+          textAlign: 'left',
+          rotation: 0,
+          opacity: 1,
+          locked: false,
+          fieldId: 'work_phone_ext',
+        },
+      ],
+    };
+    const populated = applyRecordData(template, record);
+    expect((populated.elements[0] as TextElement).text).toBe(SAMPLE_VALUES.work_phone_ext);
+  });
 });

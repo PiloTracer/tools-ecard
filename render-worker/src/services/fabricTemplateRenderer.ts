@@ -115,9 +115,21 @@ const FIELD_ID_TO_PROPERTY: Record<string, keyof RecordFieldValues> = {
   personal_birthday: 'personalBirthday',
 };
 
+/** Resolve a template fieldId to a record property; tolerates a numeric
+ * duplicate suffix ("work_phone_1") by resolving the base field id. */
+function resolveRecordKey(fieldId: string): keyof RecordFieldValues {
+  const direct = FIELD_ID_TO_PROPERTY[fieldId];
+  if (direct) return direct;
+  const base = fieldId.replace(/_\d+$/, '');
+  if (base !== fieldId && FIELD_ID_TO_PROPERTY[base]) {
+    return FIELD_ID_TO_PROPERTY[base];
+  }
+  return fieldId as keyof RecordFieldValues;
+}
+
 export function resolveText(element: TemplateElementJson, record?: RecordFieldValues): string {
   if (element.fieldId && record) {
-    const key = FIELD_ID_TO_PROPERTY[element.fieldId] ?? (element.fieldId as keyof RecordFieldValues);
+    const key = resolveRecordKey(element.fieldId);
     const value = record[key];
     if (value != null && String(value).trim() !== '') {
       // Use stored value as-is — casing is fixed at ingest; user edits must be preserved.
