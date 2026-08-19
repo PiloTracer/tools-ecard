@@ -4,6 +4,8 @@ Handles field formatting, phone normalization, and name parsing
 Extracted from __script_v9.py
 """
 
+import json
+import os
 import re
 import unicodedata
 from typing import Dict, Any, Optional
@@ -12,52 +14,22 @@ import pandas as pd
 import phonenumbers
 from nameparser import HumanName
 
-# Field mapping: maps various column name aliases to standardized field names
+# Field mapping: maps various column name aliases to standardized field names.
+# Authored per language in packages/shared-types/src/domain/field-aliases.json
+# (duplicated to fixtures/ per repo convention); language buckets are merged for
+# lookup — adding a language there needs no parser change. Parity with the Demo
+# TS parser's HEADER_ALIASES is enforced by test_batch_parsing.py and
+# front-cards/features/demo/fieldAliasesParity.test.ts.
 # Keys MUST match the 'id' field in vcardFields.ts
+_FIELD_ALIASES_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "fixtures", "field-aliases.snapshot.json"
+)
+with open(_FIELD_ALIASES_PATH, encoding="utf-8") as _f:
+    _FIELD_ALIASES = json.load(_f)["fields"]
+
 FIELD_MAPPING = {
-    # Core
-    "first_name": ["first_name", "firstName", "first name", "firstname", "fname", "given name", "nombre"],
-    "last_name": ["last_name", "lastName", "last name", "lastname", "lname", "surname", "family name", "apellido", "apellidos"],
-    "full_name": ["full_name", "fullName", "full name", "nombre completo", "usuario"],
-    "email": ["email", "e-mail", "mail", "email address", "correo", "correo electrónico", "correo electronico"],
-    "work_phone": ["work_phone", "workPhone", "work phone", "office phone", "business phone", "tel", "phone", "telefono", "teléfono", "telefono ofi", "teléfono ofi", "telefono trabajo", "teléfono trabajo"],
-    "work_phone_ext": ["work_phone_ext", "ext", "extension", "extensión", "extension trabajo", "extensión trabajo"],
-    "mobile_phone": ["mobile_phone", "mobilePhone", "mobile", "cell", "cellular", "mobile phone", "cell phone", "celular", "móvil", "whatsapp", "whats app"],
-
-    # Address (Core)
-    "address_street": ["address_street", "address", "street", "street address", "dirección", "direccion", "calle"],
-    "address_city": ["address_city", "city", "town", "ciudad"],
-    "address_state": ["address_state", "state", "province", "region", "estado", "provincia"],
-    "address_postal": ["address_postal", "zip", "postal", "zip code", "postal code", "código postal", "codigo postal"],
-    "address_country": ["address_country", "country", "nation", "país", "pais"],
-
-    # Socials
-    "social_instagram": ["social_instagram", "instagram", "ig"],
-    "social_twitter": ["social_twitter", "twitter", "x"],
-    "social_facebook": ["social_facebook", "facebook", "fb"],
-
-    # Business
-    "business_name": ["business_name", "organization", "company", "business", "org", "empresa"],
-    "business_title": ["business_title", "title", "job title", "position", "role", "puesto", "cargo"],
-    "business_department": ["business_department", "department", "dept", "departamento", "area"],
-    "business_url": ["business_url", "website", "url", "web", "sitio web"],
-    "business_hours": ["business_hours", "hours", "business hours", "horario"],
-
-    # Business Address (Overrides)
-    "business_address_street": ["business_address_street", "business address", "business street", "dirección trabajo"],
-    "business_address_city": ["business_address_city", "business city", "ciudad trabajo"],
-    "business_address_state": ["business_address_state", "business state", "estado trabajo"],
-    "business_address_postal": ["business_address_postal", "business zip", "postal trabajo"],
-    "business_address_country": ["business_address_country", "business country", "país trabajo"],
-
-    # Professional Profiles
-    "business_linkedin": ["business_linkedin", "linkedin", "li"],
-    "business_twitter": ["business_twitter", "company twitter"],
-
-    # Personal
-    "personal_url": ["personal_url", "personal website", "personal url", "sitio personal"],
-    "personal_bio": ["personal_bio", "notes", "comments", "description", "notas", "comentarios", "bio", "biography"],
-    "personal_birthday": ["personal_birthday", "birthday", "dob", "cumpleaños", "fecha nacimiento"]
+    field: [field, *[alias for buckets in lang_buckets.values() for alias in buckets]]
+    for field, lang_buckets in _FIELD_ALIASES.items()
 }
 
 # Minimum alias-token length considered for substring (fuzzy) header matching. Keeps

@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 import { decodeXmlEntities } from '../../shared/lib/decodeXmlEntities';
 import { capitalizeName, DEMO_PERSON_NAME_KEYS } from './nameCapitalize';
 import { snakeToCamel, camelToSnake } from '../batch-upload/utils/mappingSignature';
+import fieldAliasesSnapshot from './fixtures/field-aliases.snapshot.json';
 
 export type DemoParsedTable = {
   headers: string[];
@@ -47,135 +48,31 @@ export type DemoContactFields = {
   personalBirthday?: string | null;
 };
 
-export const HEADER_ALIASES: Record<string, keyof DemoContactFields> = {
-  first_name: 'firstName',
-  firstname: 'firstName',
-  first: 'firstName',
-  fname: 'firstName',
-  given_name: 'firstName',
-  nombre: 'firstName',
-  last_name: 'lastName',
-  lastname: 'lastName',
-  last: 'lastName',
-  lname: 'lastName',
-  surname: 'lastName',
-  family_name: 'lastName',
-  apellidos: 'lastName',
-  apellido: 'lastName',
-  full_name: 'fullName',
-  fullname: 'fullName',
-  name: 'fullName',
-  nombre_completo: 'fullName',
-  usuario: 'fullName',
-  email: 'email',
-  e_mail: 'email',
-  mail: 'email',
-  correo: 'email',
-  correo_electronico: 'email',
-  work_phone: 'workPhone',
-  workphone: 'workPhone',
-  office_phone: 'workPhone',
-  business_phone: 'workPhone',
-  phone: 'workPhone',
-  tel: 'workPhone',
-  telefono: 'workPhone',
-  telefono_ofi: 'workPhone',
-  telefono_trabajo: 'workPhone',
-  work_phone_ext: 'workPhoneExt',
-  ext: 'workPhoneExt',
-  extension: 'workPhoneExt',
-  extension_trabajo: 'workPhoneExt',
-  mobile_phone: 'mobilePhone',
-  mobilephone: 'mobilePhone',
-  mobile: 'mobilePhone',
-  cell: 'mobilePhone',
-  cellular: 'mobilePhone',
-  celular: 'mobilePhone',
-  movil: 'mobilePhone',
-  whatsapp: 'mobilePhone',
-  whats_app: 'mobilePhone',
-  cel_whatsapp: 'mobilePhone',
-  address_street: 'addressStreet',
-  address: 'addressStreet',
-  street: 'addressStreet',
-  direccion: 'addressStreet',
-  calle: 'addressStreet',
-  address_city: 'addressCity',
-  city: 'addressCity',
-  ciudad: 'addressCity',
-  address_state: 'addressState',
-  state: 'addressState',
-  province: 'addressState',
-  estado: 'addressState',
-  provincia: 'addressState',
-  address_postal: 'addressPostal',
-  zip: 'addressPostal',
-  postal: 'addressPostal',
-  codigo_postal: 'addressPostal',
-  address_country: 'addressCountry',
-  country: 'addressCountry',
-  pais: 'addressCountry',
-  business_name: 'businessName',
-  organization: 'businessName',
-  company: 'businessName',
-  empresa: 'businessName',
-  business_title: 'businessTitle',
-  title: 'businessTitle',
-  job_title: 'businessTitle',
-  position: 'businessTitle',
-  puesto: 'businessTitle',
-  cargo: 'businessTitle',
-  business_department: 'businessDepartment',
-  department: 'businessDepartment',
-  departamento: 'businessDepartment',
-  business_url: 'businessUrl',
-  website: 'businessUrl',
-  url: 'businessUrl',
-  business_hours: 'businessHours',
-  hours: 'businessHours',
-  horario: 'businessHours',
-  business_address_street: 'businessAddressStreet',
-  business_address: 'businessAddressStreet',
-  business_street: 'businessAddressStreet',
-  direccion_trabajo: 'businessAddressStreet',
-  business_address_city: 'businessAddressCity',
-  business_city: 'businessAddressCity',
-  ciudad_trabajo: 'businessAddressCity',
-  business_address_state: 'businessAddressState',
-  business_state: 'businessAddressState',
-  estado_trabajo: 'businessAddressState',
-  business_address_postal: 'businessAddressPostal',
-  business_postal: 'businessAddressPostal',
-  business_zip: 'businessAddressPostal',
-  postal_trabajo: 'businessAddressPostal',
-  business_address_country: 'businessAddressCountry',
-  business_country: 'businessAddressCountry',
-  pais_trabajo: 'businessAddressCountry',
-  business_linkedin: 'businessLinkedin',
-  linkedin: 'businessLinkedin',
-  business_twitter: 'businessTwitter',
-  company_twitter: 'businessTwitter',
-  social_instagram: 'socialInstagram',
-  instagram: 'socialInstagram',
-  ig: 'socialInstagram',
-  social_twitter: 'socialTwitter',
-  twitter: 'socialTwitter',
-  social_facebook: 'socialFacebook',
-  facebook: 'socialFacebook',
-  fb: 'socialFacebook',
-  personal_url: 'personalUrl',
-  personal_website: 'personalUrl',
-  sitio_personal: 'personalUrl',
-  personal_bio: 'personalBio',
-  personal_birthday: 'personalBirthday',
-  birthday: 'personalBirthday',
-  dob: 'personalBirthday',
-  fecha_nacimiento: 'personalBirthday',
-  cumpleanos: 'personalBirthday',
-  notes: 'personalBio',
-  comments: 'personalBio',
-  notas: 'personalBio',
-};
+/**
+ * Header aliases — built from the per-language snapshot
+ * (packages/shared-types/src/domain/field-aliases.json, duplicated to fixtures/ per
+ * repo convention). Keys are canonical-normalized; lookup merges all language buckets.
+ * Extending to a new language = adding a bucket in the JSON — no parser change.
+ * Parity with the Python parser's FIELD_MAPPING is enforced by fieldAliasesParity.test.ts
+ * and api-server/batch-parsing/test_batch_parsing.py.
+ */
+function buildHeaderAliases(): Record<string, keyof DemoContactFields> {
+  const map: Record<string, keyof DemoContactFields> = {};
+  for (const [fieldId, buckets] of Object.entries(fieldAliasesSnapshot.fields)) {
+    const target = snakeToCamel(fieldId) as keyof DemoContactFields;
+    // The canonical id itself always resolves (e.g. "work_phone").
+    map[normalizeHeaderKey(fieldId)] = target;
+    for (const aliases of Object.values(buckets)) {
+      for (const alias of aliases) {
+        const key = normalizeHeaderKey(alias);
+        if (!(key in map)) map[key] = target;
+      }
+    }
+  }
+  return map;
+}
+
+export const HEADER_ALIASES: Record<string, keyof DemoContactFields> = buildHeaderAliases();
 
 /** Minimum alias length considered for substring (fuzzy) header matching — keeps short
  *  aliases like "ext"/"url"/"tel" restricted to exact-token matches only, avoiding false
@@ -815,6 +712,16 @@ export function parseCsvText(text: string): DemoParsedTable {
     const stacked = reconstructStackedTablePaste(cleaned);
     if (stacked && isGoodParsedTable(stacked)) return stacked;
     return standard.rows.length > 0 ? standard : stacked ?? standard;
+  }
+
+  // KV-shaped paste (colon/whitespace label-value lines, with or without tabs)
+  // must reach the KV parser before the vertical email-anchor heuristic —
+  // otherwise "Nom Complet: …" blocks get misread as vertical stacks and phone
+  // values land in the wrong slots. Mirrors file_parser.py's
+  // `_looks_like_tabular_text or _is_key_value_section` guard.
+  const allLines = cleaned.split(/\r?\n/).filter((l) => l.trim());
+  if (isKeyValueSection(allLines)) {
+    return parseCsvTextStandard(cleaned);
   }
 
   const vertical = parseVerticalContacts(cleaned);
@@ -1471,7 +1378,10 @@ export function mapRowToContactFields(
       return;
     }
     const value = cols[i]?.trim();
-    if (value) {
+    // First column claiming a field wins — a second exact-alias column for the
+    // same field (e.g. "Phone" then "Teléfono Oficina") must not overwrite it,
+    // same guarantee the fuzzy pass below already makes.
+    if (value && !fields[key]) {
       fields[key] = value;
       mappedFromHeaders += 1;
     }

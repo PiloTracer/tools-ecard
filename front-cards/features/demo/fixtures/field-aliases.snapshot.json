@@ -1,0 +1,157 @@
+{
+  "description": "Per-language header alias table for batch field mapping. Keys are the canonical 30 vCard field ids (see vcard-fields.ts). Aliases are matched case/accent/punctuation-insensitively by both parsers (front-cards Demo TS + api-server Python); language buckets are merged for lookup and exist for authorship clarity and future per-language extensions. Add a language by adding a bucket — no parser code changes needed.",
+  "version": 1,
+  "languages": ["en", "es", "fr"],
+  "fields": {
+    "full_name": {
+      "en": ["full name", "fullname", "name"],
+      "es": ["nombre completo", "usuario"],
+      "fr": ["nom complet", "nom et prénom", "nom et prenom"]
+    },
+    "first_name": {
+      "en": ["first name", "firstname", "first", "fname", "given name"],
+      "es": ["nombre"],
+      "fr": ["prénom", "prenom"]
+    },
+    "last_name": {
+      "en": ["last name", "lastname", "last", "lname", "surname", "family name"],
+      "es": ["apellido", "apellidos"],
+      "fr": ["nom de famille", "nom"]
+    },
+    "work_phone": {
+      "en": ["work phone", "workphone", "office phone", "business phone", "phone", "tel"],
+      "es": ["teléfono", "telefono", "teléfono ofi", "telefono ofi", "teléfono trabajo", "telefono trabajo", "teléfono oficina", "telefono oficina"],
+      "fr": ["téléphone", "telephone", "tél", "téléphone travail", "telephone travail", "téléphone bureau", "telephone bureau", "téléphone professionnel", "telephone professionnel", "tel professionnel"]
+    },
+    "work_phone_ext": {
+      "en": ["ext", "extension"],
+      "es": ["extensión", "extension trabajo", "extensión trabajo"],
+      "fr": ["poste téléphonique", "poste telephonique", "extension travail"]
+    },
+    "mobile_phone": {
+      "en": ["mobile", "mobile phone", "mobilephone", "cell", "cellular", "cell phone"],
+      "es": ["celular", "móvil", "movil", "whatsapp", "whats app", "cel whatsapp", "celular whatsapp"],
+      "fr": ["portable", "téléphone portable", "telephone portable", "cellulaire", "numéro de portable", "numero de portable"]
+    },
+    "email": {
+      "en": ["email", "e-mail", "mail", "email address"],
+      "es": ["correo", "correo electrónico", "correo electronico"],
+      "fr": ["courriel", "courrier électronique", "courrier electronique", "adresse courriel", "adresse email"]
+    },
+    "address_street": {
+      "en": ["address", "street", "street address"],
+      "es": ["dirección", "direccion", "calle"],
+      "fr": ["adresse", "rue", "adresse personnelle", "adresse perso"]
+    },
+    "address_city": {
+      "en": ["city", "town"],
+      "es": ["ciudad"],
+      "fr": ["ville"]
+    },
+    "address_state": {
+      "en": ["state", "province", "region"],
+      "es": ["estado", "provincia"],
+      "fr": ["état", "etat", "région"]
+    },
+    "address_postal": {
+      "en": ["zip", "postal", "zip code", "postal code"],
+      "es": ["código postal", "codigo postal"],
+      "fr": ["code postal"]
+    },
+    "address_country": {
+      "en": ["country", "nation"],
+      "es": ["país", "pais"],
+      "fr": ["pays"]
+    },
+    "social_instagram": {
+      "en": ["instagram", "ig"],
+      "es": [],
+      "fr": []
+    },
+    "social_twitter": {
+      "en": ["twitter", "x"],
+      "es": [],
+      "fr": []
+    },
+    "social_facebook": {
+      "en": ["facebook", "fb"],
+      "es": [],
+      "fr": []
+    },
+    "business_name": {
+      "en": ["organization", "company", "business", "org"],
+      "es": ["empresa"],
+      "fr": ["entreprise", "société", "societe", "compagnie", "organisation"]
+    },
+    "business_title": {
+      "en": ["title", "job title", "position", "role"],
+      "es": ["puesto", "cargo"],
+      "fr": ["poste", "fonction", "intitulé de poste", "intitule de poste", "titre de poste"]
+    },
+    "business_department": {
+      "en": ["department", "dept"],
+      "es": ["departamento", "área", "area"],
+      "fr": ["département", "departement", "service"]
+    },
+    "business_url": {
+      "en": ["website", "url", "web"],
+      "es": ["sitio web"],
+      "fr": ["site web", "site internet", "site"]
+    },
+    "business_hours": {
+      "en": ["hours", "business hours"],
+      "es": ["horario"],
+      "fr": ["horaires", "heures d'ouverture", "horaires d'ouverture"]
+    },
+    "business_address_street": {
+      "en": ["business address", "business street"],
+      "es": ["dirección trabajo", "direccion trabajo"],
+      "fr": ["adresse professionnelle", "adresse bureau", "adresse travail", "adresse société", "adresse societe"]
+    },
+    "business_address_city": {
+      "en": ["business city"],
+      "es": ["ciudad trabajo"],
+      "fr": ["ville professionnelle", "ville bureau", "ville travail"]
+    },
+    "business_address_state": {
+      "en": ["business state"],
+      "es": ["estado trabajo"],
+      "fr": ["état travail", "etat travail", "région travail", "region travail", "province travail"]
+    },
+    "business_address_postal": {
+      "en": ["business zip", "business postal"],
+      "es": ["postal trabajo", "código postal trabajo", "codigo postal trabajo"],
+      "fr": ["code postal professionnel", "code postal travail", "code postal bureau"]
+    },
+    "business_address_country": {
+      "en": ["business country"],
+      "es": ["país trabajo", "pais trabajo"],
+      "fr": ["pays professionnel", "pays travail", "pays bureau"]
+    },
+    "business_linkedin": {
+      "en": ["linkedin", "li"],
+      "es": [],
+      "fr": []
+    },
+    "business_twitter": {
+      "en": ["company twitter"],
+      "es": [],
+      "fr": []
+    },
+    "personal_url": {
+      "en": ["personal website", "personal url"],
+      "es": ["sitio personal"],
+      "fr": ["site personnel", "site perso", "url personnelle"]
+    },
+    "personal_bio": {
+      "en": ["notes", "comments", "description", "bio", "biography"],
+      "es": ["notas", "comentarios"],
+      "fr": ["biographie", "commentaires", "présentation", "presentation"]
+    },
+    "personal_birthday": {
+      "en": ["birthday", "dob"],
+      "es": ["cumpleaños", "cumpleanos", "fecha nacimiento", "fecha de nacimiento"],
+      "fr": ["date de naissance", "anniversaire", "né le", "ne le", "née le", "nee le"]
+    }
+  }
+}

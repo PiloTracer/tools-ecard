@@ -1,5 +1,8 @@
 /**
  * Canonical vCard field list — the 30 contact fields supported across the stack.
+ * Companion table: field-aliases.json — per-language (en/es/fr) header aliases for
+ * these ids, consumed by both parsers (language buckets merged; add a language by
+ * adding a bucket, no parser code changes).
  *
  * Single source of truth for:
  *   - Normal-mode Python parser: FIELD_MAPPING keys (api-server/batch-parsing/data_normalizer.py)
@@ -8,8 +11,10 @@
  *
  * Parity is enforced by tests on both sides (fixtures are duplicated per repo
  * convention, see golden_expected.json):
- *   - api-server/batch-parsing/test_batch_parsing.py (FIELD_MAPPING ≡ snapshot)
+ *   - api-server/batch-parsing/test_batch_parsing.py (FIELD_MAPPING ≡ snapshot,
+ *     FieldAliasTableTests for the alias table)
  *   - front-cards/features/demo/vcardFieldsParity.test.ts (vcardFields + Demo ≡ snapshot)
+ *   - front-cards/features/demo/fieldAliasesParity.test.ts (alias table + EN/ES/FR variations)
  */
 
 export type VCardFieldCategory = 'core' | 'business' | 'personal';

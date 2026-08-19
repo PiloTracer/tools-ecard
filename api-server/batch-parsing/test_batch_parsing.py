@@ -391,6 +391,36 @@ class FileParserFlexibilityTests(unittest.TestCase):
             "work_phone_ext",
         )
 
+    def test_key_value_paste_french_colon_space(self):
+        # French labels, colon+space separators (no tabs) — KV path must claim the
+        # block before the vertical parser (parity with demo parseCsvText guard).
+        content = (
+            "Nom Complet: Jeanne Dupont\n"
+            "Courriel: jeanne.dupont@exemple.fr\n"
+            "Téléphone Bureau: +33 1 23 45 67 89\n"
+            "Portable: +33 6 12 34 56 78\n"
+            "Adresse: 12 Rue de Rivoli\n"
+            "Ville: Paris\n"
+            "Code Postal: 75001\n"
+            "Pays: France\n"
+        )
+        path = self._write_tmp(content, ".txt")
+        df = self.parser.parse_file(path)
+        self.assertEqual(len(df), 1)
+        row = df.iloc[0]
+        self.assertEqual(row["Nom Complet"], "Jeanne Dupont")
+        self.assertEqual(row["Téléphone Bureau"], "+33 1 23 45 67 89")
+        self.assertEqual(row["Portable"], "+33 6 12 34 56 78")
+        self.assertEqual(row["Code Postal"], "75001")
+        self.assertEqual(
+            CANONICAL_FIELD_MAP.get(_canonical_header_key("Téléphone Bureau")),
+            "work_phone",
+        )
+        self.assertEqual(
+            CANONICAL_FIELD_MAP.get(_canonical_header_key("Portable")),
+            "mobile_phone",
+        )
+
     def test_key_value_paste_unknown_label_is_kept_as_column(self):
         # Unknown KV labels must survive as (unmapped) columns so the preview
         # endpoint lists them for manual mapping instead of dropping the values.
@@ -1046,6 +1076,115 @@ class InspectFileColumnsTests(unittest.TestCase):
         )
         self.assertEqual(by_header["Telefono Oficina 2"]["confidence"], "fuzzy")
         self.assertEqual(by_header["Telefono Oficina 2"]["auto_field"], "work_phone")
+
+
+
+
+class FieldAliasTableTests(unittest.TestCase):
+    """Per-language alias table (fixtures/field-aliases.snapshot.json, duplicated from
+    packages/shared-types/src/domain/field-aliases.json) drives FIELD_MAPPING.
+    Guards: no alias loss vs the table, bucket completeness (en/es/fr), no internal
+    conflicts, and EN/ES/FR header variations resolving to the right canonical field."""
+
+    FIXTURE = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "fixtures", "field-aliases.snapshot.json"
+    )
+    BRAND_FIELDS = {
+        "social_instagram", "social_twitter", "social_facebook",
+        "business_linkedin", "business_twitter",
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+
+        with open(cls.FIXTURE, encoding="utf-8") as f:
+            cls.table = json.load(f)["fields"]
+
+    def test_field_mapping_matches_alias_fixture(self):
+        import data_normalizer as dn
+
+        self.assertEqual(set(dn.FIELD_MAPPING.keys()), set(self.table.keys()))
+        for field, buckets in self.table.items():
+            flat = [a for b in buckets.values() for a in b]
+            for alias in [field, *flat]:
+                self.assertIn(alias, dn.FIELD_MAPPING[field])
+
+    def test_alias_fixture_fields_match_canonical_snapshot(self):
+        import json
+
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "fixtures", "vcard-fields.snapshot.json"), encoding="utf-8") as f:
+            snapshot_ids = {e["id"] for e in json.load(f)}
+        self.assertEqual(set(self.table.keys()), snapshot_ids)
+
+    def test_language_buckets_complete(self):
+        for field, buckets in self.table.items():
+            self.assertGreater(len(buckets.get("en", [])), 0, f"{field}: empty en bucket")
+            if field in self.BRAND_FIELDS:
+                continue  # brand names need no translation
+            self.assertGreater(len(buckets.get("es", [])), 0, f"{field}: empty es bucket")
+            self.assertGreater(len(buckets.get("fr", [])), 0, f"{field}: empty fr bucket")
+
+    def test_no_internal_alias_conflicts(self):
+        import data_normalizer as dn
+
+        seen = {}
+        for field, buckets in self.table.items():
+            for alias in [field, *[a for b in buckets.values() for a in b]]:
+                key = dn._canonical_header_key(alias)
+                if key in seen:
+                    self.assertEqual(seen[key], field, f"alias {alias!r} maps to both {seen[key]} and {field}")
+                seen[key] = field
+
+    VARIATIONS = {
+        "full_name": ["Full Name", "Nombre Completo", "Nom Complet", "nom complet"],
+        "first_name": ["First Name", "Nombre", "Prénom", "PRENOM"],
+        "last_name": ["Last Name", "Apellidos", "Nom de famille", "Nom"],
+        "work_phone": ["work phone", "Telefono Trabajo", "TELÉFONO OFICINA", "Téléphone Bureau", "tel"],
+        "work_phone_ext": ["Ext", "Extensión", "Extension Trabajo", "Poste Téléphonique"],
+        "mobile_phone": ["mobile", "Celular", "WhatsApp", "Portable", "Téléphone Portable"],
+        "email": ["Email", "Correo", "Correo Electrónico", "Courriel", "e-mail"],
+        "address_street": ["Street Address", "Dirección", "Adresse", "Rue"],
+        "address_city": ["City", "Ciudad", "Ville"],
+        "address_state": ["State", "Provincia", "Région", "État"],
+        "address_postal": ["Zip Code", "Código Postal", "Code Postal"],
+        "address_country": ["Country", "País", "Pays"],
+        "social_instagram": ["Instagram"],
+        "social_twitter": ["Twitter", "X"],
+        "social_facebook": ["Facebook"],
+        "business_name": ["Company", "Empresa", "Entreprise", "Société"],
+        "business_title": ["Job Title", "Puesto", "Cargo", "Poste", "Fonction"],
+        "business_department": ["Department", "Área", "Service", "Département"],
+        "business_url": ["Website", "Sitio Web", "Site Web"],
+        "business_hours": ["Business Hours", "Horario", "Horaires"],
+        "business_address_street": ["Business Address", "Dirección Trabajo", "Adresse Professionnelle"],
+        "business_address_city": ["Business City", "Ciudad Trabajo", "Ville Travail"],
+        "business_address_state": ["Business State", "Estado Trabajo", "Province Travail"],
+        "business_address_postal": ["Business Zip", "Postal Trabajo", "Code Postal Travail"],
+        "business_address_country": ["Business Country", "País Trabajo", "Pays Travail"],
+        "business_linkedin": ["LinkedIn"],
+        "business_twitter": ["Company Twitter"],
+        "personal_url": ["Personal Website", "Sitio Personal", "Site Personnel"],
+        "personal_bio": ["Notes", "Notas", "Biographie"],
+        "personal_birthday": ["Birthday", "Cumpleaños", "Date de Naissance", "Anniversaire"],
+    }
+
+    def test_en_es_fr_variations_resolve(self):
+        import data_normalizer as dn
+
+        for field, headers in self.VARIATIONS.items():
+            for header in headers:
+                key = dn._canonical_header_key(header)
+                resolved = dn.CANONICAL_FIELD_MAP.get(key) or dn.find_fuzzy_field_match(header)
+                self.assertEqual(resolved, field, f"{header!r} resolved to {resolved}, expected {field}")
+
+    def test_french_fuzzy_variations_with_filler_words(self):
+        import data_normalizer as dn
+
+        self.assertEqual(dn.find_fuzzy_field_match("Téléphone de Bureau 2"), "work_phone")
+        self.assertEqual(dn.find_fuzzy_field_match("Numéro de Portable 2"), "mobile_phone")
+        self.assertEqual(dn.find_fuzzy_field_match("Courriel Professionnel"), "email")
 
 
 if __name__ == "__main__":
