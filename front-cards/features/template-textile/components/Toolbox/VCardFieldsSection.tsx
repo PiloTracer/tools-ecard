@@ -47,10 +47,33 @@ export function VCardFieldsSection() {
     addElement(textElement);
   };
 
+  const categoryIcon = (id: string) => {
+    const common = { className: 'h-4 w-4 text-text-muted', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'aria-hidden': true };
+    if (id === 'business') {
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      );
+    }
+    if (id === 'personal') {
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      );
+    }
+    return (
+      <svg {...common}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    );
+  };
+
   const categories = [
-    { id: 'core', label: 'Core Contact', icon: '📧' },
-    { id: 'business', label: 'Business', icon: '💼' },
-    { id: 'personal', label: 'Personal', icon: '👤' },
+    { id: 'core', label: 'Core Contact' },
+    { id: 'business', label: 'Business' },
+    { id: 'personal', label: 'Personal' },
   ];
 
   return (
@@ -68,7 +91,7 @@ export function VCardFieldsSection() {
               className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm">{category.icon}</span>
+                {categoryIcon(category.id)}
                 <span className="text-sm font-semibold text-slate-500">{category.label}</span>
                 <span className="text-xs text-slate-500">({fields.length})</span>
               </div>

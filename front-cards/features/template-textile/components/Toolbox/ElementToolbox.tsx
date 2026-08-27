@@ -134,10 +134,10 @@ export function ElementToolbox({ onCloseDrawer }: { onCloseDrawer?: () => void }
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         <button
           onClick={handleAddText}
-          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
+          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-accent hover:bg-accent-subtle hover:shadow-md transition-all"
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 shadow-sm">
-            <span className="text-2xl font-bold text-purple-700">T</span>
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface-inset">
+            <span className="text-2xl font-bold text-text-secondary">T</span>
           </div>
           <div>
             <div className="text-sm font-semibold text-slate-500">Text</div>
@@ -147,10 +147,10 @@ export function ElementToolbox({ onCloseDrawer }: { onCloseDrawer?: () => void }
 
         <button
           onClick={handleAddImage}
-          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
+          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-accent hover:bg-accent-subtle hover:shadow-md transition-all"
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-green-100 to-green-200 shadow-sm">
-            <svg className="h-6 w-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface-inset">
+            <svg className="h-6 w-6 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
@@ -162,10 +162,10 @@ export function ElementToolbox({ onCloseDrawer }: { onCloseDrawer?: () => void }
 
         <button
           onClick={handleAddQR}
-          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
+          className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left hover:border-accent hover:bg-accent-subtle hover:shadow-md transition-all"
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 shadow-sm">
-            <svg className="h-6 w-6 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface-inset">
+            <svg className="h-6 w-6 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
             </svg>
           </div>
@@ -180,40 +180,40 @@ export function ElementToolbox({ onCloseDrawer }: { onCloseDrawer?: () => void }
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleAddShape('rectangle')}
-              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-accent hover:bg-accent-subtle transition-all"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-indigo-100 to-indigo-200">
-                <div className="w-5 h-4 border-2 border-indigo-700"></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-surface-inset">
+                <div className="w-5 h-4 border-2 border-border-strong"></div>
               </div>
               <div className="text-xs font-semibold text-slate-500">Rectangle</div>
             </button>
 
             <button
               onClick={() => handleAddShape('circle')}
-              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-accent hover:bg-accent-subtle transition-all"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-pink-100 to-pink-200">
-                <div className="w-5 h-5 rounded-full border-2 border-pink-700"></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-surface-inset">
+                <div className="w-5 h-5 rounded-full border-2 border-border-strong"></div>
               </div>
               <div className="text-xs font-semibold text-slate-500">Circle</div>
             </button>
 
             <button
               onClick={() => handleAddShape('ellipse')}
-              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-accent hover:bg-accent-subtle transition-all"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-violet-100 to-violet-200">
-                <div className="w-6 h-4 rounded-full border-2 border-violet-700"></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-surface-inset">
+                <div className="w-6 h-4 rounded-full border-2 border-border-strong"></div>
               </div>
               <div className="text-xs font-semibold text-slate-500">Ellipse</div>
             </button>
 
             <button
               onClick={() => handleAddShape('line')}
-              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle p-2 hover:border-accent hover:bg-accent-subtle transition-all"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-slate-100 to-slate-200">
-                <div className="w-6 h-0 border-t-2 border-slate-700"></div>
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-surface-inset">
+                <div className="w-6 h-0 border-t-2 border-border-strong"></div>
               </div>
               <div className="text-xs font-semibold text-slate-500">Line</div>
             </button>
