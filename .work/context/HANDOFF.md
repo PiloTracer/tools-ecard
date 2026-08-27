@@ -2,6 +2,10 @@
 
 ## Session status
 
+**Closed:** 2026-08-27 — goal: fix inconsistent field-to-data assignation (owner report: canvas field name alone didn't guarantee placement; needed `text-1` grouping workaround) + runtime TypeError. Done: (1) **research via @x-director → 3 probes + direct verification** located 6 root causes (compaction deleted lines lacking a `linePriority===1` element — data or not; UI suggested lineGroup formats the parser rejects; unmapped fieldId silently cleared text; render-worker diverged: placeholder fallback + no compaction; `requiredFields`/`linePriority` dead metadata; all drops silent); plan approved by owner (D1/D2/D3). (2) **Implemented iteration FB** (7 tasks): new emptiness semantics (any data-bound element with content keeps the line; static lines always kept; `requiredFields` now the real per-record gate; `linePriority` removed entirely — deprecated in schema), alias/case/suffix-tolerant fieldId resolution via new `fieldResolution.ts`, render-worker parity (blank-on-missing + compaction port + alias snapshot copy per convention), batch export + render field reports (no silent drops), property-panel UX (valid lineGroup suggestions + inline validation, Line Priority control removed, "Data Field" control with canonical suggestions + unknown-field warning), docs updated. (3) **Fixed `activeObject?.isEditing is not a function`** (`DesignCanvas.tsx:1687`): Fabric v6 `IText.isEditing` is a boolean property, not a method — threw on every keypress with a text object selected. Gates: front jest 70 suites/408 passed, tsc clean, eslint 0 errors on touched files; worker jest 7 suites/37 passed; touch-scope pass; MOD-06 merge_ok. Committed + pushed this close.
+
+**Residual / owner actions:** browser spot-check (designer Data Field/Line Group panel; batch export with grouped lines; Delete key with text selected vs editing); worker PG fallback still 5/28 fields (flagged, unchanged); render-worker tofu-fonts fix still pending owner approval (Dockerfiles, from 2026-08-18); prd/demo redeploy pending — now also ships this iteration; field fallback chains (operator's "priority as substitution order" idea) logged as future SPEC candidate in the plan doc.
+
 **Closed:** 2026-08-18 (late) — goal: verify/unify field-name mapping (EN/ES + extensible), add French, verify duplicate-canvas-field rendering. Done: (1) **single per-language alias table** `packages/shared-types/src/domain/field-aliases.json` (en/es/fr buckets, 222 normalized aliases) — authored as the union of both parsers' tables (machine-verified: 0 conflicts, 0 aliases lost, 0 remapped), duplicated byte-identical to both fixtures dirs per convention; TS `HEADER_ALIASES` and Python `FIELD_MAPPING` now BUILD from it (same exported shapes — no caller changes); **adding a language = adding a JSON bucket**; (2) **French coverage** for all non-brand fields (courriel, téléphone bureau, portable, nom de famille, code postal…); "poste"→business_title vs "poste téléphonique"→ext disambiguation documented; (3) **bugs found+fixed by the new tests**: TS demo parser let colon-space KV pastes be hijacked by the vertical heuristic (Python already guarded; parity restored in `parseCsvText`); exact-alias loop overwrote a first column's field with a second same-field column — first-wins now, matching Python; (4) **duplicate canvas fields**: placement never suffixes (verified both entry paths); both render paths now tolerate `work_phone_1`-style numeric suffixes (base-field fallback) with a `work_phone_ext` no-confusion guard; (5) **30/30 render-map coverage machine-verified** both sides; mangled-label proof (case/accents/language) 28/28 both parsers. **CRITICAL FINDING (unfixed, owner decision needed): render-worker has ZERO fonts and no `registerFont` call — every server-rendered card is tofu boxes** (proved: rendered all-30-field PNG in the worker container, inspected: all tofu; `Dockerfile.prd` installs cairo/pango but no font packages). Browser-side export is unaffected (FontFace preload). Fix = fontconfig+fonts-liberation/dejavu in `render-worker/Dockerfile.{dev,prd}` (**protected files — owner approval pending**) + full font fidelity via SeaweedFS `registerFont` (proposed follow-up feature). Gates: front jest **381/381** · api **207/3 skip** · python **74 OK** · worker **22/22** · tsc clean both apps · eslint no new issues.
 
 **Residual / owner actions:** approve Dockerfile font packages (minimal legibility fix) and decide on SeaweedFS font-registration feature (full fidelity); add a legibility assertion to worker tests once fonts exist; CR-centric phone heuristic in unheadered vertical stacks misassigns non-CR numbers (pre-existing, KV/tabular unaffected); prd/demo redeploy still pending — ships everything incl. Paste button, records views, alias table, render fixes; fresh-tab browser retest of the whole import→render journey.
@@ -377,6 +381,50 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 **Blockers:** none
 
 **Next recommended:** manual browser re-test in Demo with compound labels (e.g. "Correo Trabajo", "Telefono Oficina") — should auto-pair in the modal; then `@session-control close commit`.
+
+---
+
+## Cross-framework action (@x-director) — 2026-08-27 field-binding/compaction research + plan
+
+**Date:** 2026-08-27
+**Request:** "there seems to be an issue in how the data assignation to fields is done… had to group the lines, and set the meta data to 'text-1'… 1- keep the group-line functionality to handle missing data 2- if there's a field in the batch record with data, that has a corresponding text field in the card/qr design, that data must be visible in the finally generated card/qr. verify, locate culprits, draw and document the plan, present a summary for approval before implementing."
+**Frameworks involved:** .ai
+**Classified framework bucket(s):** engineering (investigation + plan; no code changed)
+**Routing confidence:** high
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz yes | .ai.soc yes (only .ai needed)
+
+**Executed:**
+1. @x-director intake → engineering; investigation delegated to 3 explore probes (binding path, line compaction, designer UX), all key claims re-verified by direct reads.
+2. Root causes confirmed with file:line evidence — RC1 compaction deletes lines lacking a `linePriority === 1` element, data or not (`front-cards/features/template-textile/services/lineCompactionService.ts:106-111,196-224`); RC2 UI-suggested lineGroup formats (`contact-line-1`…) don't match the parser regex `/^(\w+)-(\d+)$/` (`LineMetadataProperties.tsx:57-67` vs `lineCompactionService.ts:43`) — explains why only `text-1` "worked"; RC3 unmapped `fieldId` silently clears text (`batchExportService.ts:259-267,305`); RC4 server/browser divergence — worker falls back to placeholder text and has no compaction at all (`render-worker/src/services/fabricTemplateRenderer.ts:130-141`); RC5 `requiredFields` + `linePriority` are dead/misleading metadata; RC6 all drops silent (console.warn only).
+3. Plan documented: `.work/plans/20260827-field-binding-compaction-fix-plan.md` — P1 correctness (new emptiness semantics: any-bound-content + static-line exemption + `requiredFields` override; never delete a line whose bound data exists; alias-aware fieldId resolution; server parity; export report), P2 UX hardening (valid lineGroup UI, fieldId dropdown/validation, docs). Open decisions D1–D3 presented to owner.
+
+**User correction:** none
+**Coordination notes:** No code modified; plan-only deliverable pending owner approval. Touches browser export + render-worker + designer property panel when approved.
+**Blockers:** awaiting owner approval of plan + decisions D1 (emptiness semantics), D2 (server parity scope), D3 (UX scope).
+**Next recommended:** owner approves plan → `@code-implementation plan` for the approved scope.
+
+---
+
+## Latest action (@ai-director) — 2026-08-27 FB iteration implemented
+
+**Date:** 2026-08-27
+**Request:** owner approved the field-binding/compaction plan with D1=P1.1 as written + "linePriority must be 100% reliable and clear" (→ removed entirely: deleted from logic and UI, deprecated-but-tolerated in the element schema; the operator's guessed fallback-substitution use is a different feature, noted as future SPEC candidate), D2=render-worker parity in same pass, D3=property-panel fixes. "PROCEED WITH IMPLEMENTATION".
+**Classified bucket:** code-implementation (iteration FB in `.work/plans/NEXT.md`; touch-scope declared)
+**Routing confidence:** high
+**Executed:**
+1. FB-T1 `front-cards/.../services/fieldResolution.ts` (new): FIELD_ID_TO_PROPERTY_MAP + tolerant resolution (exact → normalized case/accents → `_N` suffix strip → ingest alias table from `features/demo/fixtures/field-aliases.snapshot.json` → null); batchExportService refactored onto it; unresolvable fieldId now warns.
+2. FB-T2 `lineCompactionService.ts` rewritten: line survives iff ANY data-bound element (text with fieldId / element with requiredFields) has post-fill content; static-only lines always kept; requiredFields = explicit per-record gate (record now passed from batchExportService); linePriority fully removed from logic; remove/move/renumber mechanics unchanged. 13 new tests incl. operator regression (priority-less mobile_phone line with data survives).
+3. FB-T3 `BatchExportResult.report` (unresolvableFieldIds, recordFieldsWithoutElement, recordsWithRemovedLines) + test.
+4. FB-T4 (delegated, reviewed): render-worker port — `src/services/lineCompaction.ts` + `src/fixtures/field-aliases.snapshot.json` (byte-identical copy per convention); `fabricTemplateRenderer.ts` pre-fills bound texts ('' when missing — placeholder fallback removed for bound fields), runs compaction, warns a one-line render report; TemplateElementJson extended with sectionGroup/lineGroup/requiredFields. Tests: new lineCompaction.test.ts + renderer contract tests; one old test asserting placeholder-fallback for a bound field updated to the new blank contract.
+5. FB-T5 property panel: Line Group suggestions now valid `type-number` (type-aware prefix) + inline invalid-format error; Line Priority control removed; TextProperties "Field Name" → "Data Field" with canonical-id datalist, resolved-as hint, unknown-field warning.
+6. FB-T6 types deprecation notes; docs: BATCH-EXPORT-IMPLEMENTATION.md (binding contract + compaction semantics), template-batch.md pointer note.
+
+**Verification (dev compose):** front jest 70 suites/408 passed; front `tsc --noEmit` exit 0; eslint on touched files 0 errors (199 errors repo-wide are pre-existing debt in untouched files — verified none are in this diff); worker jest 7 suites/37 passed; worker tsc: 1 pre-existing unrelated error (cassandra-driver types absent in container); touch-scope-verify pass; blast-radius warn (3 areas — owner-approved scope; no protected surfaces touched); MOD-06 done → merge_ok.
+**User correction:** none
+**Blockers:** none — NOT committed (awaiting owner); stack left running (dev compose up).
+**Next recommended:** `@session-control close commit` after owner spot-check (browser: designer Data Field/Line Group panel + a batch export over a template with grouped lines); then prd/demo redeploy per Recommended next #1.
+
+**Follow-up fix (same session, owner-reported runtime error):** `activeObject?.isEditing is not a function` at `DesignCanvas.tsx:1687` — Fabric v6 `IText.isEditing` is a boolean **property** (`node_modules/fabric/dist/src/shapes/IText/IText.d.ts:99`), not a method; the old `?.()` call threw on every keypress while any text object was selected. Fixed to a boolean read with an explanatory comment. Gates: front `tsc --noEmit` clean; eslint on the file shows no issues in the touched range (75 errors elsewhere in the file are pre-existing debt); `duplicateFieldDelete.test.tsx` 3/3 pass.
 
 ---
 

@@ -1684,7 +1684,9 @@ export function DesignCanvas() {
       if (!canvas) return;
 
       const activeObject = canvas.getActiveObject();
-      if ((activeObject as { isEditing?: () => boolean } | undefined)?.isEditing?.()) {
+      // Fabric v6: IText.isEditing is a boolean PROPERTY (not a method) —
+      // skip canvas shortcuts while the user is editing text on the canvas.
+      if ((activeObject as { isEditing?: boolean } | undefined)?.isEditing === true) {
         return;
       }
 
