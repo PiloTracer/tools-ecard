@@ -8,6 +8,7 @@
 
 | Item | Artifact |
 |------|----------|
+| Field-binding & line-compaction reliability fix (2026-08-27) + isEditing TypeError fix | `.work/plans/20260827-field-binding-compaction-fix-plan.md`, iteration FB in this file; `fieldResolution.ts`, `lineCompactionService.ts` rewrite, render-worker parity, export/render reports, property-panel UX; front 408 + worker 37 tests green |
 | Agent OS bootstrap | `.work/` skeleton, `.cursorrules` |
 | .claude → .work migration | features, plans, fixes, implementations |
 | @plan-repair / @plan-master | Foundation + Approved master plan M1–M3 |
@@ -68,7 +69,86 @@
 
 ## Current iteration
 
-*(none active — import-ux plan implemented + demo paste-mapping fixes committed/pushed 2026-08-12, all gates green; next = prd/demo redeploy per Recommended next #1)*
+**Milestone ref:** FB — Field-binding & line-compaction reliability fix (owner-approved plan: `.work/plans/20260827-field-binding-compaction-fix-plan.md`, 2026-08-27; HANDOFF waiver: plan approved directly by owner, not derived from plan-master)
+**Status:** complete (all tasks + gates green; not yet committed) · **Started:** 2026-08-27 · **Completed:** 2026-08-27 · **Target:** all FB tasks + gates green
+
+### In scope
+
+- New line-emptiness semantics (any data-bound element with content keeps the line; static-only lines always kept; `requiredFields` becomes the explicit override; `linePriority` removed entirely)
+- Alias/case/suffix-tolerant render-time fieldId resolution, both render paths
+- render-worker parity: blank-on-missing (no placeholder leakage), compaction port, line metadata in element JSON
+- Batch export report (unresolvable fieldIds, record fields with no matching element, lines removed) — no silent drops
+- Property panel: valid/auto line-group values with inline validation, canonical-field dropdown for fieldId with unresolvable-field warning, Line Priority control removed, misleading copy fixed
+- Types deprecation notes + BATCH-EXPORT-IMPLEMENTATION.md binding-contract docs
+
+### Out of scope (explicit)
+
+- Field fallback chains (the operator's "priority as substitution order" idea) — future SPEC candidate
+- `renderer.ts:84-92` PG fallback 5/28 fields — flagged residual, not changed
+- Position-map same-type collision (`lineCompactionService.ts:61-67`) — unchanged unless hit by tests
+- api-server type mirror, demo parser, ingest pipeline — untouched
+- Single-design export path (no record data by design)
+
+### Tasks
+
+| ID | Description | Files | Status | Notes |
+|----|-------------|-------|--------|-------|
+| FB-T1 | fieldResolution module: normalize + alias-aware `resolveRecordProperty`, record-value getter, resolvability check; refactor batchExportService to use it | front-cards/.../services/fieldResolution.ts(+test), batchExportService.ts | done | aliases from features/demo/fixtures/field-aliases.snapshot.json (byte-identical to shared-types) |
+| FB-T2 | New compaction semantics + `requiredFields` override (record param) + linePriority removed | front-cards/.../services/lineCompactionService.ts, lineCompactionService.test.ts (new), batchExportService.ts (pass record) | done | keep remove/move mechanics + renumbering |
+| FB-T3 | Batch export report (aggregate; on result + logs) | front-cards/.../services/batchExportService.ts, batchExportFieldMapping.test.ts | done | |
+| FB-T4 | render-worker parity: blank-on-missing, alias-aware key resolution, compaction port, metadata in TemplateElementJson | render-worker/src/services/fabricTemplateRenderer.ts, lineCompaction.ts (new), fixtures/field-aliases.snapshot.json (new copy), tests/ | done | snapshot copy per duplication convention |
+| FB-T5 | Property panel UX: lineGroup valid suggestions + inline validation, remove Line Priority, fieldId dropdown + warning, copy fixes | front-cards/.../PropertyPanel/LineMetadataProperties.tsx, TextProperties.tsx | done | |
+| FB-T6 | Types deprecation notes + docs (binding contract, valid lineGroup format, semantics) | front-cards/.../types/index.ts, BATCH-EXPORT-IMPLEMENTATION.md | done | |
+| FB-T7 | Gates: front jest+lint+tsc, worker jest+tsc (compose); MOD-06; NEXT/HANDOFF | .work/plans/NEXT.md, .work/context/HANDOFF.md | done | |
+
+### Acceptance criteria
+
+1. A text element whose record field has data is never removed/blanked by compaction (both render paths).
+2. A line whose data-bound elements are all empty is hidden and the next line moves into its exact original coordinates.
+3. Static-only lines are never removed; icons never keep a dataless line alive.
+4. `requiredFields` on any line element gates line visibility against the record.
+5. UI no longer suggests invalid lineGroup formats; invalid input is rejected inline; no Line Priority control.
+6. Batch export result carries a report of unresolvable fieldIds / unmatched record fields / removed lines.
+7. Browser export and render-worker produce the same visible fields for the same template + record.
+
+### Validation steps
+
+- `docker compose -f docker-compose.dev.yml exec front-cards bash -c "cd /app && npm test"` (jest full)
+- `docker compose -f docker-compose.dev.yml exec front-cards bash -c "cd /app && npm run lint && npx tsc --noEmit"`
+- `docker compose -f docker-compose.dev.yml exec render-worker bash -c "cd /app && npm test && npx tsc --noEmit"`
+- Regression test reproducing operator scenario (priority-less mobile_phone line with data ⇒ renders; empty ⇒ collapses)
+
+### Owner blockers
+
+*(none)*
+
+### Cross-LLM verification
+
+- **Triggered:** no
+
+### Done this iteration
+
+| ID | Description | Status |
+|----|-------------|--------|
+| FB-T1 | fieldResolution module + batchExportService refactor (alias/case/suffix-tolerant render-time resolution) | done |
+| FB-T2 | New line-emptiness semantics (any-bound-content, static-line exemption, requiredFields override, linePriority removed) + 13 tests | done |
+| FB-T3 | Batch export field report (unresolvable fieldIds / unmatched record fields / removed lines) + test | done |
+| FB-T4 | render-worker parity (blank-on-missing, alias-aware resolution, compaction port, render report) + tests | done |
+| FB-T5 | Property panel: valid lineGroup suggestions + inline validation, Line Priority removed, Data Field control with suggestions + unknown-field warning | done |
+| FB-T6 | Types deprecation notes + docs (BATCH-EXPORT-IMPLEMENTATION.md binding contract; template-batch.md note) | done |
+| FB-T7 | Gates: front jest 70 suites/408 passed, tsc clean, lint 0 errors on touched files (199 pre-existing errors elsewhere); worker jest 7 suites/37 passed; touch-scope pass; blast-radius warn (3 areas, owner-approved scope); MOD-06 done | done |
+
+**Gates evidence (2026-08-27, dev compose):** `front-cards npm test` 70/70 suites, 408/408 tests; `npx tsc --noEmit` exit 0; eslint on touched files 0 errors (repo-wide lint debt pre-existing, see Recommended next #6). `render-worker npm test` 7/7 suites, 37/37 tests; worker `tsc --noEmit` has 1 pre-existing unrelated error (`cassandra-driver` types missing in container node_modules; untouched file `src/core/database/cassandra.ts`).
+
+**MOD-06 AI change risk summary:** AI-assisted: yes · boundaries crossed: 2 deployables (front-cards browser export + render-worker server render) — owner-approved scope · new cross-boundary deps: none (byte-identical fixture copy per repo convention) · test isolation: ok (per-module jest suites cited above) · blast radius: batch card/QR render output only; wrong behavior = blank/misplaced fields on generated cards, caught by the new regression tests incl. the operator's exact scenario; no DB schema or API contract changes · recommendation: merge_ok.
+
+### Concept / NFR registry (this iteration)
+
+| Concept | Applies | Status | Reason |
+|---------|---------|--------|--------|
+| MOD-06 ai-amplification | yes | done | agent-authored code; risk summary recorded in §Done this iteration (2026-08-27): boundaries=2 deployables (front-cards + render-worker, owner-approved), no new cross-boundary deps, test isolation ok, blast radius = batch card/QR render output, no schema/API changes → merge_ok |
+| MOD-01 coupling-audit | no | N/A | changes stay inside template-textile feature + render-worker renderer; no new module boundaries |
+| MOD-02/03/04/05/07/08 | no | N/A | no new hops, billable units, deployables, extraction, LLM feature, or IaC |
 
 ### Completed — M5: x-director recommended improvements
 

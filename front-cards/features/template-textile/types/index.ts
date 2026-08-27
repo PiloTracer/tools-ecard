@@ -21,11 +21,12 @@ export interface BaseElement {
   originalY?: number;
   originalWidth?: number;
   originalHeight?: number;
-  // Line metadata for visibility and reordering logic
+  // Line metadata for line compaction (hide empty lines, move following lines up)
   sectionGroup?: string; // Groups multiple lines together into a logical section (e.g., 'contact-info', 'business-details')
-  lineGroup?: string; // e.g., 'contact-line-1', 'contact-line-2'
-  requiredFields?: string[]; // vCard fields required for this line to be visible
-  linePriority?: number; // Priority for reordering (1, 2, 3...)
+  lineGroup?: string; // Format "type-number": dash-free prefix + line index (e.g. 'text-1', 'icon-2'); parsed by LINE_GROUP_REGEX
+  requiredFields?: string[]; // Explicit visibility gate: the line is hidden if any listed vCard field is empty in the record
+  /** @deprecated Ignored since 2026-08-27 — line survival is decided by data-bound content and line order by the lineGroup number. Tolerated so older template JSON still loads. */
+  linePriority?: number;
 }
 
 export interface TextElement extends BaseElement {

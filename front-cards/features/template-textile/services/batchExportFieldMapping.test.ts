@@ -16,9 +16,22 @@
 import * as fabric from 'fabric';
 import { vcardFields } from '../utils/vcardFields';
 import { parseCsvText, mapRowToContactFields } from '@/features/demo/demoSpreadsheetParser';
-import { applyRecordData, type BatchRecord } from './batchExportService';
+import { applyRecordData, exportTemplateToBatch, type BatchRecord } from './batchExportService';
 import { recreateElements } from './canvasRenderer';
+import { batchRecordService } from '@/features/batch-records/services/batchRecordService';
 import type { Template, TemplateElement, TextElement } from '../types';
+
+// Mocks for the exportTemplateToBatch report test below: exportTemplate is
+// replaced so no canvas rendering is needed; demo mode routes record fetching
+// to the mocked batchRecordService. Neither affects the other suites here
+// (they exercise applyRecordData / recreateElements directly).
+jest.mock('./exportService', () => ({
+  exportTemplate: jest.fn(async () => ({ dataUrl: 'data:image/png;base64,iVBORw0KGgo=', format: 'png' })),
+}));
+jest.mock('@/features/demo/isDemoMode', () => ({ isDemoMode: () => true }));
+jest.mock('@/features/batch-records/services/batchRecordService', () => ({
+  batchRecordService: { fetchRecordsForBatch: jest.fn() },
+}));
 
 /** Minimal 2D context so fabric.Canvas can construct + render in jsdom.
  *  Proxy returns a no-op for any function property and sensible defaults for
@@ -372,5 +385,46 @@ describe('batch export field mapping (all palette fields)', () => {
     };
     const populated = applyRecordData(template, record);
     expect((populated.elements[0] as TextElement).text).toBe(SAMPLE_VALUES.work_phone_ext);
+  });
+});
+
+/**
+ * Batch export field report — surfaces would-be silent drops:
+ * unresolvable template fieldIds, record fields that reach no element,
+ * and lines removed by compaction.
+ */
+describe('exportTemplateToBatch field report', () => {
+  it('reports unresolvable fieldIds, unmatched record fields, and removed lines', async () => {
+    (batchRecordService.fetchRecordsForBatch as jest.Mock).mockResolvedValue({
+      success: true,
+      data: {
+        batchFileName: 'batch.csv',
+        records: [{
+          batchRecordId: 'r1', batchId: 'b1',
+          createdAt: new Date(), updatedAt: new Date(),
+          fullName: 'Jane Doe', mobilePhone: '+1 555 000 1111',
+          email: 'jane@example.com', // has data but no element binds it
+        }],
+        pagination: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      },
+    });
+
+    const template: Template = {
+      id: 'tpl-report', name: 'report', width: 400, height: 200,
+      createdAt: new Date(), updatedAt: new Date(),
+      elements: [
+        { id: 'ok', type: 'text', x: 10, y: 100, text: 'placeholder', fontSize: 12, fontFamily: 'Arial', fieldId: 'mobile_phone', sectionGroup: 'contact', lineGroup: 'text-1' } as TextElement,
+        { id: 'bad', type: 'text', x: 10, y: 140, text: 'placeholder', fontSize: 12, fontFamily: 'Arial', fieldId: 'favorite_color', sectionGroup: 'contact', lineGroup: 'text-2' } as TextElement,
+      ],
+    };
+
+    const result = await exportTemplateToBatch(template, 'b1', { format: 'png' });
+
+    expect(result.successCount).toBe(1);
+    expect(result.report).toBeDefined();
+    expect(result.report!.unresolvableFieldIds).toEqual(['favorite_color']);
+    expect(result.report!.recordFieldsWithoutElement).toContain('email');
+    // 'bad' resolves to nothing → text cleared → its line is removed by compaction
+    expect(result.report!.recordsWithRemovedLines).toBe(1);
   });
 });

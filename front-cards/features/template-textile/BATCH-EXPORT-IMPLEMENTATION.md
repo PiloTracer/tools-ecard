@@ -294,7 +294,11 @@ All ContactRecordFull fields from Cassandra are supported via `fieldId` attribut
 **Personal:**
 - `personalUrl`, `personalBio`, `personalBirthday`
 
-### Mapping Logic
+### Mapping Logic (binding contract, 2026-08-27)
+
+The binding key is the text element's **`fieldId`** — the canvas text is only a
+design-time placeholder and plays no role in data lookup.
+
 ```typescript
 // Text element with fieldId
 <TextElement
@@ -302,9 +306,43 @@ All ContactRecordFull fields from Cassandra are supported via `fieldId` attribut
   text="Placeholder Name"
 />
 
-// Gets replaced with
-record.fullName || "Placeholder Name" || ""
+// At export, text is replaced with the record value:
+record.fullName ?? ""   // empty when the record has no value (placeholder is NOT kept)
 ```
+
+- Resolution (`services/fieldResolution.ts`) is tolerant, in order: exact
+  canonical id → case/accent/punctuation normalization → `_N` duplicate-suffix
+  strip (`work_phone_1` → `work_phone`) → the shared ingest alias table
+  (`packages/shared-types/src/domain/field-aliases.json`; e.g. `mobile`,
+  `celular`, `portable` all resolve to `mobile_phone`).
+- A `fieldId` that resolves to nothing leaves the text empty and is listed in
+  the export report (`BatchExportResult.report.unresolvableFieldIds`).
+- The report also lists record fields holding data that no element binds
+  (`recordFieldsWithoutElement`) and how many records had lines removed by
+  compaction (`recordsWithRemovedLines`) — check it after every export.
+- The render-worker (server-side PNG) follows the same contract.
+
+### Line Compaction (hide empty lines, move following lines up)
+
+Optional per-element metadata (`services/lineCompactionService.ts`):
+
+- `sectionGroup`: logical block (e.g. `contact-info`).
+- `lineGroup`: **format `type-number`** — dash-free prefix + line index, e.g.
+  `text-1`, `icon-1` (an icon and a text sharing line number 1 form one line).
+  Any other format (e.g. `contact-line-1`) is invalid and the element is left
+  fixed in place.
+- `requiredFields`: explicit visibility gate — the line is hidden when any
+  listed field is empty in the record.
+
+Line survival rule: a line survives iff **any data-bound element** (text with
+`fieldId`, or any element with `requiredFields`) has content for the record.
+Lines with no data-bound elements (static text, decorations) are always kept.
+Empty lines are removed and the following lines move into their exact original
+positions. `linePriority` is deprecated and ignored.
+
+**Guarantee:** if a record has data for a field and the design has a
+corresponding text element, that data is rendered — compaction never removes a
+line whose bound data exists.
 
 ## Usage Examples
 

@@ -106,6 +106,15 @@ Template text elements use `fieldId` attribute with snake_case:
 - `work_phone` → `record.workPhone`
 - `business_title` → `record.businessTitle`
 
+> **Updated 2026-08-27:** resolution is now tolerant (case/accents, `_N` suffix,
+> ingest aliases) and a missing record value renders empty (never the
+> placeholder), in both the browser export and the render-worker. Line
+> compaction semantics changed: a line survives iff any data-bound element has
+> content (`linePriority` deprecated/ignored; `requiredFields` is now enforced).
+> See `front-cards/features/template-textile/BATCH-EXPORT-IMPLEMENTATION.md`
+> §Mapping Logic / §Line Compaction and
+> `.work/plans/20260827-field-binding-compaction-fix-plan.md`.
+
 ### Mapping Dictionary
 ```typescript
 const FIELD_ID_TO_PROPERTY_MAP: Record<string, string> = {

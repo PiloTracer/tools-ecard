@@ -6,6 +6,8 @@ import { colorSlotLabel, wordIndexToColorIndex } from '../../utils/wordColorInde
 import { LineMetadataProperties } from './LineMetadataProperties';
 import { FontSelector } from './FontSelector';
 import { NumericStringInput } from '../common/NumericStringInput';
+import { vcardFields } from '../../utils/vcardFields';
+import { resolveCanonicalFieldId } from '../../services/fieldResolution';
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -24,10 +26,14 @@ export function TextProperties({ element }: TextPropertiesProps) {
     return value.toLowerCase().replace(/[^a-z0-9_]/g, '_');
   };
 
+  // Data-field feedback: resolveCanonicalFieldId is alias/case tolerant; null means
+  // no record field matches and the text would export empty.
+  const resolvedFieldId = element.fieldId ? resolveCanonicalFieldId(element.fieldId) : null;
+
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Field Name</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Data Field</label>
         <input
           type="text"
           value={element.fieldId || ''}
@@ -35,12 +41,36 @@ export function TextProperties({ element }: TextPropertiesProps) {
             const validatedValue = validateFieldName(e.target.value);
             handleChange({ fieldId: validatedValue });
           }}
-          placeholder="e.g., full_name, business_title"
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          placeholder="Pick or type a field, e.g. mobile_phone"
+          className={`w-full rounded border px-3 py-2 text-sm text-slate-800 focus:outline-none ${
+            element.fieldId && !resolvedFieldId
+              ? 'border-amber-400 bg-amber-50 focus:border-amber-500'
+              : 'border-gray-300 bg-white focus:border-blue-500'
+          }`}
+          list="dataFieldSuggestions"
         />
-        <p className="mt-1 text-xs text-gray-500">
-          Optional field identifier for template variables (snake_case format)
-        </p>
+        <datalist id="dataFieldSuggestions">
+          {vcardFields.map((field) => (
+            <option key={field.id} value={field.id} />
+          ))}
+        </datalist>
+        {!element.fieldId && (
+          <p className="mt-1 text-xs text-gray-500">
+            Optional. Set a field so each batch record fills this text at export; leave empty for
+            fixed static text. Aliases like &quot;mobile&quot; or &quot;celular&quot; also work.
+          </p>
+        )}
+        {element.fieldId && resolvedFieldId && (
+          <p className="mt-1 text-xs text-green-700">
+            At export this text shows the record&apos;s {resolvedFieldId.replace(/_/g, ' ')}.
+          </p>
+        )}
+        {element.fieldId && !resolvedFieldId && (
+          <p className="mt-1 text-xs text-amber-700">
+            Unknown field — no record data matches &quot;{element.fieldId}&quot;, so this text will
+            be empty at export. Pick a field from the suggestions.
+          </p>
+        )}
       </div>
 
       <div>

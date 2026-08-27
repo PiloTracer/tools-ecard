@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useTemplateStore } from '../../stores/templateStore';
 import type { BaseElement } from '../../types';
 import { vcardFields } from '../../utils/vcardFields';
-import { NumericStringInput } from '../common/NumericStringInput';
+import { LINE_GROUP_REGEX } from '../../services/lineCompactionService';
 
 interface LineMetadataPropertiesProps {
   element: BaseElement;
@@ -53,18 +53,18 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
     ...existingSectionGroups
   ].filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
 
-  // Generate line group suggestions
+  // Generate line group suggestions — must match the compaction parser format
+  // "type-number": dash-free prefix + line index (e.g. "text-1", "icon-2").
+  // The prefix defaults to the element's role (icon for images).
+  const typePrefix = element.type === 'image' ? 'icon' : element.type;
   const lineGroupSuggestions = [
-    'contact-line-1',
-    'contact-line-2',
-    'contact-line-3',
-    'phone-line',
-    'email-line',
-    'address-line',
-    'social-line',
-    'business-line',
-    ...existingLineGroups
+    `${typePrefix}-1`,
+    `${typePrefix}-2`,
+    `${typePrefix}-3`,
+    ...existingLineGroups.filter(g => LINE_GROUP_REGEX.test(g)),
   ].filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
+
+  const lineGroupValid = !element.lineGroup || LINE_GROUP_REGEX.test(element.lineGroup);
 
   const handleAddRequiredField = (fieldId: string) => {
     const currentFields = element.requiredFields || [];
@@ -111,8 +111,12 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
           type="text"
           value={element.lineGroup || ''}
           onChange={(e) => handleChange({ lineGroup: e.target.value })}
-          placeholder="e.g., contact-line-1"
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          placeholder={`e.g., ${typePrefix}-1`}
+          className={`w-full rounded border px-3 py-2 text-sm text-slate-800 focus:outline-none ${
+            lineGroupValid
+              ? 'border-gray-300 bg-white focus:border-blue-500'
+              : 'border-red-400 bg-red-50 focus:border-red-500'
+          }`}
           list="lineGroupSuggestions"
         />
         <datalist id="lineGroupSuggestions">
@@ -120,26 +124,18 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
             <option key={suggestion} value={suggestion} />
           ))}
         </datalist>
-        <p className="mt-1 text-xs text-gray-500">
-          Group elements that form a functional line
-        </p>
-      </div>
-
-      {/* Line Priority */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Line Priority</label>
-        <NumericStringInput
-          value={element.linePriority === undefined || element.linePriority === 0 ? 0 : element.linePriority}
-          roundDisplay
-          resetKey={element.id}
-          min={0}
-          max={100}
-          onCommit={(n) => handleChange({ linePriority: n < 1 ? undefined : n })}
-          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          Order for automatic line reordering (lower = higher priority). Use 0 for unset.
-        </p>
+        {lineGroupValid ? (
+          <p className="mt-1 text-xs text-gray-500">
+            Format: type-number (e.g. {typePrefix}-1). Elements sharing a line number form one
+            line: if the line&apos;s data is empty for a record, the whole line is hidden and the
+            following lines move up into its place.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-red-600">
+            Invalid format — use type-number (e.g. {typePrefix}-1): a dash-free prefix, a hyphen,
+            then the line number. This element will not participate in line grouping.
+          </p>
+        )}
       </div>
 
       {/* Required Fields */}
@@ -218,9 +214,6 @@ export function LineMetadataProperties({ element }: LineMetadataPropertiesProps)
             )}
             {element.lineGroup && (
               <li>• Line Group: <span className="font-medium">{element.lineGroup}</span></li>
-            )}
-            {element.linePriority && (
-              <li>• Priority: <span className="font-medium">{element.linePriority}</span></li>
             )}
             {element.requiredFields && element.requiredFields.length > 0 && (
               <li>• Required: <span className="font-medium">{element.requiredFields.join(', ')}</span></li>

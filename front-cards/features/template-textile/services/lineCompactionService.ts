@@ -1,9 +1,31 @@
 /**
- * Line Compaction Service - CORRECTED IMPLEMENTATION
- * Removes empty lines and physically moves remaining lines upward to fill gaps
+ * Line Compaction Service
+ * Removes empty lines and physically moves remaining lines upward to fill gaps.
+ *
+ * Line semantics (2026-08-27, operator-approved):
+ * - Lines live inside a `sectionGroup`; `lineGroup` is `type-number`
+ *   (e.g. "text-1", "icon-1" — dash-free prefix, parsed by LINE_GROUP_REGEX).
+ * - A line has content when ANY data-bound element on it has content after the
+ *   record data is applied. Data-bound = text element with `fieldId`, or any
+ *   element with `requiredFields`.
+ * - A line with NO data-bound elements (static text, icons) always has content
+ *   and is never removed.
+ * - `requiredFields` (when set on any element of the line) is the explicit
+ *   override: the line exists iff every required field has a value in the
+ *   record. Requires the record to be passed to applyLineCompaction.
+ * - `linePriority` no longer participates (removed: it silently decided line
+ *   survival and deleted data-bearing siblings; see plan
+ *   .work/plans/20260827-field-binding-compaction-fix-plan.md).
  */
 
 import type { Template, TemplateElement, TextElement, ImageElement, QRElement } from '../types';
+import { getRecordFieldValue } from './fieldResolution';
+
+/** lineGroup format: "type-number" — dash-free prefix + line index. */
+export const LINE_GROUP_REGEX = /^(\w+)-(\d+)$/;
+
+/** Minimal record shape needed for requiredFields checks. */
+export type CompactionRecord = object;
 
 /**
  * Position map structure: sectionGroup -> lineNumber -> elementType -> position
@@ -40,9 +62,9 @@ export function createOriginalPositionMap(template: Template): PositionMap {
     const { sectionGroup, lineGroup } = element;
 
     // Parse lineGroup: "type-number" (e.g., "icon-1", "text-2")
-    const match = lineGroup.match(/^(\w+)-(\d+)$/);
+    const match = lineGroup.match(LINE_GROUP_REGEX);
     if (!match) {
-      console.warn(`[LineCompaction] Invalid lineGroup format: "${lineGroup}"`);
+      console.warn(`[LineCompaction] Invalid lineGroup format: "${lineGroup}" (expected "type-number", e.g. "text-1")`);
       continue;
     }
 
@@ -75,11 +97,61 @@ export function createOriginalPositionMap(template: Template): PositionMap {
   return map;
 }
 
+/** Post-fill content signal for a single element. */
+function elementHasOwnContent(element: TemplateElement): boolean {
+  if (element.type === 'text') {
+    const text = (element as TextElement).text?.trim();
+    return Boolean(text && text.length > 0);
+  }
+  if (element.type === 'image') {
+    return Boolean((element as ImageElement).imageUrl);
+  }
+  if (element.type === 'qr') {
+    return Boolean((element as QRElement).data);
+  }
+  // Shapes and any other types always count as content if present
+  return true;
+}
+
+/** Data-bound = filled from the record (text with fieldId) or explicitly
+ *  gated on record fields (requiredFields). Static elements are not bound. */
+function isDataBound(element: TemplateElement): boolean {
+  if (element.type === 'text' && (element as TextElement).fieldId) return true;
+  return Boolean(element.requiredFields && element.requiredFields.length > 0);
+}
+
 /**
- * Determine which lines have content (non-empty primary element)
- * EMPTY LINE = line where text object with linePriority=1 has empty value
+ * Decide whether a line has content.
+ * - requiredFields on any element of the line: explicit gate — the line exists
+ *   iff every required field has a value in the record (record required).
+ * - otherwise: the line exists iff ANY data-bound element has content; a line
+ *   with no data-bound elements at all is static and always exists.
  */
-function determineExistingLines(template: Template, sectionGroup: string): number[] {
+function lineHasContent(
+  elements: TemplateElement[],
+  record?: CompactionRecord
+): boolean {
+  const requiredFields = Array.from(
+    new Set(elements.flatMap((el) => el.requiredFields ?? []))
+  );
+  if (requiredFields.length > 0 && record) {
+    return requiredFields.every((fieldId) => getRecordFieldValue(record, fieldId) !== null);
+  }
+
+  const bound = elements.filter(isDataBound);
+  if (bound.length === 0) return true; // static line — always kept
+  return bound.some(elementHasOwnContent);
+}
+
+/**
+ * Determine which lines have content.
+ * EMPTY LINE = line whose data-bound elements are all empty for this record.
+ */
+function determineExistingLines(
+  template: Template,
+  sectionGroup: string,
+  record?: CompactionRecord
+): number[] {
   const lineElements = new Map<number, TemplateElement[]>();
 
   // Group elements by line number
@@ -88,7 +160,7 @@ function determineExistingLines(template: Template, sectionGroup: string): numbe
       continue;
     }
 
-    const match = element.lineGroup.match(/^(\w+)-(\d+)$/);
+    const match = element.lineGroup.match(LINE_GROUP_REGEX);
     if (!match) continue;
 
     const lineNumber = parseInt(match[2], 10);
@@ -101,31 +173,8 @@ function determineExistingLines(template: Template, sectionGroup: string): numbe
 
   const existingLines: number[] = [];
 
-  // Check each line's primary element (linePriority === 1)
   for (const [lineNumber, elements] of lineElements) {
-    const primaryElement = elements.find(el => el.linePriority === 1);
-
-    if (!primaryElement) {
-      console.warn(`[LineCompaction] No primary element (linePriority=1) for line ${lineNumber} in "${sectionGroup}"`);
-      continue;
-    }
-
-    // Check if primary element has content
-    let hasContent = false;
-
-    if (primaryElement.type === 'text') {
-      const text = (primaryElement as TextElement).text?.trim();
-      hasContent = Boolean(text && text.length > 0);
-    } else if (primaryElement.type === 'image') {
-      hasContent = Boolean((primaryElement as ImageElement).imageUrl);
-    } else if (primaryElement.type === 'qr') {
-      hasContent = Boolean((primaryElement as QRElement).data);
-    } else {
-      // For other types, consider them as having content if they exist
-      hasContent = true;
-    }
-
-    if (hasContent) {
+    if (lineHasContent(elements, record)) {
       existingLines.push(lineNumber);
       console.log(`[LineCompaction] Line ${lineNumber} in "${sectionGroup}" EXISTS (has content)`);
     } else {
@@ -145,10 +194,14 @@ function determineExistingLines(template: Template, sectionGroup: string): numbe
  *    a. Determine which lines exist (have content)
  *    b. REMOVE elements from empty lines
  *    c. MOVE elements from existing lines to fill gaps (using original position map)
+ *
+ * Pass the current batch record so `requiredFields` gates are evaluated
+ * against real data.
  */
 export function applyLineCompaction(
   template: Template,
-  originalPositionMap: PositionMap
+  originalPositionMap: PositionMap,
+  record?: CompactionRecord
 ): Template {
   // Clone template to avoid mutation
   const compacted = JSON.parse(JSON.stringify(template)) as Template;
@@ -170,7 +223,7 @@ export function applyLineCompaction(
     console.log(`[LineCompaction] === Processing section: "${sectionGroup}" ===`);
 
     // Determine which lines exist
-    const existingLines = determineExistingLines(compacted, sectionGroup);
+    const existingLines = determineExistingLines(compacted, sectionGroup, record);
 
     if (existingLines.length === 0) {
       // No lines have content - remove entire section
@@ -185,7 +238,7 @@ export function applyLineCompaction(
     const allLineNumbers = new Set<number>();
     for (const element of compacted.elements) {
       if (element.sectionGroup === sectionGroup && element.lineGroup) {
-        const match = element.lineGroup.match(/^(\w+)-(\d+)$/);
+        const match = element.lineGroup.match(LINE_GROUP_REGEX);
         if (match) {
           allLineNumbers.add(parseInt(match[2], 10));
         }
@@ -205,7 +258,7 @@ export function applyLineCompaction(
         compacted.elements = compacted.elements.filter(element => {
           if (element.sectionGroup !== sectionGroup) return true;
 
-          const match = element.lineGroup?.match(/^(\w+)-(\d+)$/);
+          const match = element.lineGroup?.match(LINE_GROUP_REGEX);
           if (!match) return true;
 
           const elLineNum = parseInt(match[2], 10);
@@ -233,7 +286,7 @@ export function applyLineCompaction(
       const elementsToMove = compacted.elements.filter(element => {
         if (element.sectionGroup !== sectionGroup) return false;
 
-        const match = element.lineGroup?.match(/^(\w+)-(\d+)$/);
+        const match = element.lineGroup?.match(LINE_GROUP_REGEX);
         if (!match) return false;
 
         return parseInt(match[2], 10) === sourceLineNumber;
@@ -243,11 +296,10 @@ export function applyLineCompaction(
 
       // Move each element to target position
       for (const element of elementsToMove) {
-        const match = element.lineGroup!.match(/^(\w+)-(\d+)$/);
+        const match = element.lineGroup!.match(LINE_GROUP_REGEX);
         if (!match) continue;
 
         const elementType = match[1]; // 'icon', 'text', etc.
-        const oldLineNum = parseInt(match[2], 10);
 
         // Get target position from original position map
         const targetPos = originalPositionMap[sectionGroup]?.[targetPosition]?.[elementType];

@@ -6,6 +6,12 @@
 import { createCanvas, loadImage, type CanvasRenderingContext2D } from 'canvas';
 import QRCode from 'qrcode';
 import { decodeXmlEntities } from '../utils/decodeXmlEntities';
+import {
+  applyLineCompaction,
+  createOriginalPositionMap,
+  getRecordFieldValue,
+  resolveRecordProperty,
+} from './lineCompaction';
 
 export interface TemplateElementJson {
   id: string;
@@ -26,6 +32,9 @@ export interface TemplateElementJson {
   fontWeight?: string;
   fontStyle?: string;
   fieldId?: string;
+  sectionGroup?: string;
+  lineGroup?: string;
+  requiredFields?: string[];
   shapeType?: 'rectangle' | 'circle' | 'ellipse' | 'line';
   fill?: string;
   stroke?: string;
@@ -81,61 +90,24 @@ export interface RecordFieldValues {
   [key: string]: string | null | undefined;
 }
 
-/** Every vCard fieldId the designer can drop must resolve to a record property. */
-const FIELD_ID_TO_PROPERTY: Record<string, keyof RecordFieldValues> = {
-  full_name: 'fullName',
-  first_name: 'firstName',
-  last_name: 'lastName',
-  email: 'email',
-  work_phone: 'workPhone',
-  work_phone_ext: 'workPhoneExt',
-  mobile_phone: 'mobilePhone',
-  business_name: 'businessName',
-  business_title: 'businessTitle',
-  address_street: 'addressStreet',
-  address_city: 'addressCity',
-  address_state: 'addressState',
-  address_postal: 'addressPostal',
-  address_country: 'addressCountry',
-  social_instagram: 'socialInstagram',
-  social_twitter: 'socialTwitter',
-  social_facebook: 'socialFacebook',
-  business_department: 'businessDepartment',
-  business_url: 'businessUrl',
-  business_hours: 'businessHours',
-  business_address_street: 'businessAddressStreet',
-  business_address_city: 'businessAddressCity',
-  business_address_state: 'businessAddressState',
-  business_address_postal: 'businessAddressPostal',
-  business_address_country: 'businessAddressCountry',
-  business_linkedin: 'businessLinkedin',
-  business_twitter: 'businessTwitter',
-  personal_url: 'personalUrl',
-  personal_bio: 'personalBio',
-  personal_birthday: 'personalBirthday',
-};
-
-/** Resolve a template fieldId to a record property; tolerates a numeric
- * duplicate suffix ("work_phone_1") by resolving the base field id. */
-function resolveRecordKey(fieldId: string): keyof RecordFieldValues {
-  const direct = FIELD_ID_TO_PROPERTY[fieldId];
-  if (direct) return direct;
-  const base = fieldId.replace(/_\d+$/, '');
-  if (base !== fieldId && FIELD_ID_TO_PROPERTY[base]) {
-    return FIELD_ID_TO_PROPERTY[base];
-  }
-  return fieldId as keyof RecordFieldValues;
-}
-
+/**
+ * Resolve the text a text element renders.
+ * Contract (parity with the browser batch export):
+ * - Element with `fieldId` AND a record: the record value via tolerant field
+ *   resolution (exact -> normalized -> `_N` suffix strip -> alias table).
+ *   Missing or blank value -> '' (EMPTY STRING; the design-time placeholder is
+ *   never rendered for a bound field).
+ * - Element WITHOUT `fieldId`: static placeholder text, unchanged.
+ */
 export function resolveText(element: TemplateElementJson, record?: RecordFieldValues): string {
   if (element.fieldId && record) {
-    const key = resolveRecordKey(element.fieldId);
-    const value = record[key];
-    if (value != null && String(value).trim() !== '') {
+    const value = getRecordFieldValue(record, element.fieldId);
+    if (value != null) {
       // Use stored value as-is — casing is fixed at ingest; user edits must be preserved.
       // Decode any XML/HTML entities left from legacy ingest paths.
-      return decodeXmlEntities(String(value));
+      return decodeXmlEntities(value);
     }
+    return '';
   }
   return element.text ?? '';
 }
@@ -277,6 +249,37 @@ export async function renderTemplateToPng(
   const scaleX = canvasWidth / template.width;
   const scaleY = canvasHeight / template.height;
 
+  // Pre-fill + line compaction (parity with the browser batch export):
+  // 1. Replace every bound text's placeholder with the resolved record value
+  //    ('' when the fieldId is unresolvable or the record value is blank).
+  // 2. Remove lines left empty and move surviving lines up to fill gaps.
+  const unresolvableFieldIds: string[] = [];
+  let elements = template.elements.map((el) => ({ ...el }));
+  if (record) {
+    for (const element of elements) {
+      if (element.type !== 'text' || !element.fieldId) continue;
+      if (resolveRecordProperty(element.fieldId) === null && !(element.fieldId in record)) {
+        if (!unresolvableFieldIds.includes(element.fieldId)) {
+          unresolvableFieldIds.push(element.fieldId);
+        }
+      }
+      element.text = resolveText(element, record);
+    }
+  }
+  const positionMap = createOriginalPositionMap(elements);
+  const { elements: compactedElements, removedLines } = applyLineCompaction(elements, positionMap, record);
+  elements = compactedElements;
+
+  if (unresolvableFieldIds.length > 0 || removedLines.length > 0) {
+    const removed = removedLines.map((l) => `${l.sectionGroup}:${l.lineNumber}`).join(', ');
+    console.warn(
+      `[Render] ${unresolvableFieldIds.length} unresolvable fieldId(s)` +
+        `${unresolvableFieldIds.length > 0 ? ` [${unresolvableFieldIds.join(', ')}]` : ''}` +
+        `, ${removedLines.length} line(s) removed by compaction` +
+        `${removedLines.length > 0 ? ` [${removed}]` : ''}`
+    );
+  }
+
   const canvas = createCanvas(canvasWidth, canvasHeight);
   const ctx = canvas.getContext('2d');
 
@@ -286,7 +289,7 @@ export async function renderTemplateToPng(
   ctx.save();
   ctx.scale(scaleX, scaleY);
 
-  for (const element of template.elements) {
+  for (const element of elements) {
     if (element.excludeFromExport) continue;
     const prevAlpha = ctx.globalAlpha;
     if (element.opacity != null) ctx.globalAlpha = element.opacity;

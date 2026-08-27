@@ -12,7 +12,8 @@ import { batchRecordService } from '@/features/batch-records/services/batchRecor
 import type { ContactRecord } from '@/features/batch-records/types';
 import { isDemoMode } from '@/features/demo/isDemoMode';
 import { generateVCardFromRecord } from './vcardGenerator';
-import { createOriginalPositionMap, applyLineCompaction, type PositionMap } from './lineCompactionService';
+import { createOriginalPositionMap, applyLineCompaction } from './lineCompactionService';
+import { getRecordFieldValue, resolveRecordProperty } from './fieldResolution';
 import { decodeXmlEntities } from '@/shared/lib/decodeXmlEntities';
 import {
   effectiveExportPageSize,
@@ -122,7 +123,26 @@ export interface BatchExportResult {
   failed: Array<{ recordId: string; error: string }>;
   zipBlob?: Blob;
   cancelled?: boolean;
+  /** Aggregate field-binding report — surfaces what would otherwise be silent drops. */
+  report?: BatchExportFieldReport;
 }
+
+/**
+ * Aggregate field-binding report for a batch export. Answers, with evidence:
+ * "did every record field with data reach a visible element, and did every
+ * bound element resolve?"
+ */
+export interface BatchExportFieldReport {
+  /** Template fieldIds that resolve to no record field (typo / unknown field). */
+  unresolvableFieldIds: string[];
+  /** Record properties holding data in at least one record that no text element binds. */
+  recordFieldsWithoutElement: string[];
+  /** Records for which line compaction removed at least one line. */
+  recordsWithRemovedLines: number;
+}
+
+/** Record keys that are metadata, not renderable field data. */
+const RECORD_METADATA_KEYS = new Set(['batchRecordId', 'batchId', 'createdAt', 'updatedAt']);
 
 /**
  * Memory limits
@@ -199,74 +219,6 @@ export async function fetchBatchRecords(
 }
 
 /**
- * Field ID mapping: snake_case (template) -> camelCase (API)
- * Maps vCard field IDs to BatchRecord property names
- */
-const FIELD_ID_TO_PROPERTY_MAP: Record<string, string> = {
-  // Core fields
-  'full_name': 'fullName',
-  'first_name': 'firstName',
-  'last_name': 'lastName',
-
-  // Contact
-  'work_phone': 'workPhone',
-  'work_phone_ext': 'workPhoneExt',
-  'mobile_phone': 'mobilePhone',
-  'email': 'email',
-
-  // Address
-  'address_street': 'addressStreet',
-  'address_city': 'addressCity',
-  'address_state': 'addressState',
-  'address_postal': 'addressPostal',
-  'address_country': 'addressCountry',
-
-  // Social
-  'social_instagram': 'socialInstagram',
-  'social_twitter': 'socialTwitter',
-  'social_facebook': 'socialFacebook',
-
-  // Business
-  'business_name': 'businessName',
-  'business_title': 'businessTitle',
-  'business_department': 'businessDepartment',
-  'business_url': 'businessUrl',
-  'business_hours': 'businessHours',
-
-  // Business Address
-  'business_address_street': 'businessAddressStreet',
-  'business_address_city': 'businessAddressCity',
-  'business_address_state': 'businessAddressState',
-  'business_address_postal': 'businessAddressPostal',
-  'business_address_country': 'businessAddressCountry',
-
-  // Professional
-  'business_linkedin': 'businessLinkedin',
-  'business_twitter': 'businessTwitter',
-
-  // Personal
-  'personal_url': 'personalUrl',
-  'personal_bio': 'personalBio',
-  'personal_birthday': 'personalBirthday',
-};
-
-/**
- * Resolve a template element's fieldId to a BatchRecord property name.
- * Direct map first; tolerate an auto-generated/legacy duplicate suffix
- * ("work_phone_1") by resolving the base field id — the designer never
- * suffixes, but hand-edited or imported template JSON can carry them.
- */
-function resolveRecordProperty(fieldId: string): string {
-  const direct = FIELD_ID_TO_PROPERTY_MAP[fieldId];
-  if (direct) return direct;
-  const base = fieldId.replace(/_\d+$/, '');
-  if (base !== fieldId && FIELD_ID_TO_PROPERTY_MAP[base]) {
-    return FIELD_ID_TO_PROPERTY_MAP[base];
-  }
-  return fieldId;
-}
-
-/**
  * Apply batch record data to template
  * Maps fieldId attributes to record values
  */
@@ -287,11 +239,14 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
       const textElement = element as TextElement;
 
       if (textElement.fieldId) {
-        // Convert snake_case fieldId to camelCase property name
+        // Resolve fieldId → record value (alias/case/suffix tolerant); an
+        // unresolvable fieldId yields null — reported in the export report.
         const propertyName = resolveRecordProperty(textElement.fieldId);
+        const fieldValue = getRecordFieldValue(record, textElement.fieldId);
 
-        // Get value from record using the mapped property name
-        const fieldValue = (record as any)[propertyName];
+        if (!propertyName) {
+          console.warn('[BatchExport] Unresolvable fieldId (no matching record field):', textElement.fieldId);
+        }
 
         console.log('[BatchExport] Field mapping:', {
           fieldId: textElement.fieldId,
@@ -302,7 +257,7 @@ export function applyRecordData(template: Template, record: BatchRecord): Templa
 
         // Priority: record value > empty string (if no value, clear the field)
         // Do NOT re-capitalize here — casing is fixed at ingest; user edits must be preserved.
-        const newText = fieldValue ? decodeXmlEntities(String(fieldValue)) : '';
+        const newText = fieldValue ? decodeXmlEntities(fieldValue) : '';
 
         return {
           ...textElement,
@@ -424,6 +379,29 @@ export async function exportTemplateToBatch(
     // This stores original element positions to use when moving lines
     const originalPositionMap = createOriginalPositionMap(template);
 
+    // Field-binding report: which template bindings resolve, which record
+    // fields never reach an element — so no data is dropped silently.
+    const boundProperties = new Set<string>();
+    const unresolvableFieldIds = new Set<string>();
+    for (const element of template.elements) {
+      if (element.type !== 'text') continue;
+      const fieldId = (element as TextElement).fieldId;
+      if (!fieldId) continue;
+      const property = resolveRecordProperty(fieldId);
+      if (property) boundProperties.add(property);
+      else unresolvableFieldIds.add(fieldId);
+    }
+    const recordFieldsWithData = new Set<string>();
+    let recordsWithRemovedLines = 0;
+
+    const buildReport = (): BatchExportFieldReport => ({
+      unresolvableFieldIds: Array.from(unresolvableFieldIds),
+      recordFieldsWithoutElement: Array.from(recordFieldsWithData).filter(
+        (key) => !boundProperties.has(key)
+      ),
+      recordsWithRemovedLines,
+    });
+
     // Step 2: Process records in chunks
     const sanitizedBatchName = sanitizeFilename(batchName.replace(/\.(vcf|csv)$/i, ''));
 
@@ -440,6 +418,7 @@ export async function exportTemplateToBatch(
           failedCount: failed.length,
           failed,
           cancelled: true,
+          report: buildReport(),
         };
       }
 
@@ -447,8 +426,18 @@ export async function exportTemplateToBatch(
         // Apply record data to template
         const populatedTemplate = applyRecordData(template, record);
 
-        // Apply line compaction (removes empty lines and moves remaining lines up)
-        const compactedTemplate = applyLineCompaction(populatedTemplate, originalPositionMap);
+        // Apply line compaction (removes empty lines and moves remaining lines up).
+        // The record is passed so requiredFields gates evaluate against real data.
+        const compactedTemplate = applyLineCompaction(populatedTemplate, originalPositionMap, record);
+
+        // Report: record fields holding data, and lines removed by compaction
+        for (const [key, value] of Object.entries(record)) {
+          if (RECORD_METADATA_KEYS.has(key)) continue;
+          if (value != null && String(value).trim() !== '') recordFieldsWithData.add(key);
+        }
+        if (compactedTemplate.elements.length < populatedTemplate.elements.length) {
+          recordsWithRemovedLines++;
+        }
 
         // Debug: Log backgroundColor option
         if (i === 0) {
@@ -519,6 +508,13 @@ export async function exportTemplateToBatch(
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`Batch export completed in ${duration}s: ${exports.length} succeeded, ${failed.length} failed`);
 
+    const report = buildReport();
+    if (report.unresolvableFieldIds.length > 0 || report.recordFieldsWithoutElement.length > 0) {
+      console.warn('[BatchExport] Field-binding report — review these silent-drop risks:', report);
+    } else {
+      console.log('[BatchExport] Field-binding report:', report);
+    }
+
     return {
       batchId,
       batchName,
@@ -527,6 +523,7 @@ export async function exportTemplateToBatch(
       failedCount: failed.length,
       failed,
       zipBlob,
+      report,
     };
   } catch (error) {
     console.error('Batch export failed:', error);

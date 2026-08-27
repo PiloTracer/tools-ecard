@@ -180,12 +180,43 @@ describe('fabricTemplateRenderer', () => {
     }
   });
 
-  it('falls back to the placeholder text when the record value is missing', () => {
+  it('renders an empty string when a bound field value is missing (no placeholder fallback)', () => {
+    // New contract (parity with the browser batch export): a bound field with
+    // a missing/empty record value renders blank — the design-time placeholder
+    // is never emitted for a bound field.
     const resolved = resolveText(
       { id: 't1', type: 'text', fieldId: 'work_phone', text: '+1 (555) 000-0000 ', fontSize: 12 },
       { workPhone: null }
     );
-    expect(resolved).toBe('+1 (555) 000-0000 ');
+    expect(resolved).toBe('');
+  });
+
+  it('renders an empty string when a bound fieldId is unresolvable', () => {
+    const resolved = resolveText(
+      { id: 't1', type: 'text', fieldId: 'unknown_field', text: 'placeholder', fontSize: 12 },
+      ALL_FIELD_VALUES
+    );
+    expect(resolved).toBe('');
+  });
+
+  it('resolves alias and case-variant fieldIds via the ingest alias table', () => {
+    expect(
+      resolveText({ id: 'a', type: 'text', fieldId: 'Mobile Phone', fontSize: 12 }, ALL_FIELD_VALUES)
+    ).toBe(FIELD_ID_TO_VALUE.mobile_phone);
+    expect(
+      resolveText({ id: 'b', type: 'text', fieldId: 'celular', fontSize: 12 }, ALL_FIELD_VALUES)
+    ).toBe(FIELD_ID_TO_VALUE.mobile_phone);
+    expect(
+      resolveText({ id: 'c', type: 'text', fieldId: 'Móvil', fontSize: 12 }, ALL_FIELD_VALUES)
+    ).toBe(FIELD_ID_TO_VALUE.mobile_phone);
+  });
+
+  it('keeps the static text for an element without fieldId', () => {
+    const resolved = resolveText(
+      { id: 't1', type: 'text', text: 'STATIC LABEL', fontSize: 12 },
+      ALL_FIELD_VALUES
+    );
+    expect(resolved).toBe('STATIC LABEL');
   });
 
   it('fills every element sharing a fieldId, including numeric duplicate suffixes', () => {
