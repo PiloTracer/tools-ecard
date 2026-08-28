@@ -59,6 +59,7 @@ export class TemplateController {
       // Save template using unified service
       const metadata = await unifiedTemplateStorageService.saveTemplate(
         {
+          id: saveRequest.id,
           name: saveRequest.name,
           templateData: saveRequest.templateData,
           kind: saveRequest.kind ?? (global ? 'template' : undefined),

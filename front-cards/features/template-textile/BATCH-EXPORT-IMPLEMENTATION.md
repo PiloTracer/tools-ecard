@@ -344,6 +344,21 @@ positions. `linePriority` is deprecated and ignored.
 corresponding text element, that data is rendered — compaction never removes a
 line whose bound data exists.
 
+### Font & Fit Guarantees (export contract)
+
+**Fonts:** the design's font family and size are always respected. Before
+Fabric creates or measures any text object, `preloadTemplateFonts` awaits the
+exact variant (family + weight + style) via the Font Loading API
+(`new FontFace(...).load()` + `document.fonts.add(face)`), with a per-variant
+`document.fonts.load(...)` + `document.fonts.ready` backstop. No
+`font-display: swap` — fallback-first rendering is never acceptable at export.
+
+**Fit:** `fitTextToSafeArea` shrinks text **only for genuine horizontal
+(width) overflow** of the safe area, using uniform scaling clamped to
+[0.5, 1.0] (never scales up). Vertical placement is never shrunk: a line
+moved into the top/bottom padding by compaction (or by design) is logged via
+`console.warn` and left untouched.
+
 ## Usage Examples
 
 ### Basic Batch Export

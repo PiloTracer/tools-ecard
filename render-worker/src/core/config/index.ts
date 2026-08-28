@@ -33,6 +33,9 @@ export const workerConfig = {
     bucket: process.env.SEAWEEDFS_BUCKET || '',
   },
 
+  // Internal api-server base URL (font catalog + font files)
+  internalApiUrl: process.env.INTERNAL_API_URL || 'http://api-server:4000',
+
   // Worker
   worker: {
     concurrency: parseInt(process.env.WORKER_CONCURRENCY || '4', 10),

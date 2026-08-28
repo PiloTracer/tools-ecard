@@ -8,7 +8,10 @@ RUN apk add --no-cache \
     pango-dev \
     giflib-dev \
     pixman-dev \
-    openssl
+    openssl \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation
 
 WORKDIR /app
 

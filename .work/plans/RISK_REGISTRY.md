@@ -21,6 +21,7 @@ Status: **Open** | **Mitigated** | **Accepted** | **Closed**
 | R13 | Transposed-XLSX detection false positives on narrow sheets | quality | M | L | Orientation chosen only on clear score margin (≥3 and strictly greater); ambiguous → horizontal (status quo) | **Mitigated** 2026-08-12 | eng |
 | R14 | Bundled-globals manifest stale after operator drops files | ops | M | L | Regenerator script scans directory; runbook documents the step; loader tolerates missing/corrupt entries | Open | eng |
 | R15 | Global-template mutations unavailable when dashboard validate-token is down (fail-closed) | dependency | L | M | Deliberate fail-closed (503); regular templates unaffected; monitor dashboard availability | Accepted | eng |
+| R16 | Font file endpoint `GET /api/v1/fonts/:fontId/file` accepts `?userId=` as an implicit credential on an optional-auth route — anonymous callers can fetch any user's private font file given (userId, fontId); echoes arbitrary Origin with credentials (`fontController.ts:218,236-238`). render-worker `fontLoader.ts` relies on this for user-owned fonts | security | M | H | Review S-1 (2026-08-27 `.work/feedback/20260827-uncommitted-review-font-geometry.md`): drop `query.userId` (worker authenticates with a service token) or gate behind role check — separate security task, owner decision | **Open** | owner |
 
 ## Review log
 
@@ -30,3 +31,4 @@ Status: **Open** | **Mitigated** | **Accepted** | **Closed**
 | 2026-07-16 | session context verify | Closed R3; mitigated R5/R7; reopened honesty on R1/R2 from code |
 | 2026-07-16 | M4 Demo plan | R8 mitigated by design; R9/R10 opened |
 | 2026-08-12 | import-ux-templates plan (Passes 0–6) | Closed R2 (Pass 3 real endpoints); opened R11–R15 from plan §6 |
+| 2026-08-27 | uncommitted review FC+GD (`.work/feedback/20260827-uncommitted-review-font-geometry.md`) | Opened R16 (S-1 font-file endpoint authz, pre-existing HIGH newly relied upon by fontLoader) |

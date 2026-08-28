@@ -51,6 +51,8 @@ export interface TemplateMetadata {
 }
 
 export interface SaveTemplateInput {
+  /** Existing template id for in-place saves; absent = legacy name upsert. */
+  id?: string;
   name: string;
   templateData: any;
   kind?: TemplateKind; // default 'design' (DB default); 'template' via explicit "Save as template"
@@ -123,22 +125,42 @@ class UnifiedTemplateStorageService {
     const defaultProject = await projectOperations.getOrCreateDefaultProject(userId);
     const projectId = defaultProject.id;
 
-    // Check if a template with this name already exists for this user in this project
+    // Resolve the target record: prefer the explicit template id (in-place
+    // save) so same-named templates can't alias each other; fall back to the
+    // legacy name lookup for older clients and stale ids.
     let templateId: string;
     let existingTemplate: any = null;
+    let resolution: 'id-match' | 'name-match' | 'new' = 'new';
 
     try {
-      const templates = await templateOperations.listTemplates(userId);
-      existingTemplate = templates.templates.find(
-        t => t.name === input.name && t.projectId === projectId
-      );
+      if (input.id) {
+        // Direct by-id fetch (H-1): the paged listTemplates would miss any
+        // template beyond page 1 and mint a duplicate row. Keep the same
+        // ownership scope as the name path — wrong owner/project = no match.
+        const byId = await templateOperations.getTemplateById(input.id);
+        if (byId && byId.userId === userId && byId.projectId === projectId) {
+          existingTemplate = byId;
+          resolution = 'id-match';
+        }
+      }
+      if (!existingTemplate) {
+        // No unpaged name-scoped finder exists in templateOperations (and
+        // client.ts is out of scope), so page high enough that the name
+        // lookup cannot miss (H-1). projectId moves into the where clause,
+        // preserving the previous in-JS filter semantics.
+        const templates = await templateOperations.listTemplates(userId, projectId, 1, 1000);
+        existingTemplate = templates.templates.find(
+          t => t.name === input.name
+        );
+        if (existingTemplate) resolution = 'name-match';
+      }
 
       if (existingTemplate) {
         templateId = existingTemplate.id;
-        log.debug({ templateId, projectId }, 'Updating existing template');
+        log.debug({ templateId, projectId, resolution }, 'Updating existing template');
       } else {
         templateId = uuidv4();
-        log.debug({ templateId, projectId }, 'Creating new template');
+        log.debug({ templateId, projectId, resolution }, 'Creating new template');
       }
     } catch (error) {
       // If can't check, generate new ID
@@ -199,9 +221,11 @@ class UnifiedTemplateStorageService {
 
         // Note: projectId is already defined above from getOrCreateDefaultProject
         const sanitizedProjectId = this.sanitizeEmailForPath(projectId);
-        const sanitizedTemplateName = this.sanitizeEmailForPath(input.name);
 
-        const s3Key = `templates/${sanitizedEmail}/${sanitizedProjectId}/${sanitizedTemplateName}/template.json`;
+        // Blob key is identity-keyed (templateId), not name-derived, so
+        // same-named templates never alias one blob. Loads parse the stored
+        // storageUrl, so legacy name-keyed blobs remain readable.
+        const s3Key = `templates/${sanitizedEmail}/${sanitizedProjectId}/${templateId}/template.json`;
 
         // Ensure bucket exists
         const bucketExists = await s3Service.bucketExists(bucketName);
@@ -240,7 +264,7 @@ class UnifiedTemplateStorageService {
         const localPath = await fallbackStorageService.saveTemplate(
           userEmail,
           projectId,
-          input.name,
+          templateId,
           input.templateData
         );
         storageUrl = `fallback://${localPath}`;
@@ -768,17 +792,20 @@ class UnifiedTemplateStorageService {
 
     const updatedName = input.name || existing.name;
 
-    // Save as new version
+    // Save in place under the same identity (GD-T1): the id resolves to the
+    // existing row, so no fresh uuid is minted and the id-keyed blob is
+    // overwritten. Carry kind/global through so an update can't silently
+    // demote them. No delete-then-resave: that would drop the row before the
+    // id lookup and defeat the identity resolution.
     const saveInput: SaveTemplateInput = {
+      id: templateId,
       name: updatedName,
       templateData: updatedData,
+      kind: existing.metadata.kind,
+      global: existing.metadata.isPublic === true ? true : undefined,
       resources: input.resources
     };
 
-    // Delete old version
-    await this.deleteTemplate(templateId, request);
-
-    // Save new version with same ID
     return this.saveTemplate(saveInput, request);
   }
 }

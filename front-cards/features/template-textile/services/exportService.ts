@@ -168,8 +168,12 @@ export async function exportTemplate(
       evented: false,
       strokeWidth: 0,
     });
-    (backgroundRect as any).isBackgroundRect = true; // Mark for identification
-    (backgroundRect as any).excludeFromExport = false; // NEVER exclude background
+    const exportBackground = backgroundRect as fabric.Rect & {
+      isBackgroundRect?: boolean;
+      excludeFromExport?: boolean;
+    };
+    exportBackground.isBackgroundRect = true; // Mark for identification
+    exportBackground.excludeFromExport = false; // NEVER exclude background
     offscreenCanvas.add(backgroundRect);
     offscreenCanvas.sendObjectToBack(backgroundRect); // Ensure it's at the back
     console.log('[Export] Background rectangle added. Canvas objects:', offscreenCanvas.getObjects().length);
@@ -189,7 +193,7 @@ export async function exportTemplate(
     onProgress?.('Rendering canvas', 0.85);
     console.log('[Export] Objects on canvas before render:', offscreenCanvas.getObjects().length);
     console.log('[Export] Canvas backgroundColor:', offscreenCanvas.backgroundColor);
-    console.log('[Export] First object (should be background):', offscreenCanvas.getObjects()[0]?.type, (offscreenCanvas.getObjects()[0] as any)?.fill);
+    console.log('[Export] First object (should be background):', offscreenCanvas.getObjects()[0]?.type, offscreenCanvas.getObjects()[0]?.fill);
     offscreenCanvas.renderAll();
 
     // Step 7: Export
@@ -341,15 +345,24 @@ function disposeOffscreenCanvas(canvas: fabric.Canvas): void {
  */
 function removeExcludedObjects(canvas: fabric.Canvas): void {
   const objects = canvas.getObjects();
-  const excludedObjects = objects.filter((obj: any) => obj.excludeFromExport === true);
+  const excludedObjects = objects.filter(
+    (obj) => (obj as fabric.Object & { excludeFromExport?: boolean }).excludeFromExport === true
+  );
   excludedObjects.forEach(obj => canvas.remove(obj));
 }
 
 /**
  * Fit text objects within safe area (30px padding from canvas edges)
- * Uses uniform scaling to maintain aspect ratio and readability
+ *
+ * Contract: the design's font family and font size are always respected.
+ * Text is only scaled down for genuine horizontal (width) overflow of the
+ * safe area — the legitimate case where data must fit a given width.
+ * Vertical placement is never shrunk: lines moved up by compaction into a
+ * designed slot may legitimately sit inside the top/bottom padding.
+ * Uses uniform scaling to maintain aspect ratio and readability,
+ * clamped to [0.5, 1.0] (never scales up).
  */
-function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
+export function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
   const canvasWidth = canvas.width || 1200;
   const canvasHeight = canvas.height || 600;
   const safeLeft = padding;
@@ -363,7 +376,11 @@ function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
   const objects = canvas.getObjects();
   let adjustedCount = 0;
 
-  objects.forEach((obj: any) => {
+  objects.forEach((fabricObj) => {
+    const obj = fabricObj as fabric.Object & {
+      isBackgroundRect?: boolean;
+      text?: string;
+    };
     // Only process text objects
     if (obj.type !== 'text' && obj.type !== 'textbox' && obj.type !== 'i-text') {
       return;
@@ -375,7 +392,7 @@ function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
     }
 
     // Get bounding box in absolute coordinates
-    const bounds = obj.getBoundingRect(true);
+    const bounds = obj.getBoundingRect();
 
     // Check if text exceeds safe area
     const exceedsLeft = bounds.left < safeLeft;
@@ -393,9 +410,20 @@ function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
         exceedsBottom
       });
 
-      // Calculate how much to scale down to fit
+      // Vertical-only violations must NOT shrink the text: a line placed in
+      // the top/bottom padding by design (e.g. moved up by line compaction)
+      // is exactly where the design wants it. Log and leave untouched.
+      if (!exceedsLeft && !exceedsRight) {
+        console.warn('[SafeArea] Text outside safe area vertically (no shrink):', {
+          text: obj.text?.substring(0, 50),
+          bounds,
+          edge: exceedsTop ? 'top' : 'bottom'
+        });
+        return;
+      }
+
+      // Calculate how much to scale down to fit (width only)
       let scaleFactorX = 1.0;
-      let scaleFactorY = 1.0;
 
       // If exceeds right, calculate how much to shrink width
       if (exceedsRight) {
@@ -412,23 +440,9 @@ function fitTextToSafeArea(canvas: fabric.Canvas, padding: number = 30): void {
         console.log('[SafeArea] Left overhang, scaleFactorX:', scaleFactorX);
       }
 
-      // If exceeds bottom, calculate how much to shrink height
-      if (exceedsBottom) {
-        const overhang = (bounds.top + bounds.height) - safeBottom;
-        const neededHeight = bounds.height - overhang;
-        scaleFactorY = neededHeight / bounds.height;
-        console.log('[SafeArea] Bottom overhang:', overhang, 'scaleFactorY:', scaleFactorY);
-      }
-
-      // If exceeds top, need to fit from safe top
-      if (exceedsTop) {
-        const availableFromSafeTop = safeBottom - safeTop;
-        scaleFactorY = Math.min(scaleFactorY, availableFromSafeTop / bounds.height);
-        console.log('[SafeArea] Top overhang, scaleFactorY:', scaleFactorY);
-      }
-
-      // Use UNIFORM scaling - take the smaller of the two factors
-      const uniformScale = Math.min(scaleFactorX, scaleFactorY);
+      // Use UNIFORM scaling derived from the horizontal factor only;
+      // vertical violations (exceedsTop/exceedsBottom) never shrink text.
+      const uniformScale = scaleFactorX;
 
       // Never scale up (max 1.0), and don't go below 50% (min 0.5)
       const MIN_SCALE = 0.5;

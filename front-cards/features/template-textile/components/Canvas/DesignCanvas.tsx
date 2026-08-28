@@ -9,6 +9,10 @@ import type { TemplateElement, TextElement, ImageElement, QRElement, ShapeElemen
 import { createMultiColorText, updateMultiColorText, shouldUseMultiColor } from '../../utils/multiColorText';
 import { applyPersistedTemplateGeometry, readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
 import { applyImageClipShape } from '../../utils/imageClipShape';
+import {
+  readEffectiveCanvasGeometry,
+  foldCanvasGeometryForElement,
+} from './CanvasControls';
 
 /**
  * Fabric 6: ActiveSelection extends Group — `type` is often `'group'`, not `'activeSelection'`.
@@ -284,7 +288,7 @@ export function DesignCanvas() {
       const target = e.target;
       if (!target) return;
 
-      // Multi-select: move/rotate the whole group — write each child’s position into the store
+      // Multi-select: move/rotate/scale the whole group — write each child's geometry into the store
       if (isFabricActiveSelection(target)) {
         const sel = target;
         const objs = sel.getObjects();
@@ -297,13 +301,16 @@ export function DesignCanvas() {
           }
           const el = useTemplateStore.getState().elements.find(ee => ee.id === elementId);
           if (!el) continue;
-          (obj as fabric.FabricObject).setCoords();
-          const p = (obj as fabric.FabricObject).getPointByOrigin('left', 'top');
-          updateElement(elementId, {
-            x: Math.round(p.x),
-            y: Math.round(p.y),
-            rotation: (obj as any).angle ?? el.rotation,
-          } as Partial<TemplateElement>);
+          // While the selection is active, child left/top/scale are GROUP-RELATIVE
+          // (Fabric bakes absolute values only on deselect) — read the composed
+          // selection×child transform and fold the same dimensions the
+          // single-object mouseup path writes (width/height, size for QR,
+          // scaleX/scaleY for images), not position-only.
+          const geom = readEffectiveCanvasGeometry(obj as fabric.FabricObject);
+          updateElement(
+            elementId,
+            foldCanvasGeometryForElement(el, obj as fabric.FabricObject, geom) as Partial<TemplateElement>
+          );
         }
         setTimeout(() => {
           sel.getObjects().forEach((o) => {
@@ -2131,6 +2138,17 @@ export function DesignCanvas() {
                 fabricObjectsMap.current.set(element.id, qrImage);
                 canvas.renderAll();
                 console.log('[QR] Generated QR code for element', element.id, 'at size', qrWidth, 'x', qrHeight);
+              } else if (canvas) {
+                // Placeholder map miss: without this fallback the store keeps a
+                // QR element with NO canvas object (ghost — invisible here but
+                // still exported). Mount the real QR at the persisted x/y,
+                // evicting any stale canvas object carrying the same elementId.
+                console.warn('[QR] Placeholder map miss for', element.id, '— adding QR at persisted position');
+                const stale = canvas.getObjects().find(o => (o as any).elementId === element.id);
+                if (stale) canvas.remove(stale);
+                canvas.add(qrImage);
+                fabricObjectsMap.current.set(element.id, qrImage);
+                canvas.renderAll();
               }
             });
           })

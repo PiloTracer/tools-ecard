@@ -37,6 +37,13 @@ async function apiFetchWithRefresh(input: string, init: RequestInit): Promise<Re
 export type StorageMode = 'FULL' | 'FALLBACK' | 'LOCAL_ONLY';
 
 export interface SaveTemplateRequest {
+  /**
+   * In-place update identity. When present, the server upserts THIS record
+   * (id-preferred) instead of matching by name — name-keyed upserts plus
+   * name-derived blob keys are what let stale same-named twins shadow a save.
+   * Omit for creates/forks ("Save as new template") so the server creates fresh.
+   */
+  id?: string;
   name: string;
   templateData: Template;
   kind?: TemplateKind; // default 'design'; 'template' via explicit "Save as new template"
@@ -61,6 +68,8 @@ export interface TemplateMetadata {
   previewUrl?: string;
   /** Optional operator-provided description (bundled globals manifest). */
   description?: string;
+  /** Local-only record never confirmed by the server (offline/fallback save). */
+  unsynced?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +82,14 @@ export interface LoadedTemplate {
   resources: string[];
   metadata: TemplateMetadata;
 }
+
+/**
+ * browserStorageService.CachedTemplate plus the sync marker written on
+ * local-only/fallback saves. Declared here because the storage service itself
+ * is out of scope; IndexedDB `put` spreads the whole record, so the extra
+ * field persists and survives the round trip.
+ */
+type LocalCachedTemplate = CachedTemplate & { unsynced?: boolean };
 
 class TemplateService {
   private currentMode: StorageMode | null = null;
@@ -130,7 +147,9 @@ class TemplateService {
     const resourceData: any[] = [];
 
     if (mode === 'LOCAL_ONLY') {
-      // Save only to local storage
+      // Save only to local storage. Known limitation (L-1): a fresh id is minted on
+      // every save — offline in-place saves churn ids and accumulate unsynced twins;
+      // acceptable while offline, resolved once the record syncs to the server.
       const templateId = this.generateId();
       const metadata: TemplateMetadata = {
         id: templateId,
@@ -141,6 +160,9 @@ class TemplateService {
         resourceUrls: resources.map(r => r.url),
         version: 1,
         kind: request.kind ?? 'design',
+        // Never confirmed by the server — listTemplates() hides this record
+        // once a same-named server record exists (unsynced-twin rule).
+        unsynced: true,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -153,8 +175,9 @@ class TemplateService {
         resources: resources.map(r => r.url),
         timestamp: Date.now(),
         userId: 'local',
-        kind: metadata.kind
-      });
+        kind: metadata.kind,
+        unsynced: true
+      } as LocalCachedTemplate);
 
       return metadata;
     }
@@ -170,6 +193,9 @@ class TemplateService {
           name: request.name,
           templateData: processedTemplate,
           kind: request.kind,
+          // Identity-keyed save: only sent when set — the server upserts this
+          // record (id-preferred) instead of matching by name.
+          ...(request.id ? { id: request.id } : {}),
           // Only sent when true — server role-gates global saves (403 for regular users)
           ...(request.global === true ? { global: true } : {}),
           resources: resourceData
@@ -217,6 +243,9 @@ class TemplateService {
           resourceUrls: resources.map(r => r.url),
           version: 1,
           kind: request.kind ?? 'design',
+          // Never confirmed by the server — listTemplates() hides this record
+          // once a same-named server record exists (unsynced-twin rule).
+          unsynced: true,
           createdAt: new Date(),
           updatedAt: new Date()
         };
@@ -228,8 +257,9 @@ class TemplateService {
           resources: resources.map(r => r.url),
           timestamp: Date.now(),
           userId: 'fallback',
-          kind: metadata.kind
-        });
+          kind: metadata.kind,
+          unsynced: true
+        } as LocalCachedTemplate);
 
         return metadata;
       }
@@ -459,24 +489,35 @@ class TemplateService {
         // Merge with local templates
         const localTemplates = await browserStorageService.listTemplates();
         const serverIds = new Set(templates.map(t => t.id));
+        // No projectId exists on either record type (project names live only in
+        // the store's save metadata), so the twin collision key is the name.
+        const serverNames = new Set(templates.map(t => t.name));
 
         // Add local-only templates
         for (const local of localTemplates) {
           const localKind = local.kind ?? 'design';
-          if (!serverIds.has(local.id) && (!kind || localKind === kind)) {
-            templates.push({
-              id: local.id,
-              userId: local.userId || 'local',
-              name: local.name,
-              storageUrl: `local://${local.id}`,
-              storageMode: 'LOCAL_ONLY',
-              resourceUrls: local.resources,
-              version: 1,
-              kind: localKind,
-              createdAt: new Date(local.timestamp),
-              updatedAt: new Date(local.timestamp)
-            });
+          if (serverIds.has(local.id) || (kind && localKind !== kind)) continue;
+          if (serverNames.has(local.name)) {
+            // Same-named local twin (unsynced fallback/offline save with a
+            // different id): the server record wins — never list the stale copy.
+            console.warn(
+              `[templates] Local-only template "${local.name}" (${local.id}) shadowed by a same-named server record — hiding the stale twin`
+            );
+            continue;
           }
+          templates.push({
+            id: local.id,
+            userId: local.userId || 'local',
+            name: local.name,
+            storageUrl: `local://${local.id}`,
+            storageMode: 'LOCAL_ONLY',
+            resourceUrls: local.resources,
+            version: 1,
+            kind: localKind,
+            unsynced: (local as LocalCachedTemplate).unsynced,
+            createdAt: new Date(local.timestamp),
+            updatedAt: new Date(local.timestamp)
+          });
         }
 
         return templates;

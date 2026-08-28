@@ -6,6 +6,7 @@
 import { createCanvas, loadImage, type CanvasRenderingContext2D } from 'canvas';
 import QRCode from 'qrcode';
 import { decodeXmlEntities } from '../utils/decodeXmlEntities';
+import { ensureFontsRegistered, isBoldFontWeight } from './fontLoader';
 import {
   applyLineCompaction,
   createOriginalPositionMap,
@@ -135,19 +136,42 @@ function applyRotation(
   ctx.restore();
 }
 
+/**
+ * Fit-to-width scale factor. Contract (parity with the fixed browser export):
+ * shrink-only, width-only — when the measured text exceeds the available
+ * width, scale the font size down by available/measured, clamped to
+ * [0.5, 1.0]. Never scales up; no vertical fitting.
+ */
+export function computeFitScale(measured: number, available: number): number {
+  if (measured <= 0 || available <= 0 || measured <= available) return 1.0;
+  return Math.max(0.5, Math.min(1.0, available / measured));
+}
+
 function drawText(
   ctx: CanvasRenderingContext2D,
   element: TemplateElementJson,
+  designWidth: number,
   record?: RecordFieldValues
 ) {
   const text = resolveText(element, record);
   if (!text) return;
 
-  const fontSize = element.fontSize ?? 16;
+  let fontSize = element.fontSize ?? 16;
   const fontFamily = element.fontFamily ?? 'sans-serif';
-  const weight = element.fontWeight === 'bold' ? 'bold' : 'normal';
+  // Browser parity (fontService.variantFromTextStyle): 'bold', 700, '700'.
+  const weight = isBoldFontWeight(element.fontWeight) ? 'bold' : 'normal';
   const style = element.fontStyle === 'italic' ? 'italic' : 'normal';
   ctx.font = `${style} ${weight} ${fontSize}px ${fontFamily}`;
+
+  // Fit-to-width (see computeFitScale): shrink overflowing text toward the
+  // canvas' right edge, keeping a 30px safe padding like the browser export.
+  const available = designWidth - element.x - 30;
+  const fitScale = computeFitScale(ctx.measureText(text).width, available);
+  if (fitScale < 1) {
+    fontSize = fontSize * fitScale;
+    ctx.font = `${style} ${weight} ${fontSize}px ${fontFamily}`;
+  }
+
   ctx.fillStyle = element.colors?.[0] ?? element.color ?? '#000000';
   ctx.textBaseline = 'top';
 
@@ -225,6 +249,8 @@ async function drawImage(ctx: CanvasRenderingContext2D, element: TemplateElement
 async function drawQr(ctx: CanvasRenderingContext2D, element: TemplateElementJson) {
   if (!element.data) return;
   const size = element.size ?? 100;
+  const w = element.width ?? size;
+  const h = element.height ?? size;
   const dataUrl = await QRCode.toDataURL(element.data, {
     width: size,
     margin: 1,
@@ -234,8 +260,8 @@ async function drawQr(ctx: CanvasRenderingContext2D, element: TemplateElementJso
     },
   });
   const img = await loadImage(dataUrl);
-  applyRotation(ctx, element.x, element.y, size, size, element.rotation ?? 0, () => {
-    ctx.drawImage(img, element.x, element.y, size, size);
+  applyRotation(ctx, element.x, element.y, w, h, element.rotation ?? 0, () => {
+    ctx.drawImage(img, element.x, element.y, w, h);
   });
 }
 
@@ -270,6 +296,10 @@ export async function renderTemplateToPng(
   const { elements: compactedElements, removedLines } = applyLineCompaction(elements, positionMap, record);
   elements = compactedElements;
 
+  // Register the design fonts referenced by the final element set before any
+  // drawing (best-effort; falls back to Pango substitution on failure).
+  await ensureFontsRegistered(elements);
+
   if (unresolvableFieldIds.length > 0 || removedLines.length > 0) {
     const removed = removedLines.map((l) => `${l.sectionGroup}:${l.lineNumber}`).join(', ');
     console.warn(
@@ -295,7 +325,7 @@ export async function renderTemplateToPng(
     if (element.opacity != null) ctx.globalAlpha = element.opacity;
 
     if (element.type === 'text') {
-      drawText(ctx, element, record);
+      drawText(ctx, element, template.width, record);
     } else if (element.type === 'shape') {
       drawShape(ctx, element);
     } else if (element.type === 'image') {

@@ -1,4 +1,6 @@
-import { renderTemplateToPng, resolveText, type RecordFieldValues } from '../src/services/fabricTemplateRenderer';
+import * as fs from 'fs';
+import { createCanvas, registerFont, CanvasRenderingContext2D } from 'canvas';
+import { computeFitScale, renderTemplateToPng, resolveText, type RecordFieldValues } from '../src/services/fabricTemplateRenderer';
 
 /** Every fieldId the designer palette can drop — must resolve to a record value. */
 const ALL_FIELD_IDS = [
@@ -173,6 +175,65 @@ describe('fabricTemplateRenderer', () => {
     expect(buffer.length).toBeGreaterThan(200);
   });
 
+  it('renders a QR element at explicit width × height when they differ from size', async () => {
+    const drawImageSpy = jest.spyOn(CanvasRenderingContext2D.prototype, 'drawImage');
+    try {
+      await renderTemplateToPng({
+        width: 400,
+        height: 300,
+        elements: [
+          {
+            id: 'qr1',
+            type: 'qr',
+            x: 10,
+            y: 20,
+            size: 80,
+            width: 120,
+            height: 60,
+            data: 'https://example.com',
+          },
+        ],
+      });
+
+      const qrCall = drawImageSpy.mock.calls.find((c) => c[1] === 10 && c[2] === 20);
+      expect(qrCall).toBeDefined();
+      expect(qrCall![3]).toBe(120);
+      expect(qrCall![4]).toBe(60);
+    } finally {
+      drawImageSpy.mockRestore();
+    }
+  });
+
+  it('builds a bold ctx.font for string and numeric 700 fontWeight (browser parity)', async () => {
+    // drawText is not exported; capture the ctx.font string at measureText
+    // time (drawText sets ctx.font before measuring).
+    const fontByText: Record<string, string> = {};
+    const origMeasure = CanvasRenderingContext2D.prototype.measureText;
+    const measureSpy = jest
+      .spyOn(CanvasRenderingContext2D.prototype, 'measureText')
+      .mockImplementation(function (this: CanvasRenderingContext2D, text: string) {
+        fontByText[text] = this.font;
+        return origMeasure.call(this, text);
+      });
+    try {
+      await renderTemplateToPng({
+        width: 300,
+        height: 120,
+        elements: [
+          { id: 't1', type: 'text', x: 10, y: 10, text: 'BoldStr', fontSize: 20, fontWeight: '700' },
+          { id: 't2', type: 'text', x: 10, y: 50, text: 'BoldNum', fontSize: 20, fontWeight: 700 as unknown as string },
+          { id: 't3', type: 'text', x: 10, y: 90, text: 'Plain', fontSize: 20 },
+        ],
+      });
+
+      expect(fontByText['BoldStr']).toContain(' bold ');
+      expect(fontByText['BoldNum']).toContain(' bold ');
+      expect(fontByText['Plain']).toContain(' normal ');
+    } finally {
+      measureSpy.mockRestore();
+    }
+  });
+
   it('resolves EVERY droppable vCard fieldId from the record (export consistency)', () => {
     for (const fieldId of ALL_FIELD_IDS) {
       const resolved = resolveText({ id: `el-${fieldId}`, type: 'text', fieldId, fontSize: 12 }, ALL_FIELD_VALUES);
@@ -237,5 +298,88 @@ describe('fabricTemplateRenderer', () => {
       ALL_FIELD_VALUES
     );
     expect(resolved).toBe(FIELD_ID_TO_VALUE.work_phone_ext);
+  });
+});
+
+describe('computeFitScale (fit-to-width parity)', () => {
+  it('keeps the design size (1.0) when the text fits', () => {
+    expect(computeFitScale(100, 160)).toBe(1.0);
+    expect(computeFitScale(160, 160)).toBe(1.0);
+  });
+
+  it('shrinks proportionally when the text overflows', () => {
+    expect(computeFitScale(320, 160)).toBe(0.5);
+    expect(computeFitScale(200, 160)).toBeCloseTo(0.8);
+  });
+
+  it('never scales below the 0.5 floor', () => {
+    expect(computeFitScale(1000, 160)).toBe(0.5);
+  });
+
+  it('never scales up and ignores a non-positive available width', () => {
+    expect(computeFitScale(100, 500)).toBe(1.0);
+    expect(computeFitScale(100, 0)).toBe(1.0);
+    expect(computeFitScale(100, -10)).toBe(1.0);
+  });
+});
+
+// The running dev container predates the Dockerfile font packages, so the
+// size-dependent cases below only run when a real TTF is present.
+const FONT_CANDIDATES = [
+  '/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf',
+  '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+  '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+  '/usr/share/fonts/TTF/DejaVuSans.ttf',
+];
+const REAL_FONT_PATH = FONT_CANDIDATES.find((p) => fs.existsSync(p));
+const describeWithRealFont = REAL_FONT_PATH ? describe : describe.skip;
+
+describeWithRealFont('fit-to-width with a real registered font', () => {
+  beforeAll(() => {
+    registerFont(REAL_FONT_PATH!, { family: 'FitTestFont' });
+  });
+
+  it('renders overflowing text at a reduced size', () => {
+    const ctx = createCanvas(200, 100).getContext('2d');
+    const text = 'This line of text is far too long to fit';
+    const available = 200 - 10 - 30; // canvasWidth - element.x - 30px safe padding
+
+    ctx.font = 'normal normal 40px FitTestFont';
+    const measured = ctx.measureText(text).width;
+    expect(measured).toBeGreaterThan(available);
+
+    const scale = computeFitScale(measured, available);
+    expect(scale).toBeLessThan(1.0);
+    expect(scale).toBeGreaterThanOrEqual(0.5);
+
+    ctx.font = `normal normal ${40 * scale}px FitTestFont`;
+    expect(ctx.measureText(text).width).toBeLessThan(measured);
+  });
+
+  it('keeps the design size for non-overflowing text', () => {
+    const ctx = createCanvas(400, 100).getContext('2d');
+    ctx.font = 'normal normal 12px FitTestFont';
+    const measured = ctx.measureText('Hi').width;
+    expect(computeFitScale(measured, 400 - 10 - 30)).toBe(1.0);
+  });
+
+  it('renders an overflowing element end-to-end without errors', async () => {
+    const { buffer, width } = await renderTemplateToPng({
+      width: 200,
+      height: 100,
+      elements: [
+        {
+          id: 't1',
+          type: 'text',
+          x: 10,
+          y: 10,
+          text: 'This line of text is far too long to fit',
+          fontSize: 40,
+          fontFamily: 'FitTestFont',
+        },
+      ],
+    });
+    expect(width).toBe(200);
+    expect(buffer.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
   });
 });

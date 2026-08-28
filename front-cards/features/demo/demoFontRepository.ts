@@ -26,6 +26,22 @@ export const demoFontRepository = {
     const cacheKey = `${font.fontFamily}-${font.fontWeight}-${font.fontStyle}`;
     const styleId = `demo-font-${cacheKey}`;
     if (document.getElementById(styleId)) return;
+    if (typeof FontFace !== 'undefined' && document.fonts?.add) {
+      // Font Loading API path: await the actual font data before resolving so
+      // export never measures/renders with a fallback face.
+      const face = new FontFace(font.fontFamily, `url("${blob.data}")`, {
+        weight: String(font.fontWeight),
+        style: font.fontStyle,
+      });
+      await face.load();
+      document.fonts.add(face);
+      // Keep the id-based dedup marker for repeat calls
+      const marker = document.createElement('style');
+      marker.id = styleId;
+      document.head.appendChild(marker);
+      return;
+    }
+    // Fallback for environments without the Font Loading API (e.g. jsdom)
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
@@ -34,7 +50,6 @@ export const demoFontRepository = {
         src: url('${blob.data}');
         font-weight: ${font.fontWeight};
         font-style: ${font.fontStyle};
-        font-display: swap;
       }
     `;
     document.head.appendChild(style);

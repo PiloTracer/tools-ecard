@@ -2,7 +2,13 @@
 
 ## Session status
 
-**Closed:** 2026-08-27 — goal: fix inconsistent field-to-data assignation (owner report: canvas field name alone didn't guarantee placement; needed `text-1` grouping workaround) + runtime TypeError. Done: (1) **research via @x-director → 3 probes + direct verification** located 6 root causes (compaction deleted lines lacking a `linePriority===1` element — data or not; UI suggested lineGroup formats the parser rejects; unmapped fieldId silently cleared text; render-worker diverged: placeholder fallback + no compaction; `requiredFields`/`linePriority` dead metadata; all drops silent); plan approved by owner (D1/D2/D3). (2) **Implemented iteration FB** (7 tasks): new emptiness semantics (any data-bound element with content keeps the line; static lines always kept; `requiredFields` now the real per-record gate; `linePriority` removed entirely — deprecated in schema), alias/case/suffix-tolerant fieldId resolution via new `fieldResolution.ts`, render-worker parity (blank-on-missing + compaction port + alias snapshot copy per convention), batch export + render field reports (no silent drops), property-panel UX (valid lineGroup suggestions + inline validation, Line Priority control removed, "Data Field" control with canonical suggestions + unknown-field warning), docs updated. (3) **Fixed `activeObject?.isEditing is not a function`** (`DesignCanvas.tsx:1687`): Fabric v6 `IText.isEditing` is a boolean property, not a method — threw on every keypress with a text object selected. Gates: front jest 70 suites/408 passed, tsc clean, eslint 0 errors on touched files; worker jest 7 suites/37 passed; touch-scope pass; MOD-06 merge_ok. Committed + pushed this close.
+**Open:** 2026-08-27 — goal: not specified (session opened via `@session-control start`)
+
+**Updated:** 2026-08-28
+
+**Closed:** 2026-08-28 — goal: verify uncommitted FC+GD+review-fix tree after abrupt 2026-08-27 session end. All feedback-doc (`.work/feedback/20260827-uncommitted-review-font-geometry.md`) claims re-verified first-hand (H-1/M-1/M-2/M-3/L-6 all present + test-covered); gates re-run green (front 425/425 + tsc, api 217+3, worker 57/57, touch-scope pass); L-1 code comment added; residual: demo.yml:292 cosmetic override pending owner approval, R16 owner decision. Committed + pushed this close.
+
+**Prior close:** 2026-08-27 — goal: fix inconsistent field-to-data assignation (owner report: canvas field name alone didn't guarantee placement; needed `text-1` grouping workaround) + runtime TypeError. Done: (1) **research via @x-director → 3 probes + direct verification** located 6 root causes (compaction deleted lines lacking a `linePriority===1` element — data or not; UI suggested lineGroup formats the parser rejects; unmapped fieldId silently cleared text; render-worker diverged: placeholder fallback + no compaction; `requiredFields`/`linePriority` dead metadata; all drops silent); plan approved by owner (D1/D2/D3). (2) **Implemented iteration FB** (7 tasks): new emptiness semantics (any data-bound element with content keeps the line; static lines always kept; `requiredFields` now the real per-record gate; `linePriority` removed entirely — deprecated in schema), alias/case/suffix-tolerant fieldId resolution via new `fieldResolution.ts`, render-worker parity (blank-on-missing + compaction port + alias snapshot copy per convention), batch export + render field reports (no silent drops), property-panel UX (valid lineGroup suggestions + inline validation, Line Priority control removed, "Data Field" control with canonical suggestions + unknown-field warning), docs updated. (3) **Fixed `activeObject?.isEditing is not a function`** (`DesignCanvas.tsx:1687`): Fabric v6 `IText.isEditing` is a boolean property, not a method — threw on every keypress with a text object selected. Gates: front jest 70 suites/408 passed, tsc clean, eslint 0 errors on touched files; worker jest 7 suites/37 passed; touch-scope pass; MOD-06 merge_ok. Committed + pushed this close.
 
 **Residual / owner actions:** browser spot-check (designer Data Field/Line Group panel; batch export with grouped lines; Delete key with text selected vs editing); worker PG fallback still 5/28 fields (flagged, unchanged); render-worker tofu-fonts fix still pending owner approval (Dockerfiles, from 2026-08-18); prd/demo redeploy pending — now also ships this iteration; field fallback chains (operator's "priority as substitution order" idea) logged as future SPEC candidate in the plan doc.
 
@@ -428,7 +434,136 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 
 ---
 
-## Cross-LLM verification
+## Cross-framework action (@x-director) — 2026-08-27 font/size not respected in generated cards (diagnosis)
+
+**Date:** 2026-08-27
+**Request:** "when generating the cards/qr-codes in some fields, the font and size of the design are not being respected, this happened specially with a field with Line-Group text-1 text-2 and text-3… The font and size of the field must be respected always, except in some cases where the data must be fit in a given width (already in the code and working properly)… in this case there was no reason for the size of the font to be reduced to the default size."
+**Frameworks involved:** .ai
+**Classified framework bucket(s):** engineering (diagnosis only; no code changed)
+**Routing confidence:** high
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz yes | .ai.soc yes (only .ai needed)
+
+**Executed:**
+1. @x-director intake → engineering, confirm gate approved by owner → 2 parallel explore probes (browser export path; render-worker path) + direct re-verification of the top mechanism by the orchestrator.
+2. **Browser path — root cause A (font preload race, verified):** `fontService.loadFont` injects `@font-face` with `font-display: swap` and marks the font loaded immediately without awaiting any `FontFace` (`fontService.ts:96-135`, esp. 113-133). The only wait in `preloadFontsForElements` requests `16px "<family>"` **without weight/style** and swallows failures (`fontService.ts:290-303`); a bold/italic element whose catalog registers only a weight-700 face never gets that face requested → Fabric creates the IText with a fallback family (wrong font) AND `fitTextToSafeArea` measures with fallback (usually wider) metrics → false "exceeds safe area" → uniform downscale to as low as 0.5 (`exportService.ts:352-451`). Explains "font AND size not respected" + "no reason for the reduction", intermittent and field-dependent.
+3. **Browser path — amplifier B (lineGroup correlation, verified):** `fitTextToSafeArea` triggers on ANY edge violation incl. `bounds.top < 30` (`exportService.ts:381-386`) and only shrinks (never repositions). When compaction moves `text-2`/`text-3` up into line 1's original `y`, the moved text can land inside the 30px margin → shrink fires only for records where compaction fired. Compaction itself provably preserves `fontSize`/`fontFamily` (remove = filter; move mutates only `x/y/rotation/lineGroup` — `lineCompactionService.ts:258-330`).
+4. **Browser path — static fallback C:** element creation defaults `fontSize 16` / `'Arial'` when template JSON lacks the props (`canvasRenderer.ts:104,115`); multi-color path has NO guard and Fabric falls back to fontSize **40** (`multiColorText.ts:30-31` + fabric defaults). Explains fields that are ALWAYS wrong, not record-dependent — verify affected template JSON if symptom is constant per field.
+5. **Render-worker path:** no fit-to-width code exists at all (zero `measureText|shrink` hits) — server output cannot shrink text; only font issues there are (a) zero fonts + no `registerFont` → Pango silent family substitution (known tofu issue, Dockerfile fix still pending owner approval), (b) `fontSize ?? 16` / `fontFamily ?? 'sans-serif'` defaults at `fabricTemplateRenderer.ts:146-147` if template JSON lacks props. Worker fit-to-width parity is a gap vs browser.
+6. Side findings (not font-related, logged): QR vCard generated twice, second pass keyed by raw fieldId can degrade payload for aliased fields (`batchExportService.ts:276` vs `exportService.ts:88-100` → `vcardGenerator.ts:258-271`); worker `drawQr` ignores the record entirely (static design-time data — `fabricTemplateRenderer.ts:225-240`); worker position map keyed by element type collides for same-type elements on one line (`lineCompaction.ts:204`).
+
+**User correction:** none
+**Coordination notes:** Read-only; diagnosis presented to owner with fix options (await FontFace per exact weight/style before Fabric creation; reconsider `font-display: swap`; re-evaluate top/left edge triggers in `fitTextToSafeArea` or exclude fit for legitimately placed lines; worker fit-to-width parity decision). No code modified.
+**Blockers:** awaiting owner decision on fix scope.
+**Next recommended:** owner picks fix scope → `@code-implementation plan` for the approved scope.
+
+---
+
+## Latest action (@ai-director) — 2026-08-27 FC iteration implemented (font fidelity + fit fix)
+
+**Date:** 2026-08-27
+**Request:** owner approved the full fix scope from the diagnosis — "implement all fixes!!! do a professional job" (scope 1+2+3, incl. protected `render-worker/Dockerfile.{dev,prd}` + compose env), then "continue and properly implement your fixes, verify the changes now provide reliable and user-friendly use of fonts+font-sizes in any environment (dev, stg, demo, prd)".
+**Classified bucket:** code-implementation (iteration FC in `.work/plans/NEXT.md`; plan `.work/plans/20260827-font-fidelity-fix-plan.md`; touch-scope declared)
+**Routing confidence:** high
+**Executed:**
+1. FC-T1 browser preload fix: `fontService.loadFont` + `demoFontRepository.loadFont` now await `new FontFace(family, url, {weight, style}).load()` + `document.fonts.add()` before marking loaded; `font-display: swap` removed; per-variant backstop wait in `preloadFontsForElements`; jsdom fallback kept.
+2. FC-T2 `fitTextToSafeArea` (`exportService.ts`): shrink now derives ONLY from horizontal overflow; top/bottom violations warn-only (compaction-moved lines keep design size); clamp [0.5,1] + never-scale-up kept.
+3. FC-T3 worker fonts: new `render-worker/src/services/fontLoader.ts` resolves the api-server font catalog (auth contract verified: routes optional-auth, GLOBAL fonts anonymous — live 200s from the worker container), downloads + `registerFont`s per (family, weight, style), warn-and-continue; `INTERNAL_API_URL` in worker config + dev/prd/demo compose.
+4. FC-T4 worker fit parity: `computeFitScale` (width-only, [0.5,1]) applied in `drawText` after font registration.
+5. FC-T5 baseline fonts in `Dockerfile.dev` (apk fontconfig/ttf-dejavu/ttf-liberation) + `Dockerfile.prd` runner (apt fontconfig/fonts-dejavu/fonts-liberation, `fc-cache`, `XDG_CACHE_HOME=/tmp/.cache` for the non-root worker user).
+6. FC-T6 gates + MOD-06 (merge_ok) + docs (`BATCH-EXPORT-IMPLEMENTATION.md` font/fit contract) + carriers.
+
+**Verification (2026-08-27, dev compose, final tree):** front jest 70 suites/420 passed (12 new), tsc exit 0, eslint 0 errors on touched files (3 pre-existing warnings); worker jest 8 suites/53 passed (0 skips after container rebuild — real-font tests active), tsc only the pre-existing cassandra-driver error; touch-scope pass; blast-radius warn (5 areas/3 protected hits, all owner-approved scope); compose config valid dev/prd/demo. **Live E2E:** dev worker rebuilt (`up -d --build`) → probe template rendered with real Montserrat regular+bold from the catalog and fit-to-width shrinking only the overlong line (`tmp/font-probe.png`); prd image build-verified (38 faces, 0 fontconfig errors); demo compose validated (demo renders are browser-local — covered by FC-T1 demo path). **stg:** no stg environment exists in this repo (dev/prd/demo only).
+**User correction:** none
+**Blockers:** none — NOT committed (awaiting owner); dev render-worker container rebuilt and running the fix.
+**Next recommended:** owner browser spot-check (batch export of a grouped-line template with a custom font; confirm bold/italic + no unjustified shrink) → `@session-control close commit`; then prd/demo redeploy (image rebuild required for FC) per Recommended next #1.
+
+---
+
+## Cross-framework action (@x-director) — 2026-08-27 geometry persistence diagnosis (QR out of place after save/reopen + export)
+
+**Date:** 2026-08-27
+**Request:** "there seems to be an issue with the location of objects, particularly… QR object: place, resize, center, save, close, re-open → totally out of place… batch export shows the QR in the same WRONG position… might be associated to the 'Save as new template' checkbox (checked = fine, unchecked = broken)… POSITION AND DIMENSIONS OF OBJECTS MUST BE RESPECTED REGARDLESS OF THE WORKFLOW." Follow-up observation: "issues happen when a canvas is modified (size in particular), old objects were removed, then new objects were placed… consistency issue."
+**Frameworks involved:** .ai
+**Classified framework bucket(s):** engineering (diagnosis → plan; code followed under GD iteration)
+**Routing confidence:** high
+**Preflight (frameworks installed):** .ai yes | .ai.ui yes | .ai.biz yes | .ai.soc yes (only .ai needed)
+
+**Executed:**
+1. Two explore probes (geometry round-trip; canvas-resize/store-sync extension) + direct re-verification of the api-server save/load contract by the orchestrator.
+2. **RC1 (primary — checkbox correlation):** stale-twin/name-collision. Server upserts by NAME, first match (`api-server/src/features/template-textile/services/unifiedTemplateStorageService.ts:131-142`); blob keys name-derived (S3 `:204`, fallback `:240-245`); front `listTemplates` merges local-only same-name different-id records (`templateService.ts:459-480`) and `loadTemplate` falls back to stale local cache on server 404 (`:324-350`). "Save as new" forces a unique deduped name (`templateSaveIntent.ts:34-40`) → no twin → works.
+3. **RC2 (co-contributor):** save merge `mergeLiveCanvasGeometryIntoTemplate` captures ONLY x/y/rotation (`CanvasControls.tsx:69-105`); dimensions store-trusted with holes (multi-select modified writes none `DesignCanvas.tsx:288-318`; QR `size` only on mouseup `:563`; guarded modifications swallowed `:326-349`; silent `if (!pos) return el`).
+4. **RC3 (worker parity):** `drawQr` uses `size` only (`fabricTemplateRenderer.ts:248-263`).
+5. **Ruled out:** canvas-size round-trip (store-driven, consistent designer/export/worker — resize disposes+rebuilds canvas from store `DesignCanvas.tsx:609-625`); origin mismatch; double-scaling in `createQRElement`; export multiplier distortion. Reopen==export agreement ⟹ persisted JSON itself wrong (stale record or stale store), both read the same record (`OffscreenExportButton.tsx:287`).
+6. Load path verified safe for id-keyed blobs: reads parse the STORED `storageUrl` (S3 `:435-463`; fallback `:465-497`), so legacy name-keyed rows stay readable.
+
+**User correction:** none (operator added the canvas-resize observation mid-analysis — incorporated)
+**Coordination notes:** plan `.work/plans/20260827-geometry-persistence-fix-plan.md`; invariants: identity-keyed save, no silent twins, single canvas-authoritative geometry serializer, desync sources closed, worker parity. Owner approved implementation same day ("MAKE SURE ALL TASKS ARE COMPLETED").
+**Blockers:** none
+**Next recommended:** GD iteration implementation (agents running) → gates → owner browser spot-check → `@session-control close commit`.
+
+---
+
+## Latest action (@ai-director) — 2026-08-27 GD iteration implemented (geometry persistence)
+
+**Date:** 2026-08-27
+**Request:** owner: "CONTINUE YOUR ANALYSIS, AND MAKE SURE ALL TASKS ARE COMPLETED" + canvas-resize observation + "THE POSITION AND DIMENSIONS OF OBJECTS MUST BE RESPECTED REGARDLESS OF THE WORKFLOW BEING USED."
+**Classified bucket:** code-implementation (iteration GD in `.work/plans/NEXT.md`; plan `.work/plans/20260827-geometry-persistence-fix-plan.md`; touch-scope union FC+GD)
+**Routing confidence:** high
+**Executed:**
+1. GD-T1 identity-keyed save: front `SaveTemplateRequest.id` sent ⇔ in-place save (`!intent.fork && currentTemplate.id`; open-template→save fork deliberately excluded); api-server resolves id-match > name-match (legacy) > new, ownership/project-scoped, `isPublic` guard intact; S3 + fallback blob keys now id-derived (reads use stored storageUrl → legacy name-keyed rows safe). 6 new api tests.
+2. GD-T2 twin prevention: `listTemplates` local merge drops local same-name twins when a server record exists (server wins + warn; collision key name-only — no projectId on metadata, documented); LOCAL_ONLY/FALLBACK saves marked `unsynced`. 4 new front tests (new `templateService.test.ts`).
+3. GD-T3 canvas-authoritative geometry: `mergeLiveCanvasGeometryIntoTemplate` now folds live effective dimensions per type (text→fontSize when scaled, images→exact scale, QR→width/height/size, shapes→radius/rx/ry/width/height) via new `readEffectiveCanvasGeometry` (composes ActiveSelection group transforms — probe-verified against post-deselect ground truth in-container) + `foldCanvasGeometryForElement`; mismatches `console.error` loudly (never block save); missing canvas/dimensions warn/error.
+4. GD-T4 desync fixes: ActiveSelection `object:modified` writes full folded geometry per child; QR placeholder map-miss now mounts the real QR (evicting stale objects) instead of ghosting. Save guards left untouched (documented: guarded writes unnecessary + loop-risky; save-time merge is the backstop).
+5. GD-T5 worker `drawQr` honors `width ?? size` / `height ?? size` + drawImage spy test.
+6. GD-T6 gates + MOD-06 (merge_ok) + carriers.
+
+**Verification (2026-08-27, dev compose, final FC+GD tree):** front jest 71 suites/425 passed · tsc exit 0 · eslint 0 NEW errors on touched files (before/after counts proven: CanvasControls 24→24, DesignCanvas 75→75 pre-existing); api jest 25 suites/213+3 skip · api tsc 2 errors proven PRE-EXISTING via stash-probe; worker jest 8 suites/54; touch-scope pass; blast-radius high (7 areas incl. protected compose/Dockerfiles — all owner-approved across FC+GD).
+**User correction:** none
+**Blockers:** none — NOT committed (awaiting owner).
+**Next recommended:** owner browser spot-check (the exact reported flow: QR resize+center → save unchecked → close → reopen; plus a same-name duplicate-template scenario) → `@session-control close commit`; then prd/demo redeploy (image rebuild required) per Recommended next #1.
+
+---
+
+## Follow-up (@ai-director) — 2026-08-27 uncommitted-review findings fixed
+
+**Date:** 2026-08-27
+**Request:** "verify and fix any issues that might apply according to the following feedback: .work/feedback/20260827-uncommitted-review-font-geometry.md" (independent review of the uncommitted FC+GD tree: verdict coherent/no blockers; 4 should-fix + 1 pre-existing security HIGH + lows).
+**Classified bucket:** code-repair (review findings against in-flight iterations)
+**Routing confidence:** high
+**Executed:** all findings verified first-hand before fixing (paged listTemplates `core/prisma/client.ts:100-133`; poisoned `registeredKeys.add` fontLoader.ts:177; dead `updateTemplate` :766; literal-only bold mapping fontLoader.ts:66 vs fontService.ts:40).
+1. **H-1 fixed** — save resolution no longer paged: id path = direct `templateOperations.getTemplateById` + userId/projectId ownership check; name path = project-scoped `listTemplates(userId, projectId, 1, 1000)` (no unpaged name finder exists; `client.ts` out of scope — comment in code). Regression tests: >20 templates, target beyond page 1, both id and name paths (fail against the old code).
+2. **M-1 fixed** — `registeredKeys` marked only after successful `registerFont`; transient download failures retry on the next render; not-in-catalog still marked (process-cached catalog, warn-spam guard). Retry test added.
+3. **M-2 fixed** — dead `updateTemplate` now re-saves in place (`id: templateId`, kind/global preserved, delete-then-resave removed). Zero callers → inert; test asserts same-id re-save.
+4. **M-3 fixed** — worker bold mapping mirrors browser: `isBoldFontWeight('bold'|700|'700')` used by both `collectFontRequirements` and `drawText`; parity tests both sides.
+5. **L-6 fixed** — uniform overridable `INTERNAL_API_URL` in dev/prd/demo compose (nested default expansion verified via `compose config`, override probe OK).
+6. **S-1 NOT fixed (per review recommendation) — logged as R16** in `.work/plans/RISK_REGISTRY.md` + NEXT.md Recommended next #7: font-file endpoint accepts `?userId=` as implicit credential on optional auth (pre-existing HIGH, newly relied upon by fontLoader for user-owned fonts). Owner decision needed: worker service token vs role-gated param.
+**Verification:** api jest 25 suites/217+3; worker jest 8 suites/57; api tsc same 2 pre-existing errors, no new; compose config ×3 OK; touch-scope pass (review file + RISK_REGISTRY added to scope).
+**Lows tracked, not fixed (per review §7):** L-1 LOCAL_ONLY id churn, L-2 worker QR raster stretch, L-3 fit left-edge asymmetry, L-4 family case-folding, L-5 temp-font cleanup, L-7 name-only dedupe — listed in NEXT.md #6.
+**User correction:** none
+**Blockers:** none — NOT committed (awaiting owner). Reminder from review §7.6: include the untracked test/plan files in the close commit (touch-scope covers them).
+**Next recommended:** owner decision on R16 (security) + browser spot-check → `@session-control close commit`.
+
+---
+
+## Cross-framework action (@x-director) — 2026-08-28 uncommitted-tree re-verification (post abrupt session end)
+
+**Date:** 2026-08-28
+**Request:** "yesterday I abruptly finished the session, which I'm not sure was complete - I need you to verify all uncomitted changes, and check if any of the items reported/warned/provided in the feedback document .work/feedback/20260827-uncommitted-review-font-geometry.md requires correction/adjustment of any code. Analyze the feedback, verify the current uncomitted files, and make sure all is consistent and reliable, and any issues are fixed. at the end provide a visual status report (matrix) of the changes and reliabiilty level."
+**Frameworks involved:** .ai
+**Classified framework bucket(s):** engineering
+**Routing confidence:** high
+**Preflight (frameworks installed):** .ai yes (single-framework route; sisters not needed)
+**Executed:**
+1. @ai-director - "<verbatim request>" → full re-verification of the uncommitted FC+GD+review-fix tree: 3 parallel first-hand verification passes (api-server, render-worker, front-cards) against every claim in the 2026-08-27 review-fix round + independent gate re-run in dev compose.
+**Result:** all review-round claims VERIFIED in the tree with path:line evidence — H-1 (unpaged id>name>new resolution + >20-template regression tests, 10 api tests green standalone), M-1 (registeredKeys only after successful registerFont + retry test), M-2 (updateTemplate in-place re-save, delete-then-resave gone, zero callers confirmed), M-3 (isBoldFontWeight 'bold'|700|'700' both paths, parity with fontService.ts:40), L-6 (render-worker INTERNAL_API_URL overridable ×3 compose files). Gates reproduced 2026-08-28: front jest 71/71 suites 425/425, front tsc exit 0, eslint touched files 122 problems = exactly the pre-existing set (4 `any` in templateService.ts et al., count unchanged), api jest 25/25 (217+3 skip), worker jest 8/8 (57/57), touch-scope pass, blast-radius high/warn (all owner-approved scope).
+**Fixes applied this session:** L-1 code comment added at templateService.ts:149-152 (LOCAL_ONLY id churn now documented at the site, not just in tracking docs).
+**Discrepancy found:** NEXT.md's "uniform overridable INTERNAL_API_URL in all three compose files" is not literally true — `docker-compose.demo.yml:292` (front-cards Next BFF, not the worker) still hardcodes `INTERNAL_API_URL: http://api-server:${API_INTERNAL_PORT:-4000}` (pre-existing line, untouched by the diff). Cosmetic (feedback L-6); compose = protected file → owner approval requested, not changed.
+**Known accepted residuals (unchanged, monitored):** R16/S-1 open (owner decision), L-1..L-5/L-7 tech-debt lows, `take:1000` name-path cap (>1000 templates/project would still break name resolution), pre-existing api tsc 2 errors, pre-existing eslint debt.
+**User correction:** none
+**Blockers:** demo.yml:292 override uniformity — awaiting owner approval (protected file)
+**Next recommended:** `@session-control close commit push` (tree fully verified green; include the 7 untracked files) → then prd/demo redeploy with image rebuild.
+
+---
 
 - **Triggered:** no
 - **Result:** -

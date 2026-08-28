@@ -20,7 +20,7 @@ import { templateService } from '../../services/templateService';
 import { templatePackageService } from '../../services/templatePackageService';
 import { useAuth } from '@/features/auth/AuthContext';
 import { isDemoMode } from '@/features/demo/isDemoMode';
-import type { Template, ImageElement } from '../../types';
+import type { Template, TemplateElement, TextElement, ImageElement, QRElement, ShapeElement } from '../../types';
 import type { LengthUnit } from '../../utils/lengthUnits';
 import { readPersistedTemplateGeometry } from '../../utils/fabricTemplateGeometry';
 import {
@@ -62,44 +62,176 @@ function templateSnapshotForPersistence(
 }
 
 /**
- * Overwrite element x/y/rotation from the live Fabric canvas before persist.
+ * Effective (canvas-plane) geometry of a live Fabric object.
+ * For ungrouped objects this is exactly `readPersistedTemplateGeometry` plus
+ * the raw scale. For children of an ActiveSelection/group, left/top/scale are
+ * GROUP-RELATIVE while the selection is being transformed, so the parent
+ * transform is composed in (calcTransformMatrix includes it) and the left/top
+ * origin point is derived from the rotated half-dimensions — matching what
+ * Fabric bakes into the object on deselect.
+ */
+export interface EffectiveCanvasGeometry {
+  x: number;
+  y: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+export function readEffectiveCanvasGeometry(obj: fabric.FabricObject): EffectiveCanvasGeometry {
+  if (obj.group) {
+    const q = fabric.util.qrDecompose(obj.calcTransformMatrix());
+    const rad = (q.angle * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const dx = ((obj.width ?? 0) * q.scaleX) / 2;
+    const dy = ((obj.height ?? 0) * q.scaleY) / 2;
+    return {
+      x: Math.round(q.translateX - (dx * cos - dy * sin)),
+      y: Math.round(q.translateY - (dx * sin + dy * cos)),
+      rotation: q.angle,
+      scaleX: q.scaleX,
+      scaleY: q.scaleY,
+    };
+  }
+  return {
+    ...readPersistedTemplateGeometry(obj),
+    scaleX: obj.scaleX ?? 1,
+    scaleY: obj.scaleY ?? 1,
+  };
+}
+
+/**
+ * Store updates for one element from its live canvas geometry, mirroring the
+ * single-object `object:modified` mouseup fold in DesignCanvas EXACTLY:
+ * - text folds scale into fontSize only when actually scaled (multi-color
+ *   groups read the first child's fontSize);
+ * - images bake display width/height and keep the exact scaleX/scaleY
+ *   (template load honors saved scale — DesignCanvas image case);
+ * - QR folds scale into width/height/size (square: width IS the size);
+ * - shapes bake radius/rx/ry (circle/ellipse) or width/height (rect/line).
+ */
+export function foldCanvasGeometryForElement(
+  el: TemplateElement,
+  obj: fabric.FabricObject,
+  geom: EffectiveCanvasGeometry
+): Partial<TemplateElement> {
+  const updates: Partial<TemplateElement> = {
+    x: geom.x,
+    y: geom.y,
+    rotation: geom.rotation,
+  };
+  const scaleX = geom.scaleX || 1;
+  const scaleY = geom.scaleY || 1;
+
+  if (el.type === 'text') {
+    // Only fold fontSize when the object was actually scaled (not just moved).
+    if (Math.abs(scaleY - 1) > 0.01) {
+      const isMultiColorGroup =
+        (obj as { isMultiColorText?: boolean }).isMultiColorText || obj.type === 'Group';
+      const firstTextObj = isMultiColorGroup
+        ? ((obj as fabric.Group).getObjects()[0] as fabric.Text | undefined)
+        : undefined;
+      const baseFontSize =
+        firstTextObj?.fontSize || (obj as fabric.Text).fontSize || (el as TextElement).fontSize;
+      (updates as Partial<TextElement>).fontSize = Math.round(baseFontSize * scaleY);
+    }
+  } else if (el.type === 'image') {
+    updates.width = Math.round((obj.width ?? el.width ?? 0) * scaleX);
+    updates.height = Math.round((obj.height ?? el.height ?? 0) * scaleY);
+    // Exact scale values preserve precision on save/load (no rounding drift).
+    (updates as Partial<ImageElement>).scaleX = scaleX;
+    (updates as Partial<ImageElement>).scaleY = scaleY;
+  } else if (el.type === 'qr') {
+    const qrEl = el as QRElement;
+    const newWidth = Math.round((obj.width ?? el.width ?? qrEl.size) * scaleX);
+    const newHeight = Math.round((obj.height ?? el.height ?? qrEl.size) * scaleY);
+    updates.width = newWidth;
+    updates.height = newHeight;
+    (updates as Partial<QRElement>).size = newWidth; // QR codes are square, width is the size
+  } else if (el.type === 'shape') {
+    const shapeEl = el as ShapeElement;
+    const o = obj as unknown as { radius?: number; rx?: number; ry?: number };
+    if (shapeEl.shapeType === 'circle') {
+      const newRadius = Math.round((o.radius ?? shapeEl.width / 2) * scaleX);
+      updates.width = newRadius * 2;
+      updates.height = newRadius * 2;
+    } else if (shapeEl.shapeType === 'ellipse') {
+      updates.width = Math.round((o.rx ?? shapeEl.width / 2) * scaleX) * 2;
+      updates.height = Math.round((o.ry ?? shapeEl.height / 2) * scaleY) * 2;
+    } else {
+      updates.width = Math.round((obj.width ?? shapeEl.width) * scaleX);
+      updates.height = Math.round((obj.height ?? shapeEl.height) * scaleY);
+    }
+  }
+  return updates;
+}
+
+/**
+ * Overwrite element geometry from the live Fabric canvas before persist.
  * The store is not always updated (e.g. focus/blur, race with object:modified, or desync);
- * without this, save/reopen can show text and shapes in old positions.
+ * the canvas is authoritative at save time: x/y/rotation AND folded dimensions
+ * (width/height, size for QR, scaleX/scaleY for images) are captured per element.
+ * Mismatches between store and canvas are logged loudly but never block a save.
  */
 function mergeLiveCanvasGeometryIntoTemplate(
   template: Template,
   canvas: fabric.Canvas | null
 ): Template {
   if (!canvas) {
+    // Null canvas happens in the resize/dispose window — the save then persists
+    // store geometry, which may be stale. Must be visible.
+    console.warn('[SAVE] No live canvas during geometry merge — persisting store geometry as-is');
     return template;
   }
 
-  const live = new Map<string, { x: number; y: number; rotation: number }>();
+  if (!template.width || !template.height) {
+    console.error('[SAVE] Template canvas dimensions are missing/zero at save time:', {
+      name: template.name,
+      width: template.width,
+      height: template.height,
+    });
+  }
 
-  for (const obj of canvas.getObjects()) {
+  const live = new Map<string, fabric.FabricObject>();
+  const collect = (obj: fabric.FabricObject) => {
     const elementId = (obj as { elementId?: string }).elementId;
-    if (!elementId) continue;
-
-    const fo = obj as fabric.FabricObject;
-    const g = readPersistedTemplateGeometry(fo);
-    live.set(elementId, { x: g.x, y: g.y, rotation: g.rotation });
+    if (elementId && !live.has(elementId)) live.set(elementId, obj);
+  };
+  for (const obj of canvas.getObjects()) {
+    collect(obj as fabric.FabricObject);
+  }
+  // ActiveSelection children are not in canvas.getObjects() while selected.
+  const active = canvas.getActiveObject();
+  if (active && typeof (active as fabric.Group).getObjects === 'function') {
+    for (const obj of (active as fabric.Group).getObjects()) {
+      collect(obj as fabric.FabricObject);
+    }
   }
 
-  if (live.size === 0) {
-    return template;
+  const storeIds = new Set(template.elements.map((el) => el.id));
+  for (const [elementId, obj] of live) {
+    if (!storeIds.has(elementId)) {
+      console.error(
+        `[SAVE] Canvas object "${elementId}" (fabric type=${obj.type}) has no matching store element — canvas/store desync, its geometry is not persisted`
+      );
+    }
   }
 
   return {
     ...template,
     elements: template.elements.map((el) => {
-      const pos = live.get(el.id);
-      if (!pos) return el;
-      return {
-        ...el,
-        x: pos.x,
-        y: pos.y,
-        rotation: pos.rotation,
-      };
+      const obj = live.get(el.id);
+      if (!obj) {
+        console.error(
+          `[SAVE] Store element "${el.id}" (type=${el.type}) is missing on the live canvas — canvas/store desync, persisting stale store geometry`
+        );
+        return el;
+      }
+      const geom = readEffectiveCanvasGeometry(obj);
+      // The Partial spread widens the discriminated union — cast back; the fold
+      // only writes fields valid for the element's own type.
+      return { ...el, ...foldCanvasGeometryForElement(el, obj, geom) } as TemplateElement;
     }),
   };
 }
@@ -312,6 +444,11 @@ export function CanvasControls() {
         name: intent.name,
         templateData: processedTemplate,
         kind: intent.kind,
+        // Identity-keyed save: in-place updates (no fork) pass the current id so
+        // the server upserts THIS record instead of matching by name (which let
+        // stale same-named twins shadow the save). Forks — "Save as new
+        // template" and open-template→save — omit id so the server creates fresh.
+        ...(!intent.fork && currentTemplate.id ? { id: currentTemplate.id } : {}),
         // Global publish (Pass 5): only for "Save as new template" from an
         // elevated role; the server role-gates this regardless.
         global: canManageGlobalTemplates && options?.saveAsGlobal === true && intent.kind === 'template',

@@ -239,6 +239,8 @@ services:
       WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
       WORKER_TIMEOUT: ${WORKER_TIMEOUT:-60000}
       RENDER_ENGINE: ${RENDER_ENGINE:-canvas}
+      # Internal api-server base URL (font catalog + font files for server-side rendering)
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api-server:${API_INTERNAL_PORT:-4000}}
     networks:
       - ecards-prd
     depends_on:
@@ -285,7 +287,7 @@ services:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://ecards.aiepic.app}
-      INTERNAL_API_URL: http://api-server:${API_INTERNAL_PORT:-4000}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api-server:${API_INTERNAL_PORT:-4000}}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://ecards.aiepic.app}
       NEXT_PUBLIC_OAUTH_CLIENT_ID: ${NEXT_PUBLIC_OAUTH_CLIENT_ID:?NEXT_PUBLIC_OAUTH_CLIENT_ID is required}
       NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT: ${NEXT_PUBLIC_OAUTH_AUTHORIZATION_ENDPOINT:-https://aiepic.app/oauth/authorize}

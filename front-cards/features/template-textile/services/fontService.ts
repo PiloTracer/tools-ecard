@@ -51,6 +51,7 @@ export function variantFromTextStyle(
 class FontService {
   private loadedFonts: Set<string> = new Set();
   private cachedFonts: Font[] = [];
+  private fontSynthesisInjected = false;
 
   /**
    * Fetch available fonts for the current user
@@ -67,12 +68,13 @@ class FontService {
       );
       this.cachedFonts = response.fonts;
       return response.fonts;
-    } catch (error: any) {
+    } catch (error) {
       console.error('[FontService] Error listing fonts:', error);
 
       // If authentication failed and we were trying to get user fonts,
       // fall back to global fonts only
-      if (error.message?.includes('Unauthorized') && scope !== 'global') {
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (errorMessage.includes('Unauthorized') && scope !== 'global') {
         console.warn('[FontService] Auth failed, falling back to global fonts only');
         try {
           const response = await apiClient.get<{ fonts: Font[] }>(
@@ -110,16 +112,50 @@ class FontService {
 
     // Browser will automatically detect format from Content-Type header
     // This supports all formats: .woff2, .woff, .ttf, .otf, .ttc
+    if (typeof FontFace !== 'undefined' && typeof document !== 'undefined' && document.fonts?.add) {
+      // Font Loading API path: await the actual font file and only then mark
+      // the font loaded, so Fabric never measures/renders with a fallback face.
+      this.ensureFontSynthesisDisabled();
+      const face = new FontFace(font.fontFamily, `url("${fontUrl}")`, {
+        weight: String(font.fontWeight),
+        style: font.fontStyle,
+      });
+      await face.load();
+      document.fonts.add(face);
+    } else {
+      // Fallback for environments without the Font Loading API (e.g. jsdom)
+      const style = document.createElement('style');
+      style.textContent = `
+        @font-face {
+          font-family: '${font.fontFamily}';
+          src: url('${fontUrl}');
+          font-weight: ${font.fontWeight};
+          font-style: ${font.fontStyle};
+        }
+
+        /* CRITICAL: Prevent browser from applying synthetic bold/italic */
+        /* This ensures we only use the actual font file, not browser-generated weight */
+        .canvas-container * {
+          font-synthesis: none;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    this.loadedFonts.add(cacheKey);
+    console.log(`[FontService] Loaded font: ${font.fontFamily} (${font.fontVariant})`);
+  }
+
+  /**
+   * Inject the one-time CSS that disables synthetic bold/italic.
+   * Needed on the FontFace path, where no per-font style tag is injected.
+   */
+  private ensureFontSynthesisDisabled(): void {
+    if (this.fontSynthesisInjected || typeof document === 'undefined') return;
     const style = document.createElement('style');
     style.textContent = `
-      @font-face {
-        font-family: '${font.fontFamily}';
-        src: url('${fontUrl}');
-        font-weight: ${font.fontWeight};
-        font-style: ${font.fontStyle};
-        font-display: swap;
-      }
-
       /* CRITICAL: Prevent browser from applying synthetic bold/italic */
       /* This ensures we only use the actual font file, not browser-generated weight */
       .canvas-container * {
@@ -129,9 +165,7 @@ class FontService {
       }
     `;
     document.head.appendChild(style);
-
-    this.loadedFonts.add(cacheKey);
-    console.log(`[FontService] Loaded font: ${font.fontFamily} (${font.fontVariant})`);
+    this.fontSynthesisInjected = true;
   }
 
   /**
@@ -255,9 +289,8 @@ class FontService {
       cachedFonts = this.getCachedFonts();
     }
 
-    const families = new Set<string>();
+    const loadedVariants = new Set<string>();
     const loadOne = async (fontFamily: string, variant: string) => {
-      families.add(fontFamily);
       let font = this.resolveFont(fontFamily, variant, cachedFonts);
       if (!font) {
         await this.listFonts('all');
@@ -272,6 +305,8 @@ class FontService {
       }
       try {
         await this.loadFont(font);
+        // Backstop wait for exactly the variant the element requested
+        loadedVariants.add(`${font.fontStyle} ${font.fontWeight} 16px "${font.fontFamily}"`);
       } catch (error) {
         console.error(
           `[FontService] Failed to preload font ${fontFamily} (${variant}):`,
@@ -292,8 +327,8 @@ class FontService {
     if (fontsApi?.load) {
       try {
         await Promise.all(
-          Array.from(families).map((family) =>
-            fontsApi.load(`16px "${family}"`).catch(() => {})
+          Array.from(loadedVariants).map((fontSpec) =>
+            fontsApi.load(fontSpec).catch(() => {})
           )
         );
         await fontsApi.ready;

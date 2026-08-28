@@ -240,6 +240,7 @@ services:
       WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
       WORKER_TIMEOUT: ${WORKER_TIMEOUT:-60000}
       RENDER_ENGINE: ${RENDER_ENGINE:-canvas}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api-server:${API_INTERNAL_PORT:-4000}}
     networks:
       - ecards-demo
     depends_on:
