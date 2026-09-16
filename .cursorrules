@@ -262,9 +262,45 @@ AI_UI_SOURCE=/mnt/work/Projects/pilo.ai.ui.logicbison
 
 SOC_SOURCE=/mnt/work/Projects/pilo.ai.soc.logicbison
 
-The agent MUST resolve `.ai.soc/` references from `$SOC_SOURCE` (thin-client mode). When `SOC_SOURCE` is set and readable, read `.ai.soc/skills/<id>/skill.md` from `$SOC_SOURCE/skills/<id>/skill.md`. Skills, standards, concepts, templates, and scripts resolve from the source at runtime. When `SOC_SOURCE` is missing or unreadable, skills resolve locally from this repo's `.ai.soc/` (fat-client mode).
+The agent MUST resolve `.ai.soc/` references from `$SOC_SOURCE` (thin-client mode). When `SOC_SOURCE` is set and readable, read `.ai.soc/skills/<id>/skill.md` from `$SOC_SOURCE/skills/<id>/skill.md`. Skills, templates, and scripts resolve from the source at runtime. When `SOC_SOURCE` is missing or unreadable, skills resolve locally from this repo's `.ai.soc/` (fat-client mode).
 
 **Verify deployment:** `bash $SOC_SOURCE/scripts/soc-deploy-basic.sh verify .` — read-only audit of this `.cursorrules` (SOC_SOURCE correctness/reachability, stale skill handles, `.work.soc/` skeleton, sister frameworks). Exit 0 = coherent. Run after any deploy/update or whenever `SOC_SOURCE` moves.
+
+### Framework paths
+
+Sister frameworks live as siblings on disk, in the directory that holds `$SOC_SOURCE`.
+
+> **Token scope — read before resolving.** In this Security OS section, `{WORK_ROOT}` means the **framework-siblings root** (`dirname $SOC_SOURCE`). It is **not** the token of the same name in § Placeholder map, which means `.work/` (the Agent OS project-memory tree). The two are different paths with different meanings — never carry one into the other.
+
+**`{WORK_ROOT}` resolution (in priority order):**
+
+1. `dirname "$SOC_SOURCE"` — the directory holding the Security OS source. Authoritative, and the same value `soc-deploy-basic.sh verify` reports.
+2. If `SOC_SOURCE` is unset/unreadable: `dirname "$AGENT_OS_SOURCE"`.
+3. If a `WORK_ROOT:` line exists anywhere above this section, use that absolute path instead.
+4. **Never** infer it as the parent of *this* repository. That is only valid inside a framework source repo; in a thin-client consumer its parent holds no frameworks (here `/mnt/data/Projects/EPIC` contains none), so every row below would resolve into the void.
+5. Only after steps 1–3 all fail, stop with a one-line `framework not installed here` message.
+
+| Framework | Dir under `{WORK_ROOT}` | Director |
+|-----------|------------------------|----------|
+| Security OS (`.ai.soc`) | `$SOC_SOURCE` — the thin-client source itself | `@soc-director` |
+| Agent OS (`.ai`) | `pilo.ai.logicbison` (legacy `.ai`) | `@ai-director` |
+| UI Design OS (`.ai.ui`) | `pilo.ai.ui.logicbison` (legacy `.ai.ui`) | `@ui-director` |
+| Business OS (`.ai.biz`) | `pilo.ai.biz.logicbison` (legacy `.ai.biz`) | `@biz-director` |
+| CTO Professor OS (`.ai.cto`) | `pilo.ai.cto.logicbison` (legacy `.ai.cto`) | `@cto-director` |
+| Flutter Agent OS (`.ai.flutter`) | `pilo.ai.flutter.logicbison` (legacy `.ai.flutter`) | `@flutter-director` |
+| MLT Agent OS (`.ai.mlt`) | `pilo.ai.mlt.logicbison` (legacy `.ai.mlt`) | `@mlt-director` |
+
+**Installed here** (measured 2026-09-15, `{WORK_ROOT}` = `/mnt/work/Projects`): all six sisters present as `pilo.ai.<fw>.logicbison`; no legacy `.ai.<fw>` directory exists under `/mnt/work/Projects` or `/mnt/data/Projects`. Confirm with `bash $SOC_SOURCE/scripts/soc-deploy-basic.sh verify .`.
+
+Family naming: `$SOC_SOURCE/scripts/sister-discovery.sh` (`sister_names`) is the single discovery rule and resolves both forms. Derivation depends on the source name:
+- source `pilo.ai.<slot>.logicbison` (a sister framework, e.g. `pilo.ai.soc.logicbison`) → the **slot is replaced**: `+ ui` → `pilo.ai.ui.logicbison`. (Inserting before the last segment instead would wrongly yield `pilo.ai.soc.ui.logicbison`.)
+- source `pilo.ai.logicbison` (family root) → `<fw>` is inserted before the last segment: `+ ui` → `pilo.ai.ui.logicbison`.
+- source `.ai` / `.ai.<fw>` (legacy naming) → resolves `.ai.<fw>` directly.
+- legacy `.ai.<fw>` is always kept as the last-resort candidate.
+
+### Path resolution
+
+`@x-director` (cross-framework free-text router, loaded from Agent OS at `$AGENT_OS_SOURCE/skills/x-director/`) and `@ai-director` resolve frameworks from the table above. Substitute `{WORK_ROOT}` per the resolution rules at the top of this section before reading any framework path. Preflight check before routing: verify the framework's `skills/README.md` exists at the declared path. If absent, stop routing with a one-line `framework not installed here` message — never silently route into the void.
 
 ### SOC context files
 
@@ -284,6 +320,7 @@ The agent MUST resolve `.ai.soc/` references from `$SOC_SOURCE` (thin-client mod
 | `{NEXT_SOC}` | `.work.soc/plans/NEXT_SOC.md` |
 | `{UNKNOWNS_SOC}` | `.work.soc/plans/UNKNOWNS_SOC.md` |
 | `{SKILLS_SOC_ROOT}` | `$SOC_SOURCE/skills/` (from SOC_SOURCE pointer) |
+| `{WORK_ROOT}` | `dirname $SOC_SOURCE` — framework-siblings root, **not** `.work/` (§ Framework paths) |
 
 ### SOC skills
 
@@ -291,11 +328,13 @@ The agent MUST resolve `.ai.soc/` references from `$SOC_SOURCE` (thin-client mod
 |-------|---------|
 | soc-deploy-basic | Bootstrap `.work.soc/` + SOC source pointer (thin-client) |
 | soc-deploy-files | Copy `.ai.soc/` files into target (fat-client) |
-| soc-session | SOC session bookend; start/close/status/context |
+| soc-session | SOC session bookend (start/close/status/context + standalone `commit`/`commit push`); commits scoped to `.work.soc/` in deployed targets (full repo only in the framework source repo) |
 | soc-director | Run penetration tests against targets |
 | soc-gateway | Run .ai.soc from source without system install |
 
 **Sessions:** `@soc-session` — opens and closes SOC sessions
+
+**Reports:** every SOC skill response closes per the Operator handoff contract in `skills/SKILL_DEPENDENCIES.md` (resolved via `$SOC_SOURCE` in thin-client mode) — Form A single line when nothing is needed, otherwise Form B (`**Needs your approval:**` / `**Needs your answer:**` / `**Next step:**`).
 
 ### Data Loss Prevention (SOC deploy invariant)
 
