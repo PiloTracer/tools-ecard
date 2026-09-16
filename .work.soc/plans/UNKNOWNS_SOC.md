@@ -1,13 +1,19 @@
 # UNKNOWNS_SOC — SOC unknowns registry
 
-**Updated:** YYYY-MM-DD · **Maintained by:** soc-bootstrap / soc-assessment
+**Status:** Active · **Updated:** 2026-09-15 · **Needs:** nothing — no open unknowns | **Maintained by:** soc-session
 
 | ID | Question / blocker | Blocks | Owner | Status |
 |----|-------------------|--------|-------|--------|
-| U-SOC-1 | | | | Open |
+| — | (none) | | — |
 
 ## Review log
 
 | Date | Reviewer | Action |
 |------|----------|--------|
-| YYYY-MM-DD | bootstrap | Initial template |
+| 2026-07-16 | bootstrap | Initial template |
+
+---
+
+## Next action
+
+Next action: none — no open unknowns

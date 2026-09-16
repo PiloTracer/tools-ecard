@@ -1,6 +1,6 @@
 # NEXT_SOC — SOC planning backlog
 
-**Updated:** 2026-07-16
+**Status:** Active · **Updated:** 2026-09-15 · **Needs:** nothing — no open SOC work
 
 ---
 
@@ -9,7 +9,8 @@
 | Item | Artifact |
 |------|----------|
 | SOC bootstrap | `.work.soc/` skeleton |
-| License analysis | `.work.soc/analysis/*LICENSE-ANALYSIS.md` |
+
+> No analysis artifact exists yet — `.work.soc/analysis/` holds only `README.md`. A previous "License analysis" row pointed at `.work.soc/analysis/*LICENSE-ANALYSIS.md`, a file that was never created (corrected 2026-09-15).
 
 ---
 
@@ -26,34 +27,17 @@
 | Priority | Item | Notes |
 |----------|------|-------|
 | **0** | Review `.work.soc/context/HANDOFF_SOC.md` | Orient on current state |
-| **1** | Run first SOC assessment | `@soc-assessment run --target <path>` |
+| **1** | Run first SOC assessment | `@soc-director - scan <target>` |
 | **2** | Verify skills load from source or parent `.ai/` | Run `@soc-session start`; register via parent `.ai/opencode.json` when co-installed |
 
 ---
 
 ## Current SOC iteration
 
-```markdown
-## Current iteration — SOC-{N}: <iteration name>
+None active — no SOC assessment has been scoped yet. When one starts, `@soc-session` opens the iteration block here.
 
-**Status:** planning | in-progress | complete
-**Started:** (none)
+---
 
-### In scope
-- …
+## Next action
 
-### Out of scope
-- …
-
-### Tasks
-| ID | Description | Files | Status | Notes |
-|----|-------------|-------|--------|-------|
-| SOC-{N}-T1 | … | … | pending | |
-
-### Owner blockers
-- none
-
-### Done this iteration
-| Task | Completed | Notes |
-|------|-----------|-------|
-```
+`@soc-session start`

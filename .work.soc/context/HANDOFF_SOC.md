@@ -1,14 +1,16 @@
 # HANDOFF_SOC — Security OS session boundary
 
+**Status:** Active · **Needs:** nothing — no open SOC work
+
 ## Session status
 
 **Open:** -
 
-**Updated:** 2026-07-16
+**Updated:** 2026-09-15
 
 **Closed:** -
 
-**Repository state:** SOC scaffold only (thin-client `SOC_SOURCE=/mnt/work/Projects/.ai.soc`). No active SOC assessment yet.
+**Repository state:** SOC scaffold only (thin-client `SOC_SOURCE=/mnt/work/Projects/pilo.ai.soc.logicbison`). No active SOC assessment yet.
 
 **Recommended pick-up file:** `.work.soc/plans/NEXT_SOC.md`
 
@@ -18,21 +20,21 @@
 
 ## Fresh start — what the next SOC session should do first
 
-1. Run **`@session-control start`** (from `.ai/`).
+1. Run **`@soc-session start`**.
 2. Read **`.cursorrules`** (`.ai.soc` section).
 3. Read this file through § Fresh start, then § Open owner actions.
 4. Read `.work.soc/plans/NEXT_SOC.md`.
 5. Read `.work.soc/plans/UNKNOWNS_SOC.md`.
 
-End with **`@session-control close`** (add `commit` / `commit push` only when requested).
+End with **`@soc-session close`** (add `commit` / `commit push` only when requested). For mid-session checkpoints use **`@soc-session commit`** or **`@soc-session commit push`** (no close).
 
 ### Conditional reads
 
 | If the task touches… | Read first |
 |----------------------|------------|
-| Security testing / pentesting | `.ai.soc/standards/*testing*`, Strix documentation |
-| License / compliance | `.ai.soc/standards/*compliance*` |
-| Threat model | `.ai.soc/standards/*threat-model*` |
+| Security testing / pentesting | `skills/soc-director/skill.md`, Strix documentation |
+| License / compliance | Analysis template in `.work.soc/analysis/README.md` |
+| Threat model | Analysis template in `.work.soc/analysis/README.md` (STRIDE) |
 | New SOC plan | `.work.soc/plans/NEXT_SOC.md` |
 
 ---
@@ -58,3 +60,9 @@ End with **`@session-control close`** (add `commit` / `commit push` only when re
 | ID | Summary | Blocks |
 |----|---------|--------|
 | - | | |
+
+---
+
+## Next action
+
+`@soc-session start`

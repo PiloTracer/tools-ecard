@@ -6,11 +6,11 @@
 
 **Open:** closed
 
-**Updated:** 2026-08-14
+**Updated:** 2026-09-15 (state corrected; last UI session 2026-08-14)
 
 **Closed:** 2026-08-14
 
-**UI layer state:** Bootstrap complete — ready for foundation. Thin-client: `AI_UI_SOURCE=/mnt/work/Projects/.ai.ui`.
+**UI layer state:** Bootstrap **and foundation complete**; cycle S0–S4 shipped (16 primitives, 4 screens rebuilt from 4 Approved SPECs, tokens live in `front-cards/app/globals.css`). Thin-client: `AI_UI_SOURCE=/mnt/work/Projects/pilo.ai.ui.logicbison`.
 
 **Recommended pick-up:** `.work.ui/plans/NEXT_UI.md`
 
@@ -39,7 +39,7 @@
 
 ## Active UI milestone
 
-- **Milestone:** (none)
+- **Milestone:** none active — last completed: **S4 template-designer** (2026-08-14)
 - **NEXT_UI:** [.work.ui/plans/NEXT_UI.md](../plans/NEXT_UI.md)
 
 ---
